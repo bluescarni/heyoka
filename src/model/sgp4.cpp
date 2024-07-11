@@ -853,6 +853,8 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     // NOTE: we have a rough estimate of <~50 flops for a single execution of sgp4_date_to_tdelta().
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
     // parallelisation if we have 200 satellites or more.
+    // NOTE: as an alternative, if we had double-length add/sub in the expression system,
+    // we could do the transformation on-line as we evaluate the sgp4 propagation.
     if (n_sats >= 200u) {
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
                                   [&tms_vec, dates, this, n_sats](const auto &range) {
