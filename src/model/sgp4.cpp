@@ -136,7 +136,16 @@ auto sgp4_init()
     const auto N0DP = N0 / (1. + DEL0);
 
     // Initialization for new element set.
-    const auto A0DP = A0 / (1. - DEL0);
+    //
+    // NOTE: for the computation of A0DP we use the new C++ code. The original
+    // Fortran code used this instead:
+    //
+    // A0DP = A0/(1.-DEL0)
+    //
+    // Not entirely sure how these two definitions
+    // relate - perhaps the original one is an
+    // approximated form of the updated one?
+    const auto A0DP = pow(KE / N0DP, TOTHRD);
     const auto PERIGE = A0DP * (1. - E0) - 1.;
     const auto S = MIN(MAX(S0, PERIGE - S1), S1);
     const auto S4 = 1. + S;
@@ -153,7 +162,8 @@ auto sgp4_init()
                        + 0.75 * CK2 * XI / PSISQ * X3THM1 * (8. + 3. * ETASQ * (8. + ETASQ)));
 
     const auto SINI0 = sin(I0);
-    const auto C3 = COEF * XI * A3OVK2 * N0DP * SINI0 / E0;
+    // NOTE: fix for low eccentricity.
+    const auto C3 = select(gt(E0, 1.0e-4), COEF * XI * A3OVK2 * N0DP * SINI0 / E0, 0.);
     const auto X1MTH2 = 1. - THETA2;
     const auto C4 = 2. * N0DP * COEF1 * A0DP * BETA02
                     * (ETA * (2. + .5 * ETASQ) + E0 * (.5 + 2. * ETASQ)
@@ -171,10 +181,13 @@ auto sgp4_init()
     const auto HDOT1 = -TEMP1 * COSI0;
     const auto N0DOT = HDOT1 + (.5 * TEMP2 * (4. - 19. * THETA2) + 2. * TEMP3 * (3. - 7. * THETA2)) * COSI0;
     const auto OMGCOF = BSTAR * C3 * cos(OMEGA0);
-    const auto MCOF = -TOTHRD * COEF * BSTAR / EETA;
+    // NOTE: fix for low eccentricity.
+    const auto MCOF = select(gt(E0, 1.0e-4), -TOTHRD * COEF * BSTAR / EETA, 0.);
     const auto NODCF = 3.5 * BETA02 * HDOT1 * C1;
     const auto T2COF = 1.5 * C1;
-    const auto LCOF = .125 * A3OVK2 * SINI0 * (3. + 5. * COSI0) / (1. + COSI0);
+    // NOTE: fix for inclination close to 180 degrees.
+    const auto LCOF
+        = .125 * A3OVK2 * SINI0 * (3. + 5. * COSI0) / select(gt(ABS(1. + COSI0), 1.5e-12), 1. + COSI0, 1.5e-12);
     const auto AYCOF = .25 * A3OVK2 * SINI0;
     const auto DELM0 = pow(1. + ETA * cos(M0), 3.);
     const auto SINM0 = sin(M0);
@@ -234,7 +247,9 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     TEMPL = TEMPL + select(gte(PERIGE, SIMPHT), (T3COF + (T4COF + T5COF * TSINCE) * TSINCE) * TSINCE, 0.);
     const auto A = A0DP * pow(TEMPA, 2.);
     const auto N = KE / pow(A, 3. / 2);
-    const auto E = E0 - TEMPE * BSTAR;
+    auto E = E0 - TEMPE * BSTAR;
+    // NOTE: fix for low eccentricity.
+    E = select(lt(E, 1e-6), 1e-6, E);
     TEMPL = TEMPL * pow(TSINCE, 2.);
 
     // Long period periodics.
@@ -329,13 +344,13 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
 //
 // (which is easier to read because it avoids GOTOs).
 //
-// In the unit tests, we are comparing a few propagations with those produced
-// by the 'official' C++ code:
+// We also incorporate the updates to the original SGP4 algorithm from the official C++ code:
 //
 // https://celestrak.org/software/vallado-sw.php
 //
-// The agreement seems fairly good, with the positional error always
-// well below the mm range.
+// These involve a handful of checks for special cases (low eccentricity or
+// inclination close to 180 degrees) that may cause numerical issues, and an updated
+// way to "un-Kozai" the mean motion. These updates are noted in the comments.
 std::vector<expression> sgp4()
 {
     const auto init = sgp4_init();
