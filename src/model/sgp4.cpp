@@ -511,6 +511,9 @@ struct sgp4_propagator<T>::impl {
     std::vector<T> m_init_buffer;
     cfunc<T> m_cf_tprop;
     std::optional<dtens> m_dtens;
+    // NOTE: this is a buffer used to convert dates to tsinces in the call operator
+    // overloads taking dates in input.
+    std::vector<T> m_tms_vec;
 
     // Serialization.
     template <typename Archive>
@@ -520,6 +523,7 @@ struct sgp4_propagator<T>::impl {
         ar & m_init_buffer;
         ar & m_cf_tprop;
         ar & m_dtens;
+        // NOTE: no need to save the content of m_tms_vec.
     }
 };
 
@@ -634,7 +638,7 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
 
     // Build and assign the implementation.
     m_impl = std::make_unique<impl>(
-        impl{std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(dt)});
+        impl{std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(dt), {}});
 }
 
 template <typename T>
@@ -843,10 +847,7 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     // We need to convert the dates into time deltas suitable for use in the other call operator overload.
 
     // Prepare the memory buffer.
-    // NOTE: this could also be an internal buffer to be re-used across different
-    // invocations of the call operators. Like this, we would avoid a memory allocation
-    // for each call operator invocation. Worth it?
-    std::vector<T> tms_vec;
+    auto &tms_vec = m_impl->m_tms_vec;
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
 
@@ -987,7 +988,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 
     // Prepare the memory buffer.
     const auto n_evals = dates.extent(0);
-    std::vector<T> tms_vec;
+    auto &tms_vec = m_impl->m_tms_vec;
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::safe_numerics::safe<tms_vec_size_t>(n_evals) * dates.extent(1));
 

@@ -183,6 +183,11 @@ public:
     using out_3d = mdspan<T, dextents<std::size_t, 3>>;
     // NOTE: it is important to document properly the non-overlapping
     // memory requirement for the input arguments.
+    // NOTE: because of the use of an internal buffer to convert
+    // dates to tsinces, the date overloads of these operators are
+    // never thread-safe. This needs to be documented properly.
+    // Perhaps this can be fixed one day if we implement the conversion
+    // to dates on-the-fly via double-length primitives.
     void operator()(out_2d, in_1d<T>);
     void operator()(out_2d, in_1d<date>);
     void operator()(out_3d, in_2d<T>);

@@ -14,6 +14,13 @@ New
 - Add relational and logical operators to the expression system
   (`#432 <https://github.com/bluescarni/heyoka/pull/432>`__).
 
+Changes
+~~~~~~~
+
+- Reduce the maximum number of iterations in the Kepler solvers
+  and do not log if the iteration limit is reached
+  (`#434 <https://github.com/bluescarni/heyoka/pull/434>`__).
+
 Fix
 ~~~
 
