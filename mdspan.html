@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>mdspan &#8212; heyoka 5.1.0 documentation</title>
+    <title>Multidimensional array views &#8212; heyoka 5.1.0 documentation</title>
   
   
   
@@ -183,7 +183,7 @@
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">mdspan</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Multidimensional array views</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -390,7 +390,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>mdspan</h1>
+    <h1>Multidimensional array views</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -414,8 +414,8 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="mdspan">
-<h1>mdspan<a class="headerlink" href="#mdspan" title="Link to this heading">#</a></h1>
+  <section id="multidimensional-array-views">
+<h1>Multidimensional array views<a class="headerlink" href="#multidimensional-array-views" title="Link to this heading">#</a></h1>
 <p><em>#include &lt;heyoka/mdspan.hpp&gt;</em></p>
 <p>In order to interact with and represent multidimensional array views,
 heyoka includes a <a class="reference external" href="https://github.com/kokkos/mdspan">reference implementation</a>
@@ -434,9 +434,6 @@ and <a class="reference external" href="https://github.com/kokkos/mdspan/wiki/A-
 <dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE">
 <span id="_CPPv3I0_DpNSt6size_tEEN6heyoka7extentsE"></span><span id="_CPPv2I0_DpNSt6size_tEEN6heyoka7extentsE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Extents</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">extents</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">extents</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="heyoka::extents::IndexType"><span class="n"><span class="pre">IndexType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="heyoka::extents::Extents"><span class="n"><span class="pre">Extents</span></span></a><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE">
 <span id="_CPPv3I0_NSt6size_tEEN6heyoka8dextentsE"></span><span id="_CPPv2I0_NSt6size_tEEN6heyoka8dextentsE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rank</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dextents</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">dextents</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="heyoka::dextents::IndexType"><span class="n"><span class="pre">IndexType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="heyoka::dextents::Rank"><span class="n"><span class="pre">Rank</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Classes representing static and dynamic extents.</p>

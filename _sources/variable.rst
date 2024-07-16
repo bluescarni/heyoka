@@ -37,10 +37,10 @@ The :cpp:class:`~heyoka::variable` class
       :exception: any exception thrown by the copy constructor of ``std::string``.
 
    .. cpp:function:: variable(const variable &)
-   .. cpp:function:: variable(variable &&) noexcept
-   .. cpp:function:: variable &operator=(const variable &)
-   .. cpp:function:: variable &operator=(variable &&) noexcept
-   .. cpp:function:: ~variable()
+                     variable(variable &&) noexcept
+                     variable &operator=(const variable &)
+                     variable &operator=(variable &&) noexcept
+                     ~variable()
 
       Variables are copy/move constructible, copy/move assignable and destructible.
 
@@ -79,7 +79,7 @@ Operators
 ---------
 
 .. cpp:function:: bool operator==(const variable &a, const variable &b) noexcept
-.. cpp:function:: bool operator!=(const variable &a, const variable &b) noexcept
+                  bool operator!=(const variable &a, const variable &b) noexcept
 
    Equality comparison operators.
 

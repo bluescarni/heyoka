@@ -31,10 +31,10 @@ The :cpp:class:`~heyoka::number` class
       The default constructor initialises the internal union with the ``0.`` literal.
 
    .. cpp:function:: number(const number &)
-   .. cpp:function:: number(number &&) noexcept
-   .. cpp:function:: number &operator=(const number &)
-   .. cpp:function:: number &operator=(number &&) noexcept
-   .. cpp:function:: ~number()
+                     number(number &&) noexcept
+                     number &operator=(const number &)
+                     number &operator=(number &&) noexcept
+                     ~number()
 
       Numbers are copy/move constructible, copy/move assignable and destructible.
 
@@ -43,10 +43,10 @@ The :cpp:class:`~heyoka::number` class
       :exception: any exception thrown by the copy constructor/copy assignment operator of :cpp:class:`mppp::real`.
 
    .. cpp:function:: explicit number(float x) noexcept
-   .. cpp:function:: explicit number(double x) noexcept
-   .. cpp:function:: explicit number(long double x) noexcept
-   .. cpp:function:: explicit number(mppp::real128 x) noexcept
-   .. cpp:function:: explicit number(mppp::real x)
+                     explicit number(double x) noexcept
+                     explicit number(long double x) noexcept
+                     explicit number(mppp::real128 x) noexcept
+                     explicit number(mppp::real x)
 
       .. note::
 
@@ -92,7 +92,7 @@ Operators
 ---------
 
 .. cpp:function:: number operator+(number n)
-.. cpp:function:: number operator-(const number &n)
+                  number operator-(const number &n)
 
    The :cpp:class:`~heyoka::number` class supports the identity and negation operators.
 
@@ -103,9 +103,9 @@ Operators
    :exception: any exception raised by the constructors of :cpp:class:`~heyoka::number`.
 
 .. cpp:function:: number operator+(const number &x, const number &y)
-.. cpp:function:: number operator-(const number &x, const number &y)
-.. cpp:function:: number operator*(const number &x, const number &y)
-.. cpp:function:: number operator/(const number &x, const number &y)
+                  number operator-(const number &x, const number &y)
+                  number operator*(const number &x, const number &y)
+                  number operator/(const number &x, const number &y)
 
    The :cpp:class:`~heyoka::number` class supports elementary binary arithmetics.
 
@@ -122,7 +122,7 @@ Operators
    :exception std\:\:invalid_argument: if the active types of *x* and *y* differ and they don't support mixed-mode airthmetics.
 
 .. cpp:function:: bool operator==(const number &x, const number &y) noexcept
-.. cpp:function:: bool operator!=(const number &x, const number &y) noexcept
+                  bool operator!=(const number &x, const number &y) noexcept
 
    Equality comparison operators.
 

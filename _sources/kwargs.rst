@@ -3,6 +3,8 @@
 Keyword arguments
 =================
 
+*#include <heyoka/kw.hpp>*
+
 heyoka makes extensive use of the `igor library <https://github.com/bluescarni/igor>`__ to implement
 keyword/named arguments.
 

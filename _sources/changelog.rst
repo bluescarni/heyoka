@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a fully differentiable implementation of the SGP4 analytical propagator
+  (`#433 <https://github.com/bluescarni/heyoka/pull/433>`__).
 - Add the ``select()`` primitive to the expression system
   (`#432 <https://github.com/bluescarni/heyoka/pull/432>`__).
 - Add relational and logical operators to the expression system
