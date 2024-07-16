@@ -290,8 +290,8 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     auto &context = s.context();
     auto &builder = s.builder();
 
-    // Are we in fast math mode?
-    const auto use_fast_math = builder.getFastMathFlags().isFast();
+    // Can we use the faster but less precise vectorised implementations?
+    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
 
     if (!vfi.empty()) {
         // There exist vector variants of the scalar function.
@@ -546,8 +546,8 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     auto &builder = s.builder();
 
-    // Are we in fast math mode?
-    const auto use_fast_math = builder.getFastMathFlags().isFast();
+    // Can we use the faster but less precise vectorised implementations?
+    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
 
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
@@ -692,8 +692,8 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
 
     auto &builder = s.builder();
 
-    // Are we in fast math mode?
-    const auto use_fast_math = builder.getFastMathFlags().isFast();
+    // Can we use the faster but less precise vectorised implementations?
+    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
 
     // Determine the type and scalar type of the arguments.
     auto *x_t = arg_types[0];
@@ -2720,7 +2720,7 @@ namespace
 class fmf_disabler
 {
     ir_builder *m_builder;
-    llvm::FastMathFlags m_orig_fmf;
+    const llvm::FastMathFlags m_orig_fmf;
 
 public:
     explicit fmf_disabler(ir_builder &b) : m_builder(&b), m_orig_fmf(m_builder->getFastMathFlags())
