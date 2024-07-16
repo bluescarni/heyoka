@@ -23,6 +23,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/models.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -30,6 +31,7 @@
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/var_ode_sys.hpp>
 #include <heyoka/variable.hpp>
 
 #endif

@@ -39,7 +39,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          conda install -y cmake llvmdev tbb-devel tbb libboost-devel xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp=1.*'
+          conda install -y cmake llvmdev tbb-devel tbb libboost-devel xtensor xtensor-blas blas blas-devel 'fmt<11' spdlog sleef zlib libzlib 'mppp=1.*'
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 17 2022" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes

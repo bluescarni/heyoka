@@ -766,7 +766,7 @@ concept cfunc_in_range_1d = requires(R &r) {
 template <typename T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 {
-    struct HEYOKA_DLL_PUBLIC impl;
+    struct impl;
 
     std::unique_ptr<impl> m_impl;
 
@@ -823,12 +823,30 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 
     HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 
+    // Small helper to turn an input range into a vector of expressions.
+    template <typename R>
+    static auto rng_to_vecex(R &&r)
+    {
+        auto tv = r | std::views::transform([]<typename U>(U &&x) { return expression{std::forward<U>(x)}; });
+
+        return std::vector(std::ranges::begin(tv), std::ranges::end(tv));
+    }
+
 public:
     cfunc() noexcept;
     template <typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
         : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
+    {
+    }
+    template <typename R1, typename R2, typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>()) && std::ranges::input_range<R1>
+                && std::constructible_from<expression, std::ranges::range_reference_t<R1>>
+                && std::ranges::input_range<R2>
+                && std::constructible_from<expression, std::ranges::range_reference_t<R2>>
+    explicit cfunc(R1 &&rng1, R2 &&rng2, const KwArgs &...kw_args)
+        : cfunc(rng_to_vecex(std::forward<R1>(rng1)), rng_to_vecex(std::forward<R2>(rng2)), kw_args...)
     {
     }
     cfunc(const cfunc &);

@@ -34,20 +34,14 @@ namespace detail
 
 // Machinery to detect std::function.
 template <typename>
-struct is_any_std_func : std::false_type {
-};
+inline constexpr bool is_any_std_func = false;
 
 template <typename R, typename... Args>
-struct is_any_std_func<std::function<R(Args...)>> : std::true_type {
-};
-
-template <typename T>
-inline constexpr bool is_any_std_func_v = is_any_std_func<T>::value;
+inline constexpr bool is_any_std_func<std::function<R(Args...)>> = true;
 
 // Detect callable instances.
 template <typename>
-struct is_any_callable : std::false_type {
-};
+inline constexpr bool is_any_callable = false;
 
 // An empty struct used in the default initialisation
 // of callable objects.
@@ -79,7 +73,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Ar
 
         if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
             return getval<Holder>(this) != nullptr;
-        } else if constexpr (is_any_callable<unrefT>::value || is_any_std_func_v<unrefT>) {
+        } else if constexpr (is_any_callable<unrefT> || is_any_std_func<unrefT>) {
             return static_cast<bool>(getval<Holder>(this));
         } else {
             return true;
@@ -183,8 +177,7 @@ using callable_wrap_t = tanuki::wrap<callable_iface<R, Args...>, callable_wrap_c
 
 // Specialise is_any_callable to detect callables.
 template <typename R, typename... Args>
-struct is_any_callable<detail::callable_wrap_t<R, Args...>> : std::true_type {
-};
+inline constexpr bool is_any_callable<detail::callable_wrap_t<R, Args...>> = true;
 
 template <typename T>
 struct callable_impl {

@@ -45,14 +45,10 @@ The :cpp:class:`expression` class
       This constructor initialises the expression to a double-precision :ref:`number <api_number>` with a value of zero.
 
    .. cpp:function:: explicit expression(float x) noexcept
-
-   .. cpp:function:: explicit expression(double x) noexcept
-
-   .. cpp:function:: explicit expression(long double x) noexcept
-
-   .. cpp:function:: explicit expression(mppp::real128 x) noexcept
-
-   .. cpp:function:: explicit expression(mppp::real x)
+                     explicit expression(double x) noexcept
+                     explicit expression(long double x) noexcept
+                     explicit expression(mppp::real128 x) noexcept
+                     explicit expression(mppp::real x)
 
       Constructors from floating-point objects.
 
@@ -75,12 +71,9 @@ The :cpp:class:`expression` class
       :exception: any exception thrown by the copy constructor of ``std::string``.
 
    .. cpp:function:: explicit expression(number x)
-
-   .. cpp:function:: explicit expression(variable x)
-
-   .. cpp:function:: explicit expression(func x) noexcept
-
-   .. cpp:function:: explicit expression(param x) noexcept
+                     explicit expression(variable x)
+                     explicit expression(func x) noexcept
+                     explicit expression(param x) noexcept
 
       Constructors from objects of the node types.
 
@@ -91,14 +84,10 @@ The :cpp:class:`expression` class
       :exception: any exception raised by the copy constructor of :cpp:class:`number` or :cpp:class:`variable`.
 
    .. cpp:function:: expression(const expression &)
-
-   .. cpp:function:: expression(expression &&) noexcept
-
-   .. cpp:function:: expression &operator=(const expression &)
-
-   .. cpp:function:: expression &operator=(expression &&) noexcept
-
-   .. cpp:function:: ~expression()
+                     expression(expression &&) noexcept
+                     expression &operator=(const expression &)
+                     expression &operator=(expression &&) noexcept
+                     ~expression()
 
       Expressions are copy/move constructible/assignable and destructible.
 
@@ -164,8 +153,7 @@ Comparison operators
 ^^^^^^^^^^^^^^^^^^^^
 
 .. cpp:function:: bool operator==(const expression &e1, const expression &e2) noexcept
-
-.. cpp:function:: bool operator!=(const expression &e1, const expression &e2) noexcept
+                  bool operator!=(const expression &e1, const expression &e2) noexcept
 
    Expression (in)equality.
 
@@ -184,15 +172,9 @@ User-defined literals
 ---------------------
 
 .. cpp:function:: expression literals::operator""_flt(long double)
-
-.. cpp:function:: expression literals::operator""_flt(unsigned long long)
-
-.. cpp:function:: expression literals::operator""_dbl(long double)
-
-.. cpp:function:: expression literals::operator""_dbl(unsigned long long)
-
-.. cpp:function:: expression literals::operator""_ldbl(long double)
-
-.. cpp:function:: expression literals::operator""_ldbl(unsigned long long)
-
-.. cpp:function:: template <char... Chars> expression literals::operator""_f128()
+                  expression literals::operator""_flt(unsigned long long)
+                  expression literals::operator""_dbl(long double)
+                  expression literals::operator""_dbl(unsigned long long)
+                  expression literals::operator""_ldbl(long double)
+                  expression literals::operator""_ldbl(unsigned long long)
+                  template <char... Chars> expression literals::operator""_f128()

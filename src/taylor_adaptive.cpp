@@ -2004,7 +2004,7 @@ const dtens::sv_idx_t &taylor_adaptive<T>::get_mindex(std::uint32_t i) const
     return (dt.begin() + boost::numeric_cast<decltype(dt.begin() - dt.begin())>(i))->first;
 }
 
-// Explicit instantiations
+// Explicit instantiations.
 // NOLINTBEGIN
 #define HEYOKA_TAYLOR_ADAPTIVE_INST(F)                                                                                 \
     template class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                              \

@@ -1,5 +1,5 @@
-mdspan
-======
+Multidimensional array views
+============================
 
 .. cpp:namespace-push:: heyoka
 
@@ -20,8 +20,7 @@ function call operator.
    and `tutorial <https://github.com/kokkos/mdspan/wiki/A-Gentle-Introduction-to-mdspan>`__.
 
 .. cpp:type:: template <typename IndexType, std::size_t... Extents> extents = std::experimental::extents<IndexType, Extents...>
-
-.. cpp:type:: template <typename IndexType, std::size_t Rank> dextents = std::experimental::dextents<IndexType, Rank>
+              template <typename IndexType, std::size_t Rank> dextents = std::experimental::dextents<IndexType, Rank>
 
    Classes representing static and dynamic extents.
 

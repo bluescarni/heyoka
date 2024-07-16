@@ -27,10 +27,10 @@ The :cpp:class:`~heyoka::func_base` class
       :exception std\:\:invalid_argument: if *name* is empty.
 
    .. cpp:function:: func_base(const func_base &)
-   .. cpp:function:: func_base(func_base &&) noexcept
-   .. cpp:function:: func_base &operator=(const func_base &)
-   .. cpp:function:: func_base &operator=(func_base &&) noexcept
-   .. cpp:function:: ~func_base()
+                     func_base(func_base &&) noexcept
+                     func_base &operator=(const func_base &)
+                     func_base &operator=(func_base &&) noexcept
+                     ~func_base()
 
       :cpp:class:`func_base` is copy/move constructible, copy/move assignable and destructible.
 
@@ -87,10 +87,10 @@ The :cpp:class:`~heyoka::func` class
       :exception: any exception thrown by memory allocation failures or by the copy/move constructor of the user-defined function *x*.
 
    .. cpp:function:: func(const func &) noexcept
-   .. cpp:function:: func(func &&) noexcept
-   .. cpp:function:: func &operator=(const func &) noexcept
-   .. cpp:function:: func &operator=(func &&) noexcept
-   .. cpp:function:: ~func()
+                     func(func &&) noexcept
+                     func &operator=(const func &) noexcept
+                     func &operator=(func &&) noexcept
+                     ~func()
 
       :cpp:class:`func` is copy/move constructible, copy/move assignable and destructible.
 

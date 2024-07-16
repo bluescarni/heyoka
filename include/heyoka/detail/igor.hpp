@@ -48,6 +48,14 @@ struct tagged_container {
 
 } // namespace detail
 
+// Helper to turn a tagged container into another tagged container
+// containing a const reference to the original reference.
+template <typename Tag, typename T>
+auto as_const_kwarg(const detail::tagged_container<Tag, T> &tc)
+{
+    return detail::tagged_container<Tag, decltype(std::as_const(tc.value))>{std::as_const(tc.value)};
+}
+
 // Class to represent a named argument.
 template <typename Tag, typename ExplicitType = void, typename VoidCondition = void>
 struct named_argument {

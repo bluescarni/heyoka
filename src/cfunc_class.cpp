@@ -31,6 +31,7 @@
 #include <oneapi/tbb/enumerable_thread_specific.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/parallel_invoke.h>
+#include <oneapi/tbb/task_arena.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -248,8 +249,8 @@ cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
 template <typename T>
 cfunc<T>::cfunc(const cfunc &other)
     : m_impl(
-        // NOTE: support copy-construction from invalid object.
-        other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr)
+          // NOTE: support copy-construction from invalid object.
+          other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr)
 {
 }
 
@@ -679,7 +680,19 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                               // Fetch the local function pointer.
                                               auto *fptr_batch_s = ets_batch.local().second;
 
-                                              batch_iter(fptr_batch_s, range);
+                                              // NOTE: there are well-known pitfalls when using thread-specific
+                                              // storage with nested parallelism:
+                                              //
+                                              // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
+                                              //
+                                              // If parallel mode is active in the cfunc, then the current thread
+                                              // will block as execution in the parallel region of the cfunc begins. The
+                                              // blocked thread could then grab another task from the parallel for loop
+                                              // we are currently in, and it would then start writing for a second time
+                                              // into the same compact-mode tape it already begun writing into,
+                                              // leading to incorrect results.
+                                              oneapi::tbb::this_task_arena::isolate(
+                                                  [&]() { batch_iter(fptr_batch_s, range); });
                                           });
             },
             scalar_rem);
@@ -849,8 +862,8 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
 #endif
             } else {
 #if defined(HEYOKA_ARCH_PPC)
-		// Double-double implementation.
-		return 5;
+                // Double-double implementation.
+                return 5;
 #else
                 static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
 #endif
@@ -858,7 +871,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
         }
 #if defined(HEYOKA_HAVE_REAL128)
         else if constexpr (std::same_as<mppp::real128, T>) {
-            // mppp::real128.
 #if defined(HEYOKA_ARCH_PPC)
             return 10;
 #else
@@ -868,7 +880,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
 #endif
 #if defined(HEYOKA_HAVE_REAL)
         else if constexpr (std::same_as<mppp::real, T>) {
-            // mppp::real.
             // NOTE: this should be improved to take into account
             // the selected precision.
             // NOTE: for reference, mppp::real with 113 bits of precision
