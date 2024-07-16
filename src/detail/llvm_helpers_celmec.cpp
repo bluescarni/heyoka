@@ -53,9 +53,7 @@
 
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -481,7 +479,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // number of iterations has been exceeded).
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
-    auto *max_iter = builder.getInt32(50);
+    auto *max_iter = builder.getInt32(20);
     auto loop_cond = [&]() -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(E) and on the magnitude of the bounding
@@ -598,10 +596,6 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
             auto *new_val = builder.CreateSelect(
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
-
-            llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
-                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
         },
         []() {});
 
@@ -869,7 +863,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // number of iterations has been exceeded).
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
-    auto *max_iter = builder.getInt32(50);
+    auto *max_iter = builder.getInt32(20);
     auto loop_cond = [&]() -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(F) and on the magnitude of the bounding
@@ -980,10 +974,6 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
             auto *new_val = builder.CreateSelect(
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
-
-            llvm_invoke_external(s, "heyoka_inv_kep_F_max_iter", builder.getVoidTy(), {},
-                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
         },
         []() {});
 
@@ -1184,7 +1174,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     // number of iterations has been exceeded).
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
-    auto *max_iter = builder.getInt32(50);
+    auto *max_iter = builder.getInt32(20);
     auto loop_cond = [&]() -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(DE) and on the magnitude of the bounding
@@ -1295,10 +1285,6 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
             auto *new_val = builder.CreateSelect(
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
-
-            llvm_invoke_external(s, "heyoka_inv_kep_DE_max_iter", builder.getVoidTy(), {},
-                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
         },
         []() {});
 
@@ -1333,28 +1319,3 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
-
-// LCOV_EXCL_START
-
-// NOTE: these functions will be called when numerical root finding exceeds the maximum number
-// of allowed iterations.
-extern "C" {
-
-HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
-{
-    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
-}
-
-HEYOKA_DLL_PUBLIC void heyoka_inv_kep_F_max_iter() noexcept
-{
-    heyoka::detail::get_logger()->warn(
-        "iteration limit exceeded while solving the inverse Kepler equation for the eccentric longitude F");
-}
-
-HEYOKA_DLL_PUBLIC void heyoka_inv_kep_DE_max_iter() noexcept
-{
-    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the inverse Kepler equation for DE");
-}
-}
-
-// LCOV_EXCL_STOP
