@@ -701,10 +701,6 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
     // Cache nsats.
     const auto nsats = get_nsats();
 
-    if (new_data.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument("Cannot replace the satellite data with a null array");
-    }
-
     if (new_data.extent(1) != nsats) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid array provided to replace_sat_data(): the number of "
                                                 "columns ({}) does not match the number of satellites ({})",
@@ -900,9 +896,6 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
 {
     // Check the dates array.
-    if (dates.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument("A null array of dates was passed to the call operator of an sgp4_propagator");
-    }
     const auto n_sats = get_nsats();
     if (dates.extent(0) != n_sats) [[unlikely]] {
         throw std::invalid_argument(
@@ -948,23 +941,6 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
 {
-    // NOTE: need to check for nullptr input spans. In the non-batch overload
-    // we do not need the explicit check because we don't do anything with 'out'
-    // and 'tms' apart from forwarding them to the cfunc, which does the nullptr check.
-    // Here however we need to take subspans of 'out' and 'tms' and thus we need to
-    // pre-check for nullptr in order to avoid undefined behaviour - see the docs for
-    // the def ctor of mdspan:
-    //
-    // https://en.cppreference.com/w/cpp/container/mdspan/mdspan
-    if (out.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null output array was passed to the batch-mode call operator of an sgp4_propagator");
-    }
-    if (tms.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null times array was passed to the batch-mode call operator of an sgp4_propagator");
-    }
-
     // Check the dimensionalities of out and tms.
     const auto n_evals = out.extent(0);
     if (n_evals != tms.extent(0)) [[unlikely]] {
@@ -1039,10 +1015,6 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 {
     // Check the dates array.
-    if (dates.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null array of dates was passed to the batch-mode call operator of an sgp4_propagator");
-    }
     const auto n_sats = get_nsats();
     if (dates.extent(1) != n_sats) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
