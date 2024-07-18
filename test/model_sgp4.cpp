@@ -726,3 +726,124 @@ TEST_CASE("s11n")
     REQUIRE(prop.get_nsats() == 2u);
     REQUIRE(sat_data == new_sat_data);
 }
+
+TEST_CASE("replace_sat_data")
+{
+    using Catch::Matchers::Message;
+
+    detail::edb_disabler ed;
+
+    using prop_t = model::sgp4_propagator<double>;
+
+    using md_input_t = mdspan<const double, extents<std::size_t, 9, std::dynamic_extent>>;
+
+    const std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                     revday2radmin(15.50103472202482),
+                                     0.0024963,
+                                     0.0007417,
+                                     deg2rad(90.2039),
+                                     deg2rad(51.6439),
+                                     deg2rad(55.5633),
+                                     deg2rad(211.2001),
+                                     deg2rad(320.5956),
+                                     deg2rad(17.6667),
+                                     deg2rad(91.4738),
+                                     deg2rad(85.6398),
+                                     0.75863e-3,
+                                     .38792e-4,
+                                     2460486.5,
+                                     2458826.5,
+                                     0.6478633000000116,
+                                     0.6933954099999937};
+
+    prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 1};
+
+    // Build a second propagator with the two satellites' data swapped.
+    std::vector<double> ins2 = {revday2radmin(15.50103472202482),
+                                revday2radmin(13.75091047972192),
+                                0.0007417,
+                                0.0024963,
+                                deg2rad(51.6439),
+                                deg2rad(90.2039),
+                                deg2rad(211.2001),
+                                deg2rad(55.5633),
+                                deg2rad(17.6667),
+                                deg2rad(320.5956),
+                                deg2rad(85.6398),
+                                deg2rad(91.4738),
+                                .38792e-4,
+                                0.75863e-3,
+                                2458826.5,
+                                2460486.5,
+                                0.6933954099999937,
+                                0.6478633000000116};
+
+    prop_t prop2{md_input_t{ins2.data(), 2}, kw::diff_order = 1};
+
+    // Replace the data in prop with the data in prop2.
+    prop.replace_sat_data(md_input_t{ins2.data(), 2});
+
+    // Check that the replacement worked.
+    REQUIRE(std::vector(prop.get_sat_data().data_handle(), prop.get_sat_data().data_handle() + 18)
+            == std::vector(prop2.get_sat_data().data_handle(), prop2.get_sat_data().data_handle() + 18));
+
+    // Run evaluations in prop and prop2 and compare the results.
+    std::vector<prop_t::date> times;
+    times.resize(2u, prop_t::date{2460486.5, 0.6478633000000116});
+
+    std::vector<double> outs;
+    outs.resize(2 * prop.get_nouts());
+    prop_t::out_2d out_span{outs.data(), prop.get_nouts(), 2};
+
+    prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), 2});
+
+    const auto orig_out = outs;
+
+    prop2(out_span, prop_t::in_1d<prop_t::date>{times.data(), 2});
+
+    REQUIRE(orig_out == outs);
+
+    // Also check with s11n.
+    {
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+            oa << prop;
+        }
+
+        prop = prop_t{};
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+            ia >> prop;
+        }
+
+        prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), 2});
+
+        REQUIRE(orig_out == outs);
+    }
+
+    // Check with bad data.
+    ins2[1] = revday2radmin(3);
+
+    REQUIRE_THROWS_MATCHES(prop.replace_sat_data(md_input_t{ins2.data(), 2}), std::invalid_argument,
+                           Message("The satellite at index 1 has an orbital period above 225 minutes, but deep-"
+                                   "space propagation is currently not supported"));
+
+    // Check that the original data was restored after the exception was thrown.
+    REQUIRE(std::vector(prop.get_sat_data().data_handle(), prop.get_sat_data().data_handle() + 18)
+            == std::vector(prop2.get_sat_data().data_handle(), prop2.get_sat_data().data_handle() + 18));
+
+    prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), 2});
+
+    REQUIRE(orig_out == outs);
+
+    // Error throwing.
+    REQUIRE_THROWS_MATCHES((prop.replace_sat_data(md_input_t{nullptr, 2})), std::invalid_argument,
+                           Message("Cannot replace the satellite data with a null array"));
+
+    REQUIRE_THROWS_MATCHES((prop.replace_sat_data(md_input_t{ins2.data(), 1})), std::invalid_argument,
+                           Message("Invalid array provided to replace_sat_data(): the number of "
+                                   "columns (1) does not match the number of satellites (2)"));
+}
