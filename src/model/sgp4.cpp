@@ -381,35 +381,36 @@ namespace detail
 // - the original elements (minus n0, which is not needed any more) + bstar,
 // - the intermediate quantities returned by sgp4_init(), which are all functions
 //   of the original elements + bstar,
-// - the derivatives of the intermediate quantities wrt the original elements (if requested).
+// - the derivatives of the intermediate quantities wrt the diff arguments (if requested).
 //
 // The second function takes in input the outputs of the first function, and returns
 // the propagated Cartesian state (with the tsince passed in as heyoka::time), and the
-// derivatives of the Cartesian state with respect to the original orbital elements
-// (if requested).
+// derivatives of the Cartesian state with respect to the diff arguments (if requested).
 sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 {
     // Variables representing the orbital elements + bstar.
     // These are also the inputs of the init function.
     const auto init_inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
 
-    // The orbital elements.
-    const auto oel = std::vector(init_inputs.begin(), init_inputs.begin() + 6);
+    // The differentiation arguments.
+    // NOTE: if no derivatives are requested, this will remain unused.
+    const auto diff_args = std::vector(init_inputs.begin(), init_inputs.end());
 
     // Expressions for the intermediate quantities as functions of the orbital elements + bstar.
     const auto iqs_exprs = sgp4_init();
 
-    // Begin assembling the init function with the original elements (minus n0) and bstar.
+    // Begin assembling the init function's outputs with the original elements (minus n0, which is not
+    // needed in the time propagation) and bstar.
     std::vector func_init(init_inputs.begin() + 1, init_inputs.end());
 
     // Add the iqs and their derivatives, if requested.
-    std::optional<dtens> diqs_dkep;
+    std::optional<dtens> diqs;
     if (order > 0u) {
         // Compute the dtens.
-        diqs_dkep.emplace(diff_tensors(std::vector(iqs_exprs.begin(), iqs_exprs.end()), oel, kw::diff_order = order));
+        diqs.emplace(diff_tensors(std::vector(iqs_exprs.begin(), iqs_exprs.end()), diff_args, kw::diff_order = order));
 
         // Append the iqs and their derivatives.
-        const auto tv = *diqs_dkep | std::views::transform([](const auto &p) { return p.second; });
+        const auto tv = *diqs | std::views::transform([](const auto &p) { return p.second; });
         func_init.insert(func_init.end(), tv.begin(), tv.end());
     } else {
         // Append the iqs without derivatives.
@@ -429,10 +430,10 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
     std::optional<dtens> cart_dfun_dtens;
     if (order > 0u) {
         // In order to compute the derivatives, we need to transform the variables iqs_vars into dfuns
-        // of the orbital elements.
+        // of the diff arguments.
 
         // Create the vector of arguments for use in the dfuns.
-        const auto dfun_args = std::make_shared<std::vector<expression>>(oel);
+        const auto dfun_args = std::make_shared<std::vector<expression>>(diff_args);
 
         // Create the dfuns.
         std::array<expression, 29> iqs_dfuns;
@@ -443,15 +444,15 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         // Formulate the expressions for the Cartesian state in terms of the dfuns.
         const auto cart_dfun = sgp4_time_prop(iqs_dfuns, heyoka::time);
 
-        // Compute the derivatives of cart_dfun wrt the orbital elements.
-        cart_dfun_dtens.emplace(diff_tensors(cart_dfun, oel, kw::diff_order = order));
+        // Compute the derivatives of cart_dfun wrt the diff arguments.
+        cart_dfun_dtens.emplace(diff_tensors(cart_dfun, diff_args, kw::diff_order = order));
 
         // We now need to build a subs map to replace the dfuns in the expressions
         // stored in cart_dfun_dtens with variables.
-        // NOTE: in order to do this, we iterate over diqs_dkep in order to fetch
-        // the multiindices of the derivatives of the iqs wrt the orbital elements.
+        // NOTE: in order to do this, we iterate over diqs in order to fetch
+        // the multiindices of the derivatives of the iqs wrt the diff arguments.
         std::map<expression, expression> dfun_subs_map;
-        for (const auto &[key, _] : *diqs_dkep) {
+        for (const auto &[key, _] : *diqs) {
             const auto &[iq_idx, diff_idx] = key;
 
             assert(iq_idx < iqs_vars.size());
