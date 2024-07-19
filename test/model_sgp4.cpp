@@ -585,6 +585,9 @@ TEST_CASE("derivatives")
 
     for (std::size_t i = 0; i < prop_out_span.extent(0); ++i) {
         for (std::size_t j = 0; j < prop_out_span.extent(1); ++j) {
+            if (!(prop_out_span(i, j) == approximately(cf_out_span(i, j)))) {
+                std::cout << "i=" << i << ", j=" << j << std::endl;
+            }
             REQUIRE(prop_out_span(i, j) == approximately(cf_out_span(i, j)));
         }
     }
