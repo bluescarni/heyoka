@@ -523,7 +523,7 @@ TEST_CASE("derivatives")
     // First compute the order-2 derivatives of the whole model.
     const auto sgp4_func = model::sgp4();
     const auto inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
-    const auto dt = diff_tensors(sgp4_func, std::vector(inputs.begin(), inputs.begin() + 6), kw::diff_order = 2);
+    const auto dt = diff_tensors(sgp4_func, std::vector(inputs.begin(), inputs.begin() + 7), kw::diff_order = 2);
 
     // Make a compiled function with the derivatives.
     auto diff_cf = cfunc<double>(dt | std::views::transform([](const auto &p) { return p.second; }), inputs);
@@ -553,19 +553,19 @@ TEST_CASE("derivatives")
 
     prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2};
 
-    REQUIRE(prop.get_nouts() == 196u);
+    REQUIRE(prop.get_nouts() == 252u);
     REQUIRE(prop.get_diff_order() == 2u);
     auto sl = prop.get_dslice(1);
     REQUIRE(sl.first == 7u);
-    REQUIRE(sl.second == 7u + 7u * 6u);
+    REQUIRE(sl.second == 7u + 7u * 7u);
     sl = prop.get_dslice(3, 1);
-    REQUIRE(sl.first == 7u + 3u * 6u);
-    REQUIRE(sl.second == 7u + 4u * 6u);
-    REQUIRE(prop.get_mindex(7u + 4u * 6u) == dtens::sv_idx_t{4, {{0, 1}}});
+    REQUIRE(sl.first == 7u + 3u * 7u);
+    REQUIRE(sl.second == 7u + 4u * 7u);
+    REQUIRE(prop.get_mindex(7u + 4u * 7u) == dtens::sv_idx_t{4, {{0, 1}}});
     REQUIRE_THROWS_MATCHES(prop.get_mindex(1000u), std::invalid_argument,
                            Message("Cannot fetch the multiindex of the derivative at index 1000: the index "
-                                   "is not less than the total number of derivatives (196)"));
-    REQUIRE(prop.get_diff_args() == std::vector(inputs.begin(), inputs.begin() + 6));
+                                   "is not less than the total number of derivatives (252)"));
+    REQUIRE(prop.get_diff_args() == std::vector(inputs.begin(), inputs.begin() + 7));
 
     // Prepare the input buffer for the cfunc.
     std::vector<double> cf_in(ins.begin(), ins.begin() + 14);
