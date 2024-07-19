@@ -526,7 +526,8 @@ TEST_CASE("derivatives")
     const auto dt = diff_tensors(sgp4_func, std::vector(inputs.begin(), inputs.begin() + 7), kw::diff_order = 2);
 
     // Make a compiled function with the derivatives.
-    auto diff_cf = cfunc<double>(dt | std::views::transform([](const auto &p) { return p.second; }), inputs);
+    auto diff_cf = cfunc<double>(dt | std::views::transform([](const auto &p) { return p.second; }), inputs,
+                                 kw::compact_mode = true);
 
     // Create a propagator with derivatives.
     const std::vector<double> ins = {revday2radmin(13.75091047972192),
@@ -551,7 +552,7 @@ TEST_CASE("derivatives")
     const auto tm = std::array{1440., 0.};
     const prop_t::in_1d<double> tm_in{tm.data(), 2};
 
-    prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2};
+    prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2, kw::compact_mode = true};
 
     REQUIRE(prop.get_nouts() == 252u);
     REQUIRE(prop.get_diff_order() == 2u);
