@@ -87,9 +87,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
     template <typename Input, typename... KwArgs>
     static auto parse_ctor_args(const Input &in, const KwArgs &...kw_args)
     {
-        if (in.data_handle() == nullptr) [[unlikely]] {
-            throw std::invalid_argument("Cannot initialise an sgp4_propagator with a null list of satellites");
-        }
         if (in.extent(1) == 0u) [[unlikely]] {
             throw std::invalid_argument("Cannot initialise an sgp4_propagator with an empty list of satellites");
         }
@@ -168,6 +165,8 @@ public:
     [[nodiscard]] std::uint32_t get_nsats() const;
     [[nodiscard]] std::uint32_t get_nouts() const noexcept;
     [[nodiscard]] mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> get_sat_data() const;
+
+    void replace_sat_data(mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>);
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_diff_args() const;

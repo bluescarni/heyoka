@@ -350,19 +350,6 @@ TEST_CASE("single call operator")
         REQUIRE(output2[1] == -8);
         std::ranges::fill(output2, fp_t(0));
 
-        // Null output span.
-        REQUIRE_THROWS_MATCHES(
-            cf0(typename cfunc<fp_t>::out_1d{nullptr, 2u}, std::array<fp_t, 0>{}, kw::pars = par1, kw::time = fp_t(10)),
-            std::invalid_argument, Message("The outputs array passed to a cfunc cannot be null"));
-
-        // Null input span with inputs.
-        cf0 = cfunc<fp_t>({x + y - heyoka::time, x - y + par[0]}, {x, y}, kw::opt_level = opt_level,
-                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
-        REQUIRE_THROWS_MATCHES(
-            cf0(output2, typename cfunc<fp_t>::in_1d{nullptr, 2}, kw::pars = par1, kw::time = fp_t(10)),
-            std::invalid_argument,
-            Message("The inputs array passed to a cfunc can be null only if the number of input arguments is zero"));
-
         // Null par span with no pars.
         cf0 = cfunc<fp_t>({x + y - heyoka::time, x - y}, {x, y}, kw::opt_level = opt_level,
                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
@@ -373,15 +360,6 @@ TEST_CASE("single call operator")
         REQUIRE(output2[0] == -7);
         REQUIRE(output2[1] == -1);
         std::ranges::fill(output2, fp_t(0));
-
-        // Null par span with pars.
-        cf0 = cfunc<fp_t>({x + y - heyoka::time, x - y + par[0]}, {x, y}, kw::opt_level = opt_level,
-                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
-        REQUIRE_THROWS_MATCHES(cf0(output2, std::array<fp_t, 2>{1, 2},
-                                   kw::pars = typename cfunc<fp_t>::in_1d{nullptr, 1}, kw::time = fp_t(10)),
-                               std::invalid_argument,
-                               Message("The array of parameter values passed to a cfunc can be null only if the number "
-                                       "of parameters is zero"));
     };
 
     for (auto cm : {false, true}) {

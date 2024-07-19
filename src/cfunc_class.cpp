@@ -452,19 +452,10 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
                                                 m_impl->m_nouts, outputs.size()));
     }
 
-    if (outputs.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument("The outputs array passed to a cfunc cannot be null");
-    }
-
     if (inputs.size() != m_impl->m_nvars) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid inputs array passed to a cfunc: the number of function "
                                                 "inputs is {}, but the inputs array has a size of {}",
                                                 m_impl->m_nvars, inputs.size()));
-    }
-
-    if (inputs.data_handle() == nullptr && !inputs.empty()) [[unlikely]] {
-        throw std::invalid_argument(
-            "The inputs array passed to a cfunc can be null only if the number of input arguments is zero");
     }
 
     if (m_impl->m_nparams != 0u && !pars) [[unlikely]] {
@@ -478,11 +469,6 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
                                                     "of a compiled function has {} element(s), "
                                                     "but the number of parameters in the function is {}",
                                                     pars->size(), m_impl->m_nparams));
-        }
-
-        if (pars->data_handle() == nullptr && !pars->empty()) [[unlikely]] {
-            throw std::invalid_argument(
-                "The array of parameter values passed to a cfunc can be null only if the number of parameters is zero");
         }
     }
 
@@ -719,11 +705,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
                                                 m_impl->m_nouts, outputs.extent(0)));
     }
 
-    if (outputs.data_handle() == nullptr && !outputs.empty()) [[unlikely]] {
-        throw std::invalid_argument(
-            "The outputs array passed to a cfunc can be null only if the number of evaluations is zero");
-    }
-
     // Fetch the number of columns from outputs.
     const auto ncols = outputs.extent(1);
 
@@ -738,11 +719,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
             fmt::format("Invalid inputs array passed to a cfunc: the expected number of columns deduced from the "
                         "outputs array is {}, but the number of columns in the inputs array is {}",
                         ncols, inputs.extent(1)));
-    }
-
-    if (inputs.data_handle() == nullptr && !inputs.empty()) [[unlikely]] {
-        throw std::invalid_argument("The inputs array passed to a cfunc can be null only if the number of input "
-                                    "arguments or the number of evaluations is zero");
     }
 
     if (m_impl->m_nparams != 0u && !pars) [[unlikely]] {
@@ -765,11 +741,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
                                                     "outputs array is {}",
                                                     pars->extent(1), ncols));
         }
-
-        if (pars->data_handle() == nullptr && !pars->empty()) [[unlikely]] {
-            throw std::invalid_argument("The array of parameter values passed to a cfunc can be null only if the "
-                                        "number of parameters or the number of evaluations is zero");
-        }
     }
 
     if (m_impl->m_is_time_dependent && !times) [[unlikely]] {
@@ -784,11 +755,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
                                                     "but the expected size deduced from the "
                                                     "outputs array is {}",
                                                     times->size(), ncols));
-        }
-
-        if (times->data_handle() == nullptr && !times->empty()) [[unlikely]] {
-            throw std::invalid_argument("The array of time values passed to a cfunc can be null only if the "
-                                        "number of evaluations is zero");
         }
     }
 

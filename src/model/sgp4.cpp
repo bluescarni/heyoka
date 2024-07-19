@@ -510,6 +510,7 @@ struct sgp4_propagator<T>::impl {
     std::vector<T> m_sat_buffer;
     std::vector<T> m_init_buffer;
     cfunc<T> m_cf_tprop;
+    cfunc<T> m_cf_init;
     std::optional<dtens> m_dtens;
     // NOTE: this is a buffer used to convert dates to tsinces in the call operator
     // overloads taking dates in input.
@@ -522,6 +523,7 @@ struct sgp4_propagator<T>::impl {
         ar & m_sat_buffer;
         ar & m_init_buffer;
         ar & m_cf_tprop;
+        ar & m_cf_init;
         ar & m_dtens;
         // NOTE: no need to save the content of m_tms_vec.
     }
@@ -625,7 +627,7 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
     std::vector<T> init_buffer;
     init_buffer.resize(boost::safe_numerics::safe<decltype(init_buffer.size())>(n_sats) * cf_init.get_nouts());
 
-    // Prepare the in/out spans for invocation of cf_init.
+    // Prepare the in/out spans for the invocation of cf_init.
     // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
     // the epochs do not matter. Hence, 7 rows instead of 9.
     const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, boost::numeric_cast<std::size_t>(n_sats));
@@ -637,8 +639,8 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
     cf_init(init_output, init_input);
 
     // Build and assign the implementation.
-    m_impl = std::make_unique<impl>(
-        impl{std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(dt), {}});
+    m_impl = std::make_unique<impl>(impl{
+        std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(cf_init), std::move(dt), {}});
 }
 
 template <typename T>
@@ -690,6 +692,67 @@ mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> sgp4_propagator<T>
 {
     return mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>{
         m_impl->m_sat_buffer.data(), boost::numeric_cast<std::size_t>(m_impl->m_sat_buffer.size() / 9u)};
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> new_data)
+{
+    // Cache nsats.
+    const auto nsats = get_nsats();
+
+    if (new_data.extent(1) != nsats) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid array provided to replace_sat_data(): the number of "
+                                                "columns ({}) does not match the number of satellites ({})",
+                                                new_data.extent(1), nsats));
+    }
+
+    // Fetch references to sat_buffer and init_buffer.
+    auto &sat_buffer = m_impl->m_sat_buffer;
+    auto &init_buffer = m_impl->m_init_buffer;
+
+    // Make copies of the existing data for exception safety.
+    // NOTE: the concern here is mostly about sat_buffer, since the user may be
+    // providing invalid data. However, in principle, cf_init could also throw
+    // when invoked, thus we save also init_buffer.
+    const auto old_sat_buffer = sat_buffer;
+    const auto old_init_buffer = init_buffer;
+
+    try {
+        // Write the new data into sat_buffer.
+        const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(sat_buffer.data(),
+                                                                                  new_data.extent(1));
+        for (std::size_t i = 0; i < buffer_span.extent(0); ++i) {
+            for (std::size_t j = 0; j < buffer_span.extent(1); ++j) {
+                buffer_span(i, j) = new_data(i, j);
+            }
+        }
+
+        // Check the new data.
+        detail::sgp4_check_input_satbuf(sat_buffer);
+
+        // Fetch a reference to cf_init.
+        auto &cf_init = m_impl->m_cf_init;
+
+        // Prepare the in/out spans for the invocation of cf_init.
+        // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
+        // the epochs do not matter. Hence, 7 rows instead of 9.
+        // NOTE: static casts are ok, we already inited once during construction.
+        const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
+        const typename cfunc<T>::out_2d init_output(init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
+                                                    static_cast<std::size_t>(nsats));
+
+        // Evaluate the intermediate quantities and their derivatives.
+        cf_init(init_output, init_input);
+    } catch (...) {
+        // Restore the old data before rethrowing.
+        // NOTE: copy, don't move, as we need to make sure to never
+        // destroy/reallocate the existing buffers.
+        std::ranges::copy(old_sat_buffer, sat_buffer.begin());
+        std::ranges::copy(old_init_buffer, init_buffer.begin());
+
+        throw;
+    }
 }
 
 template <typename T>
@@ -833,9 +896,6 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
 {
     // Check the dates array.
-    if (dates.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument("A null array of dates was passed to the call operator of an sgp4_propagator");
-    }
     const auto n_sats = get_nsats();
     if (dates.extent(0) != n_sats) [[unlikely]] {
         throw std::invalid_argument(
@@ -881,23 +941,6 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
 {
-    // NOTE: need to check for nullptr input spans. In the non-batch overload
-    // we do not need the explicit check because we don't do anything with 'out'
-    // and 'tms' apart from forwarding them to the cfunc, which does the nullptr check.
-    // Here however we need to take subspans of 'out' and 'tms' and thus we need to
-    // pre-check for nullptr in order to avoid undefined behaviour - see the docs for
-    // the def ctor of mdspan:
-    //
-    // https://en.cppreference.com/w/cpp/container/mdspan/mdspan
-    if (out.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null output array was passed to the batch-mode call operator of an sgp4_propagator");
-    }
-    if (tms.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null times array was passed to the batch-mode call operator of an sgp4_propagator");
-    }
-
     // Check the dimensionalities of out and tms.
     const auto n_evals = out.extent(0);
     if (n_evals != tms.extent(0)) [[unlikely]] {
@@ -972,10 +1015,6 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 {
     // Check the dates array.
-    if (dates.data_handle() == nullptr) [[unlikely]] {
-        throw std::invalid_argument(
-            "A null array of dates was passed to the batch-mode call operator of an sgp4_propagator");
-    }
     const auto n_sats = get_nsats();
     if (dates.extent(1) != n_sats) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
