@@ -14,7 +14,7 @@ Unsolved
     via :cpp:class:`mppp::real128`,
   * JIT-compiled code using **both** 80-bit and quadruple-precision datatypes
     was executed,
-  * the "fast math" flag was enabled during JIT compilation.
+  * the ``fast_math`` flag was enabled during JIT compilation.
 
   The root cause is most likely a code-generation/optimisation problem in LLVM.
   This issue is currently under investigation.
