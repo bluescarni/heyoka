@@ -37,6 +37,8 @@
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Analysis/CGSCCPassManager.h>
+#include <llvm/Analysis/LoopAnalysisManager.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -59,8 +61,12 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Passes/OptimizationLevel.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -69,53 +75,6 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/Vectorize/LoadStoreVectorizer.h>
-
-#if LLVM_VERSION_MAJOR < 14
-
-// NOTE: this header was moved in LLVM 14.
-#include <llvm/Support/TargetRegistry.h>
-
-#else
-
-#include <llvm/MC/TargetRegistry.h>
-
-#endif
-
-// NOTE: new pass manager API.
-// NOTE: this is available since LLVM 13, but in that
-// version it seems like auto-vectorization with
-// vector-function-abi-variant is not working
-// properly with the new pass manager. Hence, we
-// enable it from LLVM 14.
-#if LLVM_VERSION_MAJOR >= 14
-
-#define HEYOKA_USE_NEW_LLVM_PASS_MANAGER
-
-#endif
-
-#if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
-
-#include <llvm/Analysis/CGSCCPassManager.h>
-#include <llvm/Analysis/LoopAnalysisManager.h>
-#include <llvm/IR/PassManager.h>
-#include <llvm/Passes/PassBuilder.h>
-
-#if LLVM_VERSION_MAJOR >= 14
-
-// NOTE: this header is available since LLVM 14.
-#include <llvm/Passes/OptimizationLevel.h>
-
-#endif
-
-#else
-
-#include <llvm/CodeGen/TargetPassConfig.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/Pass.h>
-#include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
-
-#endif
 
 #if LLVM_VERSION_MAJOR >= 17
 
@@ -1055,13 +1014,7 @@ void llvm_state::optimise()
     for (auto &f : module()) {
         auto attrs = f.getAttributes();
 
-        llvm::AttrBuilder
-#if LLVM_VERSION_MAJOR < 14
-            new_attrs
-#else
-            new_attrs(ctx)
-#endif
-            ;
+        llvm::AttrBuilder new_attrs(ctx);
 
         if (!cpu.empty() && !f.hasFnAttribute("target-cpu")) {
             new_attrs.addAttribute("target-cpu", cpu);
@@ -1081,11 +1034,7 @@ void llvm_state::optimise()
         }
 
         // Let new_attrs override attrs.
-#if LLVM_VERSION_MAJOR < 14
-        f.setAttributes(attrs.addAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
-#else
         f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
-#endif
     }
 
     // Force usage of AVX512 registers, if requested.
@@ -1095,19 +1044,8 @@ void llvm_state::optimise()
         }
     }
 
-#if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
-
     // NOTE: adapted from here:
     // https://llvm.org/docs/NewPassManager.html
-
-    // Optimisation level for the module pass manager.
-    // NOTE: the OptimizationLevel class has changed location
-    // since LLVM 14.
-#if LLVM_VERSION_MAJOR >= 14
-    using olevel = llvm::OptimizationLevel;
-#else
-    using olevel = llvm::PassBuilder::OptimizationLevel;
-#endif
 
     // Create the analysis managers.
     llvm::LoopAnalysisManager LAM;
@@ -1147,18 +1085,18 @@ void llvm_state::optimise()
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     // Construct the optimisation level.
-    olevel ol{};
+    llvm::OptimizationLevel ol{};
 
     switch (m_opt_level) {
         case 1u:
-            ol = olevel::O1;
+            ol = llvm::OptimizationLevel::O1;
             break;
         case 2u:
-            ol = olevel::O2;
+            ol = llvm::OptimizationLevel::O2;
             break;
         default:
             assert(m_opt_level == 3u);
-            ol = olevel::O3;
+            ol = llvm::OptimizationLevel::O3;
     }
 
     // Create the module pass manager.
@@ -1166,56 +1104,6 @@ void llvm_state::optimise()
 
     // Optimize the IR.
     MPM.run(*m_module, MAM);
-
-#else
-
-    // Init the module pass manager.
-    auto module_pm = std::make_unique<llvm::legacy::PassManager>();
-    // These are passes which set up target-specific info
-    // that are used by successive optimisation passes.
-    auto tliwp = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(
-        llvm::TargetLibraryInfoImpl(m_jitter->get_target_triple()));
-    module_pm->add(tliwp.release());
-    module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
-
-    // NOTE: not sure what this does, presumably some target-specifc
-    // configuration.
-    module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
-
-    // Init the function pass manager.
-    auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-    f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
-
-    // We use the helper class PassManagerBuilder to populate the module
-    // pass manager with standard options.
-    llvm::PassManagerBuilder pm_builder;
-    // See here for the defaults:
-    // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
-    pm_builder.OptLevel = m_opt_level;
-    // Enable function inlining.
-    pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
-    // NOTE: if requested, we turn manually on the SLP vectoriser here, which is off
-    // by default. Not sure why it is off, the LLVM docs imply this
-    // is on by default at nonzero optimisation levels for clang and opt.
-    pm_builder.SLPVectorize = m_slp_vectorize;
-
-    m_jitter->m_tm->adjustPassManager(pm_builder);
-
-    // Populate both the function pass manager and the module pass manager.
-    pm_builder.populateFunctionPassManager(*f_pm);
-    pm_builder.populateModulePassManager(*module_pm);
-
-    // Run the function pass manager on all functions in the module.
-    f_pm->doInitialization();
-    for (auto &f : *m_module) {
-        f_pm->run(f);
-    }
-    f_pm->doFinalization();
-
-    // Run the module passes.
-    module_pm->run(*m_module);
-
-#endif
 }
 
 namespace detail

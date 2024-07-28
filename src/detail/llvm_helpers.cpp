@@ -311,17 +311,8 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 = (use_fast_math && !el.lp_vf_abi_attr.empty()) ? el.lp_vf_abi_attr : el.vf_abi_attr;
             vf_abi_strs.push_back(vf_abi_attr);
         }
-#if LLVM_VERSION_MAJOR >= 14
         call->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
                                              fmt::format("{}", fmt::join(vf_abi_strs, ","))));
-#else
-        {
-            auto attrs = call->getAttributes();
-            attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
-                                       fmt::format("{}", fmt::join(vf_abi_strs, ",")));
-            call->setAttributes(attrs);
-        }
-#endif
 
         // Now we need to:
         // - add the declarations of the vector variants to the module,
