@@ -414,6 +414,27 @@ struct llvm_state::jit {
                 jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
         }
 
+        // NOTE: not all code models are supported on all archs. We make an effort
+        // here to prevent unsupported code models to be requested, as that will
+        // result in the termination of the program.
+        [[maybe_unused]] constexpr code_model supported_code_models[] = {
+#if defined(HEYOKA_ARCH_X86)
+            code_model::small, code_model::kernel, code_model::medium, code_model::large
+#elif defined(HEYOKA_ARCH_ARM)
+            code_model::tiny, code_model::small, code_model::large
+#elif defined(HEYOKA_ARCH_PPC)
+            code_model::tiny, code_model::small, code_model::medium, code_model::large
+#else
+            // NOTE: by default we assume only small and large are supported.
+            code_model::small, code_model::large
+#endif
+        };
+
+        if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("The code model '{}' is not supported on the current architecture", c_model));
+        }
+
 #if LLVM_VERSION_MAJOR >= 17
         // NOTE: the code model setup is working only on LLVM>=19 (or at least
         // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
@@ -425,42 +446,11 @@ struct llvm_state::jit {
         // ASAN failures all over the place. Thus, let us not do anything with the code
         // model setting before LLVM 17.
 
-        // NOTE: not all code models are supported on all archs. We make an effort
-        // here to prevent unsupported code models to be requested, as that will
-        // result in a termination of the program.
-        constexpr code_model supported_code_models[] = {
-#if defined(HEYOKA_ARCH_X86)
-            code_model::small,
-            code_model::kernel,
-            code_model::medium,
-            code_model::large
-#endif
-#if defined(HEYOKA_ARCH_ARM)
-                code_model::tiny,
-            code_model::small,
-            code_model::large
-#endif
-#if defined(HEYOKA_ARCH_PPC)
-                code_model::tiny,
-            code_model::small,
-            code_model::medium,
-            code_model::large
-#endif
-        };
-
-        if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("The code model '{}' is not supported on the current architecture", c_model));
-        }
-
         // Setup the code model.
         switch (c_model) {
-            // NOTE: tiny code model not supported.
-            // LCOV_EXCL_START
             case code_model::tiny:
                 jtmb->setCodeModel(llvm::CodeModel::Tiny);
                 break;
-                // LCOV_EXCL_STOP
             case code_model::small:
                 jtmb->setCodeModel(llvm::CodeModel::Small);
                 break;
