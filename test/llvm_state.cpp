@@ -459,7 +459,7 @@ TEST_CASE("code model")
 #else
 
     {
-        llvm_state s;
+        llvm_state s{kw::code_model = code_model::tiny};
         REQUIRE(s.get_code_model() == code_model::tiny);
 
         std::ostringstream oss;
