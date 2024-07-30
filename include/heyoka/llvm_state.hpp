@@ -13,13 +13,13 @@
 
 #include <concepts>
 #include <cstdint>
-#include <initializer_list>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -111,6 +111,7 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 class HEYOKA_DLL_PUBLIC llvm_state
 {
     friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+    friend class HEYOKA_DLL_PUBLIC llvm_multi_state;
 
     struct jit;
 
@@ -304,6 +305,21 @@ std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &, un
 void llvm_state_mem_cache_try_insert(std::string, unsigned, llvm_mc_value);
 
 } // namespace detail
+
+class HEYOKA_DLL_PUBLIC llvm_multi_state
+{
+    struct impl;
+
+    std::unique_ptr<impl> m_impl;
+
+public:
+    explicit llvm_multi_state(std::vector<llvm_state>);
+    llvm_multi_state(const llvm_multi_state &);
+    llvm_multi_state(llvm_multi_state &&) noexcept;
+    llvm_multi_state &operator=(const llvm_multi_state &);
+    llvm_multi_state &operator=(llvm_multi_state &&) noexcept;
+    ~llvm_multi_state();
+};
 
 HEYOKA_END_NAMESPACE
 

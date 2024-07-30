@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
-#include <initializer_list>
 #include <ios>
 #include <memory>
 #include <mutex>
@@ -29,6 +28,7 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -1386,5 +1386,74 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 
     return os << oss.str();
 }
+
+struct llvm_multi_state::impl {
+    std::vector<llvm_state> m_states;
+};
+
+llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
+{
+    // All states must be uncompiled.
+    if (std::ranges::any_of(states, &llvm_state::is_compiled)) [[unlikely]] {
+        throw std::invalid_argument("An llvm_multi_state can be constructed only from non-compiled llvm_state objects");
+    }
+
+    // Need at least 2 states.
+    if (states.size() < 2u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("At least 2 llvm_state objects are needed to construct an llvm_multi_state, but instead the "
+                        "number of llvm_state objects provided on construction is {}",
+                        states.size()));
+    }
+
+    // Settings in all states must be consistent.
+    auto cmp_states = [](const llvm_state &s1, const llvm_state &s2) {
+        if (s1.get_opt_level() != s2.get_opt_level()) {
+            return false;
+        }
+
+        if (s1.fast_math() != s2.fast_math()) {
+            return false;
+        }
+
+        if (s1.force_avx512() != s2.force_avx512()) {
+            return false;
+        }
+
+        if (s1.get_slp_vectorize() != s2.get_slp_vectorize()) {
+            return false;
+        }
+
+        return true;
+    };
+
+    for (decltype(states.size()) i = 1; i < states.size(); ++i) {
+        if (!cmp_states(states[i], states[i - 1u])) [[unlikely]] {
+            throw std::invalid_argument(
+                "Inconsistent llvm_state settings detected in the constructor of an llvm_multi_state");
+        }
+    }
+
+    impl imp{.m_states = std::move(states)};
+
+    m_impl = std::make_unique<impl>(std::move(imp));
+}
+
+llvm_multi_state::llvm_multi_state(const llvm_multi_state &other) : m_impl(std::make_unique<impl>(*other.m_impl)) {}
+
+llvm_multi_state::llvm_multi_state(llvm_multi_state &&) noexcept = default;
+
+llvm_multi_state &llvm_multi_state::operator=(const llvm_multi_state &other)
+{
+    if (this != &other) {
+        *this = llvm_multi_state(other);
+    }
+
+    return *this;
+}
+
+llvm_multi_state &llvm_multi_state::operator=(llvm_multi_state &&) noexcept = default;
+
+llvm_multi_state::~llvm_multi_state() = default;
 
 HEYOKA_END_NAMESPACE
