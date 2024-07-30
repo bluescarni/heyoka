@@ -32,7 +32,6 @@ cmake ../ -G Ninja \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DBoost_NO_BOOST_CMAKE=ON \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DCMAKE_CXX_CLANG_TIDY=`which clang-tidy` \
     -DCMAKE_C_CLANG_TIDY=`which clang-tidy` \

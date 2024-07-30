@@ -31,7 +31,6 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DBoost_NO_BOOST_CMAKE=ON \
     -DHEYOKA_ENABLE_IPO=yes
 
 # Build.

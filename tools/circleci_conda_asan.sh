@@ -37,8 +37,7 @@ cmake ../ -G Ninja \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="-fsanitize=address" \
-    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
-    -DBoost_NO_BOOST_CMAKE=ON
+    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"
 
 # Build.
 ninja -v -j4

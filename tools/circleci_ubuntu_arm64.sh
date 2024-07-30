@@ -36,8 +36,7 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="--coverage" \
-    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
-    -DBoost_NO_BOOST_CMAKE=ON
+    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"
 
 # Build.
 ninja -v
