@@ -661,10 +661,6 @@ struct llvm_state::jit {
     {
         return m_tm->getTargetFeatureString().str();
     }
-    [[nodiscard]] llvm::TargetIRAnalysis get_target_ir_analysis() const
-    {
-        return m_tm->getTargetIRAnalysis();
-    }
     [[nodiscard]] const llvm::Triple &get_target_triple() const
     {
         return m_lljit->getTargetTriple();
