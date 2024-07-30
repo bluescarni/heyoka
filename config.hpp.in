@@ -65,6 +65,12 @@
 
 #endif
 
+#if defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86)
+
+#define HEYOKA_ARCH_X86
+
+#endif
+
 // Maximum number of blocks that can be processed in parallel
 // when computing the Taylor derivatives in parallel mode.
 #define HEYOKA_CM_PAR_MAX_INVOKE_N 20

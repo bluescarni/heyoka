@@ -33,6 +33,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>

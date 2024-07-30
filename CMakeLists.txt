@@ -483,7 +483,7 @@ endif()
 
 # Mandatory dependency on fmt.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
-set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 10)
+set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 11)
 find_package(fmt REQUIRED CONFIG)
 if(${fmt_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION} OR
    ${fmt_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION})
@@ -503,7 +503,18 @@ target_link_libraries(heyoka PRIVATE TBB::tbb)
 # Mandatory dependency on Boost.
 # NOTE: need 1.69 for safe numerics.
 set(_HEYOKA_MIN_BOOST_VERSION "1.69")
-find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} REQUIRED serialization)
+# NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
+# of locating Boost in recent Boost/CMake versions. If we fail, we try again in
+# MODULE mode as last resort.
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization CONFIG)
+if(NOT ${Boost_FOUND})
+    message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization)
+endif()
+if(NOT ${Boost_FOUND})
+    message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
+endif()
+message(STATUS "Found Boost version ${Boost_VERSION}.")
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
