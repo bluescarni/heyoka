@@ -423,7 +423,7 @@ struct llvm_state::jit {
 #elif defined(HEYOKA_ARCH_ARM)
             code_model::tiny, code_model::small, code_model::large
 #elif defined(HEYOKA_ARCH_PPC)
-            code_model::tiny, code_model::small, code_model::medium, code_model::large
+            code_model::small, code_model::medium, code_model::large
 #else
             // NOTE: by default we assume only small and large are supported.
             code_model::small, code_model::large
