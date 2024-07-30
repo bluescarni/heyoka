@@ -143,7 +143,7 @@ TEST_CASE("copy semantics")
     // Copy without compilation.
     {
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true,
-                     kw::code_model = code_model::medium};
+                     kw::code_model = code_model::large};
 
         detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
@@ -160,7 +160,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
         REQUIRE(s2.get_slp_vectorize());
-        REQUIRE(s2.get_code_model() == code_model::medium);
+        REQUIRE(s2.get_code_model() == code_model::large);
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -185,7 +185,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s3.fast_math());
         REQUIRE(!s3.is_compiled());
         REQUIRE(s3.get_slp_vectorize());
-        REQUIRE(s3.get_code_model() == code_model::medium);
+        REQUIRE(s3.get_code_model() == code_model::large);
     }
 }
 
@@ -230,7 +230,7 @@ TEST_CASE("s11n")
         }
 
         s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u,       kw::fast_math = true,
-                       kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::medium};
+                       kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::large};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -302,7 +302,7 @@ TEST_CASE("make_similar")
     auto [x, y] = make_vars("x", "y");
 
     llvm_state s{kw::mname = "sample state", kw::opt_level = 2u,       kw::fast_math = true,
-                 kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::medium};
+                 kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::large};
 
     detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
@@ -324,7 +324,7 @@ TEST_CASE("make_similar")
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
     REQUIRE(s2.get_slp_vectorize());
-    REQUIRE(s2.get_code_model() == code_model::medium);
+    REQUIRE(s2.get_code_model() == code_model::large);
 }
 
 TEST_CASE("force_avx512")
@@ -459,6 +459,8 @@ TEST_CASE("code model")
         REQUIRE(oss.str() == "kernel");
     }
 
+#if !defined(HEYOKA_ARCH_ARM)
+
     {
         llvm_state s{kw::code_model = code_model::medium};
         REQUIRE(s.get_code_model() == code_model::medium);
@@ -467,6 +469,8 @@ TEST_CASE("code model")
         oss << s.get_code_model();
         REQUIRE(oss.str() == "medium");
     }
+
+#endif
 
     {
         llvm_state s{kw::code_model = code_model::large};

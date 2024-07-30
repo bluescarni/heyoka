@@ -151,13 +151,13 @@ TEST_CASE("code_model test")
     auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
     const auto size11 = llvm_state::get_memcache_size();
 
-    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::code_model = code_model::medium};
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::code_model = code_model::large};
     REQUIRE(llvm_state::get_memcache_size() > size11);
 
     const auto new_size = llvm_state::get_memcache_size();
 
     ta = taylor_adaptive<double>{
-        model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::code_model = code_model::medium, kw::force_avx512 = true};
+        model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::code_model = code_model::large, kw::force_avx512 = true};
     REQUIRE(llvm_state::get_memcache_size() > new_size);
 }
 
