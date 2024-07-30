@@ -416,9 +416,12 @@ struct llvm_state::jit {
 
         // Setup the code model.
         switch (c_model) {
+            // NOTE: tiny code model not supported.
+            // LCOV_EXCL_START
             case code_model::tiny:
                 jtmb->setCodeModel(llvm::CodeModel::Tiny);
                 break;
+                // LCOV_EXCL_STOP
             case code_model::small:
                 jtmb->setCodeModel(llvm::CodeModel::Small);
                 break;
@@ -431,8 +434,8 @@ struct llvm_state::jit {
             case code_model::large:
                 jtmb->setCodeModel(llvm::CodeModel::Large);
                 break;
-            default:
                 // LCOV_EXCL_START
+            default:
                 // NOTE: we should never end up here.
                 assert(false);
                 ;
