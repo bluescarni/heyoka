@@ -113,12 +113,11 @@ constexpr auto CK4 = -.375 * J4;
 auto sgp4_init()
 {
     // Several math wrappers used in the original fortran code.
-    // Yay caps!
-    constexpr auto ABS = [](const auto &x) { return select(gte(x, 0.), x, -x); };
+    constexpr auto heyoka_ABS = [](const auto &x) { return select(gte(x, 0.), x, -x); };
 
-    constexpr auto MAX = [](const auto &a, const auto &b) { return select(gt(a, b), a, b); };
+    constexpr auto heyoka_MAX = [](const auto &a, const auto &b) { return select(gt(a, b), a, b); };
 
-    constexpr auto MIN = [](const auto &a, const auto &b) { return select(lt(a, b), a, b); };
+    constexpr auto heyoka_MIN = [](const auto &a, const auto &b) { return select(lt(a, b), a, b); };
 
     // The inputs.
     const auto [N0, I0, E0, BSTAR, OMEGA0, M0, NODE0] = make_vars("n0", "i0", "e0", "bstar", "omega0", "m0", "node0");
@@ -148,14 +147,14 @@ auto sgp4_init()
     // approximated form of the updated one?
     const auto A0DP = pow(KE / N0DP, TOTHRD);
     const auto PERIGE = A0DP * (1. - E0) - 1.;
-    const auto S = MIN(MAX(S0, PERIGE - S1), S1);
+    const auto S = heyoka_MIN(heyoka_MAX(S0, PERIGE - S1), S1);
     const auto S4 = 1. + S;
     const auto PINVSQ = 1. / pow(A0DP * BETA02, 2.);
     const auto XI = 1. / (A0DP - S4);
     const auto ETA = A0DP * XI * E0;
     const auto ETASQ = pow(ETA, 2.);
     const auto EETA = E0 * ETA;
-    const auto PSISQ = ABS(1. - ETASQ);
+    const auto PSISQ = heyoka_ABS(1. - ETASQ);
     const auto COEF = pow((Q0 - S) * XI, 4.);
     const auto COEF1 = COEF / (sqrt(PSISQ) * pow(PSISQ, 3.));
     const auto C1 = BSTAR * COEF1 * N0DP
@@ -188,7 +187,7 @@ auto sgp4_init()
     const auto T2COF = 1.5 * C1;
     // NOTE: fix for inclination close to 180 degrees.
     const auto LCOF
-        = .125 * A3OVK2 * SINI0 * (3. + 5. * COSI0) / select(gt(ABS(1. + COSI0), 1.5e-12), 1. + COSI0, 1.5e-12);
+        = .125 * A3OVK2 * SINI0 * (3. + 5. * COSI0) / select(gt(heyoka_ABS(1. + COSI0), 1.5e-12), 1. + COSI0, 1.5e-12);
     const auto AYCOF = .25 * A3OVK2 * SINI0;
     const auto DELM0 = pow(1. + ETA * cos(M0), 3.);
     const auto SINM0 = sin(M0);
