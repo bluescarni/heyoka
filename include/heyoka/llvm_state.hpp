@@ -23,6 +23,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/ostream.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -112,6 +114,20 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 enum class code_model : unsigned { tiny, small, kernel, medium, large };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, code_model);
+
+HEYOKA_END_NAMESPACE
+
+// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::code_model> : fmt::ostream_formatter {
+};
+
+} // namespace fmt
+
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {

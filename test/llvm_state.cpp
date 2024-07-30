@@ -434,6 +434,7 @@ TEST_CASE("code model")
 {
     using Catch::Matchers::Message;
 
+    // code_model::small supported on all platofrms.
     {
         llvm_state s;
         REQUIRE(s.get_code_model() == code_model::small);
@@ -443,14 +444,44 @@ TEST_CASE("code model")
         REQUIRE(oss.str() == "small");
     }
 
-    // NOTE: tiny code model not supported.
+    // code_model::tiny not supported on x86.
+#if defined(HEYOKA_ARCH_X86)
+
     {
         std::ostringstream oss;
         oss << code_model::tiny;
         REQUIRE(oss.str() == "tiny");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::tiny}, std::invalid_argument,
+                               Message("The code model 'tiny' is not supported on the current architecture"));
     }
 
-#if !defined(HEYOKA_ARCH_ARM)
+#else
+
+    {
+        llvm_state s;
+        REQUIRE(s.get_code_model() == code_model::tiny);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "tiny");
+    }
+
+#endif
+
+    // code_model::kernel not supported on arm or ppc.
+#if defined(HEYOKA_ARCH_ARM) || defined(HEYOKA_ARCH_PPC)
+
+    {
+        std::ostringstream oss;
+        oss << code_model::kernel;
+        REQUIRE(oss.str() == "kernel");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::kernel}, std::invalid_argument,
+                               Message("The code model 'kernel' is not supported on the current architecture"));
+    }
+
+#else
 
     {
         llvm_state s{kw::code_model = code_model::kernel};
@@ -460,6 +491,22 @@ TEST_CASE("code model")
         oss << s.get_code_model();
         REQUIRE(oss.str() == "kernel");
     }
+
+#endif
+
+    // code_model::medium not supported on arm.
+#if defined(HEYOKA_ARCH_ARM)
+
+    {
+        std::ostringstream oss;
+        oss << code_model::medium;
+        REQUIRE(oss.str() == "medium");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::medium}, std::invalid_argument,
+                               Message("The code model 'medium' is not supported on the current architecture"));
+    }
+
+#else
 
     {
         llvm_state s{kw::code_model = code_model::medium};
@@ -472,6 +519,7 @@ TEST_CASE("code model")
 
 #endif
 
+    // code_model::large supported on all platofrms.
     {
         llvm_state s{kw::code_model = code_model::large};
         REQUIRE(s.get_code_model() == code_model::large);

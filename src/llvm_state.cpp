@@ -425,6 +425,34 @@ struct llvm_state::jit {
         // ASAN failures all over the place. Thus, let us not do anything with the code
         // model setting before LLVM 17.
 
+        // NOTE: not all code models are supported on all archs. We make an effort
+        // here to prevent unsupported code models to be requested, as that will
+        // result in a termination of the program.
+        constexpr code_model supported_code_models[] = {
+#if defined(HEYOKA_ARCH_X86)
+            code_model::small,
+            code_model::kernel,
+            code_model::medium,
+            code_model::large
+#endif
+#if defined(HEYOKA_ARCH_ARM)
+                code_model::tiny,
+            code_model::small,
+            code_model::large
+#endif
+#if defined(HEYOKA_ARCH_PPC)
+                code_model::tiny,
+            code_model::small,
+            code_model::medium,
+            code_model::large
+#endif
+        };
+
+        if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("The code model '{}' is not supported on the current architecture", c_model));
+        }
+
         // Setup the code model.
         switch (c_model) {
             // NOTE: tiny code model not supported.
