@@ -435,6 +435,8 @@ struct llvm_state::jit {
                 fmt::format("The code model '{}' is not supported on the current architecture", c_model));
         }
 
+        // LCOV_EXCL_START
+
 #if LLVM_VERSION_MAJOR >= 17
         // NOTE: the code model setup is working only on LLVM>=19 (or at least
         // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
@@ -463,15 +465,15 @@ struct llvm_state::jit {
             case code_model::large:
                 jtmb->setCodeModel(llvm::CodeModel::Large);
                 break;
-                // LCOV_EXCL_START
             default:
                 // NOTE: we should never end up here.
                 assert(false);
                 ;
-                // LCOV_EXCL_STOP
         }
 
 #endif
+
+        //  LCOV_EXCL_STOP
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
