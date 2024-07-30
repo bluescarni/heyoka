@@ -1,6 +1,27 @@
 Changelog
 =========
 
+5.2.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Add the possibility of specifying the LLVM code model
+  used for JIT compilation
+  (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).
+- Enable support for fmt 11
+  (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).
+
+Fix
+~~~
+
+- Fix build system warnings when using recent versions of
+  CMake and Boost
+  (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).
+- Fix compilation on FreeBSD
+  (`#439 <https://github.com/bluescarni/heyoka/pull/439>`__).
+
 5.1.0 (2024-07-21)
 ------------------
 
