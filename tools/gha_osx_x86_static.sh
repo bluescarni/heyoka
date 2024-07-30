@@ -13,7 +13,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 mamba create -y -p $deps_dir c-compiler zlib cxx-compiler libcxx 'cmake>=3.18' ninja \
     llvmdev tbb-devel tbb libboost-devel sleef xtensor xtensor-blas blas \
-    blas-devel 'fmt<11' spdlog 'mppp=1.*'
+    blas-devel fmt spdlog 'mppp=1.*'
 source activate $deps_dir
 
 # Create the build dir and cd into it.
