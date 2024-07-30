@@ -371,7 +371,7 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
     std::optional<std::string> m_object_file;
 
-    explicit jit(unsigned opt_level, code_model c_model)
+    explicit jit(unsigned opt_level, [[maybe_unused]] code_model c_model)
     {
         // NOTE: we assume here the opt level has already been clamped
         // from the outside.
