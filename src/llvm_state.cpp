@@ -414,6 +414,17 @@ struct llvm_state::jit {
                 jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
         }
 
+#if LLVM_VERSION_MAJOR >= 17
+        // NOTE: the code model setup is working only on LLVM>=19 (or at least
+        // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
+        //
+        // https://github.com/llvm/llvm-project/issues/88115
+        //
+        // Additionally, there are indications from our CI that attempting to set
+        // the code model before LLVM 17 might just be buggy, as we see widespread
+        // ASAN failures all over the place. Thus, let us not do anything with the code
+        // model setting before LLVM 17.
+
         // Setup the code model.
         switch (c_model) {
             // NOTE: tiny code model not supported.
@@ -441,6 +452,8 @@ struct llvm_state::jit {
                 ;
                 // LCOV_EXCL_STOP
         }
+
+#endif
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
