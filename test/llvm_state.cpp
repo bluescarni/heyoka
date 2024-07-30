@@ -434,16 +434,6 @@ TEST_CASE("code model")
 {
     using Catch::Matchers::Message;
 
-    // code_model::small supported on all platofrms.
-    {
-        llvm_state s;
-        REQUIRE(s.get_code_model() == code_model::small);
-
-        std::ostringstream oss;
-        oss << s.get_code_model();
-        REQUIRE(oss.str() == "small");
-    }
-
     // code_model::tiny not supported on x86.
 #if defined(HEYOKA_ARCH_X86)
 
@@ -468,6 +458,16 @@ TEST_CASE("code model")
     }
 
 #endif
+
+    // code_model::small supported on all platofrms.
+    {
+        llvm_state s;
+        REQUIRE(s.get_code_model() == code_model::small);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "small");
+    }
 
     // code_model::kernel not supported on arm or ppc.
 #if defined(HEYOKA_ARCH_ARM) || defined(HEYOKA_ARCH_PPC)
