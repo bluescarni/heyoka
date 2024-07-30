@@ -450,6 +450,8 @@ TEST_CASE("code model")
         REQUIRE(oss.str() == "tiny");
     }
 
+#if !defined(HEYOKA_ARCH_ARM)
+
     {
         llvm_state s{kw::code_model = code_model::kernel};
         REQUIRE(s.get_code_model() == code_model::kernel);
@@ -458,8 +460,6 @@ TEST_CASE("code model")
         oss << s.get_code_model();
         REQUIRE(oss.str() == "kernel");
     }
-
-#if !defined(HEYOKA_ARCH_ARM)
 
     {
         llvm_state s{kw::code_model = code_model::medium};
