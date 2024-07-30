@@ -16,6 +16,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <ios>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -370,7 +371,7 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
     std::optional<std::string> m_object_file;
 
-    explicit jit(unsigned opt_level)
+    explicit jit(unsigned opt_level, code_model c_model)
     {
         // NOTE: we assume here the opt level has already been clamped
         // from the outside.
@@ -412,6 +413,67 @@ struct llvm_state::jit {
                 assert(opt_level == 3u);
                 jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
         }
+
+        // NOTE: not all code models are supported on all archs. We make an effort
+        // here to prevent unsupported code models to be requested, as that will
+        // result in the termination of the program.
+        constexpr code_model supported_code_models[] = {
+#if defined(HEYOKA_ARCH_X86)
+            code_model::small, code_model::kernel, code_model::medium, code_model::large
+#elif defined(HEYOKA_ARCH_ARM)
+            code_model::tiny, code_model::small, code_model::large
+#elif defined(HEYOKA_ARCH_PPC)
+            code_model::small, code_model::medium, code_model::large
+#else
+            // NOTE: by default we assume only small and large are supported.
+            code_model::small, code_model::large
+#endif
+        };
+
+        if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("The code model '{}' is not supported on the current architecture", c_model));
+        }
+
+        // LCOV_EXCL_START
+
+#if LLVM_VERSION_MAJOR >= 17
+        // NOTE: the code model setup is working only on LLVM>=19 (or at least
+        // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
+        //
+        // https://github.com/llvm/llvm-project/issues/88115
+        //
+        // Additionally, there are indications from our CI that attempting to set
+        // the code model before LLVM 17 might just be buggy, as we see widespread
+        // ASAN failures all over the place. Thus, let us not do anything with the code
+        // model setting before LLVM 17.
+
+        // Setup the code model.
+        switch (c_model) {
+            case code_model::tiny:
+                jtmb->setCodeModel(llvm::CodeModel::Tiny);
+                break;
+            case code_model::small:
+                jtmb->setCodeModel(llvm::CodeModel::Small);
+                break;
+            case code_model::kernel:
+                jtmb->setCodeModel(llvm::CodeModel::Kernel);
+                break;
+            case code_model::medium:
+                jtmb->setCodeModel(llvm::CodeModel::Medium);
+                break;
+            case code_model::large:
+                jtmb->setCodeModel(llvm::CodeModel::Large);
+                break;
+            default:
+                // NOTE: we should never end up here.
+                assert(false);
+                ;
+        }
+
+#endif
+
+        //  LCOV_EXCL_STOP
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
@@ -647,10 +709,45 @@ auto llvm_state_bc_to_module(const std::string &module_name, const std::string &
 
 } // namespace detail
 
+std::ostream &operator<<(std::ostream &os, code_model c_model)
+{
+    switch (c_model) {
+        case code_model::tiny:
+            os << "tiny";
+            break;
+        case code_model::small:
+            os << "small";
+            break;
+        case code_model::kernel:
+            os << "kernel";
+            break;
+        case code_model::medium:
+            os << "medium";
+            break;
+        case code_model::large:
+            os << "large";
+            break;
+        default:
+            os << "invalid";
+    }
+
+    return os;
+}
+
+void llvm_state::validate_code_model(code_model c_model)
+{
+    if (c_model < code_model::tiny || c_model > code_model::large) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "An invalid code model enumerator with a value of {} was passed to the constructor of an llvm_state",
+            static_cast<unsigned>(c_model)));
+    }
+}
+
 // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
-    : m_jitter(std::make_unique<jit>(std::get<1>(tup))), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
-      m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)), m_module_name(std::move(std::get<0>(tup)))
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool, code_model> &&tup)
+    : m_jitter(std::make_unique<jit>(std::get<1>(tup), std::get<5>(tup))), m_opt_level(std::get<1>(tup)),
+      m_fast_math(std::get<2>(tup)), m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)),
+      m_c_model(std::get<5>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -673,9 +770,9 @@ llvm_state::llvm_state(const llvm_state &other)
     // NOTE: start off by:
     // - creating a new jit,
     // - copying over the options from other.
-    : m_jitter(std::make_unique<jit>(other.m_opt_level)), m_opt_level(other.m_opt_level),
+    : m_jitter(std::make_unique<jit>(other.m_opt_level, other.m_c_model)), m_opt_level(other.m_opt_level),
       m_fast_math(other.m_fast_math), m_force_avx512(other.m_force_avx512), m_slp_vectorize(other.m_slp_vectorize),
-      m_module_name(other.m_module_name)
+      m_c_model(other.m_c_model), m_module_name(other.m_module_name)
 {
     if (other.is_compiled()) {
         // 'other' was compiled.
@@ -733,6 +830,7 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         m_fast_math = other.m_fast_math;
         m_force_avx512 = other.m_force_avx512;
         m_slp_vectorize = other.m_slp_vectorize;
+        m_c_model = other.m_c_model;
         m_module_name = std::move(other.m_module_name);
     }
 
@@ -769,6 +867,7 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     ar << m_fast_math;
     ar << m_force_avx512;
     ar << m_slp_vectorize;
+    ar << m_c_model;
     ar << m_module_name;
 
     // Store the bitcode.
@@ -844,6 +943,10 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     ar >> slp_vectorize;
 
     // NOLINTNEXTLINE(misc-const-correctness)
+    code_model c_model{};
+    ar >> c_model;
+
+    // NOLINTNEXTLINE(misc-const-correctness)
     std::string module_name;
     ar >> module_name;
 
@@ -870,6 +973,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_fast_math = fast_math;
         m_force_avx512 = force_avx512;
         m_slp_vectorize = slp_vectorize;
+        m_c_model = c_model;
         m_module_name = module_name;
 
         // Reset module and builder to the def-cted state.
@@ -877,7 +981,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_builder.reset();
 
         // Reset the jit with a new one.
-        m_jitter = std::make_unique<jit>(opt_level);
+        m_jitter = std::make_unique<jit>(opt_level, c_model);
 
         if (cmp) {
             // Assign the snapshots.
@@ -974,6 +1078,11 @@ bool llvm_state::force_avx512() const
 bool llvm_state::get_slp_vectorize() const
 {
     return m_slp_vectorize;
+}
+
+code_model llvm_state::get_code_model() const
+{
+    return m_c_model;
 }
 
 unsigned llvm_state::clamp_opt_level(unsigned opt_level)
@@ -1310,11 +1419,18 @@ void llvm_state::compile()
         // Fetch the bitcode *before* optimisation.
         auto orig_bc = get_bc();
 
-        // Combine m_opt_level, m_force_avx512 and m_slp_vectorize into a single value,
+        // Combine m_opt_level, m_force_avx512, m_slp_vectorize and m_c_model into a single value,
         // as they all affect codegen.
+        // NOTE: here we need:
+        // - 2 bits for m_opt_level,
+        // - 1 bit for m_force_avx512 and m_slp_vectorize each,
+        // - 3 bits for m_c_model,
+        // for a total of 7 bits.
         assert(m_opt_level <= 3u);
+        assert(static_cast<unsigned>(m_c_model) <= 7u);
+        static_assert(std::numeric_limits<unsigned>::digits >= 7u);
         const auto olevel = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2)
-                            + (static_cast<unsigned>(m_slp_vectorize) << 3);
+                            + (static_cast<unsigned>(m_slp_vectorize) << 3) + (static_cast<unsigned>(m_c_model) << 4);
 
         if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, olevel)) {
             // Cache hit.
@@ -1463,7 +1579,8 @@ const std::string &llvm_state::module_name() const
 llvm_state llvm_state::make_similar() const
 {
     return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math,
-                      kw::force_avx512 = m_force_avx512, kw::slp_vectorize = m_slp_vectorize);
+                      kw::force_avx512 = m_force_avx512, kw::slp_vectorize = m_slp_vectorize,
+                      kw::code_model = m_c_model);
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
@@ -1476,6 +1593,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Fast math         : " << s.m_fast_math << '\n';
     oss << "Force AVX512      : " << s.m_force_avx512 << '\n';
     oss << "SLP vectorization : " << s.m_slp_vectorize << '\n';
+    oss << "Code model        : " << s.m_c_model << '\n';
     oss << "Optimisation level: " << s.m_opt_level << '\n';
     oss << "Data layout       : " << s.m_jitter->m_lljit->getDataLayout().getStringRepresentation() << '\n';
     oss << "Target triple     : " << s.m_jitter->get_target_triple().str() << '\n';

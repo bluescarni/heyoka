@@ -23,6 +23,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/ostream.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -108,6 +110,25 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 
 #endif
 
+// Code model.
+enum class code_model : unsigned { tiny, small, kernel, medium, large };
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, code_model);
+
+HEYOKA_END_NAMESPACE
+
+// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::code_model> : fmt::ostream_formatter {
+};
+
+} // namespace fmt
+
+HEYOKA_BEGIN_NAMESPACE
+
 class HEYOKA_DLL_PUBLIC llvm_state
 {
     friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
@@ -125,6 +146,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     bool m_fast_math;
     bool m_force_avx512;
     bool m_slp_vectorize;
+    code_model m_c_model;
     std::string m_module_name;
 
     // Serialization.
@@ -147,6 +169,9 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // Helper to clamp the optimisation level to
     // the [0, 3] range.
     static unsigned clamp_opt_level(unsigned);
+
+    // Helper to validate the code model enumerator,
+    static void validate_code_model(code_model);
 
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
@@ -224,9 +249,24 @@ class HEYOKA_DLL_PUBLIC llvm_state
             }
         }();
 
-        return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize};
+        // Code model (defaults to small).
+        auto c_model = [&p]() {
+            if constexpr (p.has(kw::code_model)) {
+                if constexpr (std::same_as<std::remove_cvref_t<decltype(p(kw::code_model))>, code_model>) {
+                    return p(kw::code_model);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'code_model' keyword argument.");
+                }
+            } else {
+                return code_model::small;
+            }
+        }();
+        validate_code_model(c_model);
+
+        return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize, c_model};
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool, code_model> &&);
 
     // Small shared helper to setup the math flags in the builder at the
     // end of a constructor.
@@ -267,6 +307,7 @@ public:
     [[nodiscard]] bool force_avx512() const;
     [[nodiscard]] unsigned get_opt_level() const;
     [[nodiscard]] bool get_slp_vectorize() const;
+    [[nodiscard]] code_model get_code_model() const;
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;
@@ -311,7 +352,8 @@ HEYOKA_END_NAMESPACE
 // - version 1: got rid of the inline_functions setting;
 // - version 2: added the force_avx512 setting;
 // - version 3: added the bitcode snapshot, simplified
-//   compilation logic, slp_vectorize flag.
-BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
+//   compilation logic, slp_vectorize flag;
+// - version 4: added the code_model option.
+BOOST_CLASS_VERSION(heyoka::llvm_state, 4)
 
 #endif

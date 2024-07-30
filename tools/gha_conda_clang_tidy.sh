@@ -15,7 +15,7 @@ export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 mamba create -y -p $deps_dir cmake c-compiler cxx-compiler clang clangxx \
-    clang-tools llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef 'fmt<11' spdlog ninja
+    clang-tools llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef fmt spdlog ninja
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -32,7 +32,6 @@ cmake ../ -G Ninja \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DBoost_NO_BOOST_CMAKE=ON \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DCMAKE_CXX_CLANG_TIDY=`which clang-tidy` \
     -DCMAKE_C_CLANG_TIDY=`which clang-tidy` \

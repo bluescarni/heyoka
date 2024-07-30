@@ -33,6 +33,7 @@ IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 // and LLVM learns to discriminate good and bad implementations.
 IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
 IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
+IGOR_MAKE_NAMED_ARGUMENT(code_model);
 
 // cfunc API.
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);

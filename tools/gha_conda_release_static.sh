@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 mamba create -y -p $deps_dir c-compiler cxx-compiler ninja cmake \
     llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor xtensor-blas \
-    blas blas-devel 'fmt<11' spdlog zlib
+    blas blas-devel fmt spdlog zlib
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -31,7 +31,6 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DBoost_NO_BOOST_CMAKE=ON \
     -DHEYOKA_ENABLE_IPO=yes \
     -DHEYOKA_FORCE_STATIC_LLVM=yes \
     -DHEYOKA_HIDE_LLVM_SYMBOLS=yes

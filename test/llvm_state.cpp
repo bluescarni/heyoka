@@ -142,7 +142,8 @@ TEST_CASE("copy semantics")
 
     // Copy without compilation.
     {
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true,
+                     kw::code_model = code_model::large};
 
         detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
@@ -159,6 +160,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
         REQUIRE(s2.get_slp_vectorize());
+        REQUIRE(s2.get_code_model() == code_model::large);
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -175,6 +177,15 @@ TEST_CASE("copy semantics")
 
         REQUIRE(outputs[0] == 6);
         REQUIRE(outputs[1] == 6);
+
+        llvm_state s3;
+        s3 = s2;
+        REQUIRE(s3.module_name() == "sample state");
+        REQUIRE(s3.get_opt_level() == 2u);
+        REQUIRE(s3.fast_math());
+        REQUIRE(!s3.is_compiled());
+        REQUIRE(s3.get_slp_vectorize());
+        REQUIRE(s3.get_code_model() == code_model::large);
     }
 }
 
@@ -218,8 +229,8 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true,
-                       kw::slp_vectorize = true};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u,       kw::fast_math = true,
+                       kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::large};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -235,6 +246,7 @@ TEST_CASE("s11n")
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.force_avx512() == false);
         REQUIRE(!s.get_slp_vectorize());
+        REQUIRE(s.get_code_model() == code_model::small);
     }
 
     // Compiled state.
@@ -289,8 +301,8 @@ TEST_CASE("make_similar")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true,
-                 kw::slp_vectorize = true};
+    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u,       kw::fast_math = true,
+                 kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::large};
 
     detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
@@ -312,6 +324,7 @@ TEST_CASE("make_similar")
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
     REQUIRE(s2.get_slp_vectorize());
+    REQUIRE(s2.get_code_model() == code_model::large);
 }
 
 TEST_CASE("force_avx512")
@@ -415,4 +428,124 @@ TEST_CASE("existing trigger")
 
     // Check that the second function was properly cleaned up.
     REQUIRE(std::distance(s.module().begin(), s.module().end()) == 1);
+}
+
+TEST_CASE("code model")
+{
+    using Catch::Matchers::Message;
+
+    // code_model::small supported on all platofrms.
+    {
+        llvm_state s;
+        REQUIRE(s.get_code_model() == code_model::small);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "small");
+    }
+
+    // code_model::tiny not supported on x86 or ppc.
+#if defined(HEYOKA_ARCH_X86) || defined(HEYOKA_ARCH_PPC)
+
+    {
+        std::ostringstream oss;
+        oss << code_model::tiny;
+        REQUIRE(oss.str() == "tiny");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::tiny}, std::invalid_argument,
+                               Message("The code model 'tiny' is not supported on the current architecture"));
+    }
+
+#else
+
+    {
+        llvm_state s{kw::code_model = code_model::tiny};
+        REQUIRE(s.get_code_model() == code_model::tiny);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "tiny");
+    }
+
+#endif
+
+    // code_model::small supported on all platofrms.
+    {
+        llvm_state s;
+        REQUIRE(s.get_code_model() == code_model::small);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "small");
+    }
+
+    // code_model::kernel not supported on arm or ppc.
+#if defined(HEYOKA_ARCH_ARM) || defined(HEYOKA_ARCH_PPC)
+
+    {
+        std::ostringstream oss;
+        oss << code_model::kernel;
+        REQUIRE(oss.str() == "kernel");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::kernel}, std::invalid_argument,
+                               Message("The code model 'kernel' is not supported on the current architecture"));
+    }
+
+#else
+
+    {
+        llvm_state s{kw::code_model = code_model::kernel};
+        REQUIRE(s.get_code_model() == code_model::kernel);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "kernel");
+    }
+
+#endif
+
+    // code_model::medium not supported on arm.
+#if defined(HEYOKA_ARCH_ARM)
+
+    {
+        std::ostringstream oss;
+        oss << code_model::medium;
+        REQUIRE(oss.str() == "medium");
+
+        REQUIRE_THROWS_MATCHES(llvm_state{kw::code_model = code_model::medium}, std::invalid_argument,
+                               Message("The code model 'medium' is not supported on the current architecture"));
+    }
+
+#else
+
+    {
+        llvm_state s{kw::code_model = code_model::medium};
+        REQUIRE(s.get_code_model() == code_model::medium);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "medium");
+    }
+
+#endif
+
+    // code_model::large supported on all platofrms.
+    {
+        llvm_state s{kw::code_model = code_model::large};
+        REQUIRE(s.get_code_model() == code_model::large);
+
+        std::ostringstream oss;
+        oss << s.get_code_model();
+        REQUIRE(oss.str() == "large");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << code_model{100};
+        REQUIRE(oss.str() == "invalid");
+    }
+
+    REQUIRE_THROWS_MATCHES(
+        llvm_state{kw::code_model = code_model{100}}, std::invalid_argument,
+        Message("An invalid code model enumerator with a value of 100 was passed to the constructor of an llvm_state"));
 }
