@@ -70,12 +70,12 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CodeGen.h>
+#include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-#include <llvm/Transforms/Vectorize/LoadStoreVectorizer.h>
 
 #if LLVM_VERSION_MAJOR >= 17
 
@@ -166,12 +166,12 @@ const std::regex ppc_regex_pattern("pwr([1-9]*)");
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
-    if (!jtmb) {
+    if (!jtmb) [[unlikely]] {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
 
     auto tm = jtmb->createTargetMachine();
-    if (!tm) {
+    if (!tm) [[unlikely]] {
         throw std::invalid_argument("Error creating the target machine");
     }
 
@@ -266,9 +266,113 @@ void init_native_target()
     });
 }
 
+// Helper to create a builder for target machines.
+llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model c_model)
+{
+    // NOTE: codegen opt level changed in LLVM 18.
+#if LLVM_VERSION_MAJOR < 18
+
+    using cg_opt_level = llvm::CodeGenOpt::Level;
+
+#else
+
+    using cg_opt_level = llvm::CodeGenOptLevel;
+
+#endif
+
+    // Try creating the target machine builder.
+    auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+    // LCOV_EXCL_START
+    if (!jtmb) [[unlikely]] {
+        throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the codegen optimisation level.
+    switch (opt_level) {
+        case 0u:
+            jtmb->setCodeGenOptLevel(cg_opt_level::None);
+            break;
+        case 1u:
+            jtmb->setCodeGenOptLevel(cg_opt_level::Less);
+            break;
+        case 2u:
+            jtmb->setCodeGenOptLevel(cg_opt_level::Default);
+            break;
+        default:
+            assert(opt_level == 3u);
+            jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
+    }
+
+    // NOTE: not all code models are supported on all archs. We make an effort
+    // here to prevent unsupported code models to be requested, as that will
+    // result in the termination of the program.
+    constexpr code_model supported_code_models[] = {
+#if defined(HEYOKA_ARCH_X86)
+        code_model::small, code_model::kernel, code_model::medium, code_model::large
+#elif defined(HEYOKA_ARCH_ARM)
+        code_model::tiny, code_model::small, code_model::large
+#elif defined(HEYOKA_ARCH_PPC)
+        code_model::small, code_model::medium, code_model::large
+#else
+        // NOTE: by default we assume only small and large are supported.
+        code_model::small, code_model::large
+#endif
+    };
+
+    if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The code model '{}' is not supported on the current architecture", c_model));
+    }
+
+    // LCOV_EXCL_START
+
+#if LLVM_VERSION_MAJOR >= 17
+
+    // NOTE: the code model setup is working only on LLVM>=19 (or at least
+    // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
+    //
+    // https://github.com/llvm/llvm-project/issues/88115
+    //
+    // Additionally, there are indications from our CI that attempting to set
+    // the code model before LLVM 17 might just be buggy, as we see widespread
+    // ASAN failures all over the place. Thus, let us not do anything with the code
+    // model setting before LLVM 17.
+
+    // Setup the code model.
+    switch (c_model) {
+        case code_model::tiny:
+            jtmb->setCodeModel(llvm::CodeModel::Tiny);
+            break;
+        case code_model::small:
+            jtmb->setCodeModel(llvm::CodeModel::Small);
+            break;
+        case code_model::kernel:
+            jtmb->setCodeModel(llvm::CodeModel::Kernel);
+            break;
+        case code_model::medium:
+            jtmb->setCodeModel(llvm::CodeModel::Medium);
+            break;
+        case code_model::large:
+            jtmb->setCodeModel(llvm::CodeModel::Large);
+            break;
+        default:
+            // NOTE: we should never end up here.
+            assert(false);
+            ;
+    }
+
+#endif
+
+    //  LCOV_EXCL_STOP
+
+    return std::move(*jtmb);
+}
+
 // Helper to optimise the input module M. Implemented here for re-use.
 template <typename Jit>
-void optimise_module(llvm::Module &M, Jit &jit, unsigned opt_level, bool force_avx512, bool slp_vectorize)
+void optimise_module(llvm::Module &M, const Jit &jit, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
+                     bool slp_vectorize)
 {
     // NOTE: don't run any optimisation pass at O0.
     if (opt_level == 0u) {
@@ -337,8 +441,7 @@ void optimise_module(llvm::Module &M, Jit &jit, unsigned opt_level, bool force_a
     llvm::TargetLibraryInfoImpl TLII(jit.get_target_triple());
     FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
-    // Create the new pass manager builder, passing
-    // the native target machine from the JIT class.
+    // Create the new pass manager builder, passing the supplied target machine.
     // NOTE: if requested, we turn manually on the SLP vectoriser here, which is off
     // by default. Not sure why it is off, the LLVM docs imply this
     // is on by default at nonzero optimisation levels for clang and opt.
@@ -351,7 +454,7 @@ void optimise_module(llvm::Module &M, Jit &jit, unsigned opt_level, bool force_a
     // alternative way of setting up the optimisation pipeline in the future.
     llvm::PipelineTuningOptions pto;
     pto.SLPVectorization = slp_vectorize;
-    llvm::PassBuilder PB(jit.m_tm.get(), pto);
+    llvm::PassBuilder PB(&tm, pto);
 
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
@@ -455,107 +558,15 @@ struct llvm_state::jit {
         // Ensure the native target is inited.
         detail::init_native_target();
 
-        // NOTE: codegen opt level changed in LLVM 18.
-#if LLVM_VERSION_MAJOR < 18
-
-        using cg_opt_level = llvm::CodeGenOpt::Level;
-
-#else
-
-        using cg_opt_level = llvm::CodeGenOptLevel;
-
-#endif
-
         // Create the target machine builder.
-        auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
-        // LCOV_EXCL_START
-        if (!jtmb) {
-            throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
-        }
-        // LCOV_EXCL_STOP
-        // Set the codegen optimisation level.
-        switch (opt_level) {
-            case 0u:
-                jtmb->setCodeGenOptLevel(cg_opt_level::None);
-                break;
-            case 1u:
-                jtmb->setCodeGenOptLevel(cg_opt_level::Less);
-                break;
-            case 2u:
-                jtmb->setCodeGenOptLevel(cg_opt_level::Default);
-                break;
-            default:
-                assert(opt_level == 3u);
-                jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
-        }
-
-        // NOTE: not all code models are supported on all archs. We make an effort
-        // here to prevent unsupported code models to be requested, as that will
-        // result in the termination of the program.
-        constexpr code_model supported_code_models[] = {
-#if defined(HEYOKA_ARCH_X86)
-            code_model::small, code_model::kernel, code_model::medium, code_model::large
-#elif defined(HEYOKA_ARCH_ARM)
-            code_model::tiny, code_model::small, code_model::large
-#elif defined(HEYOKA_ARCH_PPC)
-            code_model::small, code_model::medium, code_model::large
-#else
-            // NOTE: by default we assume only small and large are supported.
-            code_model::small, code_model::large
-#endif
-        };
-
-        if (std::ranges::find(supported_code_models, c_model) == std::ranges::end(supported_code_models)) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("The code model '{}' is not supported on the current architecture", c_model));
-        }
-
-        // LCOV_EXCL_START
-
-#if LLVM_VERSION_MAJOR >= 17
-        // NOTE: the code model setup is working only on LLVM>=19 (or at least
-        // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
-        //
-        // https://github.com/llvm/llvm-project/issues/88115
-        //
-        // Additionally, there are indications from our CI that attempting to set
-        // the code model before LLVM 17 might just be buggy, as we see widespread
-        // ASAN failures all over the place. Thus, let us not do anything with the code
-        // model setting before LLVM 17.
-
-        // Setup the code model.
-        switch (c_model) {
-            case code_model::tiny:
-                jtmb->setCodeModel(llvm::CodeModel::Tiny);
-                break;
-            case code_model::small:
-                jtmb->setCodeModel(llvm::CodeModel::Small);
-                break;
-            case code_model::kernel:
-                jtmb->setCodeModel(llvm::CodeModel::Kernel);
-                break;
-            case code_model::medium:
-                jtmb->setCodeModel(llvm::CodeModel::Medium);
-                break;
-            case code_model::large:
-                jtmb->setCodeModel(llvm::CodeModel::Large);
-                break;
-            default:
-                // NOTE: we should never end up here.
-                assert(false);
-                ;
-        }
-
-#endif
-
-        //  LCOV_EXCL_STOP
+        auto jtmb = detail::create_jit_tmb(opt_level, c_model);
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
         // NOTE: other settable properties may
         // be of interest:
         // https://www.llvm.org/doxygen/classllvm_1_1orc_1_1LLJITBuilder.html
-        lljit_builder.setJITTargetMachineBuilder(*jtmb);
+        lljit_builder.setJITTargetMachineBuilder(jtmb);
 
         // Create the jit.
         auto lljit = lljit_builder.create();
@@ -606,7 +617,7 @@ struct llvm_state::jit {
 
         // Keep a target machine around to fetch various
         // properties of the host CPU.
-        auto tm = jtmb->createTargetMachine();
+        auto tm = jtmb.createTargetMachine();
         // LCOV_EXCL_START
         if (!tm) {
             throw std::invalid_argument("Error creating the target machine");
@@ -1215,7 +1226,7 @@ void llvm_state::optimise()
 {
     check_uncompiled(__func__);
 
-    detail::optimise_module(module(), *m_jitter, m_opt_level, m_force_avx512, m_slp_vectorize);
+    detail::optimise_module(module(), *m_jitter, *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
 }
 
 namespace detail
@@ -1241,6 +1252,7 @@ void llvm_state::add_obj_trigger()
     auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
     assert(ft != nullptr);
     auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, detail::obj_trigger_name, &module());
+    assert(f != nullptr);
 
     bld.SetInsertPoint(llvm::BasicBlock::Create(context(), "entry", f));
     bld.CreateRetVoid();
