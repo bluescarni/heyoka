@@ -1224,8 +1224,6 @@ void llvm_state::verify_function(const std::string &name)
 
 void llvm_state::optimise()
 {
-    check_uncompiled(__func__);
-
     detail::optimise_module(module(), *m_jitter, *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
 }
 
