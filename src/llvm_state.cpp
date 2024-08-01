@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -369,8 +370,10 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 }
 
 // Helper to optimise the input module M. Implemented here for re-use.
-template <typename Jit>
-void optimise_module(llvm::Module &M, const Jit &jit, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
+// NOTE: this may end up being invoked concurrently from multiple threads.
+// If that is the case, we make sure before invocation to construct a different
+// TargetMachine per thread, so that we are sure no data races are possible.
+void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
                      bool slp_vectorize)
 {
     // NOTE: don't run any optimisation pass at O0.
@@ -385,9 +388,10 @@ void optimise_module(llvm::Module &M, const Jit &jit, llvm::TargetMachine &tm, u
     // For every function in the module, setup its attributes
     // so that the codegen uses all the features available on
     // the host CPU.
-    const auto cpu = jit.get_target_cpu();
-    const auto features = jit.get_target_features();
+    const auto cpu = tm.getTargetCPU().str();
+    const auto features = tm.getTargetFeatureString().str();
 
+    // Fetch the module's context.
     auto &ctx = M.getContext();
 
     for (auto &f : M) {
@@ -437,7 +441,7 @@ void optimise_module(llvm::Module &M, const Jit &jit, llvm::TargetMachine &tm, u
     // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
     // Not sure if this matters, but we did it in the old pass manager
     // and opt does it too.
-    llvm::TargetLibraryInfoImpl TLII(jit.get_target_triple());
+    llvm::TargetLibraryInfoImpl TLII(tm.getTargetTriple());
     FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
     // Create the new pass manager builder, passing the supplied target machine.
@@ -548,11 +552,13 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
     std::optional<std::string> m_object_file;
 
+    // NOTE: make sure to coordinate changes in this constructor with multi_jit.
     explicit jit(unsigned opt_level, code_model c_model)
     {
-        // NOTE: we assume here the opt level has already been clamped
-        // from the outside.
+        // NOTE: we assume here that the input arguments have
+        // been validated already.
         assert(opt_level <= 3u);
+        assert(c_model >= code_model::tiny && c_model <= code_model::large);
 
         // Ensure the native target is inited.
         detail::init_native_target();
@@ -1223,7 +1229,13 @@ void llvm_state::verify_function(const std::string &name)
 
 void llvm_state::optimise()
 {
-    detail::optimise_module(module(), *m_jitter, *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
+    // NOTE: we used to fetch the target triple from the lljit object,
+    // but recently we switched to asking the target triple directly
+    // from the target machine. Assert equality between the two for a while,
+    // just in case.
+    assert(m_jitter->m_lljit->getTargetTriple() == m_jitter->m_tm->getTargetTriple());
+
+    detail::optimise_module(module(), *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
 }
 
 namespace detail
@@ -1510,59 +1522,274 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     return os << oss.str();
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: this is a class similar in spirit to llvm_state, but set up for parallel
+// compilation of multiple modules.
+struct multi_jit {
+    // NOTE: enumerate the LLVM members here in the same order
+    // as llvm_state, as this is important to ensure proper
+    // destruction order.
+    std::unique_ptr<llvm::orc::LLJIT> m_lljit;
+    std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
+    std::unique_ptr<llvm::Module> m_module;
+    std::unique_ptr<ir_builder> m_builder;
+
+    explicit multi_jit(unsigned, code_model);
+    multi_jit(const multi_jit &) = delete;
+    multi_jit(multi_jit &&) noexcept = delete;
+    llvm_multi_state &operator=(const multi_jit &) = delete;
+    llvm_multi_state &operator=(multi_jit &&) noexcept = delete;
+    ~multi_jit() = default;
+
+    [[nodiscard]] llvm::LLVMContext &context() const noexcept
+    {
+        return *m_ctx->getContext();
+    }
+};
+
+#if 0
+
+// A task dispatcher class built on top of TBB's task group.
+class tbb_task_dispatcher : public llvm::orc::TaskDispatcher
+{
+    oneapi::tbb::task_group m_tg;
+
+public:
+    void dispatch(std::unique_ptr<llvm::orc::Task> T) override
+    {
+        m_tg.run([T = std::move(T)]() { T->run(); });
+    }
+    void shutdown() override
+    {
+        m_tg.wait();
+    }
+    ~tbb_task_dispatcher() noexcept
+    {
+        m_tg.wait();
+    }
+};
+
+#endif
+
+// NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
+// NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
+multi_jit::multi_jit(unsigned opt_level, code_model c_model)
+{
+    // NOTE: we assume here that the input arguments have
+    // been validated already.
+    assert(opt_level <= 3u);
+    assert(c_model >= code_model::tiny && c_model <= code_model::large);
+
+    // Ensure the native target is inited.
+    init_native_target();
+
+    // Create the target machine builder.
+    auto jtmb = create_jit_tmb(opt_level, c_model);
+
+    // Create the jit builder.
+    llvm::orc::LLJITBuilder lljit_builder;
+    // NOTE: other settable properties may
+    // be of interest:
+    // https://www.llvm.org/doxygen/classllvm_1_1orc_1_1LLJITBuilder.html
+    lljit_builder.setJITTargetMachineBuilder(jtmb);
+
+#if 0
+    // Create a task dispatcher.
+    auto tdisp = std::make_unique<tbb_task_dispatcher>();
+
+    // Create an ExecutorProcessControl.
+    auto epc = llvm::orc::SelfExecutorProcessControl::Create(nullptr, std::move(tdisp));
+    // LCOV_EXCL_START
+    if (!epc) {
+        auto err = epc.takeError();
+
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        ostr << err;
+
+        throw std::invalid_argument(
+            fmt::format("Could not create a SelfExecutorProcessControl. The full error message is:\n{}", ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+
+    // Set it in the lljit builder.
+    lljit_builder.setExecutorProcessControl(std::move(*epc));
+#else
+
+    // Set the number of compilation threads.
+    lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
+
+#endif
+
+    // Create the jit.
+    auto lljit = lljit_builder.create();
+    // LCOV_EXCL_START
+    if (!lljit) {
+        auto err = lljit.takeError();
+
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        ostr << err;
+
+        throw std::invalid_argument(
+            fmt::format("Could not create an LLJIT object. The full error message is:\n{}", ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+    m_lljit = std::move(*lljit);
+
+    // Setup the jit so that it can look up symbols from the current process.
+    auto dlsg
+        = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_lljit->getDataLayout().getGlobalPrefix());
+    // LCOV_EXCL_START
+    if (!dlsg) {
+        throw std::invalid_argument("Could not create the dynamic library search generator");
+    }
+    // LCOV_EXCL_STOP
+    m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
+
+    // Create the master context.
+    m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
+
+    // Create the master module.
+    m_module = std::make_unique<llvm::Module>("master", context());
+    // Setup the data layout and the target triple.
+    m_module->setDataLayout(m_lljit->getDataLayout());
+    m_module->setTargetTriple(m_lljit->getTargetTriple().str());
+
+    // Create a new builder for the master module.
+    // NOTE: no need to mess around with fast math flags for this builder.
+    m_builder = std::make_unique<ir_builder>(context());
+}
+
+} // namespace
+
+} // namespace detail
+
 struct llvm_multi_state::impl {
     std::vector<llvm_state> m_states;
+    std::unique_ptr<detail::multi_jit> m_jit;
 };
 
 llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
 {
-    // All states must be uncompiled.
-    if (std::ranges::any_of(states, &llvm_state::is_compiled)) [[unlikely]] {
-        throw std::invalid_argument("An llvm_multi_state can be constructed only from non-compiled llvm_state objects");
+    // We need at least 1 state.
+    if (states.empty()) [[unlikely]] {
+        throw std::invalid_argument("At least 1 llvm_state object is needed to construct an llvm_multi_state");
     }
 
-    // Need at least 2 states.
-    if (states.size() < 2u) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("At least 2 llvm_state objects are needed to construct an llvm_multi_state, but instead the "
-                        "number of llvm_state objects provided on construction is {}",
-                        states.size()));
+    // All states must be uncompiled.
+    if (std::ranges::any_of(states, &llvm_state::is_compiled)) [[unlikely]] {
+        throw std::invalid_argument("An llvm_multi_state can be constructed only from uncompiled llvm_state objects");
     }
 
     // Settings in all states must be consistent.
-    auto cmp_states = [](const llvm_state &s1, const llvm_state &s2) {
+    auto states_differ = [](const llvm_state &s1, const llvm_state &s2) {
         if (s1.get_opt_level() != s2.get_opt_level()) {
-            return false;
+            return true;
         }
 
         if (s1.fast_math() != s2.fast_math()) {
-            return false;
+            return true;
         }
 
         if (s1.force_avx512() != s2.force_avx512()) {
-            return false;
+            return true;
         }
 
         if (s1.get_slp_vectorize() != s2.get_slp_vectorize()) {
-            return false;
+            return true;
         }
 
-        return true;
+        if (s1.get_code_model() != s2.get_code_model()) {
+            return true;
+        }
+
+        return false;
     };
 
-    for (decltype(states.size()) i = 1; i < states.size(); ++i) {
-        if (!cmp_states(states[i], states[i - 1u])) [[unlikely]] {
-            throw std::invalid_argument(
-                "Inconsistent llvm_state settings detected in the constructor of an llvm_multi_state");
-        }
+    if (std::ranges::adjacent_find(states, states_differ) != states.end()) [[unlikely]] {
+        throw std::invalid_argument(
+            "Inconsistent llvm_state settings detected in the constructor of an llvm_multi_state");
     }
 
-    impl imp{.m_states = std::move(states)};
+    // Fetch settings from the first state.
+    const auto opt_level = states[0].get_opt_level();
+    const auto c_model = states[0].get_code_model();
+    const auto force_avx512 = states[0].force_avx512();
+    const auto slp_vectorize = states[0].get_slp_vectorize();
 
+    // Rename all states.
+    for (decltype(states.size()) i = 0; i < states.size(); ++i) {
+        const auto new_mname = fmt::format("module_{}", i);
+        states[i].m_module->setModuleIdentifier(new_mname.c_str());
+    }
+
+    // Create the multi_jit.
+    auto jit = std::make_unique<detail::multi_jit>(opt_level, c_model);
+
+    // In the master jit, setup the machinery to run the optimisation passes on the modules.
+    jit->m_lljit->getIRTransformLayer().setTransform(
+        [&lljit = *jit->m_lljit, opt_level, force_avx512, slp_vectorize,
+         c_model](llvm::orc::ThreadSafeModule TSM, llvm::orc::MaterializationResponsibility &) {
+            // See here for an explanation of what withModuleDo() entails:
+            //
+            // https://groups.google.com/g/llvm-dev/c/QauU4L_bHac
+            //
+            // In our case, the locking/thread safety aspect is not important as we are not sharing
+            // contexts between threads.
+            TSM.withModuleDo([&lljit, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
+                // NOTE: don't run any optimisation on the master module.
+                if (M.getModuleIdentifier() == "master") {
+                    return;
+                }
+
+                // NOTE: running the optimisation passes requires mutable access to a target
+                // machine. Thus, we create a new target machine per thread in order to avoid likely data races
+                // with a shared target machine.
+
+                // Fetch a target machine builder.
+                auto jtmb = detail::create_jit_tmb(opt_level, c_model);
+
+                // Try creating the target machine.
+                auto tm = jtmb.createTargetMachine();
+                // LCOV_EXCL_START
+                if (!tm) [[unlikely]] {
+                    throw std::invalid_argument("Error creating the target machine");
+                }
+                // LCOV_EXCL_STOP
+
+                // NOTE: we used to fetch the target triple from the lljit object,
+                // but recently we switched to asking the target triple directly
+                // from the target machine. Assert equality between the two for a while,
+                // just in case.
+                // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
+                // object, it should be ok with concurrent invocation.
+                static_cast<void>(lljit);
+                assert(lljit.getTargetTriple() == (*tm)->getTargetTriple());
+
+                // Optimise the module.
+                detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
+            });
+
+            return llvm::Expected<llvm::orc::ThreadSafeModule>(std::move(TSM));
+        });
+
+    // Build and assign the implementation.
+    impl imp{.m_states = std::move(states), .m_jit = std::move(jit)};
     m_impl = std::make_unique<impl>(std::move(imp));
 }
 
-llvm_multi_state::llvm_multi_state(const llvm_multi_state &other) : m_impl(std::make_unique<impl>(*other.m_impl)) {}
+llvm_multi_state::llvm_multi_state(const llvm_multi_state &)
+{
+    // TODO implement.
+}
 
 llvm_multi_state::llvm_multi_state(llvm_multi_state &&) noexcept = default;
 
@@ -1578,5 +1805,152 @@ llvm_multi_state &llvm_multi_state::operator=(const llvm_multi_state &other)
 llvm_multi_state &llvm_multi_state::operator=(llvm_multi_state &&) noexcept = default;
 
 llvm_multi_state::~llvm_multi_state() = default;
+
+void llvm_multi_state::add_obj_triggers()
+{
+    // NOTE: the idea here is that we add one trigger function per module, and then
+    // we invoke all the trigger functions from a trigger function in the master module.
+    // Like this, we should ensure materialisation of all modules when we lookup the
+    // master trigger.
+
+    // Implement the per-module triggers.
+    for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
+        // Fetch builder/module/context for the current state.
+        auto &bld = m_impl->m_states[i].builder();
+        auto &md = m_impl->m_states[i].module();
+        auto &ctx = m_impl->m_states[i].context();
+
+        // The function name.
+        const auto fname = fmt::format("{}_{}", detail::obj_trigger_name, i);
+
+        auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
+        assert(ft != nullptr);
+        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname.c_str(), &md);
+        assert(f != nullptr);
+
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRetVoid();
+    }
+
+    // Fetch the master builder/module/context.
+    auto &bld = *m_impl->m_jit->m_builder;
+    auto &md = *m_impl->m_jit->m_module;
+    auto &ctx = m_impl->m_jit->context();
+
+    // Add the prototypes of all per-module trigger functions to the master module.
+    std::vector<llvm::Function *> callees;
+    callees.reserve(m_impl->m_states.size());
+    for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
+        // The function name.
+        const auto fname = fmt::format("{}_{}", detail::obj_trigger_name, i);
+
+        auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
+        assert(ft != nullptr);
+        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname.c_str(), &md);
+        assert(f != nullptr);
+
+        callees.push_back(f);
+    }
+
+    // Create the master trigger function.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
+    assert(ft != nullptr);
+    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, detail::obj_trigger_name, &md);
+    assert(f != nullptr);
+
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Invoke all the triggers.
+    for (auto *tf : callees) {
+        bld.CreateCall(tf, {});
+    }
+
+    // Return.
+    bld.CreateRetVoid();
+}
+
+void llvm_multi_state::compile_impl()
+{
+    for (auto &s : m_impl->m_states) {
+        // Add the module to the jit (this will clear out m_module).
+        auto err = m_impl->m_jit->m_lljit->addIRModule(
+            llvm::orc::ThreadSafeModule(std::move(s.m_module), *s.m_jitter->m_ctx));
+
+        // LCOV_EXCL_START
+        if (err) {
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            ostr << err;
+
+            throw std::invalid_argument(fmt::format(
+                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
+        }
+        // LCOV_EXCL_STOP
+
+        // Clear out the builder, which won't be usable any more.
+        s.m_builder.reset();
+    }
+
+    // TODO error check.
+    auto err = m_impl->m_jit->m_lljit->addIRModule(
+        llvm::orc::ThreadSafeModule(std::move(m_impl->m_jit->m_module), *m_impl->m_jit->m_ctx));
+
+    // Trigger object code materialisation via lookup.
+    jit_lookup(detail::obj_trigger_name);
+
+    // TODO restore?
+    // assert(m_jitter->m_object_file);
+}
+
+void llvm_multi_state::compile()
+{
+    // TODO check uncompiled
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    auto *logger = detail::get_logger();
+
+    // Verify the modules before compiling.
+    // NOTE: probably this can be parallelised if needed.
+    for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+
+        if (llvm::verifyModule(*m_impl->m_states[i].m_module, &ostr)) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(
+                fmt::format("The verification of the module at index {} in an llvm_multi_state produced an error:\n{}",
+                            i, ostr.str()));
+            // LCOV_EXCL_STOP
+        }
+    }
+
+    logger->trace("llvm_multi_state module verification runtime: {}", sw);
+
+    // Add the object materialisation trigger functions.
+    add_obj_triggers();
+
+    // Run the compilation.
+    compile_impl();
+}
+
+std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)
+{
+    // TODO restore.
+    // check_compiled(__func__);
+
+    auto sym = m_impl->m_jit->m_lljit->lookup(name);
+    if (!sym) {
+        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
+    }
+
+#if LLVM_VERSION_MAJOR >= 15
+    return static_cast<std::uintptr_t>((*sym).getValue());
+#else
+    return static_cast<std::uintptr_t>((*sym).getAddress());
+#endif
+}
 
 HEYOKA_END_NAMESPACE

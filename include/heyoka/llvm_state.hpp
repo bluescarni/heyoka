@@ -353,6 +353,9 @@ class HEYOKA_DLL_PUBLIC llvm_multi_state
 
     std::unique_ptr<impl> m_impl;
 
+    HEYOKA_DLL_LOCAL void compile_impl();
+    HEYOKA_DLL_LOCAL void add_obj_triggers();
+
 public:
     explicit llvm_multi_state(std::vector<llvm_state>);
     llvm_multi_state(const llvm_multi_state &);
@@ -360,6 +363,10 @@ public:
     llvm_multi_state &operator=(const llvm_multi_state &);
     llvm_multi_state &operator=(llvm_multi_state &&) noexcept;
     ~llvm_multi_state();
+
+    void compile();
+
+    std::uintptr_t jit_lookup(const std::string &);
 };
 
 HEYOKA_END_NAMESPACE
