@@ -33,6 +33,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 
@@ -1539,6 +1540,9 @@ namespace
 // NOTE: this is a class similar in spirit to llvm_state, but set up for parallel
 // compilation of multiple modules.
 struct multi_jit {
+    // NOTE: this is the total number of modules, including
+    // the master module.
+    const unsigned m_n_modules = 0;
     // NOTE: enumerate the LLVM members here in the same order
     // as llvm_state, as this is important to ensure proper
     // destruction order.
@@ -1546,8 +1550,11 @@ struct multi_jit {
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
+    // Object files.
+    std::mutex m_object_files_mutex;
+    std::vector<std::string> m_object_files;
 
-    explicit multi_jit(unsigned, code_model);
+    explicit multi_jit(unsigned, unsigned, code_model);
     multi_jit(const multi_jit &) = delete;
     multi_jit(multi_jit &&) noexcept = delete;
     llvm_multi_state &operator=(const multi_jit &) = delete;
@@ -1586,8 +1593,10 @@ public:
 
 // NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
 // NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
-multi_jit::multi_jit(unsigned opt_level, code_model c_model)
+multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model) : m_n_modules(n_modules)
 {
+    assert(n_modules >= 2u);
+
     // NOTE: we assume here that the input arguments have
     // been validated already.
     assert(opt_level <= 3u);
@@ -1651,6 +1660,36 @@ multi_jit::multi_jit(unsigned opt_level, code_model c_model)
     }
     // LCOV_EXCL_STOP
     m_lljit = std::move(*lljit);
+
+    // Setup the machinery to store the modules' binary code
+    // when it is generated.
+    m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
+        assert(obj_buffer);
+
+        // Lock down for access to m_object_files.
+        std::lock_guard lock{m_object_files_mutex};
+
+        assert(m_object_files.size() <= m_n_modules);
+
+        // NOTE: this callback will be invoked the first time a jit lookup is performed,
+        // even if the object code was manually injected. In such a case, m_object_files
+        // has already been set up properly and we just sanity check in debug mode that
+        // one object file matches the content of obj_buffer.
+        if (m_object_files.size() < m_n_modules) {
+            // Add obj_buffer.
+            m_object_files.push_back(std::string(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd()));
+        } else {
+            // Check that at least one buffer in m_object_files is exactly
+            // identical to obj_buffer.
+            assert(std::ranges::any_of(m_object_files, [&obj_buffer](const auto &cur) {
+                return obj_buffer->getBufferSize() == cur.size()
+                       && std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), cur.begin());
+                ;
+            }));
+        }
+
+        return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
+    });
 
     // Setup the jit so that it can look up symbols from the current process.
     auto dlsg
@@ -1740,7 +1779,8 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
     }
 
     // Create the multi_jit.
-    auto jit = std::make_unique<detail::multi_jit>(opt_level, c_model);
+    auto jit = std::make_unique<detail::multi_jit>(boost::safe_numerics::safe<unsigned>(states.size()) + 1, opt_level,
+                                                   c_model);
 
     // In the master jit, setup the machinery to run the optimisation passes on the modules.
     jit->m_lljit->getIRTransformLayer().setTransform(
