@@ -1325,11 +1325,15 @@ void llvm_state::compile()
     // to fix the module and re-attempt compilation without having
     // altered the module and without having already added the trigger
     // function.
+    // NOTE: this function does its own cleanup, no need to
+    // start the try catch block yet.
     add_obj_trigger();
 
     try {
         // Fetch the bitcode *before* optimisation.
         auto orig_bc = get_bc();
+        std::vector<std::string> obc;
+        obc.push_back(std::move(orig_bc));
 
         // Combine m_opt_level, m_force_avx512, m_slp_vectorize and m_c_model into a single value,
         // as they all affect codegen.
@@ -1341,22 +1345,26 @@ void llvm_state::compile()
         assert(m_opt_level <= 3u);
         assert(static_cast<unsigned>(m_c_model) <= 7u);
         static_assert(std::numeric_limits<unsigned>::digits >= 7u);
-        const auto olevel = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2)
-                            + (static_cast<unsigned>(m_slp_vectorize) << 3) + (static_cast<unsigned>(m_c_model) << 4);
+        const auto comp_flag = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2)
+                               + (static_cast<unsigned>(m_slp_vectorize) << 3)
+                               + (static_cast<unsigned>(m_c_model) << 4);
 
-        if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, olevel)) {
+        if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
             // Cache hit.
 
             // Assign the snapshots.
-            m_ir_snapshot = std::move(cached_data->opt_ir);
-            m_bc_snapshot = std::move(cached_data->opt_bc);
+            assert(cached_data->opt_ir.size() == 1u);
+            assert(cached_data->opt_bc.size() == 1u);
+            assert(cached_data->obj.size() == 1u);
+            m_ir_snapshot = std::move(cached_data->opt_ir[0]);
+            m_bc_snapshot = std::move(cached_data->opt_bc[0]);
 
             // Clear out module and builder.
             m_module.reset();
             m_builder.reset();
 
             // Assign the object file.
-            detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj));
+            detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj[0]));
         } else {
             sw.reset();
 
@@ -1372,10 +1380,10 @@ void llvm_state::compile()
 
             logger->trace("materialisation runtime: {}", sw);
 
-            // Try to insert orig_bc into the cache.
-            detail::llvm_state_mem_cache_try_insert(std::move(orig_bc), olevel,
+            // Try to insert obc into the cache.
+            detail::llvm_state_mem_cache_try_insert(std::move(obc), comp_flag,
                                                     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-                                                    {m_bc_snapshot, m_ir_snapshot, *m_jitter->m_object_file});
+                                                    {{m_bc_snapshot}, {m_ir_snapshot}, {*m_jitter->m_object_file}});
         }
         // LCOV_EXCL_START
     } catch (...) {

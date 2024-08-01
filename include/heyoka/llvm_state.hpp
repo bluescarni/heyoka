@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <ostream>
@@ -338,12 +339,14 @@ namespace detail
 
 // The value contained in the in-memory cache.
 struct llvm_mc_value {
-    std::string opt_bc, opt_ir, obj;
+    std::vector<std::string> opt_bc, opt_ir, obj;
+
+    std::size_t total_size() const;
 };
 
 // Cache lookup and insertion.
-std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &, unsigned);
-void llvm_state_mem_cache_try_insert(std::string, unsigned, llvm_mc_value);
+std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &, unsigned);
+void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc_value);
 
 } // namespace detail
 
