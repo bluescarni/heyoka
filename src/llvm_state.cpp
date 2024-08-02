@@ -38,7 +38,6 @@
 #include <fmt/format.h>
 
 #include <llvm/ADT/SmallString.h>
-#include <llvm/ADT/SmallVector.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
@@ -73,7 +72,6 @@
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
@@ -733,12 +731,43 @@ namespace detail
 namespace
 {
 
+// An implementation of llvm::MemoryBuffer offering a view over a std::string.
+class string_view_mem_buffer final : public llvm::MemoryBuffer
+{
+public:
+    explicit string_view_mem_buffer(const std::string &s)
+    {
+        // NOTE: the important bit here is from the LLVM docs:
+        //
+        // """
+        // In addition to basic access to the characters in the file, this interface
+        // guarantees you can read one character past the end of the file, and that
+        // this character will read as '\0'.
+        // """
+        //
+        // This is exactly the guarantee given by std::string:
+        //
+        // https://en.cppreference.com/w/cpp/string/basic_string/data
+        //
+        // Not sure about the third parameter to this function though, it does not
+        // seem to have any influence apart from debug checking:
+        //
+        // https://llvm.org/doxygen/MemoryBuffer_8cpp_source.html
+        this->init(s.data(), s.data() + s.size(), true);
+    }
+    llvm::MemoryBuffer::BufferKind getBufferKind() const final
+    {
+        // Hopefully std::string is not memory-mapped...
+        return llvm::MemoryBuffer::BufferKind::MemoryBuffer_Malloc;
+    }
+};
+
 // Helper to load object code into a jit.
 template <typename Jit>
 void llvm_state_add_obj_to_jit(Jit &j, std::string obj)
 {
-    llvm::SmallVector<char, 0> buffer(obj.begin(), obj.end());
-    auto err = j.m_lljit->addObjectFile(std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buffer)));
+    // Add the object file to the jit.
+    auto err = j.m_lljit->addObjectFile(std::make_unique<string_view_mem_buffer>(obj));
 
     // LCOV_EXCL_START
     if (err) {
