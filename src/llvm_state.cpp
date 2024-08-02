@@ -505,6 +505,28 @@ void add_module_to_lljit(llvm::orc::LLJIT &lljit, std::unique_ptr<llvm::Module> 
     // LCOV_EXCL_STOP
 }
 
+// Helper to fetch the bitcode from a module.
+std::string bc_from_module(llvm::Module &m)
+{
+    std::string out;
+    llvm::raw_string_ostream ostr(out);
+
+    llvm::WriteBitcodeToFile(m, ostr);
+
+    return std::move(ostr.str());
+}
+
+// Helper to fetch the textual IR from a module.
+std::string ir_from_module(llvm::Module &m)
+{
+    std::string out;
+    llvm::raw_string_ostream ostr(out);
+
+    m.print(ostr, nullptr);
+
+    return std::move(ostr.str());
+}
+
 } // namespace
 
 // Helper function to fetch a const ref to a global object
@@ -1468,12 +1490,7 @@ std::string llvm_state::get_ir() const
     if (m_module) {
         // The module has not been compiled yet,
         // get the IR from it.
-        std::string out;
-        llvm::raw_string_ostream ostr(out);
-
-        m_module->print(ostr, nullptr);
-
-        return std::move(ostr.str());
+        return detail::ir_from_module(*m_module);
     } else {
         // The module has been compiled.
         // Return the IR snapshot that
@@ -1487,12 +1504,7 @@ std::string llvm_state::get_bc() const
     if (m_module) {
         // The module has not been compiled yet,
         // get the bitcode from it.
-        std::string out;
-        llvm::raw_string_ostream ostr(out);
-
-        llvm::WriteBitcodeToFile(*m_module, ostr);
-
-        return std::move(ostr.str());
+        return detail::bc_from_module(*m_module);
     } else {
         // The module has been compiled.
         // Return the bitcode snapshot that
