@@ -954,23 +954,12 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
     return *this;
 }
 
-llvm_state::~llvm_state()
-{
-    // Sanity checks in debug mode.
-    if (m_jitter) {
-        if (is_compiled()) {
-            assert(m_jitter->m_object_file);
-            assert(!m_builder);
-        } else {
-            assert(!m_jitter->m_object_file);
-            assert(m_builder);
-            assert(m_ir_snapshot.empty());
-            assert(m_bc_snapshot.empty());
-        }
-    }
-
-    assert(m_opt_level <= 3u);
-}
+// NOTE: we used to have debug sanity checks here. However, in certain rare corner cases,
+// an invalid llvm_state could end up being destroyed, thus triggering assertion errors
+// in debug mode (this could happen for instance when resetting an llvm_state to the
+// def-cted state after an exception had been thrown during compilation). Thus, just
+// do not run the debug checks.
+llvm_state::~llvm_state() = default;
 
 template <typename Archive>
 void llvm_state::save_impl(Archive &ar, unsigned) const
