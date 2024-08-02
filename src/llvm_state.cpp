@@ -487,6 +487,24 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
     MPM.run(M, MAM);
 }
 
+// Helper to add a module to an lljt, throwing on error.
+void add_module_to_lljit(llvm::orc::LLJIT &lljit, std::unique_ptr<llvm::Module> m, llvm::orc::ThreadSafeContext ctx)
+{
+    auto err = lljit.addIRModule(llvm::orc::ThreadSafeModule(std::move(m), std::move(ctx)));
+
+    // LCOV_EXCL_START
+    if (err) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        ostr << err;
+
+        throw std::invalid_argument(
+            fmt::format("The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+}
+
 } // namespace
 
 // Helper function to fetch a const ref to a global object
@@ -683,19 +701,7 @@ struct llvm_state::jit {
 
     void add_module(std::unique_ptr<llvm::Module> m) const
     {
-        auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
-
-        // LCOV_EXCL_START
-        if (err) {
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            ostr << err;
-
-            throw std::invalid_argument(fmt::format(
-                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
-        }
-        // LCOV_EXCL_STOP
+        detail::add_module_to_lljit(*m_lljit, std::move(m), *m_ctx);
     }
 
     // Symbol lookup.
@@ -1308,6 +1314,7 @@ void llvm_state::compile_impl()
 
     // Trigger object code materialisation via lookup.
     jit_lookup(detail::obj_trigger_name);
+
     assert(m_jitter->m_object_file);
 }
 
