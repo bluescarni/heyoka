@@ -1311,6 +1311,34 @@ void llvm_state::compile_impl()
     assert(m_jitter->m_object_file);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Combine opt_level, force_avx512, slp_vectorize and c_model into a single flag.
+// NOTE: here we need:
+//
+// - 2 bits for opt_level,
+// - 1 bit for force_avx512 and slp_vectorize each,
+// - 3 bits for c_model,
+//
+// for a total of 7 bits.
+unsigned assemble_comp_flag(unsigned opt_level, bool force_avx512, bool slp_vectorize, code_model c_model)
+{
+    assert(opt_level <= 3u);
+    assert(static_cast<unsigned>(c_model) <= 7u);
+    static_assert(std::numeric_limits<unsigned>::digits >= 7u);
+
+    return opt_level + (static_cast<unsigned>(force_avx512) << 2) + (static_cast<unsigned>(slp_vectorize) << 3)
+           + (static_cast<unsigned>(c_model) << 4);
+}
+
+} // namespace
+
+} // namespace detail
+
 // NOTE: we need to emphasise in the docs that compilation
 // triggers an optimisation pass.
 void llvm_state::compile()
@@ -1354,19 +1382,8 @@ void llvm_state::compile()
         std::vector<std::string> obc;
         obc.push_back(std::move(orig_bc));
 
-        // Combine m_opt_level, m_force_avx512, m_slp_vectorize and m_c_model into a single value,
-        // as they all affect codegen.
-        // NOTE: here we need:
-        // - 2 bits for m_opt_level,
-        // - 1 bit for m_force_avx512 and m_slp_vectorize each,
-        // - 3 bits for m_c_model,
-        // for a total of 7 bits.
-        assert(m_opt_level <= 3u);
-        assert(static_cast<unsigned>(m_c_model) <= 7u);
-        static_assert(std::numeric_limits<unsigned>::digits >= 7u);
-        const auto comp_flag = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2)
-                               + (static_cast<unsigned>(m_slp_vectorize) << 3)
-                               + (static_cast<unsigned>(m_c_model) << 4);
+        // Assemble the compilation flag.
+        const auto comp_flag = detail::assemble_comp_flag(m_opt_level, m_force_avx512, m_slp_vectorize, m_c_model);
 
         if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
             // Cache hit.
