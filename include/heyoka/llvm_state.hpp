@@ -359,13 +359,24 @@ class HEYOKA_DLL_PUBLIC llvm_multi_state
     HEYOKA_DLL_LOCAL void compile_impl();
     HEYOKA_DLL_LOCAL void add_obj_triggers();
 
+    // Check functions.
+    HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
+    HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
+
 public:
+    llvm_multi_state();
     explicit llvm_multi_state(std::vector<llvm_state>);
     llvm_multi_state(const llvm_multi_state &);
     llvm_multi_state(llvm_multi_state &&) noexcept;
     llvm_multi_state &operator=(const llvm_multi_state &);
     llvm_multi_state &operator=(llvm_multi_state &&) noexcept;
     ~llvm_multi_state();
+
+    [[nodiscard]] bool fast_math() const noexcept;
+    [[nodiscard]] bool force_avx512() const noexcept;
+    [[nodiscard]] unsigned get_opt_level() const noexcept;
+    [[nodiscard]] bool get_slp_vectorize() const noexcept;
+    [[nodiscard]] code_model get_code_model() const noexcept;
 
     void compile();
 

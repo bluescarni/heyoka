@@ -20,6 +20,7 @@
 #include <mutex>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -108,26 +109,6 @@
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
-
-// NOTE: logging here lhames' instructions on how to set up LLJIT
-// for parallel compilation of multiple modules.
-//
-//   auto J = LLJITBuilder()
-//              .setNumCompileThreads(<N>)
-//              .create();
-//   if (!J) { /* bail on error */ }
-//   (*J)->getIRTransformLayer().setTransform(
-//     [](ThreadSafeModule TSM, MaterializationResponsibility &R) -> Expected<ThreadSafeModule> {
-//       TSM.withModuleDo([](Module &M) {
-//         /* Apply your IR optimizations here */
-//       });
-//       return std::move(TSM);
-//     });
-//
-// Note that the optimisation passes in this approach are moved into the
-// transform layer. References:
-// https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
-// https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -1456,9 +1437,10 @@ void llvm_state::compile()
             logger->trace("materialisation runtime: {}", sw);
 
             // Try to insert obc into the cache.
-            detail::llvm_state_mem_cache_try_insert(std::move(obc), comp_flag,
-                                                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-                                                    {{m_bc_snapshot}, {m_ir_snapshot}, {*m_jitter->m_object_file}});
+            detail::llvm_state_mem_cache_try_insert(
+                std::move(obc), comp_flag,
+                // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                {.opt_bc = {m_bc_snapshot}, .opt_ir = {m_ir_snapshot}, .obj = {*m_jitter->m_object_file}});
         }
         // LCOV_EXCL_START
     } catch (...) {
@@ -1615,8 +1597,16 @@ struct multi_jit {
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
     // Object files.
+    // NOTE: these may be modified concurrently during compilation,
+    // protect with mutex.
     std::mutex m_object_files_mutex;
     std::vector<std::string> m_object_files;
+    // IR and bc optimised snapshots.
+    // NOTE: these may be modified concurrently during compilation,
+    // protect with mutex.
+    std::mutex m_ir_bc_mutex;
+    std::vector<std::string> m_ir_snapshots;
+    std::vector<std::string> m_bc_snapshots;
 
     explicit multi_jit(unsigned, unsigned, code_model);
     multi_jit(const multi_jit &) = delete;
@@ -1625,9 +1615,17 @@ struct multi_jit {
     llvm_multi_state &operator=(multi_jit &&) noexcept = delete;
     ~multi_jit() = default;
 
+    // Helper to fetch the context from its thread-safe counterpart.
     [[nodiscard]] llvm::LLVMContext &context() const noexcept
     {
         return *m_ctx->getContext();
+    }
+
+    // Helper to fetch the bitcode of the master module.
+    std::string get_master_bc() const
+    {
+        assert(m_module);
+        return detail::bc_from_module(*m_module);
     }
 };
 
@@ -1788,6 +1786,8 @@ struct llvm_multi_state::impl {
     std::unique_ptr<detail::multi_jit> m_jit;
 };
 
+llvm_multi_state::llvm_multi_state() = default;
+
 llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
 {
     // We need at least 1 state.
@@ -1848,46 +1848,56 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
 
     // In the master jit, setup the machinery to run the optimisation passes on the modules.
     jit->m_lljit->getIRTransformLayer().setTransform(
-        [&lljit = *jit->m_lljit, opt_level, force_avx512, slp_vectorize,
-         c_model](llvm::orc::ThreadSafeModule TSM, llvm::orc::MaterializationResponsibility &) {
+        [&j = *jit, opt_level, force_avx512, slp_vectorize, c_model](llvm::orc::ThreadSafeModule TSM,
+                                                                     llvm::orc::MaterializationResponsibility &) {
             // See here for an explanation of what withModuleDo() entails:
             //
             // https://groups.google.com/g/llvm-dev/c/QauU4L_bHac
             //
             // In our case, the locking/thread safety aspect is not important as we are not sharing
-            // contexts between threads.
-            TSM.withModuleDo([&lljit, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
+            // contexts between threads. More references from discord:
+            //
+            // https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
+            // https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
+            TSM.withModuleDo([&j, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
                 // NOTE: don't run any optimisation on the master module.
-                if (M.getModuleIdentifier() == "master") {
-                    return;
+                if (M.getModuleIdentifier() != "master") {
+                    // NOTE: running the optimisation passes requires mutable access to a target
+                    // machine. Thus, we create a new target machine per thread in order to avoid likely data races
+                    // with a shared target machine.
+
+                    // Fetch a target machine builder.
+                    auto jtmb = detail::create_jit_tmb(opt_level, c_model);
+
+                    // Try creating the target machine.
+                    auto tm = jtmb.createTargetMachine();
+                    // LCOV_EXCL_START
+                    if (!tm) [[unlikely]] {
+                        throw std::invalid_argument("Error creating the target machine");
+                    }
+                    // LCOV_EXCL_STOP
+
+                    // NOTE: we used to fetch the target triple from the lljit object,
+                    // but recently we switched to asking the target triple directly
+                    // from the target machine. Assert equality between the two for a while,
+                    // just in case.
+                    // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
+                    // object, it should be ok with concurrent invocation.
+                    assert(j.m_lljit->getTargetTriple() == (*tm)->getTargetTriple());
+
+                    // Optimise the module.
+                    detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
                 }
 
-                // NOTE: running the optimisation passes requires mutable access to a target
-                // machine. Thus, we create a new target machine per thread in order to avoid likely data races
-                // with a shared target machine.
+                // Store the optimised bitcode/IR for this module.
+                auto bc_snap = detail::bc_from_module(M);
+                auto ir_snap = detail::ir_from_module(M);
 
-                // Fetch a target machine builder.
-                auto jtmb = detail::create_jit_tmb(opt_level, c_model);
+                // NOTE: protect for multi-threaded access.
+                std::lock_guard lock{j.m_ir_bc_mutex};
 
-                // Try creating the target machine.
-                auto tm = jtmb.createTargetMachine();
-                // LCOV_EXCL_START
-                if (!tm) [[unlikely]] {
-                    throw std::invalid_argument("Error creating the target machine");
-                }
-                // LCOV_EXCL_STOP
-
-                // NOTE: we used to fetch the target triple from the lljit object,
-                // but recently we switched to asking the target triple directly
-                // from the target machine. Assert equality between the two for a while,
-                // just in case.
-                // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
-                // object, it should be ok with concurrent invocation.
-                static_cast<void>(lljit);
-                assert(lljit.getTargetTriple() == (*tm)->getTargetTriple());
-
-                // Optimise the module.
-                detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
+                j.m_bc_snapshots.push_back(std::move(bc_snap));
+                j.m_ir_snapshots.push_back(std::move(ir_snap));
             });
 
             return llvm::Expected<llvm::orc::ThreadSafeModule>(std::move(TSM));
@@ -1922,7 +1932,7 @@ void llvm_multi_state::add_obj_triggers()
 {
     // NOTE: the idea here is that we add one trigger function per module, and then
     // we invoke all the trigger functions from a trigger function in the master module.
-    // Like this, we should ensure materialisation of all modules when we lookup the
+    // Like this, we ensure materialisation of all modules when we lookup the
     // master trigger.
 
     // Implement the per-module triggers.
@@ -1981,43 +1991,77 @@ void llvm_multi_state::add_obj_triggers()
     bld.CreateRetVoid();
 }
 
+void llvm_multi_state::check_compiled(const char *f) const
+{
+    if (m_impl->m_jit->m_module) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}' can be invoked only after the llvm_multi_state has been compiled", f));
+    }
+}
+
+void llvm_multi_state::check_uncompiled(const char *f) const
+{
+    if (!m_impl->m_jit->m_module) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}' can be invoked only if the llvm_multi_state has not been compiled yet", f));
+    }
+}
+
+unsigned llvm_multi_state::get_opt_level() const noexcept
+{
+    return m_impl->m_states[0].get_opt_level();
+}
+
+bool llvm_multi_state::fast_math() const noexcept
+{
+    return m_impl->m_states[0].fast_math();
+}
+
+bool llvm_multi_state::force_avx512() const noexcept
+{
+    return m_impl->m_states[0].force_avx512();
+}
+
+bool llvm_multi_state::get_slp_vectorize() const noexcept
+{
+    return m_impl->m_states[0].get_slp_vectorize();
+}
+
+code_model llvm_multi_state::get_code_model() const noexcept
+{
+    return m_impl->m_states[0].get_code_model();
+}
+
+// NOTE: this function is NOT exception-safe, proper cleanup
+// needs to be done externally if needed.
 void llvm_multi_state::compile_impl()
 {
+    // Add all the modules from the states.
     for (auto &s : m_impl->m_states) {
-        // Add the module to the jit (this will clear out m_module).
-        auto err = m_impl->m_jit->m_lljit->addIRModule(
-            llvm::orc::ThreadSafeModule(std::move(s.m_module), *s.m_jitter->m_ctx));
+        detail::add_module_to_lljit(*m_impl->m_jit->m_lljit, std::move(s.m_module), *s.m_jitter->m_ctx);
 
-        // LCOV_EXCL_START
-        if (err) {
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            ostr << err;
-
-            throw std::invalid_argument(fmt::format(
-                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
-        }
-        // LCOV_EXCL_STOP
-
-        // Clear out the builder, which won't be usable any more.
+        // Clear out the builder.
         s.m_builder.reset();
     }
 
-    // TODO error check.
-    auto err = m_impl->m_jit->m_lljit->addIRModule(
-        llvm::orc::ThreadSafeModule(std::move(m_impl->m_jit->m_module), *m_impl->m_jit->m_ctx));
+    // Add the master module.
+    detail::add_module_to_lljit(*m_impl->m_jit->m_lljit, std::move(m_impl->m_jit->m_module), *m_impl->m_jit->m_ctx);
 
-    // Trigger object code materialisation via lookup.
+    // Clear out the master builder.
+    m_impl->m_jit->m_builder.reset();
+
+    // Trigger optimisation and object code materialisation via lookup.
     jit_lookup(detail::obj_trigger_name);
 
-    // TODO restore?
-    // assert(m_jitter->m_object_file);
+    // Sanity checks.
+    assert(m_impl->m_jit->m_bc_snapshots.size() == m_impl->m_jit->m_n_modules);
+    assert(m_impl->m_jit->m_ir_snapshots.size() == m_impl->m_jit->m_n_modules);
+    assert(m_impl->m_jit->m_object_files.size() == m_impl->m_jit->m_n_modules);
 }
 
 void llvm_multi_state::compile()
 {
-    // TODO check uncompiled
+    check_uncompiled(__func__);
 
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -2041,21 +2085,103 @@ void llvm_multi_state::compile()
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
 
-    // Add the object materialisation trigger functions.
-    add_obj_triggers();
+    try {
+        // Add the object materialisation trigger functions.
+        // NOTE: contrary to llvm_state::add_obj_trigger(), add_obj_triggers()
+        // does not implement any automatic cleanup in case of errors. Thus, we fold
+        // it into the try/catch block in order to avoid leaving the
+        // llvm_multi_state in a half-baked state.
+        add_obj_triggers();
 
-    // Run the compilation.
-    compile_impl();
+        // Fetch the bitcode *before* optimisation.
+        std::vector<std::string> obc;
+        obc.reserve(boost::safe_numerics::safe<decltype(obc.size())>(m_impl->m_states.size()) + 1u);
+        for (const auto &s : m_impl->m_states) {
+            obc.push_back(s.get_bc());
+        }
+        // Add the master bitcode.
+        obc.push_back(m_impl->m_jit->get_master_bc());
+
+        // Assemble the compilation flag.
+        const auto comp_flag
+            = detail::assemble_comp_flag(get_opt_level(), force_avx512(), get_slp_vectorize(), get_code_model());
+
+        // Lookup in the cache.
+        if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
+            // Cache hit.
+
+            // Assign the optimised snapshots.
+            assert(cached_data->opt_ir.size() == m_impl->m_jit->m_n_modules);
+            assert(cached_data->opt_bc.size() == m_impl->m_jit->m_n_modules);
+            assert(cached_data->obj.size() == m_impl->m_jit->m_n_modules);
+            assert(m_impl->m_jit->m_ir_snapshots.empty());
+            assert(m_impl->m_jit->m_bc_snapshots.empty());
+            m_impl->m_jit->m_ir_snapshots = std::move(cached_data->opt_ir);
+            m_impl->m_jit->m_bc_snapshots = std::move(cached_data->opt_bc);
+
+            // Clear out modules and builders from the states.
+            // NOTE: probably not strictly needed, but we try to keep the same
+            // behaviour as in compile_impl().
+            for (auto &s : m_impl->m_states) {
+                s.m_module.reset();
+                s.m_builder.reset();
+            }
+
+            // Clear out master module and builder.
+            m_impl->m_jit->m_module.reset();
+            m_impl->m_jit->m_builder.reset();
+
+            // Add and assign the object files.
+            for (const auto &obj : cached_data->obj) {
+                detail::add_obj_to_lljit(*m_impl->m_jit->m_lljit, obj);
+            }
+
+            // Assign the compiled objects.
+            assert(m_impl->m_jit->m_object_files.empty());
+            m_impl->m_jit->m_object_files = std::move(cached_data->obj);
+        } else {
+            // Cache miss.
+
+            sw.reset();
+
+            // Run the compilation.
+            compile_impl();
+
+            logger->trace("optimisation + materialisation runtime: {}", sw);
+
+            // NOTE: at this point, m_ir_snapshots, m_bc_snapshots and m_object_files
+            // have all been constructed in random order because of multithreading.
+            // Sort them so that we provided deterministic behaviour. Probably
+            // not strictly needed, but let's try to avoid nondeterminism.
+            // All of this can be parallelised if needed.
+            std::ranges::sort(m_impl->m_jit->m_ir_snapshots);
+            std::ranges::sort(m_impl->m_jit->m_bc_snapshots);
+            std::ranges::sort(m_impl->m_jit->m_object_files);
+
+            // Try to insert obc into the cache.
+            detail::llvm_state_mem_cache_try_insert(std::move(obc), comp_flag,
+                                                    {.opt_bc = m_impl->m_jit->m_bc_snapshots,
+                                                     .opt_ir = m_impl->m_jit->m_ir_snapshots,
+                                                     .obj = m_impl->m_jit->m_object_files});
+        }
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Reset to a def-cted state in case of error,
+        // as it looks like there's no way of recovering.
+        m_impl.reset();
+
+        throw;
+        // LCOV_EXCL_STOP
+    }
 }
 
 std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)
 {
-    // TODO restore.
-    // check_compiled(__func__);
+    check_compiled(__func__);
 
     auto sym = m_impl->m_jit->m_lljit->lookup(name);
     if (!sym) {
-        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
+        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in an llvm_multi_state", name));
     }
 
 #if LLVM_VERSION_MAJOR >= 15

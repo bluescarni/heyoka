@@ -14,8 +14,6 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-#if 0
     llvm_multi_state ms({llvm_state{}, llvm_state{}, llvm_state{}, llvm_state{}, llvm_state{}, llvm_state{}});
     ms.compile();
-#endif
 }
