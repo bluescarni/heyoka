@@ -527,6 +527,56 @@ std::string ir_from_module(llvm::Module &m)
     return std::move(ostr.str());
 }
 
+// Helper to add an object file to the jit, throwing in case of errors.
+void add_obj_to_lljit(llvm::orc::LLJIT &lljit, const std::string &obj)
+{
+    // An implementation of llvm::MemoryBuffer offering a view over a std::string.
+    class string_view_mem_buffer final : public llvm::MemoryBuffer
+    {
+    public:
+        explicit string_view_mem_buffer(const std::string &s)
+        {
+            // NOTE: the important bit here is from the LLVM docs:
+            //
+            // """
+            // In addition to basic access to the characters in the file, this interface
+            // guarantees you can read one character past the end of the file, and that
+            // this character will read as '\0'.
+            // """
+            //
+            // This is exactly the guarantee given by std::string:
+            //
+            // https://en.cppreference.com/w/cpp/string/basic_string/data
+            //
+            // Not sure about the third parameter to this function though, it does not
+            // seem to have any influence apart from debug checking:
+            //
+            // https://llvm.org/doxygen/MemoryBuffer_8cpp_source.html
+            this->init(s.data(), s.data() + s.size(), true);
+        }
+        llvm::MemoryBuffer::BufferKind getBufferKind() const final
+        {
+            // Hopefully std::string is not memory-mapped...
+            return llvm::MemoryBuffer::BufferKind::MemoryBuffer_Malloc;
+        }
+    };
+
+    // Add the object file.
+    auto err = lljit.addObjectFile(std::make_unique<string_view_mem_buffer>(obj));
+
+    // LCOV_EXCL_START
+    if (err) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        ostr << err;
+
+        throw std::invalid_argument(fmt::format(
+            "The function for adding an object file to an lljit failed. The full error message:\n{}", ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+}
+
 } // namespace
 
 // Helper function to fetch a const ref to a global object
@@ -759,55 +809,12 @@ namespace detail
 namespace
 {
 
-// An implementation of llvm::MemoryBuffer offering a view over a std::string.
-class string_view_mem_buffer final : public llvm::MemoryBuffer
-{
-public:
-    explicit string_view_mem_buffer(const std::string &s)
-    {
-        // NOTE: the important bit here is from the LLVM docs:
-        //
-        // """
-        // In addition to basic access to the characters in the file, this interface
-        // guarantees you can read one character past the end of the file, and that
-        // this character will read as '\0'.
-        // """
-        //
-        // This is exactly the guarantee given by std::string:
-        //
-        // https://en.cppreference.com/w/cpp/string/basic_string/data
-        //
-        // Not sure about the third parameter to this function though, it does not
-        // seem to have any influence apart from debug checking:
-        //
-        // https://llvm.org/doxygen/MemoryBuffer_8cpp_source.html
-        this->init(s.data(), s.data() + s.size(), true);
-    }
-    llvm::MemoryBuffer::BufferKind getBufferKind() const final
-    {
-        // Hopefully std::string is not memory-mapped...
-        return llvm::MemoryBuffer::BufferKind::MemoryBuffer_Malloc;
-    }
-};
-
-// Helper to load object code into a jit.
+// Helper to load object code into the jit of an llvm_state.
 template <typename Jit>
 void llvm_state_add_obj_to_jit(Jit &j, std::string obj)
 {
-    // Add the object file to the jit.
-    auto err = j.m_lljit->addObjectFile(std::make_unique<string_view_mem_buffer>(obj));
-
-    // LCOV_EXCL_START
-    if (err) {
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
-
-        ostr << err;
-
-        throw std::invalid_argument(fmt::format(
-            "The function for adding a compiled module to the jit failed. The full error message:\n{}", ostr.str()));
-    }
-    // LCOV_EXCL_STOP
+    // Add the object code to the lljit.
+    add_obj_to_lljit(*j.m_lljit, obj);
 
     // Add the object code also to the
     // m_object_file member.
