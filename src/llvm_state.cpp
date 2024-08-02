@@ -1421,10 +1421,11 @@ void llvm_state::compile()
         // Assemble the compilation flag.
         const auto comp_flag = detail::assemble_comp_flag(m_opt_level, m_force_avx512, m_slp_vectorize, m_c_model);
 
+        // Lookup in the cache.
         if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
             // Cache hit.
 
-            // Assign the snapshots.
+            // Assign the optimised snapshots.
             assert(cached_data->opt_ir.size() == 1u);
             assert(cached_data->opt_bc.size() == 1u);
             assert(cached_data->obj.size() == 1u);
@@ -1438,6 +1439,8 @@ void llvm_state::compile()
             // Assign the object file.
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj[0]));
         } else {
+            // Cache miss.
+
             sw.reset();
 
             // Run the optimisation pass.
