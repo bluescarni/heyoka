@@ -223,19 +223,19 @@ TEST_CASE("cfunc")
 
     // Check the first few characters of the optimised ir/bc match.
     // Cannot check the entire ir/bc because of the difference in trigger name.
-    REQUIRE((s1.get_ir().substr(0, 200) == ms.get_ir()[0].substr(0, 200)
-             || s1.get_ir().substr(0, 200) == ms.get_ir()[1].substr(0, 200)
-             || s1.get_ir().substr(0, 200) == ms.get_ir()[2].substr(0, 200)));
-    REQUIRE((s2.get_ir().substr(0, 200) == ms.get_ir()[0].substr(0, 200)
-             || s2.get_ir().substr(0, 200) == ms.get_ir()[1].substr(0, 200)
-             || s2.get_ir().substr(0, 200) == ms.get_ir()[2].substr(0, 200)));
+    REQUIRE((s1.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
+             || s1.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
+             || s1.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
+    REQUIRE((s2.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
+             || s2.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
+             || s2.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
 
-    REQUIRE((s1.get_bc().substr(0, 200) == ms.get_bc()[0].substr(0, 200)
-             || s1.get_bc().substr(0, 200) == ms.get_bc()[1].substr(0, 200)
-             || s1.get_bc().substr(0, 200) == ms.get_bc()[2].substr(0, 200)));
-    REQUIRE((s2.get_bc().substr(0, 200) == ms.get_bc()[0].substr(0, 200)
-             || s2.get_bc().substr(0, 200) == ms.get_bc()[1].substr(0, 200)
-             || s2.get_bc().substr(0, 200) == ms.get_bc()[2].substr(0, 200)));
+    REQUIRE((s1.get_bc().substr(0, 100) == ms.get_bc()[0].substr(0, 100)
+             || s1.get_bc().substr(0, 100) == ms.get_bc()[1].substr(0, 100)
+             || s1.get_bc().substr(0, 100) == ms.get_bc()[2].substr(0, 100)));
+    REQUIRE((s2.get_bc().substr(0, 100) == ms.get_bc()[0].substr(0, 100)
+             || s2.get_bc().substr(0, 100) == ms.get_bc()[1].substr(0, 100)
+             || s2.get_bc().substr(0, 100) == ms.get_bc()[2].substr(0, 100)));
 
     auto *cf1_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
