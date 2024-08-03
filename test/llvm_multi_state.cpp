@@ -310,6 +310,11 @@ TEST_CASE("cfunc")
     REQUIRE(ms.get_ir().size() == 3u);
     REQUIRE(ms.get_bc().size() == 3u);
 
+    std::cout << "Orig:\n\n" << s1.get_ir() << "\n\n" << std::endl;
+    std::cout << "cmp0:\n\n" << ms.get_ir()[0] << "\n\n" << std::endl;
+    std::cout << "cmp1:\n\n" << ms.get_ir()[1] << "\n\n" << std::endl;
+    std::cout << "cmp2:\n\n" << ms.get_ir()[2] << "\n\n" << std::endl;
+
     // Check the first few characters of the optimised ir/bc match.
     // Cannot check the entire ir/bc because of the difference in trigger name.
     REQUIRE((s1.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
