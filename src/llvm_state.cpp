@@ -2124,6 +2124,11 @@ void llvm_multi_state::check_uncompiled(const char *f) const
     }
 }
 
+unsigned llvm_multi_state::get_n_modules() const noexcept
+{
+    return m_impl->m_jit->m_n_modules;
+}
+
 unsigned llvm_multi_state::get_opt_level() const noexcept
 {
     return m_impl->m_states[0].get_opt_level();
@@ -2352,6 +2357,27 @@ std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)
 #else
     return static_cast<std::uintptr_t>((*sym).getAddress());
 #endif
+}
+
+std::ostream &operator<<(std::ostream &os, const llvm_multi_state &s)
+{
+    std::ostringstream oss;
+    oss << std::boolalpha;
+
+    oss << "N of modules      : " << s.get_n_modules() << '\n';
+    oss << "Compiled          : " << s.is_compiled() << '\n';
+    oss << "Fast math         : " << s.fast_math() << '\n';
+    oss << "Force AVX512      : " << s.force_avx512() << '\n';
+    oss << "SLP vectorization : " << s.get_slp_vectorize() << '\n';
+    oss << "Code model        : " << s.get_code_model() << '\n';
+    oss << "Optimisation level: " << s.get_opt_level() << '\n';
+    oss << "Data layout       : " << s.m_impl->m_states[0].m_jitter->m_lljit->getDataLayout().getStringRepresentation()
+        << '\n';
+    oss << "Target triple     : " << s.m_impl->m_states[0].m_jitter->get_target_triple().str() << '\n';
+    oss << "Target CPU        : " << s.m_impl->m_states[0].m_jitter->get_target_cpu() << '\n';
+    oss << "Target features   : " << s.m_impl->m_states[0].m_jitter->get_target_features() << '\n';
+
+    return os << oss.str();
 }
 
 HEYOKA_END_NAMESPACE

@@ -79,6 +79,7 @@ HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
 
 template <typename T>
 inline std::uint32_t recommended_simd_size()
@@ -133,6 +134,7 @@ HEYOKA_BEGIN_NAMESPACE
 class HEYOKA_DLL_PUBLIC llvm_state
 {
     friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
     friend class HEYOKA_DLL_PUBLIC llvm_multi_state;
 
     struct jit;
@@ -352,6 +354,8 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc
 
 class HEYOKA_DLL_PUBLIC llvm_multi_state
 {
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
+
     struct impl;
 
     std::unique_ptr<impl> m_impl;
@@ -378,6 +382,8 @@ public:
     ~llvm_multi_state();
 
     [[nodiscard]] bool is_compiled() const noexcept;
+
+    [[nodiscard]] unsigned get_n_modules() const noexcept;
 
     [[nodiscard]] bool fast_math() const noexcept;
     [[nodiscard]] bool force_avx512() const noexcept;

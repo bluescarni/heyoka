@@ -77,6 +77,7 @@ TEST_CASE("basic")
         REQUIRE(ms.force_avx512());
         REQUIRE(ms.get_slp_vectorize());
         REQUIRE(ms.get_code_model() == code_model::large);
+        REQUIRE(ms.get_n_modules() == 5u);
 
         REQUIRE(!ms.is_compiled());
 
@@ -89,6 +90,7 @@ TEST_CASE("basic")
         REQUIRE(ms.force_avx512());
         REQUIRE(ms.get_slp_vectorize());
         REQUIRE(ms.get_code_model() == code_model::large);
+        REQUIRE(ms.get_n_modules() == 5u);
     }
 }
 
@@ -339,4 +341,27 @@ TEST_CASE("cfunc")
 
     REQUIRE(outs[0] == 6);
     REQUIRE(outs[1] == 2. / 3.);
+}
+
+TEST_CASE("stream op")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+
+    const auto orig_ir1 = s1.get_ir();
+    const auto orig_ir2 = s2.get_ir();
+
+    const auto orig_bc1 = s1.get_bc();
+    const auto orig_bc2 = s2.get_bc();
+
+    llvm_multi_state ms{{s1, s2}};
+
+    std::ostringstream oss;
+    oss << ms;
+
+    REQUIRE(!oss.str().empty());
 }
