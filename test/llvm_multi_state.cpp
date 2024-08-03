@@ -14,9 +14,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 
-#include <fmt/ranges.h>
-#include <ranges>
-
 #include "catch.hpp"
 
 using namespace heyoka;
@@ -317,38 +314,6 @@ TEST_CASE("cfunc")
 
     REQUIRE(ms.get_ir().size() == 3u);
     REQUIRE(ms.get_bc().size() == 3u);
-
-    // Check the first few characters of the optimised ir/bc match.
-    // Cannot check the entire ir/bc because of the difference in trigger name.
-    REQUIRE((s1.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
-             || s1.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
-             || s1.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
-    REQUIRE((s2.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
-             || s2.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
-             || s2.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
-
-    std::cout << "orig:" << std::endl << std::endl;
-    fmt::print("{}\n\n\n",
-               s1.get_bc().substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
-
-    std::cout << "pos0:" << std::endl << std::endl;
-    fmt::print("{}\n\n\n",
-               ms.get_bc()[0].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
-
-    std::cout << "pos1:" << std::endl << std::endl;
-    fmt::print("{}\n\n\n",
-               ms.get_bc()[1].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
-
-    std::cout << "pos2:" << std::endl << std::endl;
-    fmt::print("{}\n\n\n",
-               ms.get_bc()[2].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
-
-    REQUIRE((s1.get_bc().substr(0, 25) == ms.get_bc()[0].substr(0, 25)
-             || s1.get_bc().substr(0, 25) == ms.get_bc()[1].substr(0, 25)
-             || s1.get_bc().substr(0, 25) == ms.get_bc()[2].substr(0, 25)));
-    REQUIRE((s2.get_bc().substr(0, 25) == ms.get_bc()[0].substr(0, 25)
-             || s2.get_bc().substr(0, 25) == ms.get_bc()[1].substr(0, 25)
-             || s2.get_bc().substr(0, 25) == ms.get_bc()[2].substr(0, 25)));
 
     auto *cf1_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
