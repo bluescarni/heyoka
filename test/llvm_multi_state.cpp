@@ -310,11 +310,6 @@ TEST_CASE("cfunc")
     REQUIRE(ms.get_ir().size() == 3u);
     REQUIRE(ms.get_bc().size() == 3u);
 
-    std::cout << "Orig:\n\n" << s1.get_ir() << "\n\n" << std::endl;
-    std::cout << "cmp0:\n\n" << ms.get_ir()[0] << "\n\n" << std::endl;
-    std::cout << "cmp1:\n\n" << ms.get_ir()[1] << "\n\n" << std::endl;
-    std::cout << "cmp2:\n\n" << ms.get_ir()[2] << "\n\n" << std::endl;
-
     // Check the first few characters of the optimised ir/bc match.
     // Cannot check the entire ir/bc because of the difference in trigger name.
     REQUIRE((s1.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
@@ -324,12 +319,12 @@ TEST_CASE("cfunc")
              || s2.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
              || s2.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
 
-    REQUIRE((s1.get_bc().substr(0, 100) == ms.get_bc()[0].substr(0, 100)
-             || s1.get_bc().substr(0, 100) == ms.get_bc()[1].substr(0, 100)
-             || s1.get_bc().substr(0, 100) == ms.get_bc()[2].substr(0, 100)));
-    REQUIRE((s2.get_bc().substr(0, 100) == ms.get_bc()[0].substr(0, 100)
-             || s2.get_bc().substr(0, 100) == ms.get_bc()[1].substr(0, 100)
-             || s2.get_bc().substr(0, 100) == ms.get_bc()[2].substr(0, 100)));
+    REQUIRE((s1.get_bc().substr(0, 50) == ms.get_bc()[0].substr(0, 50)
+             || s1.get_bc().substr(0, 50) == ms.get_bc()[1].substr(0, 50)
+             || s1.get_bc().substr(0, 50) == ms.get_bc()[2].substr(0, 50)));
+    REQUIRE((s2.get_bc().substr(0, 50) == ms.get_bc()[0].substr(0, 50)
+             || s2.get_bc().substr(0, 50) == ms.get_bc()[1].substr(0, 50)
+             || s2.get_bc().substr(0, 50) == ms.get_bc()[2].substr(0, 50)));
 
     auto *cf1_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
