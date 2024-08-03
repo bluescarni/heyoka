@@ -387,3 +387,83 @@ TEST_CASE("stream op")
 
     REQUIRE(!oss.str().empty());
 }
+
+// A test to check that, post compilation, snapshots and object files
+// are ordered deterministically.
+TEST_CASE("post compile ordering")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s1, s2, s3, s4;
+
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
+    add_cfunc<double>(s3, "f3", {x + y}, {x, y});
+    add_cfunc<double>(s4, "f4", {x - y}, {x, y});
+
+    llvm_state::clear_memcache();
+
+    llvm_multi_state ms{{s1, s2, s3, s4}};
+    ms.compile();
+
+    const auto orig_obj = ms.get_object_code();
+    const auto orig_ir = ms.get_ir();
+    const auto orig_bc = ms.get_bc();
+
+    for (auto i = 0; i < 20; ++i) {
+        llvm_state::clear_memcache();
+
+        llvm_multi_state ms2{{s1, s2, s3, s4}};
+        ms2.compile();
+
+        REQUIRE(ms2.get_object_code() == orig_obj);
+        REQUIRE(ms2.get_ir() == orig_ir);
+        REQUIRE(ms2.get_bc() == orig_bc);
+    }
+}
+
+TEST_CASE("memcache testing")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s1, s2, s3, s4;
+
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
+    add_cfunc<double>(s3, "f3", {x + y}, {x, y});
+    add_cfunc<double>(s4, "f4", {x - y}, {x, y});
+
+    llvm_state::clear_memcache();
+
+    llvm_multi_state ms{{s1, s2, s3, s4}};
+    ms.compile();
+
+    const auto cur_cache_size = llvm_state::get_memcache_size();
+
+    llvm_multi_state ms2{{s1, s2, s3, s4}};
+    ms2.compile();
+
+    REQUIRE(cur_cache_size == llvm_state::get_memcache_size());
+
+    auto *cf1_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
+    auto *cf2_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f2"));
+    auto *cf3_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f3"));
+    auto *cf4_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f4"));
+
+    const double ins[] = {2., 3.};
+    double outs[4] = {};
+
+    cf1_ptr(outs, ins, nullptr, nullptr);
+    cf2_ptr(outs + 1, ins, nullptr, nullptr);
+    cf3_ptr(outs + 2, ins, nullptr, nullptr);
+    cf4_ptr(outs + 3, ins, nullptr, nullptr);
+
+    REQUIRE(outs[0] == 6);
+    REQUIRE(outs[1] == 2. / 3.);
+    REQUIRE(outs[2] == 5);
+    REQUIRE(outs[3] == -1);
+}
