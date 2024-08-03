@@ -566,6 +566,20 @@ void add_obj_to_lljit(llvm::orc::LLJIT &lljit, const std::string &obj)
     // LCOV_EXCL_STOP
 }
 
+// Helper to verify a module, throwing if verification fails.
+void verify_module(const llvm::Module &m)
+{
+    std::string out;
+    llvm::raw_string_ostream ostr(out);
+
+    if (llvm::verifyModule(m, &ostr)) {
+        // LCOV_EXCL_START
+        throw std::runtime_error(fmt::format("The verification of the module '{}' produced an error:\n{}",
+                                             m.getModuleIdentifier(), ostr.str()));
+        // LCOV_EXCL_STOP
+    }
+}
+
 } // namespace
 
 // Helper function to fetch a const ref to a global object
@@ -1377,17 +1391,7 @@ void llvm_state::compile()
     auto *logger = detail::get_logger();
 
     // Run a verification on the module before compiling.
-    {
-        std::string out;
-        llvm::raw_string_ostream ostr(out);
-
-        if (llvm::verifyModule(*m_module, &ostr)) {
-            // LCOV_EXCL_START
-            throw std::runtime_error(
-                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, ostr.str()));
-            // LCOV_EXCL_STOP
-        }
-    }
+    detail::verify_module(*m_module);
 
     logger->trace("module verification runtime: {}", sw);
 
@@ -2238,16 +2242,7 @@ void llvm_multi_state::compile()
     // Verify the modules before compiling.
     // NOTE: probably this can be parallelised if needed.
     for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
-        std::string out;
-        llvm::raw_string_ostream ostr(out);
-
-        if (llvm::verifyModule(*m_impl->m_states[i].m_module, &ostr)) [[unlikely]] {
-            // LCOV_EXCL_START
-            throw std::runtime_error(
-                fmt::format("The verification of the module at index {} in an llvm_multi_state produced an error:\n{}",
-                            i, ostr.str()));
-            // LCOV_EXCL_STOP
-        }
+        detail::verify_module(*m_impl->m_states[i].m_module);
     }
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
