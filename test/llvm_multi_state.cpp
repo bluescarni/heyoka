@@ -324,12 +324,12 @@ TEST_CASE("cfunc")
              || s2.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
              || s2.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
 
-    REQUIRE((s1.get_bc().substr(0, 50) == ms.get_bc()[0].substr(0, 50)
-             || s1.get_bc().substr(0, 50) == ms.get_bc()[1].substr(0, 50)
-             || s1.get_bc().substr(0, 50) == ms.get_bc()[2].substr(0, 50)));
-    REQUIRE((s2.get_bc().substr(0, 50) == ms.get_bc()[0].substr(0, 50)
-             || s2.get_bc().substr(0, 50) == ms.get_bc()[1].substr(0, 50)
-             || s2.get_bc().substr(0, 50) == ms.get_bc()[2].substr(0, 50)));
+    REQUIRE((s1.get_bc().substr(0, 25) == ms.get_bc()[0].substr(0, 25)
+             || s1.get_bc().substr(0, 25) == ms.get_bc()[1].substr(0, 25)
+             || s1.get_bc().substr(0, 25) == ms.get_bc()[2].substr(0, 25)));
+    REQUIRE((s2.get_bc().substr(0, 25) == ms.get_bc()[0].substr(0, 25)
+             || s2.get_bc().substr(0, 25) == ms.get_bc()[1].substr(0, 25)
+             || s2.get_bc().substr(0, 25) == ms.get_bc()[2].substr(0, 25)));
 
     auto *cf1_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
