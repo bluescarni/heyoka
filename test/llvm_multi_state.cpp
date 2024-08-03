@@ -145,6 +145,9 @@ TEST_CASE("copy semantics")
         auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
             ms_copy.jit_lookup("f2"));
 
+        REQUIRE_THROWS_MATCHES(ms_copy.jit_lookup("f3"), std::invalid_argument,
+                               Message("Could not find the symbol 'f3' in an llvm_multi_state"));
+
         const double ins[] = {2., 3.};
         double outs[2] = {};
 
