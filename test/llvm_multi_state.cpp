@@ -14,6 +14,9 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 
+#include <fmt/ranges.h>
+#include <ranges>
+
 #include "catch.hpp"
 
 using namespace heyoka;
@@ -323,6 +326,22 @@ TEST_CASE("cfunc")
     REQUIRE((s2.get_ir().substr(0, 100) == ms.get_ir()[0].substr(0, 100)
              || s2.get_ir().substr(0, 100) == ms.get_ir()[1].substr(0, 100)
              || s2.get_ir().substr(0, 100) == ms.get_ir()[2].substr(0, 100)));
+
+    std::cout << "orig:" << std::endl << std::endl;
+    fmt::print("{}\n\n\n",
+               s1.get_bc().substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
+
+    std::cout << "pos0:" << std::endl << std::endl;
+    fmt::print("{}\n\n\n",
+               ms.get_bc()[0].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
+
+    std::cout << "pos1:" << std::endl << std::endl;
+    fmt::print("{}\n\n\n",
+               ms.get_bc()[1].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
+
+    std::cout << "pos2:" << std::endl << std::endl;
+    fmt::print("{}\n\n\n",
+               ms.get_bc()[2].substr(0, 25) | std::views::transform([](auto c) { return static_cast<int>(c); }));
 
     REQUIRE((s1.get_bc().substr(0, 25) == ms.get_bc()[0].substr(0, 25)
              || s1.get_bc().substr(0, 25) == ms.get_bc()[1].substr(0, 25)
