@@ -511,6 +511,14 @@ std::string ir_from_module(llvm::Module &m)
 // Helper to add an object file to the jit, throwing in case of errors.
 void add_obj_to_lljit(llvm::orc::LLJIT &lljit, const std::string &obj)
 {
+    // NOTE: an empty obj can happen when we are copying a compiled
+    // llvm_multi_state. In such case, the object files of the individual
+    // states have all be empty-inited. We then need to avoid adding
+    // obj to the jit because that will result in an error.
+    if (obj.empty()) {
+        return;
+    }
+
     // An implementation of llvm::MemoryBuffer offering a view over a std::string.
     class string_view_mem_buffer final : public llvm::MemoryBuffer
     {
@@ -1269,6 +1277,8 @@ void llvm_state::optimise()
     // from the target machine. Assert equality between the two for a while,
     // just in case.
     assert(m_jitter->m_lljit->getTargetTriple() == m_jitter->m_tm->getTargetTriple());
+    // NOTE: the target triple is also available in the module.
+    assert(m_jitter->m_lljit->getTargetTriple().str() == module().getTargetTriple());
 
     detail::optimise_module(module(), *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
 }
@@ -1884,6 +1894,8 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
                     // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
                     // object, it should be ok with concurrent invocation.
                     assert(j.m_lljit->getTargetTriple() == (*tm)->getTargetTriple());
+                    // NOTE: the target triple is also available in the module.
+                    assert(j.m_lljit->getTargetTriple().str() == M.getTargetTriple());
 
                     // Optimise the module.
                     detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
@@ -1908,9 +1920,33 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
     m_impl = std::make_unique<impl>(std::move(imp));
 }
 
-llvm_multi_state::llvm_multi_state(const llvm_multi_state &)
+llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
 {
-    // TODO implement.
+    // NOTE: start off by creating a new jit and copying the states.
+    // This will work regardless of whether other is compiled or not.
+    impl imp{.m_states = other.m_impl->m_states,
+             .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
+                                                          other.get_code_model())};
+    m_impl = std::make_unique<impl>(std::move(imp));
+
+    if (other.is_compiled()) {
+        // 'other' was compiled. Reset builder and module, copy over the snapshots
+        // and the object files, and add the files to the jit.
+        m_impl->m_jit->m_module.reset();
+        m_impl->m_jit->m_builder.reset();
+
+        m_impl->m_jit->m_object_files = other.m_impl->m_jit->m_object_files;
+        m_impl->m_jit->m_ir_snapshots = other.m_impl->m_jit->m_ir_snapshots;
+        m_impl->m_jit->m_bc_snapshots = other.m_impl->m_jit->m_bc_snapshots;
+
+        for (const auto &obj : m_impl->m_jit->m_object_files) {
+            detail::add_obj_to_lljit(*m_impl->m_jit->m_lljit, obj);
+        }
+    } else {
+        // If 'other' was not compiled, we do not need to do anything - the
+        // copy construction of the states takes care of everything. I.e., this
+        // is basically the same as construction from a list of states.
+    }
 }
 
 llvm_multi_state::llvm_multi_state(llvm_multi_state &&) noexcept = default;
@@ -2032,6 +2068,56 @@ code_model llvm_multi_state::get_code_model() const noexcept
     return m_impl->m_states[0].get_code_model();
 }
 
+bool llvm_multi_state::is_compiled() const noexcept
+{
+    return !m_impl->m_jit->m_module;
+}
+
+std::vector<std::string> llvm_multi_state::get_ir() const
+{
+    if (is_compiled()) {
+        return m_impl->m_jit->m_ir_snapshots;
+    } else {
+        std::vector<std::string> retval;
+        retval.reserve(m_impl->m_jit->m_n_modules);
+
+        for (const auto &s : m_impl->m_states) {
+            retval.push_back(s.get_ir());
+        }
+
+        // Add the IR from the master module.
+        retval.push_back(detail::ir_from_module(*m_impl->m_jit->m_module));
+
+        return retval;
+    }
+}
+
+std::vector<std::string> llvm_multi_state::get_bc() const
+{
+    if (is_compiled()) {
+        return m_impl->m_jit->m_bc_snapshots;
+    } else {
+        std::vector<std::string> retval;
+        retval.reserve(m_impl->m_jit->m_n_modules);
+
+        for (const auto &s : m_impl->m_states) {
+            retval.push_back(s.get_bc());
+        }
+
+        // Add the bitcode from the master module.
+        retval.push_back(detail::bc_from_module(*m_impl->m_jit->m_module));
+
+        return retval;
+    }
+}
+
+const std::vector<std::string> &llvm_multi_state::get_object_code() const
+{
+    check_compiled(__func__);
+
+    return m_impl->m_jit->m_object_files;
+}
+
 // NOTE: this function is NOT exception-safe, proper cleanup
 // needs to be done externally if needed.
 void llvm_multi_state::compile_impl()
@@ -2042,6 +2128,10 @@ void llvm_multi_state::compile_impl()
 
         // Clear out the builder.
         s.m_builder.reset();
+
+        // NOTE: need to manually construct the object file, as this would
+        // normally be done by the invocation of s.compile() (which we do not do).
+        s.m_jitter->m_object_file.emplace();
     }
 
     // Add the master module.
@@ -2119,12 +2209,13 @@ void llvm_multi_state::compile()
             m_impl->m_jit->m_ir_snapshots = std::move(cached_data->opt_ir);
             m_impl->m_jit->m_bc_snapshots = std::move(cached_data->opt_bc);
 
-            // Clear out modules and builders from the states.
-            // NOTE: probably not strictly needed, but we try to keep the same
-            // behaviour as in compile_impl().
+            // NOTE: here it is important that we replicate the logic happening
+            // in llvm_state::compile(): clear out module/builder, construct
+            // the object file.
             for (auto &s : m_impl->m_states) {
                 s.m_module.reset();
                 s.m_builder.reset();
+                s.m_jitter->m_object_file.emplace();
             }
 
             // Clear out master module and builder.

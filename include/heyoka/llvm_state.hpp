@@ -372,11 +372,17 @@ public:
     llvm_multi_state &operator=(llvm_multi_state &&) noexcept;
     ~llvm_multi_state();
 
+    [[nodiscard]] bool is_compiled() const noexcept;
+
     [[nodiscard]] bool fast_math() const noexcept;
     [[nodiscard]] bool force_avx512() const noexcept;
     [[nodiscard]] unsigned get_opt_level() const noexcept;
     [[nodiscard]] bool get_slp_vectorize() const noexcept;
     [[nodiscard]] code_model get_code_model() const noexcept;
+
+    [[nodiscard]] std::vector<std::string> get_ir() const;
+    [[nodiscard]] std::vector<std::string> get_bc() const;
+    [[nodiscard]] const std::vector<std::string> &get_object_code() const;
 
     void compile();
 
