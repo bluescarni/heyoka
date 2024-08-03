@@ -363,6 +363,11 @@ class HEYOKA_DLL_PUBLIC llvm_multi_state
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
 
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
 public:
     llvm_multi_state();
     explicit llvm_multi_state(std::vector<llvm_state>);

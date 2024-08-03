@@ -6,11 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <sstream>
 #include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -170,6 +172,93 @@ TEST_CASE("copy semantics")
             ms_copy2.jit_lookup("f1"));
         auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
             ms_copy2.jit_lookup("f2"));
+
+        const double ins[] = {2., 3.};
+        double outs[2] = {};
+
+        cf1_ptr(outs, ins, nullptr, nullptr);
+        cf2_ptr(outs + 1, ins, nullptr, nullptr);
+
+        REQUIRE(outs[0] == 6);
+        REQUIRE(outs[1] == 2. / 3.);
+    }
+}
+
+TEST_CASE("s11n")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+
+    // Uncompiled.
+    llvm_multi_state ms{{s1, s2}};
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << ms;
+    }
+
+    llvm_multi_state ms_copy{{llvm_state{}}};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> ms_copy;
+    }
+
+    REQUIRE(ms_copy.get_bc() == ms.get_bc());
+    REQUIRE(ms_copy.get_ir() == ms.get_ir());
+    REQUIRE(ms_copy.is_compiled() == ms.is_compiled());
+    REQUIRE(ms_copy.fast_math() == ms.fast_math());
+    REQUIRE(ms_copy.force_avx512() == ms.force_avx512());
+    REQUIRE(ms_copy.get_opt_level() == ms.get_opt_level());
+    REQUIRE(ms_copy.get_slp_vectorize() == ms.get_slp_vectorize());
+    REQUIRE(ms_copy.get_code_model() == ms.get_code_model());
+    REQUIRE_THROWS_MATCHES(
+        ms_copy.get_object_code(), std::invalid_argument,
+        Message("The function 'get_object_code' can be invoked only after the llvm_multi_state has been compiled"));
+    REQUIRE_THROWS_MATCHES(
+        ms_copy.jit_lookup("foo"), std::invalid_argument,
+        Message("The function 'jit_lookup' can be invoked only after the llvm_multi_state has been compiled"));
+
+    // Compiled.
+    ms.compile();
+
+    ss.str("");
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << ms;
+    }
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> ms_copy;
+    }
+
+    REQUIRE(ms_copy.get_bc() == ms.get_bc());
+    REQUIRE(ms_copy.get_ir() == ms.get_ir());
+    REQUIRE(ms_copy.get_object_code() == ms.get_object_code());
+    REQUIRE(ms_copy.is_compiled() == ms.is_compiled());
+    REQUIRE(ms_copy.fast_math() == ms.fast_math());
+    REQUIRE(ms_copy.force_avx512() == ms.force_avx512());
+    REQUIRE(ms_copy.get_opt_level() == ms.get_opt_level());
+    REQUIRE(ms_copy.get_slp_vectorize() == ms.get_slp_vectorize());
+    REQUIRE(ms_copy.get_code_model() == ms.get_code_model());
+    REQUIRE_NOTHROW(ms_copy.jit_lookup("f1"));
+    REQUIRE_NOTHROW(ms_copy.jit_lookup("f2"));
+
+    {
+        auto *cf1_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            ms_copy.jit_lookup("f1"));
+        auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            ms_copy.jit_lookup("f2"));
 
         const double ins[] = {2., 3.};
         double outs[2] = {};
