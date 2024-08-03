@@ -1621,7 +1621,7 @@ struct multi_jit {
     std::vector<std::string> m_ir_snapshots;
     std::vector<std::string> m_bc_snapshots;
 
-    explicit multi_jit(unsigned, unsigned, code_model);
+    explicit multi_jit(unsigned, unsigned, code_model, bool, bool);
     multi_jit(const multi_jit &) = delete;
     multi_jit(multi_jit &&) noexcept = delete;
     llvm_multi_state &operator=(const multi_jit &) = delete;
@@ -1666,9 +1666,13 @@ public:
 
 #endif
 
+// Reserved identifier for the master module in an llvm_multi_state.
+constexpr auto master_module_name = "heyoka.master";
+
 // NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
 // NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
-multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model) : m_n_modules(n_modules)
+multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model, bool force_avx512, bool slp_vectorize)
+    : m_n_modules(n_modules)
 {
     assert(n_modules >= 2u);
 
@@ -1766,6 +1770,67 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model)
         return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
     });
 
+    // Setup the machinery to run the optimisation passes on the modules.
+    m_lljit->getIRTransformLayer().setTransform(
+        [this, opt_level, force_avx512, slp_vectorize, c_model](llvm::orc::ThreadSafeModule TSM,
+                                                                llvm::orc::MaterializationResponsibility &) {
+            // See here for an explanation of what withModuleDo() entails:
+            //
+            // https://groups.google.com/g/llvm-dev/c/QauU4L_bHac
+            //
+            // In our case, the locking/thread safety aspect is not important as we are not sharing
+            // contexts between threads. More references from discord:
+            //
+            // https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
+            // https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
+            TSM.withModuleDo([this, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
+                // NOTE: don't run any optimisation on the master module.
+                if (M.getModuleIdentifier() != master_module_name) {
+                    // NOTE: running the optimisation passes requires mutable access to a target
+                    // machine. Thus, we create a new target machine per thread in order to avoid likely data races
+                    // with a shared target machine.
+
+                    // Fetch a target machine builder.
+                    auto jtmb = detail::create_jit_tmb(opt_level, c_model);
+
+                    // Try creating the target machine.
+                    auto tm = jtmb.createTargetMachine();
+                    // LCOV_EXCL_START
+                    if (!tm) [[unlikely]] {
+                        throw std::invalid_argument("Error creating the target machine");
+                    }
+                    // LCOV_EXCL_STOP
+
+                    // NOTE: we used to fetch the target triple from the lljit object,
+                    // but recently we switched to asking the target triple directly
+                    // from the target machine. Assert equality between the two for a while,
+                    // just in case.
+                    // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
+                    // object, it should be ok with concurrent invocation.
+                    assert(m_lljit->getTargetTriple() == (*tm)->getTargetTriple());
+                    // NOTE: the target triple is also available in the module.
+                    assert(m_lljit->getTargetTriple().str() == M.getTargetTriple());
+
+                    // Optimise the module.
+                    detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
+                } else {
+                    ;
+                }
+
+                // Store the optimised bitcode/IR for this module.
+                auto bc_snap = detail::bc_from_module(M);
+                auto ir_snap = detail::ir_from_module(M);
+
+                // NOTE: protect for multi-threaded access.
+                std::lock_guard lock{m_ir_bc_mutex};
+
+                m_bc_snapshots.push_back(std::move(bc_snap));
+                m_ir_snapshots.push_back(std::move(ir_snap));
+            });
+
+            return llvm::Expected<llvm::orc::ThreadSafeModule>(std::move(TSM));
+        });
+
     // Setup the jit so that it can look up symbols from the current process.
     auto dlsg
         = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_lljit->getDataLayout().getGlobalPrefix());
@@ -1780,7 +1845,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model)
     m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
 
     // Create the master module.
-    m_module = std::make_unique<llvm::Module>("master", context());
+    m_module = std::make_unique<llvm::Module>(master_module_name, context());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(m_lljit->getDataLayout());
     m_module->setTargetTriple(m_lljit->getTargetTriple().str());
@@ -1811,6 +1876,15 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
     // All states must be uncompiled.
     if (std::ranges::any_of(states, &llvm_state::is_compiled)) [[unlikely]] {
         throw std::invalid_argument("An llvm_multi_state can be constructed only from uncompiled llvm_state objects");
+    }
+
+    // Module names must not collide with master_module_name.
+    if (std::ranges::any_of(states, [](const auto &s) { return s.module_name() == detail::master_module_name; }))
+        [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("An invalid llvm_state was passed to the constructor of an llvm_multi_state: the module name "
+                        "'{}' is reserved for internal use by llvm_multi_state",
+                        detail::master_module_name));
     }
 
     // Settings in all states must be consistent.
@@ -1855,74 +1929,9 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
     const auto force_avx512 = states[0].force_avx512();
     const auto slp_vectorize = states[0].get_slp_vectorize();
 
-    // Rename all states.
-    for (decltype(states.size()) i = 0; i < states.size(); ++i) {
-        const auto new_mname = fmt::format("module_{}", i);
-        states[i].m_module->setModuleIdentifier(new_mname.c_str());
-    }
-
     // Create the multi_jit.
     auto jit = std::make_unique<detail::multi_jit>(boost::safe_numerics::safe<unsigned>(states.size()) + 1, opt_level,
-                                                   c_model);
-
-    // In the master jit, setup the machinery to run the optimisation passes on the modules.
-    jit->m_lljit->getIRTransformLayer().setTransform(
-        [&j = *jit, opt_level, force_avx512, slp_vectorize, c_model](llvm::orc::ThreadSafeModule TSM,
-                                                                     llvm::orc::MaterializationResponsibility &) {
-            // See here for an explanation of what withModuleDo() entails:
-            //
-            // https://groups.google.com/g/llvm-dev/c/QauU4L_bHac
-            //
-            // In our case, the locking/thread safety aspect is not important as we are not sharing
-            // contexts between threads. More references from discord:
-            //
-            // https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
-            // https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
-            TSM.withModuleDo([&j, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
-                // NOTE: don't run any optimisation on the master module.
-                if (M.getModuleIdentifier() != "master") {
-                    // NOTE: running the optimisation passes requires mutable access to a target
-                    // machine. Thus, we create a new target machine per thread in order to avoid likely data races
-                    // with a shared target machine.
-
-                    // Fetch a target machine builder.
-                    auto jtmb = detail::create_jit_tmb(opt_level, c_model);
-
-                    // Try creating the target machine.
-                    auto tm = jtmb.createTargetMachine();
-                    // LCOV_EXCL_START
-                    if (!tm) [[unlikely]] {
-                        throw std::invalid_argument("Error creating the target machine");
-                    }
-                    // LCOV_EXCL_STOP
-
-                    // NOTE: we used to fetch the target triple from the lljit object,
-                    // but recently we switched to asking the target triple directly
-                    // from the target machine. Assert equality between the two for a while,
-                    // just in case.
-                    // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
-                    // object, it should be ok with concurrent invocation.
-                    assert(j.m_lljit->getTargetTriple() == (*tm)->getTargetTriple());
-                    // NOTE: the target triple is also available in the module.
-                    assert(j.m_lljit->getTargetTriple().str() == M.getTargetTriple());
-
-                    // Optimise the module.
-                    detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
-                }
-
-                // Store the optimised bitcode/IR for this module.
-                auto bc_snap = detail::bc_from_module(M);
-                auto ir_snap = detail::ir_from_module(M);
-
-                // NOTE: protect for multi-threaded access.
-                std::lock_guard lock{j.m_ir_bc_mutex};
-
-                j.m_bc_snapshots.push_back(std::move(bc_snap));
-                j.m_ir_snapshots.push_back(std::move(ir_snap));
-            });
-
-            return llvm::Expected<llvm::orc::ThreadSafeModule>(std::move(TSM));
-        });
+                                                   c_model, force_avx512, slp_vectorize);
 
     // Build and assign the implementation.
     impl imp{.m_states = std::move(states), .m_jit = std::move(jit)};
@@ -1935,7 +1944,8 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
     // This will work regardless of whether other is compiled or not.
     impl imp{.m_states = other.m_impl->m_states,
              .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
-                                                          other.get_code_model())};
+                                                          other.get_code_model(), other.force_avx512(),
+                                                          other.get_slp_vectorize())};
     m_impl = std::make_unique<impl>(std::move(imp));
 
     if (other.is_compiled()) {
@@ -2013,7 +2023,8 @@ void llvm_multi_state::load(boost::archive::binary_iarchive &ar, unsigned)
 
         // Reset the jit with a new one.
         m_impl->m_jit = std::make_unique<detail::multi_jit>(
-            boost::safe_numerics::safe<unsigned>(m_impl->m_states.size()) + 1, get_opt_level(), get_code_model());
+            boost::safe_numerics::safe<unsigned>(m_impl->m_states.size()) + 1, get_opt_level(), get_code_model(),
+            force_avx512(), get_slp_vectorize());
 
         // Load the object files and the snapshots.
         ar >> m_impl->m_jit->m_object_files;

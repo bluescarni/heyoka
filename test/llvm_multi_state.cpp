@@ -6,12 +6,21 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 
+#include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+
+#include <llvm/Config/llvm-config.h>
+
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/erf.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -65,6 +74,15 @@ TEST_CASE("basic")
             Message("An llvm_multi_state can be constructed only from uncompiled llvm_state objects"));
     }
 
+    {
+        // Invalid module name.
+        llvm_state s{kw::mname = "heyoka.master"};
+        REQUIRE_THROWS_MATCHES(
+            (llvm_multi_state{{s, llvm_state{}}}), std::invalid_argument,
+            Message("An invalid llvm_state was passed to the constructor of an llvm_multi_state: the module name "
+                    "'heyoka.master' is reserved for internal use by llvm_multi_state"));
+    }
+
     // Test the property getters.
     {
         llvm_state s{kw::opt_level = 1u, kw::fast_math = true, kw::force_avx512 = true, kw::slp_vectorize = true,
@@ -98,9 +116,13 @@ TEST_CASE("copy semantics")
 {
     using Catch::Matchers::Message;
 
+    // NOTE: in order to properly test this, we have to disable the cache.
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(0);
+
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+    llvm_state s1, s2;
 
     add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
@@ -187,15 +209,22 @@ TEST_CASE("copy semantics")
         REQUIRE(outs[0] == 6);
         REQUIRE(outs[1] == 2. / 3.);
     }
+
+    // Restore the cache.
+    llvm_state::set_memcache_limit(100'000'000ull);
 }
 
 TEST_CASE("s11n")
 {
     using Catch::Matchers::Message;
 
+    // NOTE: in order to properly test this, we have to disable the cache.
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(0);
+
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+    llvm_state s1, s2;
 
     add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
@@ -274,6 +303,9 @@ TEST_CASE("s11n")
         REQUIRE(outs[0] == 6);
         REQUIRE(outs[1] == 2. / 3.);
     }
+
+    // Restore the cache.
+    llvm_state::set_memcache_limit(100'000'000ull);
 }
 
 TEST_CASE("cfunc")
@@ -283,7 +315,7 @@ TEST_CASE("cfunc")
     // Basic test.
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+    llvm_state s1, s2;
 
     add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
@@ -334,7 +366,7 @@ TEST_CASE("stream op")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s1{kw::mname = "module_0"}, s2{kw::mname = "module_1"};
+    llvm_state s1, s2;
 
     add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
@@ -432,3 +464,68 @@ TEST_CASE("memcache testing")
     REQUIRE(outs[2] == 5);
     REQUIRE(outs[3] == -1);
 }
+
+#if 0
+
+// Tests to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi double")
+{
+    for (auto fast_math : {false, true}) {
+        llvm_state s1{kw::slp_vectorize = true, kw::fast_math = fast_math};
+        llvm_state s2{kw::slp_vectorize = true, kw::fast_math = fast_math};
+
+        auto [a, b] = make_vars("a", "b");
+
+        add_cfunc<double>(s1, "cfunc", {erf(a), erf(b)}, {a, b});
+        add_cfunc<double>(s2, "cfuncs", {erf(a), erf(b)}, {a, b}, kw::strided = true);
+
+        llvm_multi_state ms{{s1, s2}};
+
+        ms.compile();
+
+        // NOTE: autovec with external scalar functions seems to work
+        // only since LLVM 16.
+#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+
+        const auto &tf = detail::get_target_features();
+
+        for (auto ir : ms.get_ir()) {
+            using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+            auto count = 0u;
+            for (auto it = boost::make_find_iterator(ir, boost::first_finder("@erf", boost::is_iequal()));
+                 it != string_find_iterator(); ++it) {
+                ++count;
+            }
+
+            if (count == 0u) {
+                continue;
+            }
+
+            // NOTE: at the moment we have comprehensive coverage of LLVM versions
+            // in the CI only for x86_64.
+            if (tf.sse2) {
+                // NOTE: occurrences of the scalar version:
+                // - 2 calls in the strided cfunc,
+                // - 1 declaration.
+                REQUIRE(count == 3u);
+            }
+
+            if (tf.aarch64) {
+                REQUIRE(count == 3u);
+            }
+
+            // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+            // to the way the target machine is being set up by orc/lljit (it works
+            // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+            // if (tf.vsx) {
+            //     REQUIRE(count == 3u);
+            // }
+        }
+
+#endif
+    }
+}
+
+#endif
