@@ -2359,16 +2359,16 @@ void llvm_multi_state::compile()
                                                     {.opt_bc = m_impl->m_jit->m_bc_snapshots,
                                                      .opt_ir = m_impl->m_jit->m_ir_snapshots,
                                                      .obj = m_impl->m_jit->m_object_files});
+            // LCOV_EXCL_START
         }
-        // LCOV_EXCL_START
     } catch (...) {
         // Reset to a def-cted state in case of error,
         // as it looks like there's no way of recovering.
         m_impl.reset();
 
         throw;
-        // LCOV_EXCL_STOP
     }
+    // LCOV_EXCL_STOP
 }
 
 std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)

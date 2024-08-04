@@ -530,8 +530,6 @@ TEST_CASE("memcache testing")
     REQUIRE(outs[3] == -1);
 }
 
-#if 0
-
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")
 {
@@ -592,5 +590,3 @@ TEST_CASE("vfabi double")
 #endif
     }
 }
-
-#endif
