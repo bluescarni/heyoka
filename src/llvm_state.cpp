@@ -532,11 +532,13 @@ public:
         // https://llvm.org/doxygen/MemoryBuffer_8cpp_source.html
         this->init(s.data(), s.data() + s.size(), true);
     }
+    // LCOV_EXCL_START
     llvm::MemoryBuffer::BufferKind getBufferKind() const final
     {
         // Hopefully std::string is not memory-mapped...
         return llvm::MemoryBuffer::BufferKind::MemoryBuffer_Malloc;
     }
+    // LCOV_EXCL_STOP
 };
 
 // Helper to add an object file to the jit, throwing in case of errors.
@@ -1866,8 +1868,12 @@ struct llvm_multi_state::impl {
 
 llvm_multi_state::llvm_multi_state() = default;
 
-llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
+llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_)
 {
+    // Fetch a const ref, as we want to make extra sure we do not modify
+    // states_ until we move it to construct the impl.
+    const auto &states = states_;
+
     // We need at least 1 state.
     if (states.empty()) [[unlikely]] {
         throw std::invalid_argument("At least 1 llvm_state object is needed to construct an llvm_multi_state");
@@ -1934,7 +1940,7 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states)
                                                    c_model, force_avx512, slp_vectorize);
 
     // Build and assign the implementation.
-    impl imp{.m_states = std::move(states), .m_jit = std::move(jit)};
+    impl imp{.m_states = std::move(states_), .m_jit = std::move(jit)};
     m_impl = std::make_unique<impl>(std::move(imp));
 }
 
@@ -1942,6 +1948,8 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
 {
     // NOTE: start off by creating a new jit and copying the states.
     // This will work regardless of whether other is compiled or not.
+    // No need to do any validation on the states are they are coming
+    // from a llvm_multi_state and they have been checked already.
     impl imp{.m_states = other.m_impl->m_states,
              .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
                                                           other.get_code_model(), other.force_avx512(),
@@ -1949,15 +1957,18 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
     m_impl = std::make_unique<impl>(std::move(imp));
 
     if (other.is_compiled()) {
-        // 'other' was compiled. Reset builder and module, copy over the snapshots
-        // and the object files, and add the files to the jit.
+        // 'other' was compiled.
+
+        // Reset builder and module.
         m_impl->m_jit->m_module.reset();
         m_impl->m_jit->m_builder.reset();
 
+        // Copy over the snapshots and the object files,
         m_impl->m_jit->m_object_files = other.m_impl->m_jit->m_object_files;
         m_impl->m_jit->m_ir_snapshots = other.m_impl->m_jit->m_ir_snapshots;
         m_impl->m_jit->m_bc_snapshots = other.m_impl->m_jit->m_bc_snapshots;
 
+        // Add the files to the jit.
         for (const auto &obj : m_impl->m_jit->m_object_files) {
             detail::add_obj_to_lljit(*m_impl->m_jit->m_lljit, obj);
         }
@@ -2046,11 +2057,11 @@ void llvm_multi_state::load(boost::archive::binary_iarchive &ar, unsigned)
         }
 
         // Debug checks.
-        assert(m_impl->m_jit->m_object_files.empty()
+        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
                || m_impl->m_jit->m_object_files.size() == m_impl->m_jit->m_n_modules);
-        assert(m_impl->m_jit->m_ir_snapshots.empty()
+        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
                || m_impl->m_jit->m_ir_snapshots.size() == m_impl->m_jit->m_n_modules);
-        assert(m_impl->m_jit->m_bc_snapshots.empty()
+        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
                || m_impl->m_jit->m_bc_snapshots.size() == m_impl->m_jit->m_n_modules);
 
         // LCOV_EXCL_START
@@ -2305,7 +2316,7 @@ void llvm_multi_state::compile()
 
             // NOTE: here it is important that we replicate the logic happening
             // in llvm_state::compile(): clear out module/builder, construct
-            // the object file.
+            // the object file. The snapshots can be left empty.
             for (auto &s : m_impl->m_states) {
                 s.m_module.reset();
                 s.m_builder.reset();

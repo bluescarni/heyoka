@@ -96,19 +96,52 @@ TEST_CASE("basic")
         REQUIRE(ms.get_slp_vectorize());
         REQUIRE(ms.get_code_model() == code_model::large);
         REQUIRE(ms.get_n_modules() == 5u);
-
         REQUIRE(!ms.is_compiled());
 
         ms.compile();
 
         REQUIRE(ms.is_compiled());
-
         REQUIRE(ms.get_opt_level() == 1u);
         REQUIRE(ms.fast_math());
         REQUIRE(ms.force_avx512());
         REQUIRE(ms.get_slp_vectorize());
         REQUIRE(ms.get_code_model() == code_model::large);
         REQUIRE(ms.get_n_modules() == 5u);
+
+        REQUIRE_THROWS_MATCHES(
+            ms.compile(), std::invalid_argument,
+            Message("The function 'compile' can be invoked only if the llvm_multi_state has not been compiled yet"));
+    }
+
+    // Move construction/assignment.
+    {
+        llvm_state s{kw::opt_level = 1u, kw::fast_math = true, kw::force_avx512 = true, kw::slp_vectorize = true,
+                     kw::code_model = code_model::large};
+
+        llvm_multi_state ms{{s, s, s, s}};
+
+        auto ms2 = std::move(ms);
+
+        REQUIRE(ms2.get_opt_level() == 1u);
+        REQUIRE(ms2.fast_math());
+        REQUIRE(ms2.force_avx512());
+        REQUIRE(ms2.get_slp_vectorize());
+        REQUIRE(ms2.get_code_model() == code_model::large);
+        REQUIRE(ms2.get_n_modules() == 5u);
+        REQUIRE(!ms2.is_compiled());
+
+        ms2.compile();
+
+        llvm_multi_state ms3;
+        ms3 = std::move(ms2);
+
+        REQUIRE(ms3.is_compiled());
+        REQUIRE(ms3.get_opt_level() == 1u);
+        REQUIRE(ms3.fast_math());
+        REQUIRE(ms3.force_avx512());
+        REQUIRE(ms3.get_slp_vectorize());
+        REQUIRE(ms3.get_code_model() == code_model::large);
+        REQUIRE(ms3.get_n_modules() == 5u);
     }
 }
 
@@ -199,6 +232,38 @@ TEST_CASE("copy semantics")
             ms_copy2.jit_lookup("f1"));
         auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
             ms_copy2.jit_lookup("f2"));
+
+        const double ins[] = {2., 3.};
+        double outs[2] = {};
+
+        cf1_ptr(outs, ins, nullptr, nullptr);
+        cf2_ptr(outs + 1, ins, nullptr, nullptr);
+
+        REQUIRE(outs[0] == 6);
+        REQUIRE(outs[1] == 2. / 3.);
+    }
+
+    // Test also copy assignment.
+    llvm_multi_state ms_copy3;
+    ms_copy3 = ms_copy2;
+
+    REQUIRE(ms_copy3.get_bc() == ms.get_bc());
+    REQUIRE(ms_copy3.get_ir() == ms.get_ir());
+    REQUIRE(ms_copy3.get_object_code() == ms.get_object_code());
+    REQUIRE(ms_copy3.is_compiled() == ms.is_compiled());
+    REQUIRE(ms_copy3.fast_math() == ms.fast_math());
+    REQUIRE(ms_copy3.force_avx512() == ms.force_avx512());
+    REQUIRE(ms_copy3.get_opt_level() == ms.get_opt_level());
+    REQUIRE(ms_copy3.get_slp_vectorize() == ms.get_slp_vectorize());
+    REQUIRE(ms_copy3.get_code_model() == ms.get_code_model());
+    REQUIRE_NOTHROW(ms_copy3.jit_lookup("f1"));
+    REQUIRE_NOTHROW(ms_copy3.jit_lookup("f2"));
+
+    {
+        auto *cf1_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            ms_copy3.jit_lookup("f1"));
+        auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            ms_copy3.jit_lookup("f2"));
 
         const double ins[] = {2., 3.};
         double outs[2] = {};
