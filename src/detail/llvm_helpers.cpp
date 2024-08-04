@@ -31,6 +31,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -271,6 +272,74 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
     return f->getAttributes();
 }
 
+// Add a pointer to the llvm.used global variable of a module:
+//
+// https://llvm.org/docs/LangRef.html#the-llvm-used-global-variable
+//
+// If the llvm.used variable does not exist yet, create it.
+//
+// NOTE: this has quadratic complexity when appending ptr to an existing
+// array. It should not be a problem for the type of use we do as we expect
+// just a few entries in this array, but something to keep in mind.
+void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
+{
+    assert(ptr != nullptr);
+    assert(ptr->getType()->isPointerTy());
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+
+    // Fetch the pointer type.
+    auto *ptr_type = llvm::PointerType::getUnqual(ctx);
+
+    if (auto *orig_used = md.getGlobalVariable("llvm.used")) {
+        // The llvm.used variable exists already.
+
+        // Fetch the original initializer.
+        assert(orig_used->hasInitializer());
+        auto *orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
+
+        // Construct a new initializer with the original values
+        // plus the new pointer.
+        std::vector<llvm::Constant *> arr_values;
+        arr_values.reserve(
+            boost::safe_numerics::safe<decltype(arr_values.size())>(orig_init->getType()->getNumElements()) + 1);
+        for (decltype(orig_init->getType()->getNumElements()) i = 0; i < orig_init->getType()->getNumElements(); ++i) {
+            auto *orig_el = orig_init->getAggregateElement(boost::numeric_cast<unsigned>(i));
+            assert(orig_el->getType()->isPointerTy());
+
+            // NOTE: if ptr was already in the llvm.used vector, just bail
+            // out early.
+            if (orig_el->isElementWiseEqual(ptr)) {
+                return;
+            }
+
+            arr_values.push_back(orig_el);
+        }
+        arr_values.push_back(ptr);
+
+        // Create the new array.
+        auto *used_array_type = llvm::ArrayType::get(ptr_type, boost::numeric_cast<std::uint64_t>(arr_values.size()));
+        auto *used_arr = llvm::ConstantArray::get(used_array_type, arr_values);
+
+        // Remove the original one.
+        orig_used->eraseFromParent();
+
+        // Add the new global variable.
+        auto *g_used_arr = new llvm::GlobalVariable(md, used_arr->getType(), true,
+                                                    llvm::GlobalVariable::AppendingLinkage, used_arr, "llvm.used");
+        g_used_arr->setSection("llvm.metadata");
+    } else {
+        // The llvm.used variable does not exist yet, create it.
+        auto *used_array_type = llvm::ArrayType::get(ptr_type, 1);
+        std::vector<llvm::Constant *> arr_values{ptr};
+        auto *used_arr = llvm::ConstantArray::get(used_array_type, arr_values);
+        auto *g_used_arr = new llvm::GlobalVariable(md, used_arr->getType(), true,
+                                                    llvm::GlobalVariable::AppendingLinkage, used_arr, "llvm.used");
+        g_used_arr->setSection("llvm.metadata");
+    }
+}
+
 // Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
 // The necessary vfabi information is stored in vfi. The function returns "call".
 // The attributes of the scalar function will be attached to the vector variants.
@@ -312,17 +381,8 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 = (use_fast_math && !el.lp_vf_abi_attr.empty()) ? el.lp_vf_abi_attr : el.vf_abi_attr;
             vf_abi_strs.push_back(vf_abi_attr);
         }
-#if LLVM_VERSION_MAJOR >= 14
         call->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
                                              fmt::format("{}", fmt::join(vf_abi_strs, ","))));
-#else
-        {
-            auto attrs = call->getAttributes();
-            attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
-                                       fmt::format("{}", fmt::join(vf_abi_strs, ",")));
-            call->setAttributes(attrs);
-        }
-#endif
 
         // Now we need to:
         // - add the declarations of the vector variants to the module,
@@ -374,33 +434,9 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 assert(vf_ptr->getAttributes() == f->getAttributes());
             }
 
-            // Create the name of the dummy function to ensure the variant is not optimised out.
-            //
-            // NOTE: another way of doing this involves the llvm.used global variable - need
-            // to learn about the metadata API apparently.
-            //
-            // https://llvm.org/docs/LangRef.html#the-llvm-used-global-variable
-            // https://godbolt.org/z/1neaG4bYj
-            const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el_name);
-
-            if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
-                // The dummy function has not been defined yet, do it.
-                auto *dummy = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, dummy_name, &md);
-
-                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", dummy));
-
-                // The dummy function just forwards its arguments to the variant.
-                std::vector<llvm::Value *> dummy_args;
-                for (auto *dummy_arg = dummy->args().begin(); dummy_arg != dummy->args().end(); ++dummy_arg) {
-                    dummy_args.emplace_back(dummy_arg);
-                }
-
-                builder.CreateRet(builder.CreateCall(vf_ptr, dummy_args));
-            } else {
-                // The declaration of the dummy function is already there.
-                // Check that the signatures match.
-                assert(dummy_ptr->getFunctionType() == vec_ft);
-            }
+            // Ensure that the variant is not optimised out because it is not
+            // explicitly used in the code.
+            detail::llvm_append_used(s, vf_ptr);
         }
 
         // Restore the original insertion block.

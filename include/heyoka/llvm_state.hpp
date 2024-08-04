@@ -12,14 +12,15 @@
 #include <heyoka/config.hpp>
 
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -78,6 +79,7 @@ HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
 
 template <typename T>
 inline std::uint32_t recommended_simd_size()
@@ -132,6 +134,8 @@ HEYOKA_BEGIN_NAMESPACE
 class HEYOKA_DLL_PUBLIC llvm_state
 {
     friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
+    friend class HEYOKA_DLL_PUBLIC llvm_multi_state;
 
     struct jit;
 
@@ -337,14 +341,64 @@ namespace detail
 
 // The value contained in the in-memory cache.
 struct llvm_mc_value {
-    std::string opt_bc, opt_ir, obj;
+    std::vector<std::string> opt_bc, opt_ir, obj;
+
+    std::size_t total_size() const;
 };
 
 // Cache lookup and insertion.
-std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &, unsigned);
-void llvm_state_mem_cache_try_insert(std::string, unsigned, llvm_mc_value);
+std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &, unsigned);
+void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc_value);
 
 } // namespace detail
+
+class HEYOKA_DLL_PUBLIC llvm_multi_state
+{
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
+
+    struct impl;
+
+    std::unique_ptr<impl> m_impl;
+
+    HEYOKA_DLL_LOCAL void compile_impl();
+    HEYOKA_DLL_LOCAL void add_obj_triggers();
+
+    // Check functions.
+    HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
+    HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+public:
+    llvm_multi_state();
+    explicit llvm_multi_state(std::vector<llvm_state>);
+    llvm_multi_state(const llvm_multi_state &);
+    llvm_multi_state(llvm_multi_state &&) noexcept;
+    llvm_multi_state &operator=(const llvm_multi_state &);
+    llvm_multi_state &operator=(llvm_multi_state &&) noexcept;
+    ~llvm_multi_state();
+
+    [[nodiscard]] bool is_compiled() const noexcept;
+
+    [[nodiscard]] unsigned get_n_modules() const noexcept;
+
+    [[nodiscard]] bool fast_math() const noexcept;
+    [[nodiscard]] bool force_avx512() const noexcept;
+    [[nodiscard]] unsigned get_opt_level() const noexcept;
+    [[nodiscard]] bool get_slp_vectorize() const noexcept;
+    [[nodiscard]] code_model get_code_model() const noexcept;
+
+    [[nodiscard]] std::vector<std::string> get_ir() const;
+    [[nodiscard]] std::vector<std::string> get_bc() const;
+    [[nodiscard]] const std::vector<std::string> &get_object_code() const;
+
+    void compile();
+
+    std::uintptr_t jit_lookup(const std::string &);
+};
 
 HEYOKA_END_NAMESPACE
 

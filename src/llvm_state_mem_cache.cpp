@@ -17,7 +17,7 @@
 #include <optional>
 #include <string>
 #include <utility>
-#include <variant>
+#include <vector>
 
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -28,7 +28,8 @@
 #include <heyoka/llvm_state.hpp>
 
 // This in-memory cache maps the bitcode
-// of an LLVM module and an optimisation level to:
+// of one or more LLVM modules and an integer flag
+// (representing several compilation settings) to:
 //
 // - the optimised version of the bitcode,
 // - the textual IR corresponding
@@ -43,6 +44,26 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Helper to compute the total size in bytes
+// of the data contained in an llvm_mc_value.
+// Will throw on overflow.
+std::size_t llvm_mc_value::total_size() const
+{
+    assert(!opt_bc.empty());
+    assert(opt_bc.size() == opt_ir.size());
+    assert(opt_bc.size() == obj.size());
+
+    boost::safe_numerics::safe<std::size_t> ret = 0;
+
+    for (decltype(opt_bc.size()) i = 0; i < opt_bc.size(); ++i) {
+        ret += opt_bc[i].size();
+        ret += opt_ir[i].size();
+        ret += obj[i].size();
+    }
+
+    return ret;
+}
+
 namespace
 {
 
@@ -56,16 +77,33 @@ HEYOKA_CONSTINIT
 std::mutex mem_cache_mutex;
 
 // Definition of the data structures for the cache.
-using lru_queue_t = std::list<std::pair<std::string, unsigned>>;
+using lru_queue_t = std::list<std::pair<std::vector<std::string>, unsigned>>;
 
 using lru_key_t = lru_queue_t::iterator;
+
+// Implementation of hashing for std::pair<std::vector<std::string>, unsigned> and
+// its heterogeneous counterpart.
+template <typename T>
+auto cache_key_hasher(const T &k) noexcept
+{
+    assert(!k.first.empty());
+
+    // Combine the bitcodes.
+    auto seed = std::hash<std::string>{}(k.first[0]);
+    for (decltype(k.first.size()) i = 1; i < k.first.size(); ++i) {
+        boost::hash_combine(seed, k.first[i]);
+    }
+
+    // Combine with the compilation flag.
+    boost::hash_combine(seed, static_cast<std::size_t>(k.second));
+
+    return seed;
+}
 
 struct lru_hasher {
     std::size_t operator()(const lru_key_t &k) const noexcept
     {
-        auto seed = std::hash<std::string>{}(k->first);
-        boost::hash_combine(seed, k->second);
-        return seed;
+        return cache_key_hasher(*k);
     }
 };
 
@@ -96,16 +134,16 @@ HEYOKA_CONSTINIT std::uint64_t mem_cache_limit = 2147483648ull;
 
 // Machinery for heterogeneous lookup into the cache.
 // NOTE: this function MUST be invoked while holding the global lock.
-auto llvm_state_mem_cache_hl(const std::string &bc, unsigned opt_level)
+auto llvm_state_mem_cache_hl(const std::vector<std::string> &bc, unsigned comp_flag)
 {
-    using compat_key_t = std::pair<const std::string &, unsigned>;
+    // NOTE: the heterogeneous version of the key replaces std::vector<std::string>
+    // with a const reference.
+    using compat_key_t = std::pair<const std::vector<std::string> &, unsigned>;
 
     struct compat_hasher {
         std::size_t operator()(const compat_key_t &k) const noexcept
         {
-            auto seed = std::hash<std::string>{}(k.first);
-            boost::hash_combine(seed, k.second);
-            return seed;
+            return cache_key_hasher(k);
         }
     };
 
@@ -120,7 +158,7 @@ auto llvm_state_mem_cache_hl(const std::string &bc, unsigned opt_level)
         }
     };
 
-    return lru_map.find(std::make_pair(std::cref(bc), opt_level), compat_hasher{}, compat_cmp{});
+    return lru_map.find(std::make_pair(std::cref(bc), comp_flag), compat_hasher{}, compat_cmp{});
 }
 
 // Debug function to run sanity checks on the cache.
@@ -131,15 +169,13 @@ void llvm_state_mem_cache_sanity_checks()
 
     // Check that the computed size of the cache is consistent with mem_cache_size.
     assert(std::accumulate(lru_map.begin(), lru_map.end(), boost::safe_numerics::safe<std::size_t>(0),
-                           [](const auto &a, const auto &p) {
-                               return a + p.second.opt_bc.size() + p.second.opt_ir.size() + p.second.obj.size();
-                           })
+                           [](const auto &a, const auto &p) { return a + p.second.total_size(); })
            == mem_cache_size);
 }
 
 } // namespace
 
-std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &bc, unsigned opt_level)
+std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &bc, unsigned comp_flag)
 {
     // Lock down.
     const std::lock_guard lock(mem_cache_mutex);
@@ -147,7 +183,7 @@ std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &bc, 
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
 
-    if (const auto it = llvm_state_mem_cache_hl(bc, opt_level); it == lru_map.end()) {
+    if (const auto it = llvm_state_mem_cache_hl(bc, comp_flag); it == lru_map.end()) {
         // Cache miss.
         return {};
     } else {
@@ -163,7 +199,7 @@ std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &bc, 
     }
 }
 
-void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc_value val)
+void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_flag, llvm_mc_value val)
 {
     // Lock down.
     const std::lock_guard lock(mem_cache_mutex);
@@ -174,7 +210,7 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
     // Do a first lookup to check if bc is already in the cache.
     // This could happen, e.g., if two threads are compiling the same
     // code concurrently.
-    if (const auto it = llvm_state_mem_cache_hl(bc, opt_level); it != lru_map.end()) {
+    if (const auto it = llvm_state_mem_cache_hl(bc, comp_flag); it != lru_map.end()) {
         assert(val.opt_bc == it->second.opt_bc);
         assert(val.opt_ir == it->second.opt_ir);
         assert(val.obj == it->second.obj);
@@ -183,8 +219,7 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
     }
 
     // Compute the new cache size.
-    auto new_cache_size = static_cast<std::size_t>(boost::safe_numerics::safe<std::size_t>(mem_cache_size)
-                                                   + val.opt_bc.size() + val.opt_ir.size() + val.obj.size());
+    auto new_cache_size = boost::safe_numerics::safe<std::size_t>(mem_cache_size) + val.total_size();
 
     // Remove items from the cache if we are exceeding
     // the limit.
@@ -195,8 +230,7 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
         const auto &cur_val = cur_it->second;
         // NOTE: no possibility of overflow here, as cur_size is guaranteed
         // not to be greater than mem_cache_size.
-        const auto cur_size
-            = static_cast<std::size_t>(cur_val.opt_bc.size()) + cur_val.opt_ir.size() + cur_val.obj.size();
+        const auto cur_size = cur_val.total_size();
 
         // NOTE: the next 4 lines cannot throw, which ensures that the
         // cache cannot be left in an inconsistent state.
@@ -222,7 +256,7 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
     // Add the new item to the front of the queue.
     // NOTE: if this throws, we have not modified lru_map yet,
     // no cleanup needed.
-    lru_queue.emplace_front(std::move(bc), opt_level);
+    lru_queue.emplace_front(std::move(bc), comp_flag);
 
     // Add the new item to the map.
     try {
