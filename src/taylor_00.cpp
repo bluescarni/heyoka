@@ -685,9 +685,6 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     // Create the return value.
     builder.CreateRetVoid();
 
-    // Verify the function.
-    s.verify_function(f);
-
     return dc;
 }
 
@@ -832,9 +829,6 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
 
     // Create the return value.
     builder.CreateRetVoid();
-
-    // Verify the function.
-    s.verify_function(f);
 
     return dc;
 }

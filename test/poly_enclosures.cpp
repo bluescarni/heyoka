@@ -108,9 +108,6 @@ TEST_CASE("polynomial enclosures")
 
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // Restore the original insertion block.
                 builder.SetInsertPoint(orig_bb);
 
@@ -137,9 +134,6 @@ TEST_CASE("polynomial enclosures")
                 }
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -249,9 +243,6 @@ TEST_CASE("polynomial enclosures mp")
 
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // Restore the original insertion block.
                 builder.SetInsertPoint(orig_bb);
 
@@ -278,9 +269,6 @@ TEST_CASE("polynomial enclosures mp")
                 }
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();

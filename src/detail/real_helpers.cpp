@@ -351,8 +351,6 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
 
         builder.CreateRet(res);
 
-        s.verify_function(f);
-
         builder.SetInsertPoint(orig_bb);
     }
 
@@ -417,8 +415,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
 
         builder.CreateRet(res);
 
-        s.verify_function(f);
-
         builder.SetInsertPoint(orig_bb);
     }
 
@@ -477,8 +473,6 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
 
         // Truncate the result to a boolean and return.
         builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
-
-        s.verify_function(f);
 
         builder.SetInsertPoint(orig_bb);
     }
@@ -686,8 +680,6 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 
         builder.CreateRet(res);
 
-        s.verify_function(f);
-
         builder.SetInsertPoint(orig_bb);
     }
 
@@ -752,8 +744,6 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
                                                               llvm::ConstantInt::getSigned(int32_t, 1)));
 
         builder.CreateRet(ret);
-
-        s.verify_function(f);
 
         builder.SetInsertPoint(orig_bb);
     }

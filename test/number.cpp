@@ -365,8 +365,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
@@ -391,8 +389,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::infinity()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
@@ -415,8 +411,6 @@ TEST_CASE("llvm_codegen")
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::quiet_NaN()}));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -444,8 +438,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<long double>()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
@@ -470,8 +462,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::infinity()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
@@ -494,8 +484,6 @@ TEST_CASE("llvm_codegen")
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::quiet_NaN()}));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -525,8 +513,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::pi_128}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
@@ -551,8 +537,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::infinity()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
@@ -575,8 +559,6 @@ TEST_CASE("llvm_codegen")
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::quiet_NaN()}));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -604,8 +586,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
@@ -630,8 +610,6 @@ TEST_CASE("llvm_codegen")
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
@@ -654,8 +632,6 @@ TEST_CASE("llvm_codegen")
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -682,8 +658,6 @@ TEST_CASE("llvm_codegen")
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::real_pi(256)}));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -714,8 +688,6 @@ TEST_CASE("llvm_codegen")
         detail::ext_store_vector_to_memory(s, f->arg_begin(), real_val);
 
         builder.CreateRetVoid();
-
-        s.verify_function(f);
 
         s.compile();
 

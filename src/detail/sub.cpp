@@ -272,9 +272,6 @@ llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, con
         // Return the result.
         builder.CreateRet(builder.CreateLoad(val_t, retval));
 
-        // Verify.
-        s.verify_function(f);
-
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
@@ -345,9 +342,6 @@ llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, con
         // Return the result.
         builder.CreateRet(builder.CreateLoad(val_t, retval));
 
-        // Verify.
-        s.verify_function(f);
-
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
@@ -401,9 +395,6 @@ llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, con
 
         // Create the return value.
         builder.CreateRet(llvm_fsub(s, v0, v1));
-
-        // Verify.
-        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);

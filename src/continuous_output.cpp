@@ -294,9 +294,6 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // Create the return value.
     builder.CreateRetVoid();
 
-    // Verify the function.
-    m_llvm_state.verify_function(f);
-
     // Compile.
     m_llvm_state.compile();
 
@@ -980,9 +977,6 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
     // Create the return value.
     builder.CreateRetVoid();
-
-    // Verify the function.
-    m_llvm_state.verify_function(f);
 
     // Compile.
     m_llvm_state.compile();

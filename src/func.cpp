@@ -931,9 +931,6 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
         // Return it.
         builder.CreateRet(ret);
 
-        // Verify.
-        s.verify_function(f);
-
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }

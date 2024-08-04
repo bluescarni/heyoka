@@ -386,9 +386,6 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
 
         builder.CreateRet(pairwise_sum(s, vals));
 
-        // Verify.
-        s.verify_function(f);
-
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }

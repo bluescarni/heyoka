@@ -317,9 +317,6 @@ public:
     [[nodiscard]] std::string get_bc() const;
     [[nodiscard]] const std::string &get_object_code() const;
 
-    void verify_function(const std::string &);
-    void verify_function(llvm::Function *);
-
     [[nodiscard]] bool is_compiled() const;
 
     void compile();

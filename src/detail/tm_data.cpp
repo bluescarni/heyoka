@@ -321,9 +321,6 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
 
     // Create the return value.
     builder.CreateRetVoid();
-
-    // Verify the function.
-    st.verify_function(f);
 }
 
 } // namespace

@@ -117,9 +117,6 @@ llvm::Function *time_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
         // Return it.
         builder.CreateRet(ret);
 
-        // Verify.
-        s.verify_function(f);
-
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
@@ -234,9 +231,6 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
 
         // Return the result.
         builder.CreateRet(builder.CreateLoad(val_t, retval));
-
-        // Verify.
-        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);

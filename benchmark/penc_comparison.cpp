@@ -100,9 +100,6 @@ void run_benchmark(unsigned order)
 
     builder.CreateRetVoid();
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -129,9 +126,6 @@ void run_benchmark(unsigned order)
     }
 
     builder.CreateRetVoid();
-
-    // Verify.
-    s.verify_function(f);
 
     // Compile.
     s.compile();

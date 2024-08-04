@@ -311,9 +311,6 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, co
         builder.CreateRet(builder.CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_ord, llvm_fmul(s, slope_c, u_ord)));
     }
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -582,9 +579,6 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
 
     // Return the result.
     builder.CreateRet(builder.CreateLoad(val_t, retval));
-
-    // Verify.
-    s.verify_function(f);
 
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
