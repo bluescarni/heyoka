@@ -13,7 +13,6 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <ios>
 #include <limits>
 #include <memory>
@@ -1518,23 +1517,6 @@ std::string llvm_state::get_bc() const
         return m_bc_snapshot;
     }
 }
-
-// LCOV_EXCL_START
-
-void llvm_state::dump_object_code(const std::string &filename) const
-{
-    const auto &oc = get_object_code();
-
-    std::ofstream ofs;
-    // NOTE: turn on exceptions, and overwrite any existing content.
-    ofs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ofs.open(filename, std::ios_base::out | std::ios::trunc);
-
-    // Write out the binary data to ofs.
-    ofs.write(oc.data(), boost::numeric_cast<std::streamsize>(oc.size()));
-}
-
-// LCOV_EXCL_STOP
 
 const std::string &llvm_state::get_object_code() const
 {
