@@ -1895,12 +1895,6 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_)
 
     // Settings in all states must be consistent.
     auto states_differ = [](const llvm_state &s1, const llvm_state &s2) {
-        // NOTE: bit of paranoia here.
-        assert(s1.m_jitter->m_lljit->getDataLayout() == s2.m_jitter->m_lljit->getDataLayout());
-        assert(s1.m_jitter->get_target_triple() == s2.m_jitter->get_target_triple());
-        assert(s1.m_jitter->get_target_cpu() == s2.m_jitter->get_target_cpu());
-        assert(s1.m_jitter->get_target_features() == s2.m_jitter->get_target_features());
-
         if (s1.get_opt_level() != s2.get_opt_level()) {
             return true;
         }
@@ -1920,6 +1914,12 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_)
         if (s1.get_code_model() != s2.get_code_model()) {
             return true;
         }
+
+        // NOTE: bit of paranoia here.
+        assert(s1.m_jitter->m_lljit->getDataLayout() == s2.m_jitter->m_lljit->getDataLayout());
+        assert(s1.m_jitter->get_target_triple() == s2.m_jitter->get_target_triple());
+        assert(s1.m_jitter->get_target_cpu() == s2.m_jitter->get_target_cpu());
+        assert(s1.m_jitter->get_target_features() == s2.m_jitter->get_target_features());
 
         return false;
     };
