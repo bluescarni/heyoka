@@ -1528,9 +1528,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Finish off the function.
     builder.CreateRetVoid();
 
-    // Verify it.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 

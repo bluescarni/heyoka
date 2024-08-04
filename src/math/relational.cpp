@@ -342,9 +342,6 @@ llvm::Function *rel_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 
     builder.CreateRet(builder.CreateLoad(val_t, retval));
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 

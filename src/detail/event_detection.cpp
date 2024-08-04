@@ -440,9 +440,6 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // Create the return value.
     builder.CreateRetVoid();
 
-    // Verify the function.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -633,9 +630,6 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     // Return.
     builder.CreateRetVoid();
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -757,9 +751,6 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
     // Return.
     builder.CreateRetVoid();
-
-    // Verify.
-    s.verify_function(f);
 
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);

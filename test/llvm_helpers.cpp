@@ -97,9 +97,6 @@ TEST_CASE("sgn scalar")
             // Create the return value.
             builder.CreateRet(llvm_sgn(s, x));
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -147,9 +144,6 @@ TEST_CASE("sgn scalar mp")
 
         // Create the return value.
         builder.CreateRet(llvm_sgn(s, x));
-
-        // Verify.
-        s.verify_function(f);
 
         // Compile.
         s.compile();
@@ -217,9 +211,6 @@ TEST_CASE("sgn batch")
 
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // Compile.
                 s.compile();
 
@@ -285,9 +276,6 @@ TEST_CASE("sincos scalar")
             // Create the return value.
             builder.CreateRetVoid();
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -348,9 +336,6 @@ TEST_CASE("sincos batch")
 
                 // Create the return value.
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -416,9 +401,6 @@ TEST_CASE("sincos mp")
 
         // Create the return value.
         builder.CreateRetVoid();
-
-        // Verify.
-        s.verify_function(f);
 
         // Compile.
         s.compile();
@@ -993,9 +975,6 @@ TEST_CASE("while_loop")
         // Return the result.
         builder.CreateRet(builder.CreateLoad(val_t, retval));
 
-        // Verify.
-        s.verify_function(f);
-
         // Compile.
         s.compile();
 
@@ -1043,8 +1022,7 @@ TEST_CASE("while_loop")
         // exceptions?
         auto thrower = [&]() {
             try {
-                llvm_while_loop(
-                    s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {});
+                llvm_while_loop(s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {});
             } catch (...) {
                 f->eraseFromParent();
 
@@ -1288,9 +1266,6 @@ TEST_CASE("minmax")
                 // Create the return value.
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // llvm_max.
                 f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "max", &md);
 
@@ -1309,9 +1284,6 @@ TEST_CASE("minmax")
 
                 // Create the return value.
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // llvm_min_nan.
                 f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "min_nan", &md);
@@ -1332,9 +1304,6 @@ TEST_CASE("minmax")
                 // Create the return value.
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // llvm_max_nan.
                 f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "max_nan", &md);
 
@@ -1353,9 +1322,6 @@ TEST_CASE("minmax")
 
                 // Create the return value.
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -1498,9 +1464,6 @@ TEST_CASE("fma scalar")
 
             builder.CreateRet(llvm_fma(s, x, y, z));
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -1555,9 +1518,6 @@ TEST_CASE("fma batch")
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -1628,9 +1588,6 @@ TEST_CASE("fma scalar mp")
 
         builder.CreateRetVoid();
 
-        // Verify.
-        s.verify_function(f);
-
         // Compile.
         s.compile();
 
@@ -1690,9 +1647,6 @@ TEST_CASE("eft_product scalar")
             }
 
             builder.CreateRetVoid();
-
-            // Verify.
-            s.verify_function(f);
 
             // Compile.
             s.compile();
@@ -1772,9 +1726,6 @@ TEST_CASE("eft_product batch")
                 detail::store_vector_to_memory(builder, y_ptr, y);
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -1868,9 +1819,6 @@ TEST_CASE("dl mul scalar")
             }
 
             builder.CreateRetVoid();
-
-            // Verify.
-            s.verify_function(f);
 
             // Compile.
             s.compile();
@@ -1973,9 +1921,6 @@ TEST_CASE("dl mul batch")
                 }
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -2090,9 +2035,6 @@ TEST_CASE("dl div scalar")
 
             builder.CreateRetVoid();
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -2191,9 +2133,6 @@ TEST_CASE("dl div batch")
 
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(f);
-
                 // Compile.
                 s.compile();
                 // Fetch the function pointer.
@@ -2288,9 +2227,6 @@ TEST_CASE("floor scalar")
 
             builder.CreateRet(llvm_floor(s, x));
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -2340,9 +2276,6 @@ TEST_CASE("floor batch")
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -2408,9 +2341,6 @@ TEST_CASE("dl floor scalar")
             }
 
             builder.CreateRetVoid();
-
-            // Verify.
-            s.verify_function(f);
 
             // Compile.
             s.compile();
@@ -2495,9 +2425,6 @@ TEST_CASE("dl floor batch")
                 }
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -2592,9 +2519,6 @@ TEST_CASE("dl modulus scalar")
 
             builder.CreateRetVoid();
 
-            // Verify.
-            s.verify_function(f);
-
             // Compile.
             s.compile();
 
@@ -2676,9 +2600,6 @@ TEST_CASE("dl modulus batch")
                 }
 
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
 
                 // Compile.
                 s.compile();
@@ -2921,8 +2842,6 @@ TEST_CASE("real_ext_load")
 
     builder.CreateRetVoid();
 
-    s.verify_function(f);
-
     s.compile();
 
     auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *)>(s.jit_lookup("test"));
@@ -2962,8 +2881,6 @@ TEST_CASE("switch")
 
         builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
 
-        s.verify_function(f);
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<std::uint32_t (*)(std::uint32_t)>(s.jit_lookup("test"));
@@ -2993,8 +2910,6 @@ TEST_CASE("switch")
                                 {{5, [&]() { builder.CreateStore(builder.getInt32(10), out_storage); }}});
 
         builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
-
-        s.verify_function(f);
 
         s.compile();
 
@@ -3027,8 +2942,6 @@ TEST_CASE("switch")
                                  {10, [&]() { builder.CreateStore(builder.getInt32(30), out_storage); }}});
 
         builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
-
-        s.verify_function(f);
 
         s.compile();
 

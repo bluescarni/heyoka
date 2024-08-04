@@ -1102,9 +1102,6 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     // Create the return value.
     builder.CreateRetVoid();
 
-    // Verify the function.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 }

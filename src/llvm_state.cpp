@@ -13,7 +13,6 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <ios>
 #include <limits>
 #include <memory>
@@ -1251,40 +1250,6 @@ void llvm_state::check_compiled(const char *f) const
     }
 }
 
-void llvm_state::verify_function(llvm::Function *f)
-{
-    check_uncompiled(__func__);
-
-    if (f == nullptr) {
-        throw std::invalid_argument("Cannot verify a null function pointer");
-    }
-
-    std::string err_report;
-    llvm::raw_string_ostream ostr(err_report);
-    if (llvm::verifyFunction(*f, &ostr)) {
-        // Remove function before throwing.
-        const auto fname = std::string(f->getName());
-        f->eraseFromParent();
-
-        throw std::invalid_argument(fmt::format(
-            "The verification of the function '{}' failed. The full error message:\n{}", fname, ostr.str()));
-    }
-}
-
-void llvm_state::verify_function(const std::string &name)
-{
-    check_uncompiled(__func__);
-
-    // Lookup the function in the module.
-    auto *f = m_module->getFunction(name);
-    if (f == nullptr) {
-        throw std::invalid_argument(fmt::format("The function '{}' does not exist in the module", name));
-    }
-
-    // Run the actual check.
-    verify_function(f);
-}
-
 void llvm_state::optimise()
 {
     // NOTE: we used to fetch the target triple from the lljit object,
@@ -1518,23 +1483,6 @@ std::string llvm_state::get_bc() const
         return m_bc_snapshot;
     }
 }
-
-// LCOV_EXCL_START
-
-void llvm_state::dump_object_code(const std::string &filename) const
-{
-    const auto &oc = get_object_code();
-
-    std::ofstream ofs;
-    // NOTE: turn on exceptions, and overwrite any existing content.
-    ofs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ofs.open(filename, std::ios_base::out | std::ios::trunc);
-
-    // Write out the binary data to ofs.
-    ofs.write(oc.data(), boost::numeric_cast<std::streamsize>(oc.size()));
-}
-
-// LCOV_EXCL_STOP
 
 const std::string &llvm_state::get_object_code() const
 {

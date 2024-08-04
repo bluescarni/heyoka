@@ -602,9 +602,6 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Return the result.
     builder.CreateRet(builder.CreateLoad(tp, retval));
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -677,9 +674,6 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
 
     // Return.
     builder.CreateRetVoid();
-
-    // Verify.
-    s.verify_function(f);
 
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
@@ -996,9 +990,6 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Return the result.
     builder.CreateRet(ret);
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -1306,9 +1297,6 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
 
     // Return the result.
     builder.CreateRet(ret);
-
-    // Verify.
-    s.verify_function(f);
 
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);

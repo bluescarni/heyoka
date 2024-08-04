@@ -857,9 +857,6 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
                 // Return.
                 builder.CreateRetVoid();
 
-                // Verify.
-                s.verify_function(worker);
-
                 // Create the wrapper function. This will execute multiple calls
                 // to the worker in parallel, until the entire range [0, ncalls) has
                 // been consumed.
@@ -877,9 +874,6 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
 
                 // Return.
                 builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(wrapper);
 
                 // Restore the original insertion block.
                 builder.SetInsertPoint(orig_bb);

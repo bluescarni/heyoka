@@ -242,9 +242,6 @@ llvm::Function *taylor_c_diff_func_logical_andor_impl(const func_base &fb, llvm_
 
     builder.CreateRet(builder.CreateLoad(val_t, retval));
 
-    // Verify.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
