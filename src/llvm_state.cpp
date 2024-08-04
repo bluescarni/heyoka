@@ -1485,11 +1485,7 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
         throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
     }
 
-#if LLVM_VERSION_MAJOR >= 15
     return static_cast<std::uintptr_t>((*sym).getValue());
-#else
-    return static_cast<std::uintptr_t>((*sym).getAddress());
-#endif
 }
 
 std::string llvm_state::get_ir() const
@@ -2380,11 +2376,7 @@ std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)
         throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in an llvm_multi_state", name));
     }
 
-#if LLVM_VERSION_MAJOR >= 15
     return static_cast<std::uintptr_t>((*sym).getValue());
-#else
-    return static_cast<std::uintptr_t>((*sym).getAddress());
-#endif
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_multi_state &s)

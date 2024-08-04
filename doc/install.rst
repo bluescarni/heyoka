@@ -14,7 +14,7 @@ and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
 
-* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=14 and <=18),
+* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=15 and <=18),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.69),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=11),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
