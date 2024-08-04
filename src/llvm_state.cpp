@@ -1434,6 +1434,9 @@ void llvm_state::compile()
 
             // Assign the object file.
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj[0]));
+
+            // Look up the trigger.
+            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 
@@ -1630,13 +1633,6 @@ struct multi_jit {
     [[nodiscard]] llvm::LLVMContext &context() const noexcept
     {
         return *m_ctx->getContext();
-    }
-
-    // Helper to fetch the bitcode of the master module.
-    std::string get_master_bc() const
-    {
-        assert(m_module);
-        return detail::bc_from_module(*m_module);
     }
 };
 
@@ -2291,7 +2287,7 @@ void llvm_multi_state::compile()
             obc.push_back(s.get_bc());
         }
         // Add the master bitcode.
-        obc.push_back(m_impl->m_jit->get_master_bc());
+        obc.push_back(detail::bc_from_module(*m_impl->m_jit->m_module));
 
         // Assemble the compilation flag.
         const auto comp_flag
@@ -2331,6 +2327,9 @@ void llvm_multi_state::compile()
             // Assign the compiled objects.
             assert(m_impl->m_jit->m_object_files.empty());
             m_impl->m_jit->m_object_files = std::move(cached_data->obj);
+
+            // Lookup the trigger.
+            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 

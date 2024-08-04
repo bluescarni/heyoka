@@ -278,9 +278,9 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 //
 // If the llvm.used variable does not exist yet, create it.
 //
-// NOTE: this has quadratic complexity. It should not be a problem
-// for the type of use we do as we expect just a few entries in this
-// array, but something to keep in mind.
+// NOTE: this has quadratic complexity when appending ptr to an existing
+// array. It should not be a problem for the type of use we do as we expect
+// just a few entries in this array, but something to keep in mind.
 void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 {
     assert(ptr != nullptr);
