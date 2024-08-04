@@ -550,8 +550,6 @@ TEST_CASE("vfabi double")
         // only since LLVM 16.
 #if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
 
-        const auto &tf = detail::get_target_features();
-
         for (auto ir : ms.get_ir()) {
             using string_find_iterator = boost::find_iterator<std::string::iterator>;
 
@@ -561,30 +559,18 @@ TEST_CASE("vfabi double")
                 ++count;
             }
 
+            // NOTE: in the master module or in the "cfunc" module, we don't
+            // expect any @erf: the master module contains only the trigger,
+            // the "cfunc" module should have vectorised everything and
+            // there should be no more references to the scalar @erf.
             if (count == 0u) {
                 continue;
             }
 
-            // NOTE: at the moment we have comprehensive coverage of LLVM versions
-            // in the CI only for x86_64.
-            if (tf.sse2) {
-                // NOTE: occurrences of the scalar version:
-                // - 2 calls in the strided cfunc,
-                // - 1 declaration.
-                REQUIRE(count == 3u);
-            }
-
-            if (tf.aarch64) {
-                REQUIRE(count == 3u);
-            }
-
-            // NOTE: currently no auto-vectorization happens on ppc64 due apparently
-            // to the way the target machine is being set up by orc/lljit (it works
-            // fine with the opt tool). When this is resolved, we can test ppc64 too.
-
-            // if (tf.vsx) {
-            //     REQUIRE(count == 3u);
-            // }
+            // NOTE: occurrences of the scalar version:
+            // - 2 calls in the strided cfunc,
+            // - 1 declaration.
+            REQUIRE(count == 3u);
         }
 
 #endif
