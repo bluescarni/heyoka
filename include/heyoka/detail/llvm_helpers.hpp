@@ -43,15 +43,6 @@ HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm_state &, const T &);
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);
 
-// Helper to construct an LLVM vector type of size batch_size with elements
-// of the LLVM type tp corresponding to the C++ type T. If batch_size is 1, tp
-// will be returned. batch_size cannot be zero.
-template <typename T>
-inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch_size)
-{
-    return make_vector_type(to_llvm_type<T>(c), batch_size);
-}
-
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
