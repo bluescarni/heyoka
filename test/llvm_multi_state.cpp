@@ -6,7 +6,10 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <array>
 #include <cmath>
+#include <list>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 
@@ -574,5 +577,90 @@ TEST_CASE("vfabi double")
         }
 
 #endif
+    }
+}
+
+// Test for the range constructor.
+TEST_CASE("range ctor")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    {
+        std::list<llvm_state> slist;
+
+        slist.emplace_back();
+        add_cfunc<double>(slist.back(), "f1", {x * y}, {x, y});
+
+        slist.emplace_back();
+        add_cfunc<double>(slist.back(), "f2", {x / y}, {x, y});
+
+        slist.emplace_back();
+        add_cfunc<double>(slist.back(), "f3", {x + y}, {x, y});
+
+        slist.emplace_back();
+        add_cfunc<double>(slist.back(), "f4", {x - y}, {x, y});
+
+        llvm_state::clear_memcache();
+
+        llvm_multi_state ms{slist | std::views::transform([](auto &s) -> auto && { return std::move(s); })};
+        ms.compile();
+
+        auto *cf1_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
+        auto *cf2_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f2"));
+        auto *cf3_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f3"));
+        auto *cf4_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f4"));
+
+        const double ins[] = {2., 3.};
+        double outs[4] = {};
+
+        cf1_ptr(outs, ins, nullptr, nullptr);
+        cf2_ptr(outs + 1, ins, nullptr, nullptr);
+        cf3_ptr(outs + 2, ins, nullptr, nullptr);
+        cf4_ptr(outs + 3, ins, nullptr, nullptr);
+
+        REQUIRE(outs[0] == 6);
+        REQUIRE(outs[1] == 2. / 3.);
+        REQUIRE(outs[2] == 5);
+        REQUIRE(outs[3] == -1);
+    }
+
+    {
+        std::array<llvm_state, 4> slist;
+
+        add_cfunc<double>(slist[0], "f1", {x * y}, {x, y});
+        add_cfunc<double>(slist[1], "f2", {x / y}, {x, y});
+        add_cfunc<double>(slist[2], "f3", {x + y}, {x, y});
+        add_cfunc<double>(slist[3], "f4", {x - y}, {x, y});
+
+        llvm_state::clear_memcache();
+
+        llvm_multi_state ms{slist | std::views::transform([](auto &s) -> auto && { return std::move(s); })};
+        ms.compile();
+
+        auto *cf1_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f1"));
+        auto *cf2_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f2"));
+        auto *cf3_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f3"));
+        auto *cf4_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ms.jit_lookup("f4"));
+
+        const double ins[] = {2., 3.};
+        double outs[4] = {};
+
+        cf1_ptr(outs, ins, nullptr, nullptr);
+        cf2_ptr(outs + 1, ins, nullptr, nullptr);
+        cf3_ptr(outs + 2, ins, nullptr, nullptr);
+        cf4_ptr(outs + 3, ins, nullptr, nullptr);
+
+        REQUIRE(outs[0] == 6);
+        REQUIRE(outs[1] == 2. / 3.);
+        REQUIRE(outs[2] == 5);
+        REQUIRE(outs[3] == -1);
     }
 }
