@@ -110,7 +110,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Init the name.
     auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);
@@ -212,7 +212,7 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const para
     auto &builder = s.builder();
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Determine the index into the parameter array.
     // LCOV_EXCL_START
@@ -247,7 +247,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *fp_t, con
     auto &builder = s.builder();
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Fetch the pointer into par_ptr.
     // NOTE: the overflow check is done when constructing the integrator.
@@ -949,7 +949,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     auto &context = s.context();
 
     // Fetch the external type corresponding to fp_scal_t.
-    auto *ext_fp_scal_t = llvm_ext_type(fp_scal_t);
+    auto *ext_fp_scal_t = make_external_llvm_type(fp_scal_t);
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();

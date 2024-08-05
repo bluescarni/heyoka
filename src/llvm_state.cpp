@@ -737,7 +737,7 @@ struct llvm_state::jit {
         // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
         // NOTE: these checks need access to the data layout, so we put them here for convenience.
         const auto &dl = m_lljit->getDataLayout();
-        auto *real_t = llvm::cast<llvm::StructType>(detail::to_llvm_type<mppp::real>(*m_ctx->getContext()));
+        auto *real_t = llvm::cast<llvm::StructType>(detail::to_external_llvm_type<mppp::real>(*m_ctx->getContext()));
         const auto *slo = dl.getStructLayout(real_t);
         assert(slo->getSizeInBytes() == sizeof(mppp::real));
         assert(slo->getAlignment().value() == alignof(mppp::real));

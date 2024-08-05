@@ -683,7 +683,7 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
     auto &md = s.module();
 
     // Fetch the external type corresponding to fp_type.
-    auto *ext_fp_t = llvm_ext_type(fp_type);
+    auto *ext_fp_t = make_external_llvm_type(fp_type);
 
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
@@ -1092,7 +1092,7 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
     auto &builder = s.builder();
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     std::vector<llvm::Value *> retval;
     for (std::uint32_t i = 0; i < n; ++i) {

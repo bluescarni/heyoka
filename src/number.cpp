@@ -642,14 +642,14 @@ number number_like(llvm_state &s, llvm::Type *tp, double val)
 
     auto &context = s.context();
 
-    if (tp == to_llvm_type<float>(context, false)) {
+    if (tp == to_external_llvm_type<float>(context, false)) {
         return number{static_cast<float>(val)};
-    } else if (tp == to_llvm_type<double>(context, false)) {
+    } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{val};
-    } else if (tp == to_llvm_type<long double>(context, false)) {
+    } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{static_cast<long double>(val)};
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+    } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{static_cast<mppp::real128>(val)};
 #endif
 #if defined(HEYOKA_HAVE_REAL)

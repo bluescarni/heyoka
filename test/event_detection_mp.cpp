@@ -67,7 +67,7 @@ TEST_CASE("poly translator 1")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            detail::add_poly_translator_1(s, detail::llvm_type_like(s, input[0]), 5, 1);
+            detail::add_poly_translator_1(s, detail::internal_llvm_type_like(s, input[0]), 5, 1);
 
             s.compile();
 
@@ -96,9 +96,9 @@ TEST_CASE("poly csc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            const auto mname = detail::llvm_mangle_type(detail::llvm_type_like(s, input[0]));
+            const auto mname = detail::llvm_mangle_type(detail::internal_llvm_type_like(s, input[0]));
 
-            detail::llvm_add_csc(s, detail::llvm_type_like(s, input[0]), 5, 1);
+            detail::llvm_add_csc(s, detail::internal_llvm_type_like(s, input[0]), 5, 1);
 
             s.compile();
 
@@ -152,8 +152,7 @@ TEST_CASE("event construction")
     {
         std::ostringstream oss;
 
-        t_ev_t ev(
-            x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, int) { return true; });
+        t_ev_t ev(x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, int) { return true; });
 
         oss << ev;
 

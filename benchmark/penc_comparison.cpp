@@ -68,7 +68,7 @@ void run_benchmark(unsigned order)
     auto &builder = s.builder();
     auto &context = s.context();
 
-    auto val_t = detail::to_llvm_type<T>(context);
+    auto val_t = detail::to_external_llvm_type<T>(context);
     auto ptr_val_t = llvm::PointerType::getUnqual(val_t);
 
     // Fetch the current insertion block.

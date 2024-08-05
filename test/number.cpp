@@ -429,7 +429,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<long double>(context);
+        auto *fp_t = detail::to_external_llvm_type<long double>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -453,7 +453,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<long double>(context);
+        auto *fp_t = detail::to_external_llvm_type<long double>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -476,7 +476,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<long double>(context);
+        auto *fp_t = detail::to_external_llvm_type<long double>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -504,7 +504,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+        auto *fp_t = detail::to_external_llvm_type<mppp::real128>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -528,7 +528,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+        auto *fp_t = detail::to_external_llvm_type<mppp::real128>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -551,7 +551,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+        auto *fp_t = detail::to_external_llvm_type<mppp::real128>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -650,7 +650,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *fp_t = detail::to_llvm_type<double>(context);
+        auto *fp_t = detail::to_external_llvm_type<double>(context);
 
         auto *ft = llvm::FunctionType::get(fp_t, {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
@@ -674,7 +674,7 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = detail::to_llvm_type<mppp::real>(context);
+        auto *real_t = detail::to_external_llvm_type<mppp::real>(context);
 
         const auto real_pi_256 = mppp::real_pi(256);
 
@@ -683,7 +683,7 @@ TEST_CASE("llvm_codegen")
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        auto *real_val = llvm_codegen(s, detail::llvm_type_like(s, real_pi_256), number{real_pi_256});
+        auto *real_val = llvm_codegen(s, detail::internal_llvm_type_like(s, real_pi_256), number{real_pi_256});
 
         detail::ext_store_vector_to_memory(s, f->arg_begin(), real_val);
 
@@ -723,8 +723,8 @@ TEST_CASE("number_like")
         if (std::numeric_limits<long double>::digits == 53) {
             // NOTE: here we are on Windows + MSVC, where long double == double
             // and thus C++ long double associates to LLVM double.
-            // In number_like(), we check tp == to_llvm_type<double> *before*
-            // tp == to_llvm_type<long double>, so we get a number containing
+            // In number_like(), we check tp == to_external_llvm_type<double> *before*
+            // tp == to_external_llvm_type<long double>, so we get a number containing
             // double rather than long double.
             num = detail::number_like(s, llvm::Type::getDoubleTy(s.context()), 42);
             REQUIRE(num == number{42.});

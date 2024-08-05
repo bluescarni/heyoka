@@ -73,7 +73,7 @@ constexpr auto ntrials = 100;
 TEST_CASE("sgn scalar")
 {
     using detail::llvm_sgn;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
@@ -85,7 +85,7 @@ TEST_CASE("sgn scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {val_t}, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
@@ -117,7 +117,7 @@ TEST_CASE("sgn scalar")
 TEST_CASE("sgn scalar mp")
 {
     using detail::llvm_sgn;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     using fp_t = mppp::real;
 
@@ -130,8 +130,8 @@ TEST_CASE("sgn scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *val_t = to_llvm_type<fp_t>(context);
-        auto *real_t = detail::llvm_type_like(s, mppp::real{0, prec});
+        auto *val_t = to_external_llvm_type<fp_t>(context);
+        auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
         auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
@@ -178,7 +178,7 @@ int sgn(T val)
 TEST_CASE("sgn batch")
 {
     using detail::llvm_sgn;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
@@ -191,7 +191,7 @@ TEST_CASE("sgn batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 auto *ft = llvm::FunctionType::get(
                     builder.getVoidTy(),
@@ -242,7 +242,7 @@ TEST_CASE("sgn batch")
 TEST_CASE("sincos scalar")
 {
     using detail::llvm_sincos;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::cos;
     using std::sin;
 
@@ -256,7 +256,7 @@ TEST_CASE("sincos scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{val_t, llvm::PointerType::getUnqual(val_t),
                                             llvm::PointerType::getUnqual(val_t)};
@@ -299,7 +299,7 @@ TEST_CASE("sincos scalar")
 TEST_CASE("sincos batch")
 {
     using detail::llvm_sincos;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::cos;
     using std::sin;
 
@@ -314,7 +314,7 @@ TEST_CASE("sincos batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
                                                 llvm::PointerType::getUnqual(val_t),
@@ -367,7 +367,7 @@ TEST_CASE("sincos batch")
 TEST_CASE("sincos mp")
 {
     using detail::llvm_sincos;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::cos;
     using std::sin;
 
@@ -380,8 +380,8 @@ TEST_CASE("sincos mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = to_llvm_type<mppp::real>(context);
-        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+        auto *real_t = to_external_llvm_type<mppp::real>(context);
+        auto *fp_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
         const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(real_t));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -431,7 +431,7 @@ TEST_CASE("inv_kep_E_scalar")
             llvm_state s{kw::opt_level = opt_level};
 
             // Add the function.
-            llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), 1, "hey_kep");
+            llvm_add_inv_kep_E_wrapper(s, detail::to_external_llvm_type<fp_t>(s.context()), 1, "hey_kep");
 
             // Compile.
             s.compile();
@@ -575,7 +575,7 @@ TEST_CASE("inv_kep_E_batch")
                 llvm_state s{kw::opt_level = opt_level};
 
                 // Add the function.
-                llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), batch_size, "hey_kep");
+                llvm_add_inv_kep_E_wrapper(s, detail::to_external_llvm_type<fp_t>(s.context()), batch_size, "hey_kep");
 
                 // Compile.
                 s.compile();
@@ -810,7 +810,7 @@ TEST_CASE("inv_kep_E_scalar mp")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         llvm_state s{kw::opt_level = opt_level};
 
-        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+        auto *fp_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
         // Add the function.
         llvm_add_inv_kep_E_wrapper(s, fp_t, 1, "hey_kep");
@@ -1078,7 +1078,7 @@ TEST_CASE("csc_scalar")
 {
     using detail::llvm_add_csc;
     using detail::llvm_mangle_type;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
@@ -1088,12 +1088,12 @@ TEST_CASE("csc_scalar")
 
             const auto degree = 4u;
 
-            llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, 1);
+            llvm_add_csc(s, to_external_llvm_type<fp_t>(s.context()), degree, 1);
 
             s.compile();
 
-            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
-                fmt::format("heyoka_csc_degree_{}_{}", degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
+            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(fmt::format(
+                "heyoka_csc_degree_{}_{}", degree, llvm_mangle_type(to_external_llvm_type<fp_t>(s.context())))));
 
             // Random testing.
             std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -1151,7 +1151,7 @@ TEST_CASE("csc_batch")
     using detail::llvm_add_csc;
     using detail::llvm_mangle_type;
     using detail::make_vector_type;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
@@ -1162,13 +1162,13 @@ TEST_CASE("csc_batch")
 
                 const auto degree = 4u;
 
-                llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, batch_size);
+                llvm_add_csc(s, to_external_llvm_type<fp_t>(s.context()), degree, batch_size);
 
                 s.compile();
 
-                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
-                    fmt::format("heyoka_csc_degree_{}_{}", degree,
-                                llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(fmt::format(
+                    "heyoka_csc_degree_{}_{}", degree,
+                    llvm_mangle_type(make_vector_type(to_external_llvm_type<fp_t>(s.context()), batch_size)))));
 
                 // Random testing.
                 std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -1226,7 +1226,7 @@ TEST_CASE("csc_batch")
 
 TEST_CASE("minmax")
 {
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::isnan;
 
     auto tester = [](auto fp_x) {
@@ -1240,7 +1240,7 @@ TEST_CASE("minmax")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
                                                 llvm::PointerType::getUnqual(val_t),
@@ -1437,7 +1437,7 @@ TEST_CASE("minmax")
 TEST_CASE("fma scalar")
 {
     using detail::llvm_fma;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::fma;
 
     auto tester = [](auto fp_x) {
@@ -1450,7 +1450,7 @@ TEST_CASE("fma scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{val_t, val_t, val_t};
             auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -1484,7 +1484,7 @@ TEST_CASE("fma scalar")
 TEST_CASE("fma batch")
 {
     using detail::llvm_fma;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::fma;
 
     auto tester = [](auto fp_x) {
@@ -1498,7 +1498,7 @@ TEST_CASE("fma batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1554,7 +1554,7 @@ TEST_CASE("fma batch")
 TEST_CASE("fma scalar mp")
 {
     using detail::llvm_fma;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::fma;
 
     const auto prec = 237u;
@@ -1566,8 +1566,8 @@ TEST_CASE("fma scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = to_llvm_type<mppp::real>(context);
-        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+        auto *real_t = to_external_llvm_type<mppp::real>(context);
+        auto *fp_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
         const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1612,7 +1612,7 @@ TEST_CASE("fma scalar mp")
 TEST_CASE("eft_product scalar")
 {
     using detail::llvm_eft_product;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -1625,7 +1625,7 @@ TEST_CASE("eft_product scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
                                             val_t, val_t};
@@ -1692,7 +1692,7 @@ TEST_CASE("eft_product scalar")
 TEST_CASE("eft_product batch")
 {
     using detail::llvm_eft_product;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -1706,7 +1706,7 @@ TEST_CASE("eft_product batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1782,7 +1782,7 @@ TEST_CASE("eft_product batch")
 TEST_CASE("dl mul scalar")
 {
     using detail::llvm_dl_mul;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -1795,7 +1795,7 @@ TEST_CASE("dl mul scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{
                 llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
@@ -1881,7 +1881,7 @@ TEST_CASE("dl mul scalar")
 TEST_CASE("dl mul batch")
 {
     using detail::llvm_dl_mul;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -1895,7 +1895,7 @@ TEST_CASE("dl mul batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1997,7 +1997,7 @@ TEST_CASE("dl mul batch")
 TEST_CASE("dl div scalar")
 {
     using detail::llvm_dl_div;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -2010,7 +2010,7 @@ TEST_CASE("dl div scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{
                 llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
@@ -2092,7 +2092,7 @@ TEST_CASE("dl div scalar")
 TEST_CASE("dl div batch")
 {
     using detail::llvm_dl_div;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
 
     auto tester = [](auto fp_x) {
@@ -2106,7 +2106,7 @@ TEST_CASE("dl div batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2203,7 +2203,7 @@ TEST_CASE("dl div batch")
 TEST_CASE("floor scalar")
 {
     using detail::llvm_floor;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
 
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
@@ -2215,7 +2215,7 @@ TEST_CASE("floor scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{val_t};
             auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -2246,7 +2246,7 @@ TEST_CASE("floor scalar")
 TEST_CASE("floor batch")
 {
     using detail::llvm_floor;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::floor;
 
     auto tester = [](auto fp_x) {
@@ -2260,7 +2260,7 @@ TEST_CASE("floor batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2304,7 +2304,7 @@ TEST_CASE("floor batch")
 TEST_CASE("dl floor scalar")
 {
     using detail::llvm_dl_floor;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
     using std::floor;
     using std::trunc;
@@ -2319,7 +2319,7 @@ TEST_CASE("dl floor scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
                                             val_t, val_t};
@@ -2386,7 +2386,7 @@ TEST_CASE("dl floor scalar")
 TEST_CASE("dl floor batch")
 {
     using detail::llvm_dl_floor;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::abs;
     using std::floor;
     using std::trunc;
@@ -2402,7 +2402,7 @@ TEST_CASE("dl floor batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2481,7 +2481,7 @@ TEST_CASE("dl floor batch")
 TEST_CASE("dl modulus scalar")
 {
     using detail::llvm_dl_modulus;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::floor;
 
     auto tester = [](auto fp_x) {
@@ -2494,7 +2494,7 @@ TEST_CASE("dl modulus scalar")
             auto &builder = s.builder();
             auto &context = s.context();
 
-            auto val_t = to_llvm_type<fp_t>(context);
+            auto val_t = to_external_llvm_type<fp_t>(context);
 
             std::vector<llvm::Type *> fargs{
                 llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
@@ -2559,7 +2559,7 @@ TEST_CASE("dl modulus scalar")
 TEST_CASE("dl modulus batch")
 {
     using detail::llvm_dl_modulus;
-    using detail::to_llvm_type;
+    using detail::to_external_llvm_type;
     using std::floor;
 
     auto tester = [](auto fp_x) {
@@ -2573,7 +2573,7 @@ TEST_CASE("dl modulus batch")
                 auto &builder = s.builder();
                 auto &context = s.context();
 
-                auto val_t = to_llvm_type<fp_t>(context);
+                auto val_t = to_external_llvm_type<fp_t>(context);
 
                 std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2659,19 +2659,19 @@ TEST_CASE("get_alignment")
     auto &context = s.context();
     auto &builder = s.builder();
 
-    auto *tp = detail::to_llvm_type<float>(context);
+    auto *tp = detail::to_external_llvm_type<float>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(float));
 
-    tp = detail::to_llvm_type<double>(context);
+    tp = detail::to_external_llvm_type<double>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(double));
 
 #if !defined(HEYOKA_ARCH_PPC)
-    tp = detail::to_llvm_type<long double>(context);
+    tp = detail::to_external_llvm_type<long double>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(long double));
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
-    tp = detail::to_llvm_type<mppp::real128>(context);
+    tp = detail::to_external_llvm_type<mppp::real128>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(mppp::real128));
 #endif
 
@@ -2690,7 +2690,7 @@ TEST_CASE("to_size_t")
         auto &context = s.context();
 
         std::vector<llvm::Type *> fargs(1, builder.getInt32Ty());
-        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *lst = to_external_llvm_type<std::size_t>(context);
         auto *ft = llvm::FunctionType::get(lst, fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
 
@@ -2715,7 +2715,7 @@ TEST_CASE("to_size_t")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *lst = to_external_llvm_type<std::size_t>(context);
         std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
                                         llvm::PointerType::getUnqual(builder.getInt32Ty())};
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2755,7 +2755,7 @@ TEST_CASE("to_size_t")
         auto &context = s.context();
 
         std::vector<llvm::Type *> fargs(1, builder.getInt64Ty());
-        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *lst = to_external_llvm_type<std::size_t>(context);
         auto *ft = llvm::FunctionType::get(lst, fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
 
@@ -2780,7 +2780,7 @@ TEST_CASE("to_size_t")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *lst = to_external_llvm_type<std::size_t>(context);
         std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
                                         llvm::PointerType::getUnqual(builder.getInt64Ty())};
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2824,7 +2824,7 @@ TEST_CASE("real_ext_load")
     auto &builder = s.builder();
     auto &context = s.context();
 
-    auto *real_t = detail::to_llvm_type<mppp::real>(context);
+    auto *real_t = detail::to_external_llvm_type<mppp::real>(context);
 
     const auto real_pi_257 = mppp::real_pi(257);
 
@@ -2835,7 +2835,8 @@ TEST_CASE("real_ext_load")
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
     // Load the input from the first pointer.
-    auto *real_val = detail::ext_load_vector_from_memory(s, detail::llvm_type_like(s, real_pi_257), f->arg_begin(), 1);
+    auto *real_val
+        = detail::ext_load_vector_from_memory(s, detail::internal_llvm_type_like(s, real_pi_257), f->arg_begin(), 1);
 
     // Write it out.
     detail::ext_store_vector_to_memory(s, f->arg_begin() + 1, real_val);
