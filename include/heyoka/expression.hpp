@@ -696,6 +696,11 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
 }
 
+template <typename>
+std::pair<llvm_multi_state, std::vector<expression>>
+make_multi_cfunc(const llvm_state &, const std::string &, const std::vector<expression> &,
+                 const std::vector<expression> &, std::uint32_t, bool, bool, long long);
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
