@@ -1584,7 +1584,7 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
                                    const std::string &base_name, llvm::Value *main_eval_arr, llvm::Value *main_par_ptr,
                                    llvm::Value *main_time_ptr, llvm::Value *main_stride)
 {
-    assert(!states.empty());
+    assert(!states.empty()); // LCOV_EXCL_LINE
     auto &main_state = states.back();
 
     // Structure used to log, in trace mode, the breakdown of each segment.
