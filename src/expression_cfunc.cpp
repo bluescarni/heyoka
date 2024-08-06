@@ -1587,6 +1587,14 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
     assert(!states.empty());
     auto &main_state = states.back();
 
+    // Structure used to log, in trace mode, the breakdown of each segment.
+    // For each segment, this structure contains the number of invocations
+    // of each evaluation function in the segment. It will be unused if we are not tracing.
+    std::vector<std::vector<std::uint32_t>> segment_bd;
+
+    // Are we tracing?
+    const auto is_tracing = get_logger()->should_log(spdlog::level::trace);
+
     // List of evaluation functions in a segment.
     //
     // This map contains a list of functions for the compact-mode evaluation of elementary subexpressions.
@@ -1919,10 +1927,28 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
 
         // Update the number of codegenned blocks.
         n_cg_blocks += seg_map.size();
+
+        // LCOV_EXCL_START
+        // Update segment_bd if needed.
+        if (is_tracing) {
+            segment_bd.emplace_back();
+
+            for (const auto &p : seg_map) {
+                segment_bd.back().push_back(p.second.first);
+            }
+        }
+        // LCOV_EXCL_STOP
     }
 
     // We need one last return statement for the last added state.
     cur_state->builder().CreateRetVoid();
+
+    // LCOV_EXCL_START
+    // Log segment_bd, if needed.
+    if (is_tracing) {
+        get_logger()->trace("make_multi_cfunc() function maps breakdown: {}", segment_bd);
+    }
+    // LCOV_EXCL_STOP
 }
 
 // NOTE: here we are forced to use a templated function, rather than passing in the
