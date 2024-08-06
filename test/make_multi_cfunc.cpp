@@ -12,6 +12,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
+
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -19,8 +21,10 @@
 #include <heyoka/model/sgp4.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("basic")
 {
@@ -128,16 +132,35 @@ TEST_CASE("sgp4")
 
     const auto inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
 
-    auto dt = diff_tensors(model::sgp4(), std::vector(inputs.begin(), inputs.end()));
-
-    // auto cf = cfunc<double>(dt.get_jacobian(), inputs, kw::compact_mode = true);
-
-    // return;
+    auto cf = cfunc<double>(model::sgp4(), inputs);
 
     llvm_state tplt;
 
-    auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", dt.get_jacobian(),
-                                                     std::vector(inputs.begin(), inputs.end()), 4, false, false, 0);
+    auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", model::sgp4(),
+                                                     std::vector(inputs.begin(), inputs.end()), 1, false, false, 0);
 
     ms.compile();
+
+    auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+        ms.jit_lookup("test.unstrided.batch_size_1"));
+
+    const auto revday2radmin = [](auto x) { return x * 2. * boost::math::constants::pi<double>() / 1440.; };
+    const auto deg2rad = [](auto x) { return x * 2. * boost::math::constants::pi<double>() / 360.; };
+
+    std::vector<double> ins = {revday2radmin(15.50103472202482),
+                               0.0007417,
+                               deg2rad(51.6439),
+                               deg2rad(211.2001),
+                               deg2rad(17.6667),
+                               deg2rad(85.6398),
+                               .38792e-4,
+                               0.},
+                        outs1(7u), outs2(7u);
+
+    cf_s_u(outs1.data(), ins.data(), nullptr, nullptr);
+    cf(outs2, ins);
+
+    for (auto i = 0u; i < 7u; ++i) {
+        REQUIRE(outs1[i] == approximately(outs2[i]));
+    }
 }
