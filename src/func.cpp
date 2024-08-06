@@ -710,7 +710,7 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
     auto &builder = s.builder();
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Determine the index into the parameter array.
     auto *arr_idx = builder.CreateMul(stride, to_size_t(s, builder.getInt32(p.idx())));
@@ -778,7 +778,7 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Init the name.
     auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
@@ -791,7 +791,7 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     // - stride value.
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), llvm::PointerType::getUnqual(val_t),
                                     llvm::PointerType::getUnqual(ext_fp_t), llvm::PointerType::getUnqual(ext_fp_t),
-                                    to_llvm_type<std::size_t>(c)};
+                                    to_external_llvm_type<std::size_t>(c)};
 
     // Add the mangling and LLVM arg types for the argument types.
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
@@ -853,7 +853,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     auto &context = s.context();
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);

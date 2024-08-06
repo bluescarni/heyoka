@@ -146,7 +146,7 @@ namespace
 // Small helper to codegen the MPFR_RNDN constant.
 llvm::Constant *llvm_mpfr_rndn(llvm_state &s)
 {
-    return llvm::ConstantInt::getSigned(to_llvm_type<real_rnd_t>(s.context()),
+    return llvm::ConstantInt::getSigned(to_external_llvm_type<real_rnd_t>(s.context()),
                                         boost::numeric_cast<std::int64_t>(static_cast<real_rnd_t>(MPFR_RNDN)));
 }
 
@@ -154,7 +154,7 @@ llvm::Constant *llvm_mpfr_rndn(llvm_state &s)
 // as an LLVM constant.
 llvm::Constant *llvm_mpfr_prec(llvm_state &s, mpfr_prec_t prec)
 {
-    return llvm::ConstantInt::getSigned(to_llvm_type<mpfr_prec_t>(s.context()),
+    return llvm::ConstantInt::getSigned(to_external_llvm_type<mpfr_prec_t>(s.context()),
                                         boost::numeric_cast<std::int64_t>(prec));
 }
 
@@ -180,7 +180,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, ll
     builder.CreateStore(builder.CreateExtractValue(r, {2u}), limb_arr);
 
     // Create the mpfr_struct_t.
-    auto *real_t = to_llvm_type<mppp::real>(s.context());
+    auto *real_t = to_external_llvm_type<mppp::real>(s.context());
     auto *mpfr_struct_inst = builder.CreateAlloca(real_t);
 
     // Store the precision.
@@ -235,7 +235,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     auto *limb_arr = builder.CreateAlloca(limb_arr_t);
 
     // Create the mpfr_struct_t.
-    auto *real_t = to_llvm_type<mppp::real>(s.context());
+    auto *real_t = to_external_llvm_type<mppp::real>(s.context());
     auto *mpfr_struct_inst = builder.CreateAlloca(real_t);
 
     // Store the precision.
@@ -260,7 +260,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
     auto &builder = s.builder();
 
-    auto *real_t = to_llvm_type<mppp::real>(s.context());
+    auto *real_t = to_external_llvm_type<mppp::real>(s.context());
     auto *struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
@@ -272,7 +272,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     // In debug mode, double check that the precision in the view matches
     // the precision of fp_t.
 
-    auto *prec_t = to_llvm_type<mpfr_prec_t>(s.context());
+    auto *prec_t = to_external_llvm_type<mpfr_prec_t>(s.context());
 
     // Load the precision value from the view.
     auto *prec_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)});
@@ -344,7 +344,7 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
+        llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
@@ -403,7 +403,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, "mpfr_sin_cos", to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
+        llvm_invoke_external(s, "mpfr_sin_cos", to_external_llvm_type<int>(context), mpfr_args,
+                             get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res_sin = llvm_mpfr_view_to_real(s, real_res_sin, limb_arr_res_sin, fp_t);
@@ -468,8 +469,8 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
         }
 
         // Invoke the MPFR primitive.
-        auto *cmp_ret
-            = llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
+        auto *cmp_ret = llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args,
+                                             get_mpfr_attr_list(context));
 
         // Truncate the result to a boolean and return.
         builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
@@ -666,14 +667,15 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         if (source_int_width == ul_width) {
             mpfr_args.push_back(f->args().begin());
         } else {
-            mpfr_args.push_back(builder.CreateZExt(f->args().begin(), to_llvm_type<unsigned long>(context)));
+            mpfr_args.push_back(builder.CreateZExt(f->args().begin(), to_external_llvm_type<unsigned long>(context)));
         }
 
         // Add the rounding mode.
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, "mpfr_set_ui", to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
+        llvm_invoke_external(s, "mpfr_set_ui", to_external_llvm_type<int>(context), mpfr_args,
+                             get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
@@ -732,7 +734,7 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
         const std::vector<llvm::Value *> mpfr_args{llvm_real_to_mpfr_view(s, f->args().begin()).first};
 
         // Invoke the MPFR primitive.
-        auto *int_t = to_llvm_type<int>(context);
+        auto *int_t = to_external_llvm_type<int>(context);
         auto *cmp_ret = llvm_invoke_external(s, "heyoka_mpfr_sgn", int_t, mpfr_args, get_mpfr_attr_list(context));
 
         // Compute the int32 return value: cmp_ret == 0 ? 0 : (cmp_ret < 0 ? -1 : 1).

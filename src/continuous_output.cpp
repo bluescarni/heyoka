@@ -103,7 +103,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto &context = m_llvm_state.context();
 
     // Fetch the internal floating-point type.
-    auto *fp_t = detail::llvm_type_like(m_llvm_state, m_output[0]);
+    auto *fp_t = detail::internal_llvm_type_like(m_llvm_state, m_output[0]);
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
@@ -132,7 +132,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
     // No overlap is allowed. All pointers are external.
-    auto *ext_fp_t = detail::to_llvm_type<T>(context);
+    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
     auto *ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
     const std::vector<llvm::Type *> fargs(5u, ptr_t);
     // The function does not return anything.
@@ -620,7 +620,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
     // No overlap is allowed.
-    auto fp_t = detail::to_llvm_type<T>(context);
+    auto fp_t = detail::to_external_llvm_type<T>(context);
     auto fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
     auto ptr_t = llvm::PointerType::getUnqual(fp_t);
     const std::vector<llvm::Type *> fargs(5, ptr_t);

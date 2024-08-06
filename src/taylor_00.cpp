@@ -478,7 +478,7 @@ void taylor_write_tc(
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Convert to std::uint32_t for overflow checking and use below.
     const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs_dc.size());

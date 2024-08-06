@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -166,10 +167,10 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret = llvm::StructType::create({to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
-                                              to_llvm_type<mpfr_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))},
-                                             "heyoka.real");
+        auto *ret = llvm::StructType::create(
+            {to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
+             to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(to_external_llvm_type<mp_limb_t>(c))},
+            "heyoka.real");
 
         assert(ret != nullptr);
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
@@ -203,11 +204,11 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 
     // NOTE: by default we assume it is safe to invoke the LLVM intrinsics
     // on the fundamental C++ floating-point types.
-    // NOTE: to_llvm_type fails by returning nullptr - in such a case
+    // NOTE: to_external_llvm_type fails by returning nullptr - in such a case
     // (which I don't think is currently possible) then the
     // comparison to tp will fail as tp is not null.
-    return tp == to_llvm_type<float>(context, false) || tp == to_llvm_type<double>(context, false)
-           || tp == to_llvm_type<long double>(context, false);
+    return tp == to_external_llvm_type<float>(context, false) || tp == to_external_llvm_type<double>(context, false)
+           || tp == to_external_llvm_type<long double>(context, false);
 }
 
 // Helper to lookup/insert the declaration of an LLVM intrinsic into a module.
@@ -266,7 +267,7 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 {
     // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
     // which intrinsic we pick.
-    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
+    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_external_llvm_type<double>(s.context())}, 1);
     assert(f != nullptr);
 
     return f->getAttributes();
@@ -644,7 +645,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 #if defined(HEYOKA_HAVE_REAL128)
 
     // NOTE: this handles both the scalar and vector cases.
-    if (scal_t == to_llvm_type<mppp::real128>(s.context(), false)) {
+    if (scal_t == to_external_llvm_type<mppp::real128>(s.context(), false)) {
         return llvm_scalarise_ext_math_vector_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
                                                    // NOTE: use the standard math function attributes.
                                                    llvm_ext_math_func_attrs(s));
@@ -685,21 +686,21 @@ std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal
 
     auto &context = s.context();
 
-    if (scal_t == to_llvm_type<float>(context, false)) {
+    if (scal_t == to_external_llvm_type<float>(context, false)) {
         return "f";
     }
 
-    if (scal_t == to_llvm_type<double>(context, false)) {
+    if (scal_t == to_external_llvm_type<double>(context, false)) {
         return "";
     }
 
-    if (scal_t == to_llvm_type<long double>(context, false)) {
+    if (scal_t == to_external_llvm_type<long double>(context, false)) {
         return "l";
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+    if (scal_t == to_external_llvm_type<mppp::real128>(context, false)) {
         return "q";
     }
 
@@ -803,7 +804,7 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
 
 // Implementation of the function to associate a C++ type to
 // an LLVM type.
-llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bool err_throw)
+llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bool err_throw)
 {
     const auto it = type_map.find(tp);
 
@@ -889,7 +890,7 @@ llvm::Value *to_size_t(llvm_state &s, llvm::Value *n)
     const auto n_bw = llvm::cast<llvm::IntegerType>(n->getType()->getScalarType())->getBitWidth();
 
     // Fetch the LLVM type corresponding to size_t, and its bit width.
-    auto *lst = to_llvm_type<std::size_t>(s.context());
+    auto *lst = to_external_llvm_type<std::size_t>(s.context());
     const auto lst_bw = llvm::cast<llvm::IntegerType>(lst)->getBitWidth();
     assert(lst_bw == static_cast<unsigned>(std::numeric_limits<std::size_t>::digits)); // LCOV_EXCL_LINE
 
@@ -982,10 +983,10 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<mp_limb_t>(context);
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
-        auto *real_t = to_llvm_type<mppp::real>(context);
+        auto *real_t = to_external_llvm_type<mppp::real>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -996,7 +997,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         // type matches exactly the precision of the external variable.
 
         // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
+        auto *prec_t = to_external_llvm_type<mpfr_prec_t>(context);
         auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
@@ -1011,12 +1012,12 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Read and insert the sign.
         auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
-        auto *sign = builder.CreateLoad(to_llvm_type<mpfr_sign_t>(context), sign_ptr);
+        auto *sign = builder.CreateLoad(to_external_llvm_type<mpfr_sign_t>(context), sign_ptr);
         ret = builder.CreateInsertValue(ret, sign, {0u});
 
         // Read and insert the exponent.
         auto *exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
-        auto *exp = builder.CreateLoad(to_llvm_type<mpfr_exp_t>(context), exp_ptr);
+        auto *exp = builder.CreateLoad(to_external_llvm_type<mpfr_exp_t>(context), exp_ptr);
         ret = builder.CreateInsertValue(ret, exp, {1u});
 
         // Load in a local variable the input pointer to the limbs.
@@ -1082,10 +1083,10 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<mp_limb_t>(context);
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
-        auto *real_t = to_llvm_type<mppp::real>(context);
+        auto *real_t = to_external_llvm_type<mppp::real>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -1096,7 +1097,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         // type matches exactly the precision of the external variable.
 
         // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
+        auto *prec_t = to_external_llvm_type<mpfr_prec_t>(context);
         auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
@@ -2161,7 +2162,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 
     auto &context = s.context();
 
-    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+    if (scal_t == to_external_llvm_type<mppp::real128>(context, false)) {
         auto &builder = s.builder();
 
         // Convert the vector argument to scalars.
@@ -2363,7 +2364,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     auto &context = s.context();
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(scal_t);
+    auto *ext_fp_t = make_external_llvm_type(scal_t);
 
     // Fetch the vector floating-point type.
     auto *tp = make_vector_type(scal_t, batch_size);
@@ -2538,7 +2539,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     auto &builder = s.builder();
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
@@ -2642,7 +2643,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     auto &builder = s.builder();
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // bj_series will contain the terms of the series
     // for the computation of bj. old_bj_series will be
@@ -3203,32 +3204,38 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
                           x, y);
 }
 
-// This helper returns the type to be used for the internal LLVM representation
-// of the input value x.
-// NOTE: it is not really clear from the naming of this function that
-// this returns the *internal* representation, as opposed to to_llvm_type()
-// which instead returns the representation used to communicate between
-// LLVM and the external world. Perhaps we should consider renaming
-// for clarity.
 template <typename T>
-llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
+llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec)
 {
     auto &c = s.context();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        const auto name = fmt::format("heyoka.real.{}", x.get_prec());
+    if constexpr (std::same_as<T, mppp::real>) {
+        // Checks on prec.
+        // LCOV_EXCL_START
+        if (prec == 0 || prec < mppp::real_prec_min() || prec > mppp::real_prec_max()) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("An invalid precision value of {} was passed to to_internal_llvm_type()", prec));
+        }
+        // LCOV_EXCL_STOP
+
+        const auto name = fmt::format("heyoka.real.{}", prec);
 
         if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
             return ptr;
         }
 
-        // Fetch the limb array type.
-        auto *limb_arr_t
-            = llvm::ArrayType::get(to_llvm_type<mp_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
+        // Compute the required number of limbs.
+        // NOTE: this is a computation done in the implementation of mppp::real and
+        // reproduced here. We should consider exposing this functionality in mp++.
+        const auto nlimbs
+            = boost::numeric_cast<std::uint64_t>(prec / GMP_NUMB_BITS + static_cast<int>((prec % GMP_NUMB_BITS) != 0));
 
-        auto *ret
-            = llvm::StructType::create({to_llvm_type<mpfr_sign_t>(c), to_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
+        // Fetch the limb array type.
+        auto *limb_arr_t = llvm::ArrayType::get(to_external_llvm_type<mp_limb_t>(c), nlimbs);
+
+        auto *ret = llvm::StructType::create(
+            {to_external_llvm_type<mpfr_sign_t>(c), to_external_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 
         assert(ret != nullptr);
         assert(llvm::StructType::getTypeByName(c, name) == ret);
@@ -3236,45 +3243,85 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
         return ret;
     } else {
 #endif
-        return to_llvm_type<T>(c);
+        // NOTE: for anything else than mppp::real, the internal and
+        // external types coincide.
+        return to_external_llvm_type<T>(c);
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<float>(llvm_state &, const float &);
+template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<float>(llvm_state &, long long);
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<double>(llvm_state &, const double &);
+template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<double>(llvm_state &, long long);
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<long double>(llvm_state &, const long double &);
+template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<long double>(llvm_state &, long long);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real128>(llvm_state &, const mppp::real128 &);
+template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<mppp::real128>(llvm_state &, long long);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real>(llvm_state &, const mppp::real &);
+template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<mppp::real>(llvm_state &, long long);
 
 #endif
 
-// Compute the LLVM data type to be used for loading external data
-// into an LLVM variable of type fp_t.
-llvm::Type *llvm_ext_type(llvm::Type *fp_t)
+// This helper returns the type to be used for the internal LLVM representation
+// of the input value x.
+template <typename T>
+llvm::Type *internal_llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
-    if (fp_t->isFloatingPointTy()) {
+    auto &c = s.context();
+
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        return to_internal_llvm_type<T>(s, x.get_prec());
+    } else {
+#endif
+        // NOTE: for anything else than mppp::real, the internal and
+        // external types coincide.
+        return to_external_llvm_type<T>(c);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<float>(llvm_state &, const float &);
+
+template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<double>(llvm_state &, const double &);
+
+template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<long double>(llvm_state &, const long double &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<mppp::real128>(llvm_state &, const mppp::real128 &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<mppp::real>(llvm_state &, const mppp::real &);
+
+#endif
+
+// Fetch the external llvm type corresponding to the input external llvm type.
+llvm::Type *make_external_llvm_type(llvm::Type *fp_t)
+{
+    if (fp_t->isFloatingPointTy() || fp_t->isIntegerTy()) {
         return fp_t;
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
-        return to_llvm_type<mppp::real>(fp_t->getContext());
+        return to_external_llvm_type<mppp::real>(fp_t->getContext());
 #endif
         // LCOV_EXCL_START
     } else {
         throw std::invalid_argument(
-            fmt::format("Cannot compute the external type for the LLVM type '{}'", llvm_type_name(fp_t)));
+            fmt::format("Cannot associate an external LLVM type to the internal LLVM type '{}'", llvm_type_name(fp_t)));
     }
     // LCOV_EXCL_STOP
 }

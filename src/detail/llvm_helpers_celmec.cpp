@@ -76,14 +76,14 @@ number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
 
     auto &context = s.context();
 
-    if (tp == to_llvm_type<float>(context, false)) {
+    if (tp == to_external_llvm_type<float>(context, false)) {
         return number{boost::math::constants::pi<float>()};
-    } else if (tp == to_llvm_type<double>(context, false)) {
+    } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{boost::math::constants::pi<double>()};
-    } else if (tp == to_llvm_type<long double>(context, false)) {
+    } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{boost::math::constants::pi<long double>()};
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+    } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::pi_128};
 #endif
 #if defined(HEYOKA_HAVE_REAL)
@@ -196,14 +196,14 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
 
         auto &context = s.context();
 
-        if (fp_t == to_llvm_type<float>(context, false)) {
+        if (fp_t == to_external_llvm_type<float>(context, false)) {
             return impl(0.f);
-        } else if (fp_t == to_llvm_type<double>(context, false)) {
+        } else if (fp_t == to_external_llvm_type<double>(context, false)) {
             return impl(0.);
-        } else if (fp_t == to_llvm_type<long double>(context, false)) {
+        } else if (fp_t == to_external_llvm_type<long double>(context, false)) {
             return impl(0.l);
 #if defined(HEYOKA_HAVE_REAL128)
-        } else if (fp_t == to_llvm_type<mppp::real128>(context, false)) {
+        } else if (fp_t == to_external_llvm_type<mppp::real128>(context, false)) {
             return impl(mppp::real128(0));
 #endif
         }
@@ -243,14 +243,14 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
 
     auto &context = s.context();
 
-    if (tp == to_llvm_type<float>(context, false)) {
+    if (tp == to_external_llvm_type<float>(context, false)) {
         return number{std::numeric_limits<float>::epsilon()};
-    } else if (tp == to_llvm_type<double>(context, false)) {
+    } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{std::numeric_limits<double>::epsilon()};
-    } else if (tp == to_llvm_type<long double>(context, false)) {
+    } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{std::numeric_limits<long double>::epsilon()};
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+    } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{std::numeric_limits<mppp::real128>::epsilon()};
 #endif
 #if defined(HEYOKA_HAVE_REAL)
@@ -625,7 +625,7 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(scal_t);
+    auto *ext_fp_t = make_external_llvm_type(scal_t);
 
     // The function arguments:
     // - output pointer (write only),

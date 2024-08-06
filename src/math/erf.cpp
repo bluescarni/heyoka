@@ -136,14 +136,14 @@ number sqrt_pi_2_like(llvm_state &s, llvm::Type *tp)
 
     auto &context = s.context();
 
-    if (tp == to_llvm_type<float>(context, false)) {
+    if (tp == to_external_llvm_type<float>(context, false)) {
         return number{std::sqrt(boost::math::constants::pi<float>()) / 2};
-    } else if (tp == to_llvm_type<double>(context, false)) {
+    } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{std::sqrt(boost::math::constants::pi<double>()) / 2};
-    } else if (tp == to_llvm_type<long double>(context, false)) {
+    } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{std::sqrt(boost::math::constants::pi<long double>()) / 2};
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+    } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::sqrt(mppp::pi_128) / 2};
 #endif
 #if defined(HEYOKA_HAVE_REAL)

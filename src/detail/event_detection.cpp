@@ -370,7 +370,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     auto &context = s.context();
 
     // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Helper to fetch the (i, j) binomial coefficient from
     // a precomputed global array. The returned value is already
@@ -554,7 +554,7 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto &context = s.context();
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Add the translator and the sign changes counting function.
     auto *pt = add_poly_translator_1(s, fp_t, n, batch_size);
@@ -661,7 +661,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto &context = s.context();
 
     // Fetch the external type.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
@@ -851,7 +851,7 @@ taylor_adaptive<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> tes, s
     // Fetch the scalar FP type.
     // NOTE: s0 is the first value in the state vector of the integrator,
     // from which the internal floating-point type is deduced.
-    auto *fp_t = detail::llvm_type_like(m_state, s0);
+    auto *fp_t = detail::internal_llvm_type_like(m_state, s0);
 
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.
@@ -1425,7 +1425,7 @@ taylor_adaptive_batch<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> 
     assert(batch_size != 0u);                  // LCOV_EXCL_LINE
 
     // Fetch the scalar FP type.
-    auto *fp_t = detail::to_llvm_type<T>(m_state.context());
+    auto *fp_t = detail::to_external_llvm_type<T>(m_state.context());
 
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.

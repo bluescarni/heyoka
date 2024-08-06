@@ -386,12 +386,12 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     m_order = detail::taylor_order_from_tol(m_tol);
 
     // Determine the external fp type.
-    auto *ext_fp_t = detail::to_llvm_type<T>(m_llvm.context());
+    auto *ext_fp_t = detail::to_external_llvm_type<T>(m_llvm.context());
 
     // Determine the internal fp type.
     // NOTE: in case of mppp::real, we ensured earlier that the tolerance value
-    // has the correct precision, so that llvm_type_like() will yield the correct internal type.
-    auto *fp_t = detail::llvm_type_like(m_llvm, m_tol);
+    // has the correct precision, so that internal_llvm_type_like() will yield the correct internal type.
+    auto *fp_t = detail::internal_llvm_type_like(m_llvm, m_tol);
 
     // Add the stepper function.
     if (with_events) {
@@ -437,7 +437,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     // Add the function for the computation of
     // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, detail::llvm_type_like(m_llvm, m_state[0]), m_dim, m_order, 1,
+    detail::taylor_add_d_out_function(m_llvm, detail::internal_llvm_type_like(m_llvm, m_state[0]), m_dim, m_order, 1,
                                       high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);

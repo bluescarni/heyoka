@@ -673,7 +673,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
     std::vector<llvm::Value *> eval_arr;
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
 
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
@@ -1149,7 +1149,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     const auto n_pars = gl_arr_size(out_gl[4]);
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_scal_t);
+    auto *ext_fp_t = make_external_llvm_type(fp_scal_t);
 
     // Fetch the vector type.
     auto *fp_vec_t = make_vector_type(fp_scal_t, batch_size);
@@ -1237,7 +1237,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     auto &md = s.module();
 
     // Fetch the type for external loading.
-    auto *ext_fp_t = llvm_ext_type(fp_type);
+    auto *ext_fp_t = make_external_llvm_type(fp_type);
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
@@ -1452,22 +1452,14 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - the stride (if requested).
     //
     // The pointer arguments cannot overlap.
-    auto *fp_t = [&]() {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            return llvm_type_like(s, mppp::real{mppp::real_kind::zero, static_cast<mpfr_prec_t>(prec)});
-        } else {
-#endif
-            return to_llvm_type<T>(context);
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
-    }();
-    auto *ext_fp_t = llvm_ext_type(fp_t);
+
+    // Fetch the internal and external types.
+    auto *fp_t = to_internal_llvm_type<T>(s, prec);
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
     std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
 
     if (strided) {
-        fargs.push_back(to_llvm_type<std::size_t>(context));
+        fargs.push_back(to_external_llvm_type<std::size_t>(context));
     }
 
     // The function does not return anything.

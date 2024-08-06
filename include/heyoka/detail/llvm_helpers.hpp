@@ -28,29 +28,42 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
+HEYOKA_DLL_PUBLIC llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
 
-// Helper to associate a C++ type to an LLVM type.
+// Helper to fetch the external llvm type corresponding to the C++ type T.
+//
+// The external type is the type to be used in llvm when interfacing with the world
+// outside JIT compiled code (e.g., when accessing in JITted code data which
+// was created in C++). The external type must be identical (in terms
+// of size, alignment and, for structures, layout) to the corresponding C++ type.
+//
+// In case no llvm type can be associated to T, if err_throw is true, an exception
+// will be thrown, otherwise nullptr will be returned.
 template <typename T>
-inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
+inline llvm::Type *to_external_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
-    return to_llvm_type_impl(c, typeid(T), err_throw);
+    return to_external_llvm_type_impl(c, typeid(T), err_throw);
 }
 
+// Helper to fetch the internal llvm type corresponding to the C++ type T.
+//
+// The internal type is the type used in the JITted code to manipulate
+// values which in C++ are of type T. It coincides with the external llvm
+// type for all supported types apart for mppp::real, which has a
+// representation in the JITted code different from its C++ representation.
+//
+// Because mppp::real's precision is a runtime property (i.e., not encoded
+// in the type), if T is mppp::real then the precision must be passed as
+// second argument to this function.
 template <typename T>
-HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm_state &, const T &);
+HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type(llvm_state &, long long = 0);
+
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like(llvm_state &, const T &);
+
+HEYOKA_DLL_PUBLIC llvm::Type *make_external_llvm_type(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);
-
-// Helper to construct an LLVM vector type of size batch_size with elements
-// of the LLVM type tp corresponding to the C++ type T. If batch_size is 1, tp
-// will be returned. batch_size cannot be zero.
-template <typename T>
-inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch_size)
-{
-    return make_vector_type(to_llvm_type<T>(c), batch_size);
-}
 
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 
