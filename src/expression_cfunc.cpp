@@ -2078,6 +2078,9 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         batch_sizes.push_back(batch_size_);
     }
 
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
+
     // Build the compiled functions.
     for (const auto batch_size : batch_sizes) {
         for (const auto strided : {false, true}) {
@@ -2176,6 +2179,8 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
             builder.SetInsertPoint(orig_bb);
         }
     }
+
+    get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
 
     // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
     // the custom transform:
