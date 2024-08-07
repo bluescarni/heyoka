@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -18,10 +19,12 @@
 #include <tuple>
 #include <typeinfo>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/serialization/array.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -46,6 +49,7 @@
 #endif
 
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -61,16 +65,14 @@ struct cfunc<T>::impl {
     using cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, std::size_t) noexcept;
 
     // Thread-local storage for parallel operations.
-    using ets_item_t = std::pair<llvm_state, cfunc_ptr_s_t>;
+    using ets_item_t = std::pair<llvm_multi_state, cfunc_ptr_s_t>;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
     // Data members.
     std::vector<expression> m_fn;
     std::vector<expression> m_vars;
-    llvm_state m_s_scal;
-    llvm_state m_s_scal_s;
-    llvm_state m_s_batch_s;
+    std::variant<std::array<llvm_state, 3>, llvm_multi_state> m_states;
     std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
     cfunc_ptr_t m_fptr_scal = nullptr;
@@ -91,9 +93,7 @@ struct cfunc<T>::impl {
     {
         ar << m_fn;
         ar << m_vars;
-        ar << m_s_scal;
-        ar << m_s_scal_s;
-        ar << m_s_batch_s;
+        ar << m_states;
         ar << m_batch_size;
         ar << m_dc;
         ar << m_nparams;
@@ -110,9 +110,7 @@ struct cfunc<T>::impl {
     {
         ar >> m_fn;
         ar >> m_vars;
-        ar >> m_s_scal;
-        ar >> m_s_scal_s;
-        ar >> m_s_batch_s;
+        ar >> m_states;
         ar >> m_batch_size;
         ar >> m_dc;
         ar >> m_nparams;
@@ -126,24 +124,44 @@ struct cfunc<T>::impl {
         ar >> m_parallel_mode;
 
         // Recover the function pointers.
-        m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
-        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
+        assign_fptrs();
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+    // Small helper to fetch the function pointers from the states. Used after des11n or copy.
+    void assign_fptrs()
+    {
+        if (auto *arr_ptr = std::get_if<0>(&m_states)) {
+            assert(!m_compact_mode);
+
+            m_fptr_scal = reinterpret_cast<cfunc_ptr_t>((*arr_ptr)[0].jit_lookup("cfunc"));
+            m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>((*arr_ptr)[1].jit_lookup("cfunc"));
+            m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>((*arr_ptr)[2].jit_lookup("cfunc"));
+        } else {
+            assert(m_compact_mode);
+
+            auto &ms = std::get<1>(m_states);
+
+            m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(ms.jit_lookup("cfunc.unstrided.batch_size_1"));
+            m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(ms.jit_lookup("cfunc.strided.batch_size_1"));
+            m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(
+                ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_batch_size)));
+        }
+    }
 
     // NOTE: this is necessary only for s11n.
     impl() = default;
 
     // NOTE: we use a single llvm_state for construction - all the internal
-    // llvm_state instances will be copied/moved from s.
+    // llvm_state instances will be either copied from s, or we will use
+    // s as a template.
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
                   long long prec, bool check_prec)
-        : m_fn(std::move(fn)), m_vars(std::move(vars)), m_s_scal(std::move(s)), m_s_scal_s(m_s_scal),
-          m_s_batch_s(m_s_scal), m_prec(prec), m_check_prec(check_prec), m_high_accuracy(high_accuracy),
-          m_compact_mode(compact_mode), m_parallel_mode(parallel_mode)
+        : m_fn(std::move(fn)), m_vars(std::move(vars)), m_states(std::array{s, s, s}), m_prec(prec),
+          m_check_prec(check_prec), m_high_accuracy(high_accuracy), m_compact_mode(compact_mode),
+          m_parallel_mode(parallel_mode)
     {
         // Setup the batch size.
         // NOTE: manually specified batch size of zero is interpreted as undefined.
@@ -162,38 +180,73 @@ struct cfunc<T>::impl {
 
 #endif
 
-        // Add the compiled functions.
-        oneapi::tbb::parallel_invoke(
-            [&]() {
-                // Scalar unstrided.
-                // NOTE: we fetch the decomposition from the scalar
-                // unstrided invocation of add_cfunc().
-                m_dc = add_cfunc<T>(m_s_scal, "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
-                                    kw::compact_mode = compact_mode, kw::prec = prec);
+        if (compact_mode) {
+            // Build the multi cfunc.
+            auto [ms, dc] = detail::make_multi_cfunc<T>(s, "cfunc", m_fn, m_vars, m_batch_size, high_accuracy,
+                                                        m_parallel_mode, prec);
 
-                m_s_scal.compile();
+            // Compile.
+            ms.compile();
 
-                m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-            },
-            [&]() {
-                // Scalar strided.
-                add_cfunc<T>(m_s_scal_s, "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
-                             kw::compact_mode = compact_mode, kw::prec = prec, kw::strided = true);
+            // Assign the pointers.
+            m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(ms.jit_lookup("cfunc.unstrided.batch_size_1"));
+            m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(ms.jit_lookup("cfunc.strided.batch_size_1"));
+            m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(
+                ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_batch_size)));
 
-                m_s_scal_s.compile();
+            // Move in m_states and dc.
+            m_states = std::move(ms);
+            m_dc = std::move(dc);
+        } else {
+            auto &s_arr = std::get<0>(m_states);
 
-                m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
-            },
-            [&]() {
-                // Batch strided.
-                add_cfunc<T>(m_s_batch_s, "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
-                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec,
-                             kw::strided = true);
+            // Add the compiled functions.
+            oneapi::tbb::parallel_invoke(
+                [&]() {
+                    // Scalar unstrided.
+                    // NOTE: we fetch the decomposition from the scalar
+                    // unstrided invocation of add_cfunc().
+                    m_dc = add_cfunc<T>(s_arr[0], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
+                                        kw::prec = prec,
+                                        // NOTE: be explicit about the lack of compact mode,
+                                        // because the default setting for mppp::real is different
+                                        // from the other types and if we leave this unset we will
+                                        // get the wrong function.
+                                        kw::compact_mode = false);
 
-                m_s_batch_s.compile();
+                    s_arr[0].compile();
 
-                m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
-            });
+                    m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(s_arr[0].jit_lookup("cfunc"));
+                },
+                [&]() {
+                    // Scalar strided.
+                    add_cfunc<T>(s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
+                                 kw::strided = true,
+                                 // NOTE: be explicit about the lack of compact mode,
+                                 // because the default setting for mppp::real is different
+                                 // from the other types and if we leave this unset we will
+                                 // get the wrong function.
+                                 kw::compact_mode = false);
+
+                    s_arr[1].compile();
+
+                    m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(s_arr[1].jit_lookup("cfunc"));
+                },
+                [&]() {
+                    // Batch strided.
+                    add_cfunc<T>(s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
+                                 kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true,
+                                 // NOTE: be explicit about the lack of compact mode,
+                                 // because the default setting for mppp::real is different
+                                 // from the other types and if we leave this unset we will
+                                 // get the wrong function.
+                                 kw::compact_mode = false);
+
+                    s_arr[2].compile();
+
+                    m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(s_arr[2].jit_lookup("cfunc"));
+                });
+        }
 
         // Let's figure out if fn contains params and if it is time-dependent.
         m_nparams = get_param_size(m_fn);
@@ -207,17 +260,14 @@ struct cfunc<T>::impl {
         m_nvars = boost::numeric_cast<std::uint32_t>(m_vars.size());
     }
     impl(const impl &other)
-        : m_fn(other.m_fn), m_vars(other.m_vars), m_s_scal(other.m_s_scal), m_s_scal_s(other.m_s_scal_s),
-          m_s_batch_s(other.m_s_batch_s), m_batch_size(other.m_batch_size), m_dc(other.m_dc),
-          m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent), m_nouts(other.m_nouts),
-          m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
+        : m_fn(other.m_fn), m_vars(other.m_vars), m_states(other.m_states), m_batch_size(other.m_batch_size),
+          m_dc(other.m_dc), m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent),
+          m_nouts(other.m_nouts), m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
           m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
           m_parallel_mode(other.m_parallel_mode)
     {
         // Recover the function pointers.
-        m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
-        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
+        assign_fptrs();
     }
 
     // These are never needed.
@@ -308,27 +358,11 @@ const std::vector<expression> &cfunc<T>::get_dc() const
 }
 
 template <typename T>
-const llvm_state &cfunc<T>::get_llvm_state_scalar() const
+const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &cfunc<T>::get_llvm_states() const
 {
     check_valid(__func__);
 
-    return m_impl->m_s_scal;
-}
-
-template <typename T>
-const llvm_state &cfunc<T>::get_llvm_state_scalar_s() const
-{
-    check_valid(__func__);
-
-    return m_impl->m_s_scal_s;
-}
-
-template <typename T>
-const llvm_state &cfunc<T>::get_llvm_state_batch_s() const
-{
-    check_valid(__func__);
-
-    return m_impl->m_s_batch_s;
+    return m_impl->m_states;
 }
 
 template <typename T>
@@ -653,10 +687,14 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     if (m_impl->m_compact_mode) {
         // Construct the thread-specific storage for batch parallel operations.
         typename impl::ets_t ets_batch([this]() {
-            auto s_batch_s = m_impl->m_s_batch_s;
-            auto *fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(s_batch_s.jit_lookup("cfunc"));
+            // Make a copy of the multi state.
+            auto ms = std::get<1>(m_impl->m_states);
 
-            return std::make_pair(std::move(s_batch_s), fptr);
+            // Fetch the function pointer.
+            auto fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(
+                ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_impl->m_batch_size)));
+
+            return std::make_pair(std::move(ms), fptr);
         });
 
         oneapi::tbb::parallel_invoke(

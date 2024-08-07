@@ -865,9 +865,7 @@ public:
     [[nodiscard]] const std::vector<expression> &get_fn() const;
     [[nodiscard]] const std::vector<expression> &get_vars() const;
     [[nodiscard]] const std::vector<expression> &get_dc() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar_s() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_batch_s() const;
+    [[nodiscard]] const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &get_llvm_states() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] bool get_parallel_mode() const;
