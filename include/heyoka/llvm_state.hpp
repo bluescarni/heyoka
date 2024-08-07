@@ -369,29 +369,13 @@ class HEYOKA_DLL_PUBLIC llvm_multi_state
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    // Helper to turn an input range into a vector of llvm_state objects.
-    template <typename R>
-    static std::vector<llvm_state> rng_to_vector(R &&r)
-    {
-        std::vector<llvm_state> retval;
-        if constexpr (std::ranges::sized_range<R>) {
-            retval.reserve(static_cast<decltype(retval.size())>(std::ranges::size(r)));
-        }
-
-        for (auto &&s : r) {
-            retval.push_back(std::forward<decltype(s)>(s));
-        }
-
-        return retval;
-    }
-
 public:
     llvm_multi_state();
     explicit llvm_multi_state(std::vector<llvm_state>);
     template <typename R>
         requires std::ranges::input_range<R>
                  && std::same_as<llvm_state, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
-    explicit llvm_multi_state(R &&rng) : llvm_multi_state(rng_to_vector(std::forward<R>(rng)))
+    explicit llvm_multi_state(R &&rng) : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)))
     {
     }
     llvm_multi_state(const llvm_multi_state &);
