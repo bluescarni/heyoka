@@ -1022,7 +1022,34 @@ HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
 
 #undef HEYOKA_CFUNC_CLASS_EXTERN_INST
 
+namespace detail
+{
+
+// Boost s11n class version history for the cfunc class:
+// - 1: implemented parallel compilation for compact mode, introduced
+//      external storage for the evaluation tape.
+inline constexpr int cfunc_s11n_version = 1;
+
+} // namespace detail
+
 HEYOKA_END_NAMESPACE
+
+// Set the Boost s11n class version for the cfunc class.
+BOOST_CLASS_VERSION(heyoka::cfunc<float>, heyoka::detail::cfunc_s11n_version);
+BOOST_CLASS_VERSION(heyoka::cfunc<double>, heyoka::detail::cfunc_s11n_version);
+BOOST_CLASS_VERSION(heyoka::cfunc<long double>, heyoka::detail::cfunc_s11n_version);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real128>, heyoka::detail::cfunc_s11n_version);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real>, heyoka::detail::cfunc_s11n_version);
+
+#endif
 
 // fmt formatter for cfunc, implemented
 // on top of the streaming operator.

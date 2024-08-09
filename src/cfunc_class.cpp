@@ -529,8 +529,15 @@ void cfunc<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 }
 
 template <typename T>
-void cfunc<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+void cfunc<T>::load(boost::archive::binary_iarchive &ar, unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<cfunc<T>>::type::value)) {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a cfunc: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     try {
         ar >> m_impl;
         // LCOV_EXCL_START
