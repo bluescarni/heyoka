@@ -73,6 +73,10 @@ struct aligned_array_deleter {
     std::align_val_t al{};
     void operator()(void *ptr) const noexcept
     {
+        // NOTE: here we are using directly the delete operator (which does not invoke destructors),
+        // rather than a delete expression (which would also invoke destructors). However, because
+        // ptr points to a bytes array, we do not need to explicitly call the destructor here, deallocation will be
+        // sufficient.
         ::operator delete[](ptr, al);
     }
 };
@@ -87,7 +91,21 @@ aligned_array_t make_aligned_array(std::size_t sz, std::size_t al)
     if (sz == 0u) {
         return {};
     } else {
+#if defined(_MSC_VER)
+        // MSVC workaround for this issue:
+        // https://developercommunity.visualstudio.com/t/using-c17-new-stdalign-val-tn-syntax-results-in-er/528320
+
+        // Allocate the raw memory.
+        auto *buf = ::operator new[](sz, std::align_val_t{al});
+
+        // Formally construct the bytes array.
+        auto *ptr = ::new (buf) std::byte[sz];
+
+        // Constrcut and return the unique ptr.
+        return aligned_array_t{ptr, {.al = std::align_val_t{al}}};
+#else
         return aligned_array_t{::new (std::align_val_t{al}) std::byte[sz], {.al = std::align_val_t{al}}};
+#endif
     }
 }
 
