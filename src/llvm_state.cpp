@@ -1399,9 +1399,6 @@ void llvm_state::compile()
 
             // Assign the object file.
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj[0]));
-
-            // Look up the trigger.
-            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 
@@ -2284,9 +2281,6 @@ void llvm_multi_state::compile()
             // Assign the compiled objects.
             assert(m_impl->m_jit->m_object_files.empty());
             m_impl->m_jit->m_object_files = std::move(cached_data->obj);
-
-            // Lookup the trigger.
-            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 

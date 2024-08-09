@@ -199,7 +199,7 @@ struct cfunc<T>::impl {
     void assign_fptrs()
     {
         if (auto *arr_ptr = std::get_if<0>(&m_states)) {
-            assert(!m_compact_mode);
+            assert(!m_compact_mode); // LCOV_EXCL_LINE
 
             m_fptr_scal = reinterpret_cast<cfunc_ptr_t>((*arr_ptr)[0].jit_lookup("cfunc"));
             m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>((*arr_ptr)[1].jit_lookup("cfunc"));
