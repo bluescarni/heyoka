@@ -20,8 +20,8 @@
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -75,7 +75,7 @@ ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_i
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -125,7 +125,7 @@ ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -173,7 +173,7 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -261,7 +261,7 @@ ensemble_propagate_until_batch_impl(
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -310,7 +310,7 @@ ensemble_propagate_for_batch_impl(
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -369,7 +369,7 @@ ensemble_propagate_grid_batch_impl(
     std::vector<std::tuple<taylor_adaptive_batch<T>, step_callback_batch<T>, std::vector<T>>> retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    tbb::parallel_for(tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);

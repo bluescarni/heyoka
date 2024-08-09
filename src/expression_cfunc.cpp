@@ -15,9 +15,11 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <list>
 #include <map>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -30,6 +32,7 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -1285,7 +1288,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     builder.CreateLifetimeStart(eval_arr, builder.getInt64(eval_arr_size));
 
     // Copy over the values of the variables.
-    // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
         auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
@@ -1381,6 +1383,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 // input/output/par buffers contiguously (that is,
 // it assumes the input/output/par scalar/vector values are stored one
 // after the other without "holes" between them).
+//
+// NOTE: there is a bunch of boilerplate logic overlap here with make_multi_cfunc(). Make sure to
+// coordinate changes between the two functions.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
                     bool compact_mode, bool parallel_mode, [[maybe_unused]] long long prec, bool strided)
@@ -1560,6 +1565,705 @@ HEYOKA_ADD_CFUNC_INST(mppp::real)
 #endif
 
 #undef HEYOKA_ADD_CFUNC_INST
+
+namespace
+{
+
+// Implementation of the compact-mode evaluation of a compiled function split over several driver functions
+// implemented in distinct llvm_state objects.
+//
+// states is the current list of states (to which more will be added by this function), and the last state
+// in the list is the "main" state. s_dc is the segmented decomposition of the function to be compiled.
+// base_name is the name of the main function from which the drivers are to be invoked. main_eval_arr,
+// main_par_ptr, main_time_ptr and main_stride are, respectively, the pointer to the evaluation tape,
+// the pointer to the parameter values, the pointer to time coordinate(s) and the stride - these are all
+// defined in the main state and they are passed to the driver functions invocations.
+template <typename T, typename SDC>
+void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_dc, std::uint32_t nvars,
+                                   std::uint32_t batch_size, bool high_accuracy, long long prec,
+                                   const std::string &base_name, llvm::Value *main_eval_arr, llvm::Value *main_par_ptr,
+                                   llvm::Value *main_time_ptr, llvm::Value *main_stride)
+{
+    assert(!states.empty()); // LCOV_EXCL_LINE
+    auto &main_state = states.back();
+
+    // Structure used to log, in trace mode, the breakdown of each segment.
+    // For each segment, this structure contains the number of invocations
+    // of each evaluation function in the segment. It will be unused if we are not tracing.
+    std::vector<std::vector<std::uint32_t>> segment_bd;
+
+    // Are we tracing?
+    const auto is_tracing = get_logger()->should_log(spdlog::level::trace);
+
+    // List of evaluation functions in a segment.
+    //
+    // This map contains a list of functions for the compact-mode evaluation of elementary subexpressions.
+    // Each function is mapped to a pair, containing:
+    //
+    // - the number of times the function is to be invoked,
+    // - a list of functors (generators) that generate the arguments for
+    //   the invocation.
+    //
+    // NOTE: we use maps with name-based comparison for the functions. This ensures that the order in which these
+    // functions are invoked is always the same. If we used directly pointer
+    // comparisons instead, the order could vary across different executions and different platforms. The name
+    // mangling we do when creating the function names should ensure that there are no possible name collisions.
+    using seg_f_list_t
+        = std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+                   llvm_func_name_compare>;
+
+    // Push back a new state and use it as initial current state.
+    states.push_back(main_state.make_similar());
+    auto *cur_state = &states.back();
+
+    // Index of the state we are currently operating on,
+    // relative to the original number of states.
+    boost::safe_numerics::safe<unsigned> cur_state_idx = 0;
+
+    // Is the stride value a constant?
+    const auto const_stride = llvm::isa<llvm::ConstantInt>(main_stride);
+
+    // Helper to create and return the prototype of a driver function in the state s.
+    auto make_driver_proto = [&base_name, const_stride](llvm_state &s, unsigned cur_idx) {
+        auto &builder = s.builder();
+        auto &md = s.module();
+        auto &ctx = s.context();
+
+        // The arguments to the driver are:
+        // - an (internal) pointer to the tape,
+        // - external pointers to par and time,
+        // - the stride (if not a constant).
+        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(ctx), llvm::PointerType::getUnqual(ctx),
+                                        llvm::PointerType::getUnqual(ctx)};
+        if (!const_stride) {
+            fargs.push_back(to_external_llvm_type<std::size_t>(ctx));
+        }
+
+        // The driver does not return anything.
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        assert(ft != nullptr); // LCOV_EXCL_LINE
+
+        // Now create the driver.
+        const auto cur_name = fmt::format("{}.driver_{}", base_name, cur_idx);
+        auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
+        // NOTE: the driver cannot call itself recursively.
+        f->addFnAttr(llvm::Attribute::NoRecurse);
+
+        // Add the arguments' attributes.
+        // NOTE: no aliasing is possible between the 3 pointers,
+        // as the tape array is internal, and the cfunc assumption is
+        // that par and time arrays are not aliasing each other.
+        auto *eval_arr_arg = f->args().begin();
+        eval_arr_arg->setName("eval_arr_ptr");
+        eval_arr_arg->addAttr(llvm::Attribute::NoCapture);
+        eval_arr_arg->addAttr(llvm::Attribute::NoAlias);
+
+        auto *par_ptr_arg = eval_arr_arg + 1;
+        par_ptr_arg->setName("par_ptr");
+        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+        par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *time_ptr_arg = eval_arr_arg + 2;
+        time_ptr_arg->setName("time_ptr");
+        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+        time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+        if (!const_stride) {
+            auto *stride_arg = eval_arr_arg + 3;
+            stride_arg->setName("stride");
+        }
+
+        return f;
+    };
+
+    // Helper to invoke a driver function from the main state.
+    auto main_invoke_driver
+        = [&main_state, main_eval_arr, main_par_ptr, main_time_ptr, main_stride, const_stride](llvm::Function *f) {
+              std::vector fargs = {main_eval_arr, main_par_ptr, main_time_ptr};
+              if (!const_stride) {
+                  fargs.push_back(main_stride);
+              }
+
+              main_state.builder().CreateCall(f, fargs);
+          };
+
+    // Add the driver declaration to the main state, and invoke it.
+    main_invoke_driver(make_driver_proto(main_state, cur_state_idx));
+
+    // Add the driver declaration to the current state,
+    // and start insertion into the driver.
+    cur_state->builder().SetInsertPoint(
+        llvm::BasicBlock::Create(cur_state->context(), "entry", make_driver_proto(*cur_state, cur_state_idx)));
+
+    // Variable to keep track of how many blocks have been codegenned
+    // in the current state.
+    boost::safe_numerics::safe<unsigned> n_cg_blocks = 0;
+
+    // Limit of codegenned blocks per state.
+    constexpr auto max_n_cg_blocks = 20u;
+
+    // Variable to keep track of the u variable
+    // on whose definition we are operating.
+    auto cur_u_idx = nvars;
+
+    // Iterate over the segments in s_dc.
+    for (const auto &seg : s_dc) {
+        if (n_cg_blocks > max_n_cg_blocks) {
+            // We have codegenned enough blocks for this state. Create the return
+            // value for the current driver, and move to the next one.
+            cur_state->builder().CreateRetVoid();
+
+            // Create the new current state.
+            states.push_back(main_state.make_similar());
+            cur_state = &states.back();
+
+            // Reset/update the counters.
+            n_cg_blocks = 0;
+            ++cur_state_idx;
+
+            // Add the driver declaration to the main state, and invoke it.
+            main_invoke_driver(make_driver_proto(main_state, cur_state_idx));
+
+            // Add the driver declaration to the current state,
+            // and start insertion into the driver.
+            cur_state->builder().SetInsertPoint(
+                llvm::BasicBlock::Create(cur_state->context(), "entry", make_driver_proto(*cur_state, cur_state_idx)));
+        }
+
+        // Fetch the internal fp type and its vector counterpart for the current state.
+        auto *fp_t = to_internal_llvm_type<T>(*cur_state, prec);
+        auto *fp_vec_type = make_vector_type(fp_t, batch_size);
+
+        // Fetch the current builder.
+        auto &cur_builder = cur_state->builder();
+
+        // This structure maps a function to sets of arguments with which the function
+        // is to be called. For instance, if function f(x, y, z) is to be called as
+        // f(a, b, c) and f(d, e, f), then tmp_map will contain {f : [[a, b, c], [d, e, f]]}.
+        // After construction, we have verified that for each function
+        // in the map the sets of arguments have all the same size.
+        // NOTE: again, here and below we use name-based ordered maps for the functions.
+        // This ensures that the invocations of cm_make_arg_gen_*(), which create several
+        // global variables, always happen in a well-defined order. If we used an unordered map instead,
+        // the variables would be created in a "random" order, which would result in a
+        // unnecessary miss for the in-memory cache machinery when two logically-identical
+        // LLVM modules are considered different because of the difference in the order
+        // of declaration of global variables.
+        std::map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>,
+                 llvm_func_name_compare>
+            tmp_map;
+
+        for (const auto &ex : seg) {
+            // Get the evaluation function.
+            auto *func
+                = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(*cur_state, fp_t, batch_size, high_accuracy);
+
+            // Insert the function into tmp_map.
+            const auto [it, is_new_func] = tmp_map.try_emplace(func);
+
+            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
+
+            // Convert the variables/constants in the current dc
+            // element into a set of indices/constants.
+            const auto c_args = udef_to_variants(ex, {});
+
+            // LCOV_EXCL_START
+            if (!is_new_func && it->second.back().size() - 1u != c_args.size()) [[unlikely]] {
+                throw std::invalid_argument(
+                    fmt::format("Inconsistent arity detected in a compiled function in compact "
+                                "mode: the same function is being called with both {} and {} arguments",
+                                it->second.back().size() - 1u, c_args.size()));
+            }
+            // LCOV_EXCL_STOP
+
+            // Add the new set of arguments.
+            it->second.emplace_back();
+            // Add the idx of the u variable.
+            it->second.back().emplace_back(cur_u_idx);
+            // Add the actual function arguments.
+            it->second.back().insert(it->second.back().end(), c_args.begin(), c_args.end());
+
+            ++cur_u_idx;
+        }
+
+        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
+        // to {f : [[a, d], [b, e], [c, f]]}.
+        std::map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>,
+                 llvm_func_name_compare>
+            tmp_map_transpose;
+        for (const auto &[func, vv] : tmp_map) {
+            assert(!vv.empty()); // LCOV_EXCL_LINE
+
+            // Add the function.
+            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
+            assert(ins_status); // LCOV_EXCL_LINE
+
+            const auto n_calls = vv.size();
+            const auto n_args = vv[0].size();
+            // NOTE: n_args must be at least 1 because the u idx
+            // is prepended to the actual function arguments in
+            // the tmp_map entries.
+            assert(n_args >= 1u); // LCOV_EXCL_LINE
+
+            for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
+                // Build the vector of values corresponding
+                // to the current argument index.
+                std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
+                    tmp_c_vec.push_back(vv[j][i]);
+                }
+
+                // Turn tmp_c_vec (a vector of variants) into a variant
+                // of vectors, and insert the result.
+                it->second.push_back(vv_transpose(tmp_c_vec));
+            }
+        }
+
+        // Create the seg_f_list_t for the current segment.
+        seg_f_list_t seg_map;
+
+        for (const auto &[func, vv] : tmp_map_transpose) {
+            // NOTE: vv.size() is now the number of arguments. We know it cannot
+            // be zero because the evaluation functions
+            // in compact mode always have at least 1 argument (i.e., the index
+            // of the u variable which is being evaluated).
+            assert(!vv.empty()); // LCOV_EXCL_LINE
+
+            // Add the function.
+            const auto [it, ins_status] = seg_map.try_emplace(func);
+            assert(ins_status); // LCOV_EXCL_LINE
+
+            // Set the number of calls for this function.
+            it->second.first
+                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
+            assert(it->second.first > 0u); // LCOV_EXCL_LINE
+
+            // Create the generators for each argument.
+            for (const auto &v : vv) {
+                it->second.second.push_back(std::visit(
+                    [cur_state, fp_t](const auto &x) {
+                        using type = uncvref_t<decltype(x)>;
+
+                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
+                            return cm_make_arg_gen_vidx(*cur_state, x);
+                        } else {
+                            return cm_make_arg_gen_vc(*cur_state, fp_t, x);
+                        }
+                    },
+                    v));
+            }
+        }
+
+        // Fetch the arguments from the driver prototype.
+        auto *driver_f = cur_builder.GetInsertBlock()->getParent();
+        auto *eval_arr = driver_f->args().begin();
+        auto *par_ptr = driver_f->args().begin() + 1;
+        auto *time_ptr = driver_f->args().begin() + 2;
+
+        // NOTE: the stride is not an argument, if constant.
+        llvm::Value *stride = nullptr;
+        if (const_stride) {
+            stride
+                = llvm::ConstantInt::get(cur_state->context(), llvm::cast<llvm::ConstantInt>(main_stride)->getValue());
+        } else {
+            stride = driver_f->args().begin() + 3;
+        }
+
+        // Generate the code for the evaluation of all blocks in the segment.
+        for (const auto &[func, fpair] : seg_map) {
+            const auto &[ncalls, gens] = fpair;
+
+            // LCOV_EXCL_START
+            assert(ncalls > 0u);
+            assert(!gens.empty());
+            assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
+            // LCOV_EXCL_STOP
+
+            // We will be manually unrolling loops if ncalls is small enough.
+            // This seems to help with compilation times.
+            constexpr auto max_unroll_n = 5u;
+
+            if (ncalls > max_unroll_n) {
+                // Loop over the number of calls.
+                llvm_loop_u32(*cur_state, cur_builder.getInt32(0), cur_builder.getInt32(ncalls),
+                              [&](llvm::Value *cur_call_idx) {
+                                  // Create the u variable index from the first generator.
+                                  auto *u_idx = gens[0](cur_call_idx);
+
+                                  // Initialise the vector of arguments with which func must be called. The following
+                                  // initial arguments are always present:
+                                  // - eval array,
+                                  // - pointer to the param values,
+                                  // - pointer to the time value(s),
+                                  // - stride.
+                                  std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
+
+                                  // Create the other arguments via the generators.
+                                  for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                                      args.push_back(gens[i](cur_call_idx));
+                                  }
+
+                                  // Evaluate and store the result.
+                                  cfunc_c_store_eval(*cur_state, fp_vec_type, eval_arr, u_idx,
+                                                     cur_builder.CreateCall(func, args));
+                              });
+            } else {
+                // The manually-unrolled version of the above.
+                for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
+                    auto *cur_call_idx = cur_builder.getInt32(idx);
+                    auto u_idx = gens[0](cur_call_idx);
+                    std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
+
+                    for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                        args.push_back(gens[i](cur_call_idx));
+                    }
+
+                    cfunc_c_store_eval(*cur_state, fp_vec_type, eval_arr, u_idx, cur_builder.CreateCall(func, args));
+                }
+            }
+        }
+
+        // Update the number of codegenned blocks.
+        n_cg_blocks += seg_map.size();
+
+        // LCOV_EXCL_START
+        // Update segment_bd if needed.
+        if (is_tracing) {
+            segment_bd.emplace_back();
+
+            for (const auto &p : seg_map) {
+                segment_bd.back().push_back(p.second.first);
+            }
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    // We need one last return statement for the last added state.
+    cur_state->builder().CreateRetVoid();
+
+    // LCOV_EXCL_START
+    // Log segment_bd, if needed.
+    if (is_tracing) {
+        get_logger()->trace("make_multi_cfunc() function maps breakdown: {}", segment_bd);
+    }
+    // LCOV_EXCL_STOP
+}
+
+// NOTE: here we are forced to use a templated function, rather than passing in the
+// LLVM type fp_t as usual, because we need to re-create the type for every context
+// in every state, and there seems not to be an easy way to transfer/copy a type
+// from one context to the other.
+template <typename T>
+std::array<std::size_t, 2>
+add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+                     llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                     std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy, long long prec,
+                     const std::string &base_name, llvm::Value *eval_arr)
+{
+    // Fetch the main state, module, etc.
+    auto &main_state = states.back();
+    auto &main_md = main_state.module();
+    auto &main_builder = main_state.builder();
+
+    // Fetch the fp types for the main state.
+    auto *main_fp_t = to_internal_llvm_type<T>(main_state, prec);
+    auto *main_ext_fp_t = make_external_llvm_type(main_fp_t);
+    auto *fp_vec_type = make_vector_type(main_fp_t, batch_size);
+
+    // Split dc into segments.
+    const auto s_dc = function_segment_dc(dc, nvars, nuvars);
+
+    // Generate the global arrays used to write the outputs at the
+    // end of the computation.
+    const auto cout_gl = cfunc_c_make_output_globals(main_state, main_fp_t, dc, nuvars);
+
+    // Total required size in bytes for the tape.
+    const auto sz = boost::safe_numerics::safe<std::size_t>(get_size(main_md, fp_vec_type)) * nuvars;
+
+    // Tape alignment.
+    const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
+
+    // NOTE: eval_arr is used as temporary storage for the current function,
+    // but it provided externally from dynamically-allocated memory in order to avoid stack overflow.
+    // This creates a situation in which LLVM cannot elide stores into eval_arr
+    // (even if it figures out a way to avoid storing intermediate results into
+    // eval_arr) because LLVM must assume that some other function may
+    // use these stored values later. Thus, we declare via an intrinsic that the
+    // lifetime of eval_arr begins here and ends at the end of the function,
+    // so that LLVM can assume that any value stored in it cannot be possibly
+    // used outside this function.
+    main_builder.CreateLifetimeStart(eval_arr, main_builder.getInt64(sz));
+
+    // Copy over the values of the variables.
+    llvm_loop_u32(main_state, main_builder.getInt32(0), main_builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
+        // Fetch the pointer from in_ptr.
+        auto *ptr = main_builder.CreateInBoundsGEP(main_ext_fp_t, in_ptr,
+                                                   main_builder.CreateMul(stride, to_size_t(main_state, cur_var_idx)));
+
+        // Load as a vector.
+        auto *vec = ext_load_vector_from_memory(main_state, main_fp_t, ptr, batch_size);
+
+        // Store into eval_arr.
+        cfunc_c_store_eval(main_state, fp_vec_type, eval_arr, cur_var_idx, vec);
+    });
+
+    // Generate the code for the evaluation of all segments.
+    multi_cfunc_evaluate_segments<T>(states, s_dc, nvars, batch_size, high_accuracy, prec, base_name, eval_arr, par_ptr,
+                                     time_ptr, stride);
+
+    // Write the results to the output pointer.
+    cfunc_c_write_outputs(main_state, main_fp_t, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+
+    // End the lifetime of eval_arr.
+    main_builder.CreateLifetimeEnd(eval_arr, main_builder.getInt64(sz));
+
+    return {sz, al};
+}
+
+} // namespace
+
+// This function will compile several versions of the input function fn, with input variables vars, in compact mode.
+//
+// The compiled functions are implemented across several llvm_states which are collated together and returned as
+// a single llvm_multi_state (this is the first element of the return tuple). If batch_size is 1,
+// then 2 compiled functions are created - a scalar strided and a scalar unstrided version.
+// If batch size is > 1, then an additional batch-mode strided compiled function is returned.
+// The function names are created using "name" as base name and then mangling in the strided/unstrided
+// property and the batch size.
+//
+// The second element of the return tuple is the decomposition of fn.
+//
+// The third element of the return tuple is a vector of pairs, each pair containing the size and alignment requirements
+// for the externally-provided storage for the evaluation tape. If batch_size is 1, then only a single
+// pair is returned, representing the size/alignment requirements for the scalar-mode evaluation tape.
+// If batch_size > 1, then an additional pair is appended representing the size/alignment requirements
+// for the batch-mode evaluation tape.
+//
+// NOTE: there is a bunch of boilerplate logic overlap here with add_cfunc_impl(). Make sure to
+// coordinate changes between the two functions.
+template <typename T>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
+make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vector<expression> &fn,
+                 const std::vector<expression> &vars, std::uint32_t batch_size_, bool high_accuracy, bool parallel_mode,
+                 long long prec)
+{
+    if (batch_size_ == 0u) [[unlikely]] {
+        throw std::invalid_argument("The batch size of a compiled function cannot be zero");
+    }
+
+    if (parallel_mode) [[unlikely]] {
+        throw std::invalid_argument("Parallel mode has not been implemented yet");
+    }
+
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
+
+        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("An invalid precision value of {} was passed to make_multi_cfunc() (the "
+                            "value must be in the [{}, {}] range)",
+                            sprec, mppp::real_prec_min(), mppp::real_prec_max()));
+        }
+    }
+
+#endif
+
+    if (name.empty()) [[unlikely]] {
+        throw std::invalid_argument("A non-empty function name is required when invoking make_multi_cfunc()");
+    }
+
+    // Decompose the function and cache the number of vars and outputs.
+    auto dc = function_decompose(fn, vars);
+    const auto nvars = boost::numeric_cast<std::uint32_t>(vars.size());
+    const auto nouts = boost::numeric_cast<std::uint32_t>(fn.size());
+
+    // Determine the number of u variables.
+    assert(dc.size() >= nouts); // LCOV_EXCL_LINE
+    const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
+
+    // NOTE: due to the presence of the stride argument, we will be always
+    // indexing into the input, output and parameter arrays via size_t.
+    // Hence, we don't need here the same overflow checking we need to perform
+    // in the integrators, as we assume that any array allocated from C++
+    // can't have a size larger than the max size_t.
+
+    // Init the states list.
+    // NOTE: we use a list here because it is convenient to have
+    // pointer/reference stability when iteratively constructing
+    // the set of states.
+    std::list<llvm_state> states;
+
+    // The required batch sizes. We always need a scalar implementation,
+    // if a non-unitary batch size is supplied build also the batch implementation.
+    std::vector<std::uint32_t> batch_sizes{static_cast<std::uint32_t>(1)};
+    if (batch_size_ > 1u) {
+        batch_sizes.push_back(batch_size_);
+    }
+
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
+
+    // Build the compiled functions.
+    std::vector<std::array<std::size_t, 2>> tape_size_align;
+    for (const auto batch_size : batch_sizes) {
+        for (const auto strided : {false, true}) {
+            // NOTE: we do not need the batch unstrided variant.
+            if (!strided && batch_size != 1u) {
+                continue;
+            }
+
+            // Add a new state and fetch it.
+            states.push_back(tplt.make_similar());
+            auto &s = states.back();
+
+            // Fetch builder/context/module for the new state.
+            auto &builder = s.builder();
+            auto &context = s.context();
+            auto &md = s.module();
+
+            // Fetch the current insertion block.
+            auto *orig_bb = builder.GetInsertBlock();
+
+            // Prepare the arguments:
+            //
+            // - a write-only pointer to the outputs,
+            // - a read-only pointer to the inputs,
+            // - a read-only pointer to the pars,
+            // - a read-only pointer to the time value(s),
+            // - a read/write pointer to the external storage,
+            // - the stride (if requested).
+            //
+            // The pointer arguments cannot overlap.
+            std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
+
+            if (strided) {
+                fargs.push_back(to_external_llvm_type<std::size_t>(context));
+            }
+
+            // The function does not return anything.
+            auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+            assert(ft != nullptr); // LCOV_EXCL_LINE
+
+            // Create the function prototype.
+            const auto cur_name
+                = fmt::format("{}.{}.batch_size_{}", name, strided ? "strided" : "unstrided", batch_size);
+            auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
+            // NOTE: a cfunc cannot call itself recursively.
+            f->addFnAttr(llvm::Attribute::NoRecurse);
+
+            // Set the names/attributes of the function arguments.
+            auto *out_ptr = f->args().begin();
+            out_ptr->setName("out_ptr");
+            out_ptr->addAttr(llvm::Attribute::NoCapture);
+            out_ptr->addAttr(llvm::Attribute::NoAlias);
+            out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+            auto *in_ptr = out_ptr + 1;
+            in_ptr->setName("in_ptr");
+            in_ptr->addAttr(llvm::Attribute::NoCapture);
+            in_ptr->addAttr(llvm::Attribute::NoAlias);
+            in_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+            auto *par_ptr = out_ptr + 2;
+            par_ptr->setName("par_ptr");
+            par_ptr->addAttr(llvm::Attribute::NoCapture);
+            par_ptr->addAttr(llvm::Attribute::NoAlias);
+            par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+            auto *time_ptr = out_ptr + 3;
+            time_ptr->setName("time_ptr");
+            time_ptr->addAttr(llvm::Attribute::NoCapture);
+            time_ptr->addAttr(llvm::Attribute::NoAlias);
+            time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+            auto *ext_storage = out_ptr + 4;
+            ext_storage->setName("ext_storage");
+            ext_storage->addAttr(llvm::Attribute::NoCapture);
+            ext_storage->addAttr(llvm::Attribute::NoAlias);
+
+            llvm::Value *stride = nullptr;
+            if (strided) {
+                stride = out_ptr + 5;
+                stride->setName("stride");
+            } else {
+                stride = to_size_t(s, builder.getInt32(batch_size));
+            }
+
+            // Create a new basic block to start insertion into.
+            auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+            assert(bb != nullptr); // LCOV_EXCL_LINE
+            builder.SetInsertPoint(bb);
+
+            // Create the body of the function.
+            const auto tape_sa
+                = add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars,
+                                          batch_size, high_accuracy, prec, cur_name, ext_storage);
+
+            // Add the size/alignment requirements for the external storage.
+            // NOTE: there's not difference in the external storage requirements
+            // between strided and unstrided variants, thus we append only is strided mode
+            // to avoid duplicates in size_align.
+            if (strided) {
+                tape_size_align.push_back(tape_sa);
+            }
+
+            // Finish off the function.
+            builder.CreateRetVoid();
+
+            // Restore the original insertion block.
+            builder.SetInsertPoint(orig_bb);
+        }
+    }
+
+    // Sanity check.
+    assert((tape_size_align.size() == 1u && batch_size_ == 1u) || (tape_size_align.size() == 2u && batch_size_ > 1u));
+
+    get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
+
+    // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
+    // the custom transform:
+    //
+    // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
+    return std::make_tuple(
+        llvm_multi_state(states | std::views::transform([](auto &s) -> auto && { return std::move(s); })),
+        std::move(dc), std::move(tape_size_align));
+}
+
+// Explicit instantiations.
+#define HEYOKA_MAKE_MULTI_CFUNC_INST(T)                                                                                \
+    template HEYOKA_DLL_PUBLIC                                                                                         \
+        std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>                 \
+        make_multi_cfunc<T>(const llvm_state &, const std::string &, const std::vector<expression> &,                  \
+                            const std::vector<expression> &, std::uint32_t, bool, bool, long long);
+
+HEYOKA_MAKE_MULTI_CFUNC_INST(float)
+HEYOKA_MAKE_MULTI_CFUNC_INST(double)
+HEYOKA_MAKE_MULTI_CFUNC_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real)
+
+#endif
+
+#undef HEYOKA_MAKE_MULTI_CFUNC_INST
 
 } // namespace detail
 

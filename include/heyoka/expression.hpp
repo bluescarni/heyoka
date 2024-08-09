@@ -696,6 +696,11 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
 }
 
+template <typename>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
+make_multi_cfunc(const llvm_state &, const std::string &, const std::vector<expression> &,
+                 const std::vector<expression> &, std::uint32_t, bool, bool, long long);
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
@@ -860,9 +865,7 @@ public:
     [[nodiscard]] const std::vector<expression> &get_fn() const;
     [[nodiscard]] const std::vector<expression> &get_vars() const;
     [[nodiscard]] const std::vector<expression> &get_dc() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar_s() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_batch_s() const;
+    [[nodiscard]] const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &get_llvm_states() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] bool get_parallel_mode() const;

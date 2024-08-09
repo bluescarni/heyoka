@@ -160,6 +160,7 @@ ADD_HEYOKA_TESTCASE(cfunc_multieval)
 ADD_HEYOKA_TESTCASE(dfun)
 ADD_HEYOKA_TESTCASE(var_ode_sys)
 ADD_HEYOKA_TESTCASE(llvm_multi_state)
+ADD_HEYOKA_TESTCASE(make_multi_cfunc)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)

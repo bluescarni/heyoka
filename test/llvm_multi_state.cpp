@@ -376,6 +376,26 @@ TEST_CASE("s11n")
     llvm_state::set_memcache_limit(100'000'000ull);
 }
 
+// Test about s11n of a default-cted llvm_multi_state.
+TEST_CASE("empty s11n")
+{
+    llvm_multi_state ms;
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << ms;
+    }
+
+    ms = llvm_multi_state{{llvm_state{}}};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+        REQUIRE_NOTHROW(ia >> ms);
+    }
+}
+
 TEST_CASE("cfunc")
 {
     using Catch::Matchers::Message;

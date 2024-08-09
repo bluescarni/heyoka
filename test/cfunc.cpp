@@ -16,6 +16,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -89,9 +90,7 @@ TEST_CASE("basic")
         REQUIRE_THROWS_AS(cf0.get_vars(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_fn(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_dc(), std::invalid_argument);
-        REQUIRE_THROWS_AS(cf0.get_llvm_state_scalar(), std::invalid_argument);
-        REQUIRE_THROWS_AS(cf0.get_llvm_state_scalar_s(), std::invalid_argument);
-        REQUIRE_THROWS_AS(cf0.get_llvm_state_batch_s(), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf0.get_llvm_states(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_high_accuracy(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_compact_mode(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_parallel_mode(), std::invalid_argument);
@@ -136,9 +135,13 @@ TEST_CASE("basic")
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
-        REQUIRE(cf0.get_llvm_state_scalar().get_opt_level() == 3u);
-        REQUIRE(cf0.get_llvm_state_scalar_s().get_opt_level() == 3u);
-        REQUIRE(cf0.get_llvm_state_batch_s().get_opt_level() == 3u);
+        if (cf0.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == 3u);
+        } else {
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[0].get_opt_level() == 3u);
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[1].get_opt_level() == 3u);
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[2].get_opt_level() == 3u);
+        }
         REQUIRE(cf0.get_high_accuracy() == false);
         REQUIRE(cf0.get_compact_mode() == false);
         REQUIRE(cf0.get_parallel_mode() == true);
@@ -167,9 +170,13 @@ TEST_CASE("basic")
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
-        REQUIRE(cf0.get_llvm_state_scalar().get_opt_level() == opt_level);
-        REQUIRE(cf0.get_llvm_state_scalar_s().get_opt_level() == opt_level);
-        REQUIRE(cf0.get_llvm_state_batch_s().get_opt_level() == opt_level);
+        if (cf0.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == opt_level);
+        } else {
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[0].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[1].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0.get_llvm_states())[2].get_opt_level() == opt_level);
+        }
         REQUIRE(cf0.get_high_accuracy() == high_accuracy);
         REQUIRE(cf0.get_compact_mode() == compact_mode);
         REQUIRE(cf0.get_parallel_mode() == false);
@@ -186,9 +193,13 @@ TEST_CASE("basic")
         REQUIRE(cf0_copy.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0_copy.get_vars() == std::vector{y, x});
         REQUIRE(!cf0_copy.get_dc().empty());
-        REQUIRE(cf0_copy.get_llvm_state_scalar().get_opt_level() == opt_level);
-        REQUIRE(cf0_copy.get_llvm_state_scalar_s().get_opt_level() == opt_level);
-        REQUIRE(cf0_copy.get_llvm_state_batch_s().get_opt_level() == opt_level);
+        if (cf0_copy.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf0_copy.get_llvm_states()).get_opt_level() == opt_level);
+        } else {
+            REQUIRE(std::get<0>(cf0_copy.get_llvm_states())[0].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0_copy.get_llvm_states())[1].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0_copy.get_llvm_states())[2].get_opt_level() == opt_level);
+        }
         REQUIRE(cf0_copy.get_high_accuracy() == high_accuracy);
         REQUIRE(cf0_copy.get_compact_mode() == compact_mode);
         REQUIRE(cf0_copy.get_parallel_mode() == false);
@@ -207,9 +218,13 @@ TEST_CASE("basic")
         REQUIRE(cf0_move.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0_move.get_vars() == std::vector{y, x});
         REQUIRE(!cf0_move.get_dc().empty());
-        REQUIRE(cf0_move.get_llvm_state_scalar().get_opt_level() == opt_level);
-        REQUIRE(cf0_move.get_llvm_state_scalar_s().get_opt_level() == opt_level);
-        REQUIRE(cf0_move.get_llvm_state_batch_s().get_opt_level() == opt_level);
+        if (cf0_move.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf0_move.get_llvm_states()).get_opt_level() == opt_level);
+        } else {
+            REQUIRE(std::get<0>(cf0_move.get_llvm_states())[0].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0_move.get_llvm_states())[1].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf0_move.get_llvm_states())[2].get_opt_level() == opt_level);
+        }
         REQUIRE(cf0_move.get_high_accuracy() == high_accuracy);
         REQUIRE(cf0_move.get_compact_mode() == compact_mode);
         REQUIRE(cf0_move.get_parallel_mode() == false);
@@ -226,9 +241,13 @@ TEST_CASE("basic")
         REQUIRE(cf1.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf1.get_vars() == std::vector{y, x});
         REQUIRE(!cf1.get_dc().empty());
-        REQUIRE(cf1.get_llvm_state_scalar().get_opt_level() == opt_level);
-        REQUIRE(cf1.get_llvm_state_scalar_s().get_opt_level() == opt_level);
-        REQUIRE(cf1.get_llvm_state_batch_s().get_opt_level() == opt_level);
+        if (cf1.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf1.get_llvm_states()).get_opt_level() == opt_level);
+        } else {
+            REQUIRE(std::get<0>(cf1.get_llvm_states())[0].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf1.get_llvm_states())[1].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf1.get_llvm_states())[2].get_opt_level() == opt_level);
+        }
         REQUIRE(cf1.get_high_accuracy() == high_accuracy);
         REQUIRE(cf1.get_compact_mode() == compact_mode);
         REQUIRE(cf1.get_parallel_mode() == false);
@@ -247,9 +266,13 @@ TEST_CASE("basic")
         REQUIRE(cf2.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf2.get_vars() == std::vector{y, x});
         REQUIRE(!cf2.get_dc().empty());
-        REQUIRE(cf2.get_llvm_state_scalar().get_opt_level() == opt_level);
-        REQUIRE(cf2.get_llvm_state_scalar_s().get_opt_level() == opt_level);
-        REQUIRE(cf2.get_llvm_state_batch_s().get_opt_level() == opt_level);
+        if (cf2.get_compact_mode()) {
+            REQUIRE(std::get<1>(cf2.get_llvm_states()).get_opt_level() == opt_level);
+        } else {
+            REQUIRE(std::get<0>(cf2.get_llvm_states())[0].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf2.get_llvm_states())[1].get_opt_level() == opt_level);
+            REQUIRE(std::get<0>(cf2.get_llvm_states())[2].get_opt_level() == opt_level);
+        }
         REQUIRE(cf2.get_high_accuracy() == high_accuracy);
         REQUIRE(cf2.get_compact_mode() == compact_mode);
         REQUIRE(cf2.get_parallel_mode() == false);
@@ -425,9 +448,7 @@ TEST_CASE("s11n")
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
-        REQUIRE(cf0.get_llvm_state_scalar().get_opt_level() == 1);
-        REQUIRE(cf0.get_llvm_state_scalar_s().get_opt_level() == 1);
-        REQUIRE(cf0.get_llvm_state_batch_s().get_opt_level() == 1);
+        REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == 1);
         REQUIRE(cf0.get_high_accuracy() == true);
         REQUIRE(cf0.get_compact_mode() == true);
         REQUIRE(cf0.get_parallel_mode() == false);
@@ -546,9 +567,7 @@ TEST_CASE("s11n mp")
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
-        REQUIRE(cf0.get_llvm_state_scalar().get_opt_level() == 1);
-        REQUIRE(cf0.get_llvm_state_scalar_s().get_opt_level() == 1);
-        REQUIRE(cf0.get_llvm_state_batch_s().get_opt_level() == 1);
+        REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == 1);
         REQUIRE(cf0.get_high_accuracy() == true);
         REQUIRE(cf0.get_compact_mode() == true);
         REQUIRE(cf0.get_parallel_mode() == false);
