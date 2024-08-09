@@ -13,6 +13,8 @@
 #include <cstddef>
 #include <functional>
 #include <iterator>
+#include <memory>
+#include <new>
 #include <random>
 #include <stdexcept>
 #include <vector>
@@ -42,6 +44,24 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
+struct al_array_deleter {
+    std::align_val_t al = std::align_val_t{0};
+    void operator()(void *ptr) const
+    {
+        ::operator delete[](ptr, al);
+    }
+};
+
+std::unique_ptr<char[], al_array_deleter> make_aligned_storage(std::size_t sz, std::size_t al)
+{
+    if (sz == 0u) {
+        return {};
+    } else {
+        return std::unique_ptr<char[], al_array_deleter>{new (std::align_val_t{al}) char[sz],
+                                                         {.al = std::align_val_t{al}}};
+    }
+}
+
 TEST_CASE("basic")
 {
     auto [x, y] = make_vars("x", "y");
@@ -50,19 +70,26 @@ TEST_CASE("basic")
     for (auto opt_level : {0u, 1u, 3u}) {
         llvm_state tplt{kw::opt_level = opt_level};
 
-        auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]}, {x, y},
-                                                         1, false, false, 0);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]},
+                                                             {x, y}, 1, false, false, 0);
+
+        REQUIRE(sa.size() == 1u);
 
         ms.compile();
 
         {
             // Scalar unstrided.
-            auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
                 ms.jit_lookup("test.unstrided.batch_size_1"));
 
             std::vector<double> ins{1, 2}, outs(2u), pars = {-0.25}, time{0.5};
 
-            cf_s_u(outs.data(), ins.data(), pars.data(), time.data());
+            const auto [sz, al] = sa[0];
+            REQUIRE(al == alignof(double));
+
+            auto ext_storage = make_aligned_storage(sz, al);
+
+            cf_s_u(outs.data(), ins.data(), pars.data(), time.data(), ext_storage.get());
 
             REQUIRE(outs[0] == ins[0] + ins[1] + time[0]);
             REQUIRE(outs[1] == ins[0] - ins[1] - pars[0]);
@@ -70,14 +97,18 @@ TEST_CASE("basic")
 
         {
             // Scalar strided.
-            auto *cf_s_s
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    ms.jit_lookup("test.strided.batch_size_1"));
+            auto *cf_s_s = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *,
+                                                     std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
 
             // Stride value of 3.
             std::vector<double> ins{1, 0, 0, 2, 0, 0}, outs(6u), pars = {-0.25, 0, 0}, time{0.5, 0, 0};
 
-            cf_s_s(outs.data(), ins.data(), pars.data(), time.data(), 3);
+            const auto [sz, al] = sa[0];
+            REQUIRE(al == alignof(double));
+
+            auto ext_storage = make_aligned_storage(sz, al);
+
+            cf_s_s(outs.data(), ins.data(), pars.data(), time.data(), ext_storage.get(), 3);
 
             REQUIRE(outs[0] == ins[0] + ins[3] + time[0]);
             REQUIRE(outs[3] == ins[0] - ins[3] - pars[0]);
@@ -88,19 +119,26 @@ TEST_CASE("basic")
     for (auto opt_level : {0u, 1u, 3u}) {
         llvm_state tplt{kw::opt_level = opt_level};
 
-        auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]}, {x, y},
-                                                         2, false, false, 0);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]},
+                                                             {x, y}, 2, false, false, 0);
+
+        REQUIRE(sa.size() == 2u);
 
         ms.compile();
 
         {
             // Scalar unstrided.
-            auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
                 ms.jit_lookup("test.unstrided.batch_size_1"));
 
             std::vector<double> ins{1, 2}, outs(2u), pars = {-0.25}, time{0.5};
 
-            cf_s_u(outs.data(), ins.data(), pars.data(), time.data());
+            const auto [sz, al] = sa[0];
+            REQUIRE(al == alignof(double));
+
+            auto ext_storage = make_aligned_storage(sz, al);
+
+            cf_s_u(outs.data(), ins.data(), pars.data(), time.data(), ext_storage.get());
 
             REQUIRE(outs[0] == ins[0] + ins[1] + time[0]);
             REQUIRE(outs[1] == ins[0] - ins[1] - pars[0]);
@@ -108,14 +146,18 @@ TEST_CASE("basic")
 
         {
             // Scalar strided.
-            auto *cf_s_s
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    ms.jit_lookup("test.strided.batch_size_1"));
+            auto *cf_s_s = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *,
+                                                     std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
 
             // Stride value of 3.
             std::vector<double> ins{1, 0, 0, 2, 0, 0}, outs(6u), pars = {-0.25, 0, 0}, time{0.5, 0, 0};
 
-            cf_s_s(outs.data(), ins.data(), pars.data(), time.data(), 3);
+            const auto [sz, al] = sa[0];
+            REQUIRE(al == alignof(double));
+
+            auto ext_storage = make_aligned_storage(sz, al);
+
+            cf_s_s(outs.data(), ins.data(), pars.data(), time.data(), ext_storage.get(), 3);
 
             REQUIRE(outs[0] == ins[0] + ins[3] + time[0]);
             REQUIRE(outs[3] == ins[0] - ins[3] - pars[0]);
@@ -123,14 +165,18 @@ TEST_CASE("basic")
 
         {
             // Batch strided.
-            auto *cf_b_s
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    ms.jit_lookup("test.strided.batch_size_2"));
+            auto *cf_b_s = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *,
+                                                     std::size_t)>(ms.jit_lookup("test.strided.batch_size_2"));
 
             // Stride value of 3.
             std::vector<double> ins{1, 1.1, 0, 2, 2.1, 0}, outs(6u), pars = {-0.25, -0.26, 0}, time{0.5, 0.51, 0};
 
-            cf_b_s(outs.data(), ins.data(), pars.data(), time.data(), 3);
+            const auto [sz, al] = sa[1];
+            REQUIRE(al >= alignof(double));
+
+            auto ext_storage = make_aligned_storage(sz, al);
+
+            cf_b_s(outs.data(), ins.data(), pars.data(), time.data(), ext_storage.get(), 3);
 
             REQUIRE(outs[0] == ins[0] + ins[3] + time[0]);
             REQUIRE(outs[1] == ins[1] + ins[4] + time[1]);
@@ -152,12 +198,14 @@ TEST_CASE("sgp4")
 
     llvm_state tplt;
 
-    auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", model::sgp4(),
-                                                     std::vector(inputs.begin(), inputs.end()), 1, false, false, 0);
+    auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", model::sgp4(),
+                                                         std::vector(inputs.begin(), inputs.end()), 1, false, false, 0);
+
+    REQUIRE(sa.size() == 1u);
 
     ms.compile();
 
-    auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+    auto *cf_s_u = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
         ms.jit_lookup("test.unstrided.batch_size_1"));
 
     const auto revday2radmin = [](auto x) { return x * 2. * boost::math::constants::pi<double>() / 1440.; };
@@ -173,7 +221,12 @@ TEST_CASE("sgp4")
                                0.},
                         outs1(7u), outs2(7u);
 
-    cf_s_u(outs1.data(), ins.data(), nullptr, nullptr);
+    const auto [sz, al] = sa[0];
+    REQUIRE(al == alignof(double));
+
+    auto ext_storage = make_aligned_storage(sz, al);
+
+    cf_s_u(outs1.data(), ins.data(), nullptr, nullptr, ext_storage.get());
     cf(outs2, ins);
 
     for (auto i = 0u; i < 7u; ++i) {
@@ -213,21 +266,36 @@ TEST_CASE("nbody")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
+            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
 
             ms.compile();
 
             if (batch_size == 1u) {
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    ms.jit_lookup("test.unstrided.batch_size_1"));
+                REQUIRE(sa.size() == 1u);
 
-                cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
-            } else {
+                const auto [sz, al] = sa[0];
+                REQUIRE(al == alignof(double));
+
                 auto *cf_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                        ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
+                        ms.jit_lookup("test.unstrided.batch_size_1"));
 
-                cf_ptr(outs.data(), ins.data(), nullptr, nullptr, batch_size);
+                auto ext_storage = make_aligned_storage(sz, al);
+
+                cf_ptr(outs.data(), ins.data(), nullptr, nullptr, ext_storage.get());
+            } else {
+                REQUIRE(sa.size() == 2u);
+
+                const auto [sz, al] = sa[1];
+                REQUIRE(al >= alignof(double));
+
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *,
+                                                         void *, std::size_t)>(
+                    ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+
+                auto ext_storage = make_aligned_storage(sz, al);
+
+                cf_ptr(outs.data(), ins.data(), nullptr, nullptr, ext_storage.get(), batch_size);
             }
 
             for (auto i = 0u; i < 6u; ++i) {
@@ -319,14 +387,22 @@ TEST_CASE("nbody mp")
         std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
         std::ranges::sort(vars, std::less<expression>{});
 
-        auto [ms, dc] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
 
         ms.compile();
 
+        REQUIRE(sa.size() == 1u);
+
+        const auto [sz, al] = sa[0];
+        REQUIRE(al == alignof(mppp::real));
+
         auto *cf_ptr
-            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                ms.jit_lookup("test.unstrided.batch_size_1"));
-        cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *,
+                                        void *)>(ms.jit_lookup("test.unstrided.batch_size_1"));
+
+        auto ext_storage = make_aligned_storage(sz, al);
+
+        cf_ptr(outs.data(), ins.data(), nullptr, nullptr, ext_storage.get());
 
         for (auto i = 0u; i < 6u; ++i) {
             for (auto j = 0u; j < batch_size; ++j) {
@@ -416,21 +492,36 @@ TEST_CASE("nbody par")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
+            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
 
             ms.compile();
 
-            auto *cfs_ptr
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+            REQUIRE(((batch_size == 1u && sa.size() == 1u) || (batch_size > 1u && sa.size() == 2u)));
+
+            // Fetch the strided function for the current batch size.
+            auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *,
+                                                      std::size_t)>(
+                ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+
+            const auto [sz_b, al_b] = sa[batch_size == 1u ? 0 : 1];
+            auto ext_storage_sb = make_aligned_storage(sz_b, al_b);
 
             if (batch_size == 1u) {
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    ms.jit_lookup("test.unstrided.batch_size_1"));
+                REQUIRE(sa.size() == 1u);
 
-                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
+                        ms.jit_lookup("test.unstrided.batch_size_1"));
+
+                const auto [sz, al] = sa[0];
+
+                auto ext_storage = make_aligned_storage(sz, al);
+
+                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage.get());
             } else {
-                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size);
+                REQUIRE(sa.size() == 2u);
+
+                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage_sb.get(), batch_size);
             }
 
             for (auto i = 0u; i < 6u; ++i) {
@@ -492,7 +583,7 @@ TEST_CASE("nbody par")
 
             std::generate(ins.begin(), ins.end(), gen);
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage_sb.get(), batch_size + extra_stride);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -595,19 +686,26 @@ TEST_CASE("nbody par mp")
         std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
         std::ranges::sort(vars, std::less<expression>{});
 
-        auto [ms, dc] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
 
         ms.compile();
 
+        REQUIRE(sa.size() == 1u);
+
+        const auto [sz, al] = sa[0];
+        REQUIRE(al == alignof(mppp::real));
+
         auto *cf_ptr
-            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                ms.jit_lookup("test.unstrided.batch_size_1"));
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *,
+                                        void *)>(ms.jit_lookup("test.unstrided.batch_size_1"));
 
         auto *cfs_ptr
             = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *,
-                                        std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
+                                        void *, std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
 
-        cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+        auto ext_storage = make_aligned_storage(sz, al);
+
+        cf_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage.get());
 
         for (auto i = 0u; i < 6u; ++i) {
             for (auto j = 0u; j < batch_size; ++j) {
@@ -669,7 +767,7 @@ TEST_CASE("nbody par mp")
         std::generate(ins.begin(), ins.end(), gen);
         std::generate(outs.begin(), outs.end(), gen);
 
-        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
+        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage.get(), batch_size + extra_stride);
 
         for (auto i = 0u; i < 6u; ++i) {
             for (auto j = 0u; j < batch_size; ++j) {
@@ -745,22 +843,36 @@ TEST_CASE("numparams")
 
             std::generate(pars.begin(), pars.end(), gen);
 
-            auto [ms, dc]
+            auto [ms, dc, sa]
                 = detail::make_multi_cfunc<double>(tplt, "test", {1_dbl, par[0]}, {}, batch_size, false, false, 0);
+
+            REQUIRE(((batch_size == 1u && sa.size() == 1u) || (batch_size > 1u && sa.size() == 2u)));
 
             ms.compile();
 
-            auto *cfs_ptr
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+            auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *,
+                                                      std::size_t)>(
+                ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
+
+            const auto [sz_b, al_b] = sa[batch_size == 1u ? 0 : 1];
+            auto ext_storage_sb = make_aligned_storage(sz_b, al_b);
 
             if (batch_size == 1u) {
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    ms.jit_lookup("test.unstrided.batch_size_1"));
+                REQUIRE(sa.size() == 1u);
 
-                cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *)>(
+                        ms.jit_lookup("test.unstrided.batch_size_1"));
+
+                const auto [sz, al] = sa[0];
+
+                auto ext_storage = make_aligned_storage(sz, al);
+
+                cf_ptr(outs.data(), nullptr, pars.data(), nullptr, ext_storage.get());
             } else {
-                cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size);
+                REQUIRE(sa.size() == 2u);
+
+                cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, ext_storage_sb.get(), batch_size);
             }
 
             for (auto j = 0u; j < batch_size; ++j) {
@@ -775,7 +887,7 @@ TEST_CASE("numparams")
 
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
+            cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, ext_storage_sb.get(), batch_size + extra_stride);
 
             for (auto j = 0u; j < batch_size; ++j) {
                 REQUIRE(outs[j] == 1);
@@ -808,20 +920,27 @@ TEST_CASE("numparams mp")
         std::generate(pars.begin(), pars.end(), gen);
         std::generate(outs.begin(), outs.end(), gen);
 
-        auto [ms, dc] = detail::make_multi_cfunc<mppp::real>(tplt, "test", {1_dbl, par[0], par[1], -2_dbl}, {}, 1,
-                                                             false, false, prec);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", {1_dbl, par[0], par[1], -2_dbl}, {}, 1,
+                                                                 false, false, prec);
 
         ms.compile();
 
+        REQUIRE(sa.size() == 1u);
+
+        const auto [sz, al] = sa[0];
+        REQUIRE(al == alignof(mppp::real));
+
         auto *cf_ptr
-            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                ms.jit_lookup("test.unstrided.batch_size_1"));
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *,
+                                        void *)>(ms.jit_lookup("test.unstrided.batch_size_1"));
 
         auto *cfs_ptr
             = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *,
-                                        std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
+                                        void *, std::size_t)>(ms.jit_lookup("test.strided.batch_size_1"));
 
-        cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
+        auto ext_storage = make_aligned_storage(sz, al);
+
+        cf_ptr(outs.data(), nullptr, pars.data(), nullptr, ext_storage.get());
 
         for (auto j = 0u; j < batch_size; ++j) {
             REQUIRE(outs[j] == 1);
@@ -838,7 +957,7 @@ TEST_CASE("numparams mp")
         std::generate(pars.begin(), pars.end(), gen);
         std::generate(outs.begin(), outs.end(), gen);
 
-        cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
+        cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, ext_storage.get(), batch_size + extra_stride);
 
         for (auto j = 0u; j < batch_size; ++j) {
             REQUIRE(outs[j] == 1);
@@ -872,16 +991,21 @@ TEST_CASE("bogus stride")
         std::generate(ins.begin(), ins.end(), gen);
         std::generate(pars.begin(), pars.end(), gen);
 
-        auto [ms, dc] = detail::make_multi_cfunc<double>(tplt, "test", {x + 2_dbl * y + par[0] * z, par[1] - x * y},
-                                                         {x, y, z}, batch_size, false, false, 0);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + 2_dbl * y + par[0] * z, par[1] - x * y},
+                                                             {x, y, z}, batch_size, false, false, 0);
 
         ms.compile();
 
+        REQUIRE(((batch_size == 1u && sa.size() == 1u) || (batch_size > 1u && sa.size() == 2u)));
+
         auto *cfs_ptr
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, void *, std::size_t)>(
                 ms.jit_lookup(fmt::format("test.strided.batch_size_{}", batch_size)));
 
-        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size - 1u);
+        const auto [sz_b, al_b] = sa[batch_size == 1u ? 0 : 1];
+        auto ext_storage_sb = make_aligned_storage(sz_b, al_b);
+
+        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage_sb.get(), batch_size - 1u);
 
         if (batch_size > 1u) {
             for (auto j = 0u; j < batch_size - 1u; ++j) {
@@ -893,7 +1017,7 @@ TEST_CASE("bogus stride")
                         == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
             }
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, 0);
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, ext_storage_sb.get(), 0);
 
             for (auto j = 0u; j < batch_size; ++j) {
                 REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));

@@ -1956,12 +1956,12 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
 // in every state, and there seems not to be an easy way to transfer/copy a type
 // from one context to the other.
 template <typename T>
-void add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::Value *in_ptr,
-                          llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
-                          const std::vector<expression> &dc, std::uint32_t nvars,
-                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                          std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy, long long prec,
-                          const std::string &base_name)
+std::array<std::size_t, 2>
+add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+                     llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                     std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy, long long prec,
+                     const std::string &base_name, llvm::Value *eval_arr)
 {
     // Fetch the main state, module, etc.
     auto &main_state = states.back();
@@ -1971,6 +1971,7 @@ void add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, l
     // Fetch the fp types for the main state.
     auto *main_fp_t = to_internal_llvm_type<T>(main_state, prec);
     auto *main_ext_fp_t = make_external_llvm_type(main_fp_t);
+    auto *fp_vec_type = make_vector_type(main_fp_t, batch_size);
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
@@ -1979,27 +1980,14 @@ void add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, l
     // end of the computation.
     const auto cout_gl = cfunc_c_make_output_globals(main_state, main_fp_t, dc, nuvars);
 
-    // Prepare the array that will contain the evaluation of all the
-    // elementary subexpressions.
-    // NOTE: the array size is specified as a 64-bit integer in the
-    // LLVM API.
-    auto *fp_vec_type = make_vector_type(main_fp_t, batch_size);
-    auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
+    // Total required size in bytes for the tape.
+    const auto sz = boost::safe_numerics::safe<std::size_t>(get_size(main_md, fp_vec_type)) * nuvars;
 
-    // Make the global array and fetch a pointer to its first element.
-    // NOTE: we use a global array rather than a local one here because
-    // its size can grow quite large, which can lead to stack overflow issues.
-    // This has of course consequences in terms of thread safety, which
-    // we will have to document.
-    auto *eval_arr_gvar = make_global_zero_array(main_md, array_type);
-    auto *eval_arr = main_builder.CreateInBoundsGEP(array_type, eval_arr_gvar,
-                                                    {main_builder.getInt32(0), main_builder.getInt32(0)});
-
-    // Compute the size in bytes of eval_arr.
-    const auto eval_arr_size = get_size(main_md, array_type);
+    // Tape alignment.
+    const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
 
     // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it is declared as a global variable in order to avoid stack overflow.
+    // but it provided externally from dynamically-allocated memory in order to avoid stack overflow.
     // This creates a situation in which LLVM cannot elide stores into eval_arr
     // (even if it figures out a way to avoid storing intermediate results into
     // eval_arr) because LLVM must assume that some other function may
@@ -2007,7 +1995,7 @@ void add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, l
     // lifetime of eval_arr begins here and ends at the end of the function,
     // so that LLVM can assume that any value stored in it cannot be possibly
     // used outside this function.
-    main_builder.CreateLifetimeStart(eval_arr, main_builder.getInt64(eval_arr_size));
+    main_builder.CreateLifetimeStart(eval_arr, main_builder.getInt64(sz));
 
     // Copy over the values of the variables.
     llvm_loop_u32(main_state, main_builder.getInt32(0), main_builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
@@ -2030,15 +2018,34 @@ void add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, l
     cfunc_c_write_outputs(main_state, main_fp_t, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
 
     // End the lifetime of eval_arr.
-    main_builder.CreateLifetimeEnd(eval_arr, main_builder.getInt64(eval_arr_size));
+    main_builder.CreateLifetimeEnd(eval_arr, main_builder.getInt64(sz));
+
+    return {sz, al};
 }
 
 } // namespace
 
+// This function will compile several versions of the input function fn, with input variables vars, in compact mode.
+//
+// The compiled functions are implemented across several llvm_states which are collated together and returned as
+// a single llvm_multi_state (this is the first element of the return tuple). If batch_size is 1,
+// then 2 compiled functions are created - a scalar strided and a scalar unstrided version.
+// If batch size is > 1, then an additional batch-mode strided compiled function is returned.
+// The function names are created using "name" as base name and then mangling in the strided/unstrided
+// property and the batch size.
+//
+// The second element of the return tuple is the decomposition of fn.
+//
+// The third element of the return tuple is a vector of pairs, each pair containing the size and alignment requirements
+// for the externally-provided storage for the evaluation tape. If batch_size is 1, then only a single
+// pair is returned, representing the size/alignment requirements for the scalar-mode evaluation tape.
+// If batch_size > 1, then an additional pair is appended representing the size/alignment requirements
+// for the batch-mode evaluation tape.
+//
 // NOTE: there is a bunch of boilerplate logic overlap here with add_cfunc_impl(). Make sure to
 // coordinate changes between the two functions.
 template <typename T>
-std::pair<llvm_multi_state, std::vector<expression>>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vector<expression> &fn,
                  const std::vector<expression> &vars, std::uint32_t batch_size_, bool high_accuracy, bool parallel_mode,
                  long long prec)
@@ -2108,9 +2115,10 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     spdlog::stopwatch sw;
 
     // Build the compiled functions.
+    std::vector<std::array<std::size_t, 2>> tape_size_align;
     for (const auto batch_size : batch_sizes) {
         for (const auto strided : {false, true}) {
-            // NOTE: we do not need the batch unstrided.
+            // NOTE: we do not need the batch unstrided variant.
             if (!strided && batch_size != 1u) {
                 continue;
             }
@@ -2119,6 +2127,7 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
             states.push_back(tplt.make_similar());
             auto &s = states.back();
 
+            // Fetch builder/context/module for the new state.
             auto &builder = s.builder();
             auto &context = s.context();
             auto &md = s.module();
@@ -2128,18 +2137,15 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
 
             // Prepare the arguments:
             //
-            // - a write-only float pointer to the outputs,
-            // - a const float pointer to the inputs,
-            // - a const float pointer to the pars,
-            // - a const float pointer to the time value(s),
+            // - a write-only pointer to the outputs,
+            // - a read-only pointer to the inputs,
+            // - a read-only pointer to the pars,
+            // - a read-only pointer to the time value(s),
+            // - a read/write pointer to the external storage,
             // - the stride (if requested).
             //
             // The pointer arguments cannot overlap.
-
-            // Fetch the internal and external types.
-            auto *fp_t = to_internal_llvm_type<T>(s, prec);
-            auto *ext_fp_t = make_external_llvm_type(fp_t);
-            std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
+            std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
 
             if (strided) {
                 fargs.push_back(to_external_llvm_type<std::size_t>(context));
@@ -2149,7 +2155,7 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             assert(ft != nullptr); // LCOV_EXCL_LINE
 
-            // Now create the function.
+            // Create the function prototype.
             const auto cur_name
                 = fmt::format("{}.{}.batch_size_{}", name, strided ? "strided" : "unstrided", batch_size);
             auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
@@ -2181,9 +2187,14 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
             time_ptr->addAttr(llvm::Attribute::NoAlias);
             time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
+            auto *ext_storage = out_ptr + 4;
+            ext_storage->setName("ext_storage");
+            ext_storage->addAttr(llvm::Attribute::NoCapture);
+            ext_storage->addAttr(llvm::Attribute::NoAlias);
+
             llvm::Value *stride = nullptr;
             if (strided) {
-                stride = out_ptr + 4;
+                stride = out_ptr + 5;
                 stride->setName("stride");
             } else {
                 stride = to_size_t(s, builder.getInt32(batch_size));
@@ -2195,8 +2206,17 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
             builder.SetInsertPoint(bb);
 
             // Create the body of the function.
-            add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
-                                    high_accuracy, prec, cur_name);
+            const auto tape_sa
+                = add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars,
+                                          batch_size, high_accuracy, prec, cur_name, ext_storage);
+
+            // Add the size/alignment requirements for the external storage.
+            // NOTE: there's not difference in the external storage requirements
+            // between strided and unstrided variants, thus we append only is strided mode
+            // to avoid duplicates in size_align.
+            if (strided) {
+                tape_size_align.push_back(tape_sa);
+            }
 
             // Finish off the function.
             builder.CreateRetVoid();
@@ -2206,22 +2226,26 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         }
     }
 
+    // Sanity check.
+    assert((tape_size_align.size() == 1u && batch_size_ == 1u) || (tape_size_align.size() == 2u && batch_size_ > 1u));
+
     get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
 
     // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
     // the custom transform:
     //
     // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
-    return std::make_pair(
+    return std::make_tuple(
         llvm_multi_state(states | std::views::transform([](auto &s) -> auto && { return std::move(s); })),
-        std::move(dc));
+        std::move(dc), std::move(tape_size_align));
 }
 
 // Explicit instantiations.
 #define HEYOKA_MAKE_MULTI_CFUNC_INST(T)                                                                                \
-    template HEYOKA_DLL_PUBLIC std::pair<llvm_multi_state, std::vector<expression>> make_multi_cfunc<T>(               \
-        const llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,     \
-        std::uint32_t, bool, bool, long long);
+    template HEYOKA_DLL_PUBLIC                                                                                         \
+        std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>                 \
+        make_multi_cfunc<T>(const llvm_state &, const std::string &, const std::vector<expression> &,                  \
+                            const std::vector<expression> &, std::uint32_t, bool, bool, long long);
 
 HEYOKA_MAKE_MULTI_CFUNC_INST(float)
 HEYOKA_MAKE_MULTI_CFUNC_INST(double)

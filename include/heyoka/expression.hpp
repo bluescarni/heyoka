@@ -697,7 +697,7 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
 }
 
 template <typename>
-std::pair<llvm_multi_state, std::vector<expression>>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc(const llvm_state &, const std::string &, const std::vector<expression> &,
                  const std::vector<expression> &, std::uint32_t, bool, bool, long long);
 

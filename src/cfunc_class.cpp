@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <new>
 #include <optional>
 #include <ostream>
 #include <stdexcept>
@@ -58,14 +59,54 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+namespace
+{
+
+// Utilities to create and destroy tape arrays for compiled functions
+// in compact mode. These may have custom alignment requirements due
+// to the use of SIMD instructions, hence we need to use aligned new/delete
+// and a custom deleter for the unique ptr.
+struct aligned_array_deleter {
+    std::align_val_t al{};
+    void operator()(void *ptr) const noexcept
+    {
+        ::operator delete[](ptr, al);
+    }
+};
+
+using aligned_array_t = std::unique_ptr<std::byte[], aligned_array_deleter>;
+
+aligned_array_t make_aligned_array(std::size_t sz, std::size_t al)
+{
+    assert(al > 0u);
+    assert((al & (al - 1u)) == 0u);
+
+    if (sz == 0u) {
+        return {};
+    } else {
+        return aligned_array_t{::new (std::align_val_t{al}) std::byte[sz], {.al = std::align_val_t{al}}};
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
 template <typename T>
 struct cfunc<T>::impl {
     // The compiled function types.
+    // Non-compact mode.
     using cfunc_ptr_t = void (*)(T *, const T *, const T *, const T *) noexcept;
     using cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, std::size_t) noexcept;
+    // Compact-mode. These have an additional argument - the tape pointer.
+    using c_cfunc_ptr_t = void (*)(T *, const T *, const T *, const T *, void *) noexcept;
+    using c_cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, void *, std::size_t) noexcept;
 
     // Thread-local storage for parallel operations.
-    using ets_item_t = std::pair<llvm_multi_state, cfunc_ptr_s_t>;
+    using ets_item_t = detail::aligned_array_t;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
@@ -75,9 +116,11 @@ struct cfunc<T>::impl {
     std::variant<std::array<llvm_state, 3>, llvm_multi_state> m_states;
     std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
-    cfunc_ptr_t m_fptr_scal = nullptr;
-    cfunc_ptr_s_t m_fptr_scal_s = nullptr;
-    cfunc_ptr_s_t m_fptr_batch_s = nullptr;
+    std::vector<std::array<std::size_t, 2>> m_tape_sa;
+    std::vector<detail::aligned_array_t> m_tapes;
+    std::variant<cfunc_ptr_t, c_cfunc_ptr_t> m_fptr_scal;
+    std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_scal_s;
+    std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_batch_s;
     std::uint32_t m_nparams = 0;
     bool m_is_time_dependent = false;
     std::uint32_t m_nouts = 0;
@@ -96,6 +139,7 @@ struct cfunc<T>::impl {
         ar << m_states;
         ar << m_batch_size;
         ar << m_dc;
+        ar << m_tape_sa;
         ar << m_nparams;
         ar << m_is_time_dependent;
         ar << m_nouts;
@@ -113,6 +157,7 @@ struct cfunc<T>::impl {
         ar >> m_states;
         ar >> m_batch_size;
         ar >> m_dc;
+        ar >> m_tape_sa;
         ar >> m_nparams;
         ar >> m_is_time_dependent;
         ar >> m_nouts;
@@ -125,6 +170,10 @@ struct cfunc<T>::impl {
 
         // Recover the function pointers.
         assign_fptrs();
+
+        // Reconstruct the tapes.
+        m_tapes.clear();
+        construct_tapes();
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
@@ -142,10 +191,21 @@ struct cfunc<T>::impl {
 
             auto &ms = std::get<1>(m_states);
 
-            m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(ms.jit_lookup("cfunc.unstrided.batch_size_1"));
-            m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(ms.jit_lookup("cfunc.strided.batch_size_1"));
-            m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(
+            m_fptr_scal = reinterpret_cast<c_cfunc_ptr_t>(ms.jit_lookup("cfunc.unstrided.batch_size_1"));
+            m_fptr_scal_s = reinterpret_cast<c_cfunc_ptr_s_t>(ms.jit_lookup("cfunc.strided.batch_size_1"));
+            m_fptr_batch_s = reinterpret_cast<c_cfunc_ptr_s_t>(
                 ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_batch_size)));
+        }
+    }
+
+    // Small helper to construct the tapes from the information in m_tape_sa.
+    // Assumes an empty m_tapes.
+    void construct_tapes()
+    {
+        assert(m_tapes.empty());
+
+        for (const auto [sz, al] : m_tape_sa) {
+            m_tapes.push_back(detail::make_aligned_array(sz, al));
         }
     }
 
@@ -181,22 +241,18 @@ struct cfunc<T>::impl {
 #endif
 
         if (compact_mode) {
-            // Build the multi cfunc.
-            auto [ms, dc] = detail::make_multi_cfunc<T>(s, "cfunc", m_fn, m_vars, m_batch_size, high_accuracy,
-                                                        m_parallel_mode, prec);
+            // Build the multi cfunc, and assign the internal members.
+            std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(s, "cfunc", m_fn, m_vars, m_batch_size,
+                                                                              high_accuracy, m_parallel_mode, prec);
 
             // Compile.
-            ms.compile();
+            std::get<1>(m_states).compile();
 
-            // Assign the pointers.
-            m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(ms.jit_lookup("cfunc.unstrided.batch_size_1"));
-            m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(ms.jit_lookup("cfunc.strided.batch_size_1"));
-            m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(
-                ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_batch_size)));
+            // Assign the function pointers.
+            assign_fptrs();
 
-            // Move in m_states and dc.
-            m_states = std::move(ms);
-            m_dc = std::move(dc);
+            // Construct the tapes.
+            construct_tapes();
         } else {
             auto &s_arr = std::get<0>(m_states);
 
@@ -261,13 +317,16 @@ struct cfunc<T>::impl {
     }
     impl(const impl &other)
         : m_fn(other.m_fn), m_vars(other.m_vars), m_states(other.m_states), m_batch_size(other.m_batch_size),
-          m_dc(other.m_dc), m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent),
-          m_nouts(other.m_nouts), m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
-          m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
-          m_parallel_mode(other.m_parallel_mode)
+          m_dc(other.m_dc), m_tape_sa(other.m_tape_sa), m_nparams(other.m_nparams),
+          m_is_time_dependent(other.m_is_time_dependent), m_nouts(other.m_nouts), m_nvars(other.m_nvars),
+          m_prec(other.m_prec), m_check_prec(other.m_check_prec), m_high_accuracy(other.m_high_accuracy),
+          m_compact_mode(other.m_compact_mode), m_parallel_mode(other.m_parallel_mode)
     {
         // Recover the function pointers.
         assign_fptrs();
+
+        // Construct the tapes.
+        construct_tapes();
     }
 
     // These are never needed.
@@ -546,8 +605,16 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
 #endif
 
     // Invoke the compiled function.
-    m_impl->m_fptr_scal(outputs.data_handle(), inputs.data_handle(), pars ? pars->data_handle() : nullptr,
-                        time ? &*time : nullptr);
+    if (m_impl->m_compact_mode) {
+        assert(!m_impl->m_tapes.empty());
+
+        std::get<1>(m_impl->m_fptr_scal)(outputs.data_handle(), inputs.data_handle(),
+                                         pars ? pars->data_handle() : nullptr, time ? &*time : nullptr,
+                                         m_impl->m_tapes[0].get());
+    } else {
+        std::get<0>(m_impl->m_fptr_scal)(outputs.data_handle(), inputs.data_handle(),
+                                         pars ? pars->data_handle() : nullptr, time ? &*time : nullptr);
+    }
 }
 
 template <typename T>
@@ -560,8 +627,14 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     const auto batch_size = m_impl->m_batch_size;
 
     // Cache the function pointers.
-    auto *fptr_batch_s = m_impl->m_fptr_batch_s;
-    auto *fptr_scal_s = m_impl->m_fptr_scal_s;
+    auto fptr_batch_s = m_impl->m_fptr_batch_s;
+    auto fptr_scal_s = m_impl->m_fptr_scal_s;
+
+    // Cache the compact mode flag.
+    const auto compact_mode = m_impl->m_compact_mode;
+
+    // Cache a reference to the tapes.
+    const auto &tapes = m_impl->m_tapes;
 
     // Number of simd blocks in the arrays.
     const auto n_simd_blocks = nevals / batch_size;
@@ -599,19 +672,48 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     assert(m_impl->m_nouts > 0u);
 
     // Evaluate over the simd blocks.
-    for (std::size_t k = 0; k < n_simd_blocks; ++k) {
-        const auto start_offset = k * batch_size;
+    if (compact_mode) {
+        // NOTE: the batch-mode tape is at index 1 only if the batch
+        // size is > 1, otherwise we are using the scalar tape.
+        auto *batch_tape_ptr = tapes[batch_size > 1u].get();
 
-        // Run the evaluation.
-        fptr_batch_s(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
-                     read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
-                     nevals);
+        auto *fptr = std::get<1>(fptr_batch_s);
+
+        for (std::size_t k = 0; k < n_simd_blocks; ++k) {
+            const auto start_offset = k * batch_size;
+
+            fptr(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                 read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
+                 batch_tape_ptr, nevals);
+        }
+    } else {
+        auto *fptr = std::get<0>(fptr_batch_s);
+
+        for (std::size_t k = 0; k < n_simd_blocks; ++k) {
+            const auto start_offset = k * batch_size;
+
+            fptr(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                 read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr, nevals);
+        }
     }
 
     // Handle the remainder, if present.
-    for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
-        fptr_scal_s(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
-                    read_time ? time_data + k : nullptr, nevals);
+    if (compact_mode) {
+        auto *scalar_tape_ptr = tapes[0].get();
+
+        auto *fptr = std::get<1>(fptr_scal_s);
+
+        for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
+            fptr(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                 read_time ? time_data + k : nullptr, scalar_tape_ptr, nevals);
+        }
+    } else {
+        auto *fptr = std::get<0>(fptr_scal_s);
+
+        for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
+            fptr(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                 read_time ? time_data + k : nullptr, nevals);
+        }
     }
 }
 
@@ -623,6 +725,16 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
     // Cache the batch size.
     const auto batch_size = m_impl->m_batch_size;
+
+    // Cache the function pointers.
+    auto fptr_batch_s = m_impl->m_fptr_batch_s;
+    auto fptr_scal_s = m_impl->m_fptr_scal_s;
+
+    // Cache the compact mode flag.
+    const auto compact_mode = m_impl->m_compact_mode;
+
+    // Cache a reference to the tapes.
+    const auto &tapes = m_impl->m_tapes;
 
     // Fetch the pointers.
     auto *out_data = outputs.data_handle();
@@ -661,48 +773,63 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
     // The functor to evaluate the scalar remainder, if present. It will be run concurrently with
     // the batch-parallel iterations.
-    const auto scalar_rem = [n_simd_blocks, batch_size, fptr_scal_s = m_impl->m_fptr_scal_s, nevals, out_data,
-                             read_inputs, in_data, read_pars, par_data, read_time, time_data]() {
+    // NOTE: in compact mode, this function uses the existing scalar tape. It is invoked concurrently
+    // with batch_iter, which, in compact mode, uses thread-local tapes and does not use
+    // any of the existing tapes in the class. Thus, there is no danger of data races.
+    const auto scalar_rem = [n_simd_blocks, batch_size, fptr_scal_s, nevals, out_data, read_inputs, in_data, read_pars,
+                             par_data, read_time, time_data, &tapes]<bool CM>() {
+        auto *fptr = std::get<(CM ? 1 : 0)>(fptr_scal_s);
+        auto *scalar_tape_ptr = CM ? tapes[0].get() : nullptr;
+
         for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
-            fptr_scal_s(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
-                        read_time ? time_data + k : nullptr, nevals);
+            if constexpr (CM) {
+                fptr(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                     read_time ? time_data + k : nullptr, scalar_tape_ptr, nevals);
+            } else {
+                fptr(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                     read_time ? time_data + k : nullptr, nevals);
+            }
         }
     };
 
     // The functor to evaluate the batch-parallel iterations.
     const auto batch_iter = [batch_size, out_data, read_inputs, in_data, read_pars, par_data, read_time, time_data,
-                             nevals](auto *fptr_batch_s, const auto &range) {
+                             nevals, fptr_batch_s]<bool CM>(const auto &range, void *tape_ptr) {
+        auto *fptr = std::get<(CM ? 1 : 0)>(fptr_batch_s);
+
         for (auto k = range.begin(); k != range.end(); ++k) {
             const auto start_offset = k * batch_size;
 
-            fptr_batch_s(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
-                         read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
-                         nevals);
+            if constexpr (CM) {
+                assert(tape_ptr != nullptr);
+                fptr(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                     read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
+                     tape_ptr, nevals);
+            } else {
+                assert(tape_ptr == nullptr);
+                fptr(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                     read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
+                     nevals);
+            }
         }
     };
 
-    // NOTE: in compact mode each batch-parallel iteration needs its own copy of the batch strided
-    // function due to the auxiliary global storage employed to accumulate the elementary subexpression
-    // evaluations.
-    if (m_impl->m_compact_mode) {
+    // NOTE: in compact mode each batch-parallel iteration needs its own tape.
+    if (compact_mode) {
         // Construct the thread-specific storage for batch parallel operations.
-        typename impl::ets_t ets_batch([this]() {
-            // Make a copy of the multi state.
-            auto ms = std::get<1>(m_impl->m_states);
-
-            // Fetch the function pointer.
-            auto fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(
-                ms.jit_lookup(fmt::format("cfunc.strided.batch_size_{}", m_impl->m_batch_size)));
-
-            return std::make_pair(std::move(ms), fptr);
+        typename impl::ets_t ets_batch([this, batch_size]() {
+            // NOTE: the batch-mode tape is at index 1 only if the batch
+            // size is > 1, otherwise we are using the scalar tape.
+            return detail::make_aligned_array(m_impl->m_tape_sa[batch_size > 1u][0],
+                                              m_impl->m_tape_sa[batch_size > 1u][1]);
         });
 
         oneapi::tbb::parallel_invoke(
             [&ets_batch, &batch_iter, n_simd_blocks]() {
                 oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                                           [&ets_batch, &batch_iter](const auto &range) {
-                                              // Fetch the local function pointer.
-                                              auto *fptr_batch_s = ets_batch.local().second;
+                                              // Fetch the local tape.
+                                              auto *tape_ptr = ets_batch.local().get();
 
                                               // NOTE: there are well-known pitfalls when using thread-specific
                                               // storage with nested parallelism:
@@ -713,21 +840,20 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                               // will block as execution in the parallel region of the cfunc begins. The
                                               // blocked thread could then grab another task from the parallel for loop
                                               // we are currently in, and it would then start writing for a second time
-                                              // into the same compact-mode tape it already begun writing into,
-                                              // leading to incorrect results.
+                                              // into the same tape it already begun writing into, leading to UB.
                                               oneapi::tbb::this_task_arena::isolate(
-                                                  [&]() { batch_iter(fptr_batch_s, range); });
+                                                  [&]() { batch_iter.template operator()<true>(range, tape_ptr); });
                                           });
             },
-            scalar_rem);
+            [&scalar_rem]() { scalar_rem.template operator()<true>(); });
     } else {
         oneapi::tbb::parallel_invoke(
             [fptr_batch_s = m_impl->m_fptr_batch_s, &batch_iter, n_simd_blocks]() {
                 oneapi::tbb::parallel_for(
                     oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
-                    [fptr_batch_s, &batch_iter](const auto &range) { batch_iter(fptr_batch_s, range); });
+                    [&batch_iter](const auto &range) { batch_iter.template operator()<false>(range, nullptr); });
             },
-            scalar_rem);
+            [&scalar_rem]() { scalar_rem.template operator()<false>(); });
     }
 }
 
