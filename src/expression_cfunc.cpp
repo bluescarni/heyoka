@@ -2247,6 +2247,16 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     spdlog::stopwatch sw;
 
     // Build the compiled functions.
+    //
+    // NOTE: in order to further parallelise the creation of the individual functions, we should:
+    //
+    // - do a first pass analyzing the decomposition in order to decide where to initiate
+    //   the construction of the drivers,
+    // - construct the drivers in parallel, perhaps pushing back the states as they are constructed
+    //   into a thread-safe tbb vector.
+    //
+    // At the moment though it looks like the practical gains from such further parallelisation
+    // would not be worth it, perhaps we can reconsider in the future.
     if (batch_size == 1u) {
         oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); });
