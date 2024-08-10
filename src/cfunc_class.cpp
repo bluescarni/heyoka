@@ -101,7 +101,7 @@ aligned_array_t make_aligned_array(std::size_t sz, std::size_t al)
         // Formally construct the bytes array.
         auto *ptr = ::new (buf) std::byte[sz];
 
-        // Constrcut and return the unique ptr.
+        // Construct and return the unique ptr.
         return aligned_array_t{ptr, {.al = std::align_val_t{al}}};
 #else
         return aligned_array_t{::new (std::align_val_t{al}) std::byte[sz], {.al = std::align_val_t{al}}};

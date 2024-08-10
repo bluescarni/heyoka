@@ -68,7 +68,7 @@ std::unique_ptr<char[], al_array_deleter> make_aligned_storage(std::size_t sz, s
         // Formally construct the bytes array.
         auto *ptr = ::new (buf) char[sz];
 
-        // Constrcut and return the unique ptr.
+        // Construct and return the unique ptr.
         return std::unique_ptr<char[], al_array_deleter>{ptr, {.al = std::align_val_t{al}}};
 #else
         return std::unique_ptr<char[], al_array_deleter>{new (std::align_val_t{al}) char[sz],
