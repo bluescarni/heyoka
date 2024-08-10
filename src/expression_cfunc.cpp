@@ -37,6 +37,8 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
+#include <oneapi/tbb/parallel_invoke.h>
+
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -2047,10 +2049,10 @@ add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::
 template <typename T>
 std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vector<expression> &fn,
-                 const std::vector<expression> &vars, std::uint32_t batch_size_, bool high_accuracy, bool parallel_mode,
+                 const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode,
                  long long prec)
 {
-    if (batch_size_ == 0u) [[unlikely]] {
+    if (batch_size == 0u) [[unlikely]] {
         throw std::invalid_argument("The batch size of a compiled function cannot be zero");
     }
 
@@ -2098,136 +2100,167 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     // in the integrators, as we assume that any array allocated from C++
     // can't have a size larger than the max size_t.
 
-    // Init the states list.
-    // NOTE: we use a list here because it is convenient to have
+    // Init the states lists.
+    // NOTE: we use lists here because it is convenient to have
     // pointer/reference stability when iteratively constructing
     // the set of states.
-    std::list<llvm_state> states;
-
-    // The required batch sizes. We always need a scalar implementation,
-    // if a non-unitary batch size is supplied build also the batch implementation.
-    std::vector<std::uint32_t> batch_sizes{static_cast<std::uint32_t>(1)};
-    if (batch_size_ > 1u) {
-        batch_sizes.push_back(batch_size_);
+    std::vector<std::list<llvm_state>> states_lists;
+    // NOTE: if the batch size is 1, we build 2 cfuncs. Otherwise,
+    // we build 3.
+    if (batch_size == 1u) {
+        states_lists.resize(2);
+    } else {
+        states_lists.resize(3);
     }
+
+    // Init the tape size/alignment requirements vector.
+    std::vector<std::array<std::size_t, 2>> tape_size_align;
+    // NOTE: if the batch size is 1, we only record the size/alignment
+    // requirements of the scalar tape. Otherwise, we also record
+    // the size/alignment requirements of the batch-mode tape.
+    if (batch_size == 1u) {
+        tape_size_align.resize(1);
+    } else {
+        tape_size_align.resize(2);
+    }
+
+    // Helper to create a cfunc.
+    auto create_cfunc = [&states_lists, &tape_size_align, &tplt, &name, &dc = std::as_const(dc), nvars, nuvars,
+                         high_accuracy, prec](bool strided, std::uint32_t cur_batch_size) {
+        // NOTE: the batch unstrided variant is not supposed to be requested.
+        assert(strided || cur_batch_size == 1u);
+
+        // Which list of states are we operating on?
+        auto sidx = 0u;
+        if (cur_batch_size == 1u) {
+            sidx = strided ? 1 : 0;
+        } else {
+            sidx = 2;
+        }
+
+        // Fetch the list of states.
+        auto &states = states_lists[sidx];
+
+        assert(states.empty());
+
+        // Add a new state and fetch it.
+        states.push_back(tplt.make_similar());
+        auto &s = states.back();
+
+        // Fetch builder/context/module for the new state.
+        auto &builder = s.builder();
+        auto &context = s.context();
+        auto &md = s.module();
+
+        // Fetch the current insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Prepare the arguments:
+        //
+        // - a write-only pointer to the outputs,
+        // - a read-only pointer to the inputs,
+        // - a read-only pointer to the pars,
+        // - a read-only pointer to the time value(s),
+        // - a read/write pointer to the tape storage,
+        // - the stride (if requested).
+        //
+        // The pointer arguments cannot overlap.
+        std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
+
+        if (strided) {
+            fargs.push_back(to_external_llvm_type<std::size_t>(context));
+        }
+
+        // The function does not return anything.
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        assert(ft != nullptr); // LCOV_EXCL_LINE
+
+        // Create the function prototype.
+        const auto cur_name
+            = fmt::format("{}.{}.batch_size_{}", name, strided ? "strided" : "unstrided", cur_batch_size);
+        auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
+        // NOTE: a cfunc cannot call itself recursively.
+        f->addFnAttr(llvm::Attribute::NoRecurse);
+
+        // Set the names/attributes of the function arguments.
+        auto *out_ptr = f->args().begin();
+        out_ptr->setName("out_ptr");
+        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        out_ptr->addAttr(llvm::Attribute::NoAlias);
+        out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+        auto *in_ptr = out_ptr + 1;
+        in_ptr->setName("in_ptr");
+        in_ptr->addAttr(llvm::Attribute::NoCapture);
+        in_ptr->addAttr(llvm::Attribute::NoAlias);
+        in_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *par_ptr = out_ptr + 2;
+        par_ptr->setName("par_ptr");
+        par_ptr->addAttr(llvm::Attribute::NoCapture);
+        par_ptr->addAttr(llvm::Attribute::NoAlias);
+        par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *time_ptr = out_ptr + 3;
+        time_ptr->setName("time_ptr");
+        time_ptr->addAttr(llvm::Attribute::NoCapture);
+        time_ptr->addAttr(llvm::Attribute::NoAlias);
+        time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *tape_ptr = out_ptr + 4;
+        tape_ptr->setName("tape_ptr");
+        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        tape_ptr->addAttr(llvm::Attribute::NoAlias);
+
+        llvm::Value *stride = nullptr;
+        if (strided) {
+            stride = out_ptr + 5;
+            stride->setName("stride");
+        } else {
+            stride = to_size_t(s, builder.getInt32(cur_batch_size));
+        }
+
+        // Create a new basic block to start insertion into.
+        auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+        assert(bb != nullptr); // LCOV_EXCL_LINE
+        builder.SetInsertPoint(bb);
+
+        // Create the body of the function.
+        const auto tape_sa = add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars,
+                                                     nuvars, cur_batch_size, high_accuracy, prec, cur_name, tape_ptr);
+
+        // Add the size/alignment requirements for the tape storage.
+        // NOTE: there's no difference in requirements between strided and
+        // unstrided variants. Assign only is strided mode in order to avoid data races.
+        if (strided) {
+            tape_size_align[cur_batch_size > 1u] = tape_sa;
+        }
+
+        // Finish off the function.
+        builder.CreateRetVoid();
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    };
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
     // Build the compiled functions.
-    std::vector<std::array<std::size_t, 2>> tape_size_align;
-    for (const auto batch_size : batch_sizes) {
-        for (const auto strided : {false, true}) {
-            // NOTE: we do not need the batch unstrided variant.
-            if (!strided && batch_size != 1u) {
-                continue;
-            }
-
-            // Add a new state and fetch it.
-            states.push_back(tplt.make_similar());
-            auto &s = states.back();
-
-            // Fetch builder/context/module for the new state.
-            auto &builder = s.builder();
-            auto &context = s.context();
-            auto &md = s.module();
-
-            // Fetch the current insertion block.
-            auto *orig_bb = builder.GetInsertBlock();
-
-            // Prepare the arguments:
-            //
-            // - a write-only pointer to the outputs,
-            // - a read-only pointer to the inputs,
-            // - a read-only pointer to the pars,
-            // - a read-only pointer to the time value(s),
-            // - a read/write pointer to the external storage,
-            // - the stride (if requested).
-            //
-            // The pointer arguments cannot overlap.
-            std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
-
-            if (strided) {
-                fargs.push_back(to_external_llvm_type<std::size_t>(context));
-            }
-
-            // The function does not return anything.
-            auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-            assert(ft != nullptr); // LCOV_EXCL_LINE
-
-            // Create the function prototype.
-            const auto cur_name
-                = fmt::format("{}.{}.batch_size_{}", name, strided ? "strided" : "unstrided", batch_size);
-            auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
-            // NOTE: a cfunc cannot call itself recursively.
-            f->addFnAttr(llvm::Attribute::NoRecurse);
-
-            // Set the names/attributes of the function arguments.
-            auto *out_ptr = f->args().begin();
-            out_ptr->setName("out_ptr");
-            out_ptr->addAttr(llvm::Attribute::NoCapture);
-            out_ptr->addAttr(llvm::Attribute::NoAlias);
-            out_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-            auto *in_ptr = out_ptr + 1;
-            in_ptr->setName("in_ptr");
-            in_ptr->addAttr(llvm::Attribute::NoCapture);
-            in_ptr->addAttr(llvm::Attribute::NoAlias);
-            in_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-            auto *par_ptr = out_ptr + 2;
-            par_ptr->setName("par_ptr");
-            par_ptr->addAttr(llvm::Attribute::NoCapture);
-            par_ptr->addAttr(llvm::Attribute::NoAlias);
-            par_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-            auto *time_ptr = out_ptr + 3;
-            time_ptr->setName("time_ptr");
-            time_ptr->addAttr(llvm::Attribute::NoCapture);
-            time_ptr->addAttr(llvm::Attribute::NoAlias);
-            time_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-            auto *ext_storage = out_ptr + 4;
-            ext_storage->setName("ext_storage");
-            ext_storage->addAttr(llvm::Attribute::NoCapture);
-            ext_storage->addAttr(llvm::Attribute::NoAlias);
-
-            llvm::Value *stride = nullptr;
-            if (strided) {
-                stride = out_ptr + 5;
-                stride->setName("stride");
-            } else {
-                stride = to_size_t(s, builder.getInt32(batch_size));
-            }
-
-            // Create a new basic block to start insertion into.
-            auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-            assert(bb != nullptr); // LCOV_EXCL_LINE
-            builder.SetInsertPoint(bb);
-
-            // Create the body of the function.
-            const auto tape_sa
-                = add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars,
-                                          batch_size, high_accuracy, prec, cur_name, ext_storage);
-
-            // Add the size/alignment requirements for the external storage.
-            // NOTE: there's not difference in the external storage requirements
-            // between strided and unstrided variants, thus we append only is strided mode
-            // to avoid duplicates in size_align.
-            if (strided) {
-                tape_size_align.push_back(tape_sa);
-            }
-
-            // Finish off the function.
-            builder.CreateRetVoid();
-
-            // Restore the original insertion block.
-            builder.SetInsertPoint(orig_bb);
-        }
+    if (batch_size == 1u) {
+        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+                                     [&create_cfunc]() { create_cfunc(true, 1); });
+    } else {
+        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+                                     [&create_cfunc]() { create_cfunc(true, 1); },
+                                     [&create_cfunc, batch_size]() { create_cfunc(true, batch_size); });
     }
 
-    // Sanity check.
-    assert((tape_size_align.size() == 1u && batch_size_ == 1u) || (tape_size_align.size() == 2u && batch_size_ > 1u));
+    // Consolidate all the state lists into a single one.
+    states_lists[0].splice(states_lists[0].end(), states_lists[1]);
+    if (batch_size > 1u) {
+        states_lists[0].splice(states_lists[0].end(), states_lists[2]);
+    }
 
     get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
 
@@ -2236,7 +2269,7 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     //
     // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
     return std::make_tuple(
-        llvm_multi_state(states | std::views::transform([](auto &s) -> auto && { return std::move(s); })),
+        llvm_multi_state(states_lists[0] | std::views::transform([](auto &s) -> auto && { return std::move(s); })),
         std::move(dc), std::move(tape_size_align));
 }
 

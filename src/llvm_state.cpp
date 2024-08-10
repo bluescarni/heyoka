@@ -37,6 +37,9 @@
 
 #include <fmt/format.h>
 
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
@@ -573,7 +576,7 @@ void verify_module(const llvm::Module &m)
     std::string out;
     llvm::raw_string_ostream ostr(out);
 
-    if (llvm::verifyModule(m, &ostr)) {
+    if (llvm::verifyModule(m, &ostr)) [[unlikely]] {
         // LCOV_EXCL_START
         throw std::runtime_error(fmt::format("The verification of the module '{}' produced an error:\n{}",
                                              m.getModuleIdentifier(), ostr.str()));
@@ -2219,10 +2222,12 @@ void llvm_multi_state::compile()
     auto *logger = detail::get_logger();
 
     // Verify the modules before compiling.
-    // NOTE: probably this can be parallelised if needed.
-    for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
-        detail::verify_module(*m_impl->m_states[i].m_module);
-    }
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
+                              [](const auto &rng) {
+                                  for (const auto &s : rng) {
+                                      detail::verify_module(*s.m_module);
+                                  }
+                              });
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
 
