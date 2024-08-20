@@ -891,6 +891,8 @@ private:
 public:
     // NOTE: it is important to document properly the non-overlapping
     // memory requirement for the input arguments.
+    // NOTE: if/when we add overloads with user-provided tape pointers,
+    // then we must document the non-overlapping requirement for them too.
     template <typename Out, typename In, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
                 && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)

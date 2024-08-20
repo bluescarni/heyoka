@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <limits>
 #include <list>
 #include <map>
 #include <numeric>
@@ -1624,8 +1625,8 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
         auto &ctx = s.context();
 
         // The arguments to the driver are:
-        // - an (internal) pointer to the tape,
-        // - external pointers to par and time,
+        // - a pointer to the tape,
+        // - pointers to par and time,
         // - the stride (if not a constant).
         std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(ctx), llvm::PointerType::getUnqual(ctx),
                                         llvm::PointerType::getUnqual(ctx)};
@@ -1644,9 +1645,8 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
         f->addFnAttr(llvm::Attribute::NoRecurse);
 
         // Add the arguments' attributes.
-        // NOTE: no aliasing is possible between the 3 pointers,
-        // as the tape array is internal, and the cfunc assumption is
-        // that par and time arrays are not aliasing each other.
+        // NOTE: no aliasing is assumed between the pointer
+        // arguments.
         auto *eval_arr_arg = f->args().begin();
         eval_arr_arg->setName("eval_arr_ptr");
         eval_arr_arg->addAttr(llvm::Attribute::NoCapture);
@@ -1696,6 +1696,8 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
     boost::safe_numerics::safe<unsigned> n_cg_blocks = 0;
 
     // Limit of codegenned blocks per state.
+    // NOTE: this has not been really properly tuned,
+    // needs more investigation.
     constexpr auto max_n_cg_blocks = 20u;
 
     // Variable to keep track of the u variable
@@ -1859,6 +1861,14 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
         // NOTE: the stride is not an argument, if constant.
         llvm::Value *stride = nullptr;
         if (const_stride) {
+            // LCOV_EXCL_START
+            // NOTE: make sure that the bit width of the constant stride argument
+            // is the correct one, so that llvm::ConstantInt::get() produces a
+            // constant integer of the correct type.
+            assert(llvm::cast<llvm::ConstantInt>(main_stride)->getValue().getBitWidth()
+                   == static_cast<unsigned>(std::numeric_limits<std::size_t>::digits));
+            // LCOV_EXCL_STOP
+
             stride
                 = llvm::ConstantInt::get(cur_state->context(), llvm::cast<llvm::ConstantInt>(main_stride)->getValue());
         } else {
