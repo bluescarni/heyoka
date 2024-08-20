@@ -24,9 +24,9 @@
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_invoke.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
 
@@ -223,7 +223,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     // for different values of alpha.
     std::vector<expression> parts(boost::numeric_cast<std::vector<expression>::size_type>(n_alpha));
 
-    tbb::parallel_for(tbb::blocked_range(static_cast<std::size_t>(0), n_alpha), [&](const auto &r) {
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(static_cast<std::size_t>(0), n_alpha), [&](const auto &r) {
         for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
             // Fetch the number of terms for this chunk.
             const auto cur_size = sizes_ptr[alpha];
@@ -232,7 +232,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             // for the current value of alpha.
             std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
 
-            tbb::parallel_for(tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
+            oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
                 // trig will contain the components of the
                 // sin/cos trigonometric argument.
                 auto trig = std::vector<expression>(17u);
@@ -312,12 +312,12 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     // Get the elliptic orbital elements.
     expression a, lam, k, h, q_, p_;
 
-    tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
-                         [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
-                         [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
-                         [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
-                         [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
-                         [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
+    oneapi::tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
+                                 [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
+                                 [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
+                                 [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
+                                 [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                                 [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
     // NOTE: we follow the procedure described here to convert the equinoctial elements
     // to Cartesian coordinates:

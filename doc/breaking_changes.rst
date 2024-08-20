@@ -3,6 +3,13 @@
 Breaking changes
 ================
 
+.. _bchanges_6_0_0:
+
+6.0.0
+-----
+
+- Support for LLVM<15 has been dropped.
+
 .. _bchanges_4_0_0:
 
 4.0.0

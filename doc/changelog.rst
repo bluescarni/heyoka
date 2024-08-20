@@ -1,7 +1,7 @@
 Changelog
 =========
 
-5.2.0 (unreleased)
+6.0.0 (unreleased)
 ------------------
 
 New
@@ -12,6 +12,13 @@ New
   (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).
 - Enable support for fmt 11
   (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).
+
+Changes
+~~~~~~~
+
+- **BREAKING**: the minimum required LLVM version is now 15
+  (`#444 <https://github.com/bluescarni/heyoka/pull/444>`__).
+  This is a :ref:`breaking change <bchanges_6_0_0>`.
 
 Fix
 ~~~

@@ -696,6 +696,11 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
 }
 
+template <typename>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
+make_multi_cfunc(const llvm_state &, const std::string &, const std::vector<expression> &,
+                 const std::vector<expression> &, std::uint32_t, bool, bool, long long);
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
@@ -860,9 +865,7 @@ public:
     [[nodiscard]] const std::vector<expression> &get_fn() const;
     [[nodiscard]] const std::vector<expression> &get_vars() const;
     [[nodiscard]] const std::vector<expression> &get_dc() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_scalar_s() const;
-    [[nodiscard]] const llvm_state &get_llvm_state_batch_s() const;
+    [[nodiscard]] const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &get_llvm_states() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] bool get_parallel_mode() const;
@@ -888,6 +891,8 @@ private:
 public:
     // NOTE: it is important to document properly the non-overlapping
     // memory requirement for the input arguments.
+    // NOTE: if/when we add overloads with user-provided tape pointers,
+    // then we must document the non-overlapping requirement for them too.
     template <typename Out, typename In, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
                 && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
@@ -1019,7 +1024,34 @@ HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
 
 #undef HEYOKA_CFUNC_CLASS_EXTERN_INST
 
+namespace detail
+{
+
+// Boost s11n class version history for the cfunc class:
+// - 1: implemented parallel compilation for compact mode, introduced
+//      external storage for the evaluation tape.
+inline constexpr int cfunc_s11n_version = 1;
+
+} // namespace detail
+
 HEYOKA_END_NAMESPACE
+
+// Set the Boost s11n class version for the cfunc class.
+BOOST_CLASS_VERSION(heyoka::cfunc<float>, heyoka::detail::cfunc_s11n_version);
+BOOST_CLASS_VERSION(heyoka::cfunc<double>, heyoka::detail::cfunc_s11n_version);
+BOOST_CLASS_VERSION(heyoka::cfunc<long double>, heyoka::detail::cfunc_s11n_version);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real128>, heyoka::detail::cfunc_s11n_version);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real>, heyoka::detail::cfunc_s11n_version);
+
+#endif
 
 // fmt formatter for cfunc, implemented
 // on top of the streaming operator.

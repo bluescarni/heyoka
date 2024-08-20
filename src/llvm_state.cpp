@@ -37,6 +37,9 @@
 
 #include <fmt/format.h>
 
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
 #include <llvm/Analysis/LoopAnalysisManager.h>
@@ -573,7 +576,7 @@ void verify_module(const llvm::Module &m)
     std::string out;
     llvm::raw_string_ostream ostr(out);
 
-    if (llvm::verifyModule(m, &ostr)) {
+    if (llvm::verifyModule(m, &ostr)) [[unlikely]] {
         // LCOV_EXCL_START
         throw std::runtime_error(fmt::format("The verification of the module '{}' produced an error:\n{}",
                                              m.getModuleIdentifier(), ostr.str()));
@@ -1399,9 +1402,6 @@ void llvm_state::compile()
 
             // Assign the object file.
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj[0]));
-
-            // Look up the trigger.
-            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 
@@ -1804,6 +1804,69 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 struct llvm_multi_state::impl {
     std::vector<llvm_state> m_states;
     std::unique_ptr<detail::multi_jit> m_jit;
+
+    // s11n.
+    void save(boost::archive::binary_oarchive &ar, unsigned) const
+    {
+        // Start by establishing if the state is compiled.
+        const auto cmp = !m_jit->m_module;
+        ar << cmp;
+
+        // Store the states.
+        ar << m_states;
+
+        // Store the object files and the snapshots. These may be empty.
+        ar << m_jit->m_object_files;
+        ar << m_jit->m_ir_snapshots;
+        ar << m_jit->m_bc_snapshots;
+
+        // NOTE: no need to explicitly store the bitcode of the master
+        // module: if this is compiled, the master module is in the snapshots.
+        // Otherwise, the master module is empty and there's no need to
+        // store anything.
+    }
+    void load(boost::archive::binary_iarchive &ar, unsigned)
+    {
+        // Load the compiled status flag from the archive.
+        // NOLINTNEXTLINE(misc-const-correctness)
+        bool cmp{};
+        ar >> cmp;
+
+        // Load the states.
+        ar >> m_states;
+
+        assert(!m_states.empty());
+
+        // Reset the jit with a new one.
+        m_jit = std::make_unique<detail::multi_jit>(boost::safe_numerics::safe<unsigned>(m_states.size()) + 1,
+                                                    m_states[0].get_opt_level(), m_states[0].get_code_model(),
+                                                    m_states[0].force_avx512(), m_states[0].get_slp_vectorize());
+
+        // Load the object files and the snapshots.
+        ar >> m_jit->m_object_files;
+        ar >> m_jit->m_ir_snapshots;
+        ar >> m_jit->m_bc_snapshots;
+
+        if (cmp) {
+            // If the stored state was compiled, we need to reset
+            // master builder and module. Otherwise, the empty default-constructed
+            // master module is ok (the master module remains empty until compilation
+            // is triggered).
+            m_jit->m_module.reset();
+            m_jit->m_builder.reset();
+
+            // We also need to add all the object files to the jit.
+            for (const auto &obj : m_jit->m_object_files) {
+                detail::add_obj_to_lljit(*m_jit->m_lljit, obj);
+            }
+        }
+
+        // Debug checks.
+        assert((m_jit->m_object_files.empty() && !cmp) || m_jit->m_object_files.size() == m_jit->m_n_modules);
+        assert((m_jit->m_object_files.empty() && !cmp) || m_jit->m_ir_snapshots.size() == m_jit->m_n_modules);
+        assert((m_jit->m_object_files.empty() && !cmp) || m_jit->m_bc_snapshots.size() == m_jit->m_n_modules);
+    }
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 llvm_multi_state::llvm_multi_state() = default;
@@ -1943,67 +2006,13 @@ llvm_multi_state::~llvm_multi_state() = default;
 
 void llvm_multi_state::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
-    // Start by establishing if the state is compiled.
-    const auto cmp = is_compiled();
-    ar << cmp;
-
-    // Store the states.
-    ar << m_impl->m_states;
-
-    // Store the object files and the snapshots. These may be empty.
-    ar << m_impl->m_jit->m_object_files;
-    ar << m_impl->m_jit->m_ir_snapshots;
-    ar << m_impl->m_jit->m_bc_snapshots;
-
-    // NOTE: no need to explicitly store the bitcode of the master
-    // module: if this is compiled, the master module is in the snapshots.
-    // Otherwise, the master module is empty and there's no need to
-    // store anything.
+    ar << m_impl;
 }
 
 void llvm_multi_state::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     try {
-        // Load the compiled status flag from the archive.
-        // NOLINTNEXTLINE(misc-const-correctness)
-        bool cmp{};
-        ar >> cmp;
-
-        // Load the states.
-        ar >> m_impl->m_states;
-
-        // Reset the jit with a new one.
-        m_impl->m_jit = std::make_unique<detail::multi_jit>(
-            boost::safe_numerics::safe<unsigned>(m_impl->m_states.size()) + 1, get_opt_level(), get_code_model(),
-            force_avx512(), get_slp_vectorize());
-
-        // Load the object files and the snapshots.
-        ar >> m_impl->m_jit->m_object_files;
-        ar >> m_impl->m_jit->m_ir_snapshots;
-        ar >> m_impl->m_jit->m_bc_snapshots;
-
-        if (cmp) {
-            // If the stored state was compiled, we need to reset
-            // master builder and module. Otherwise, the empty default-constructed
-            // master module is ok (the master module remains empty until compilation
-            // is triggered).
-            m_impl->m_jit->m_module.reset();
-            m_impl->m_jit->m_builder.reset();
-
-            // We also need to add all the object files to the jit.
-            for (const auto &obj : m_impl->m_jit->m_object_files) {
-                detail::add_obj_to_lljit(*m_impl->m_jit->m_lljit, obj);
-            }
-        }
-
-        // Debug checks.
-        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
-               || m_impl->m_jit->m_object_files.size() == m_impl->m_jit->m_n_modules);
-        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
-               || m_impl->m_jit->m_ir_snapshots.size() == m_impl->m_jit->m_n_modules);
-        assert((m_impl->m_jit->m_object_files.empty() && !cmp)
-               || m_impl->m_jit->m_bc_snapshots.size() == m_impl->m_jit->m_n_modules);
-
+        ar >> m_impl;
         // LCOV_EXCL_START
     } catch (...) {
         m_impl.reset();
@@ -2213,10 +2222,12 @@ void llvm_multi_state::compile()
     auto *logger = detail::get_logger();
 
     // Verify the modules before compiling.
-    // NOTE: probably this can be parallelised if needed.
-    for (decltype(m_impl->m_states.size()) i = 0; i < m_impl->m_states.size(); ++i) {
-        detail::verify_module(*m_impl->m_states[i].m_module);
-    }
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
+                              [](const auto &rng) {
+                                  for (const auto &s : rng) {
+                                      detail::verify_module(*s.m_module);
+                                  }
+                              });
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
 
@@ -2275,9 +2286,6 @@ void llvm_multi_state::compile()
             // Assign the compiled objects.
             assert(m_impl->m_jit->m_object_files.empty());
             m_impl->m_jit->m_object_files = std::move(cached_data->obj);
-
-            // Lookup the trigger.
-            jit_lookup(detail::obj_trigger_name);
         } else {
             // Cache miss.
 

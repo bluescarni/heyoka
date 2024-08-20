@@ -1353,8 +1353,6 @@ TEST_CASE("cfunc bogus stride")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
-                              kw::batch_size = batch_size, kw::compact_mode = cm);
             add_cfunc<double>(s, "cfunc.strided", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
                               kw::batch_size = batch_size, kw::compact_mode = cm, kw::strided = true);
 
