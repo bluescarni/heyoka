@@ -8,7 +8,7 @@ Breaking changes
 6.0.0
 -----
 
-- Support for LLVM < 15 has been dropped.
+- Support for LLVM<15 has been dropped.
 
 .. _bchanges_4_0_0:
 
