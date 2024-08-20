@@ -745,20 +745,16 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     // in output the list of indices of the u variables on which ex depends.
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
-            [](const auto &v) -> std::vector<std::uint32_t> {
-                using type = uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, func>) {
+            []<typename T>(const T &v) -> std::vector<std::uint32_t> {
+                if constexpr (std::is_same_v<T, func>) {
                     std::vector<std::uint32_t> retval;
 
                     for (const auto &arg : v.args()) {
                         std::visit(
-                            [&retval](const auto &x) {
-                                using tp = uncvref_t<decltype(x)>;
-
-                                if constexpr (std::is_same_v<tp, variable>) {
+                            [&retval]<typename U>(const U &x) {
+                                if constexpr (std::is_same_v<U, variable>) {
                                     retval.push_back(uname_to_index(x.name()));
-                                } else if constexpr (!std::is_same_v<tp, number> && !std::is_same_v<tp, param>) {
+                                } else if constexpr (!std::is_same_v<U, number> && !std::is_same_v<U, param>) {
                                     // LCOV_EXCL_START
                                     throw std::invalid_argument(
                                         "Invalid argument encountered in an element of a function decomposition: the "
@@ -801,8 +797,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
         // Determine the u indices on which ex depends.
         const auto u_indices = udef_args_indices(ex);
 
-        if (std::any_of(u_indices.begin(), u_indices.end(),
-                        [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
+        if (std::ranges::any_of(u_indices, [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
             // The current expression depends on one or more variables
             // within the current block. Start a new block and
             // update cur_limit_idx with the start index of the new block.
@@ -828,8 +823,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
             // less than counter + nvars (which is the starting
             // index of the block).
             const auto u_indices = udef_args_indices(ex);
-            assert(std::all_of(u_indices.begin(), u_indices.end(),
-                               [idx_limit = counter + nvars](auto idx) { return idx < idx_limit; }));
+            assert(std::ranges::all_of(u_indices, [idx_limit = counter + nvars](auto idx) { return idx < idx_limit; }));
         }
 
         // Update the counter.
