@@ -732,8 +732,6 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
 // Function to split the central part of a function decomposition (i.e., the definitions of the u variables
 // that do not represent original variables) into parallelisable segments. Within a segment,
 // the definition of a u variable does not depend on any u variable defined within that segment.
-// NOTE: the segments in the return value will contain shallow copies of the
-// expressions in dc.
 std::vector<std::vector<expression>> function_segment_dc(const std::vector<expression> &dc,
                                                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                          std::uint32_t nvars, std::uint32_t nuvars)
@@ -784,7 +782,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     auto cur_limit_idx = nvars;
     for (std::uint32_t i = nvars; i < nuvars; ++i) {
         // NOTE: at the very first iteration of this for loop,
-        // no block has been created yet. Do it now.
+        // no segment has been created yet. Do it now.
         if (i == nvars) {
             assert(s_dc.empty());
             s_dc.emplace_back();
@@ -799,13 +797,13 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 
         if (std::ranges::any_of(u_indices, [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
             // The current expression depends on one or more variables
-            // within the current block. Start a new block and
-            // update cur_limit_idx with the start index of the new block.
+            // within the current segment. Start a new segment and
+            // update cur_limit_idx with the start index of the new segment.
             s_dc.emplace_back();
             cur_limit_idx = i;
         }
 
-        // Append ex to the current block.
+        // Append ex to the current segment.
         s_dc.back().push_back(ex);
     }
 
@@ -819,9 +817,9 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 
         for (const auto &ex : s) {
             // All the indices in the definitions of the
-            // u variables in the current block must be
+            // u variables in the current segment must be
             // less than counter + nvars (which is the starting
-            // index of the block).
+            // index of the segment).
             const auto u_indices = udef_args_indices(ex);
             assert(std::ranges::all_of(u_indices, [idx_limit = counter + nvars](auto idx) { return idx < idx_limit; }));
         }
