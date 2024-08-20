@@ -22,6 +22,12 @@ Unsolved
 Solved
 ======
 
+* Certain LLVM versions fail to correctly free memory when objects used to
+  implement just-in-time compilation are destroyed. In practice this may result
+  in exhausting the available RAM if many integrators and/or compiled functions
+  are created and destroyed during program execution. LLVM 18 is known to be affected
+  by this issue, which has been rectified in LLVM 19. Earlier LLVM versions may also
+  be affected.
 * In several LLVM versions, attempting to use :ref:`batch mode <tut_batch_mode>`
   with the extended precision ``long double`` type on x86 processors will lead
   to incorrect results. This is due to code generation issues in LLVM with
