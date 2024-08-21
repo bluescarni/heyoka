@@ -811,7 +811,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                               // will block as execution in the parallel region of the cfunc begins. The
                                               // blocked thread could then grab another task from the parallel for loop
                                               // we are currently in, and it would then start writing for a second time
-                                              // into the same tape it already begun writing into, leading to UB.
+                                              // into the same tape it already begun writing into.
                                               oneapi::tbb::this_task_arena::isolate(
                                                   [&]() { batch_iter.template operator()<true>(range, tape_ptr); });
                                           });
