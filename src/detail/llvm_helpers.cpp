@@ -1492,7 +1492,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 
 // Small helper to fetch a string representation
 // of an LLVM type.
-std::string llvm_type_name(const llvm::Type *t)
+std::string llvm_type_name(llvm::Type *t)
 {
     assert(t != nullptr);
 
@@ -3360,7 +3360,10 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 }
 
 // Utility to create an identical copy of the type tp in the context of the state s.
-llvm::Type *llvm_clone_type(llvm_state &s, const llvm::Type *tp)
+// NOTE: although it may look like this is a read-only operation on tp, it is not,
+// since we are potentially poking into the context of tp during operations. Thus, this
+// function cannot be called concurrently from multiple threads on the same tp object.
+llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 {
     assert(tp != nullptr);
 
@@ -3369,7 +3372,7 @@ llvm::Type *llvm_clone_type(llvm_state &s, const llvm::Type *tp)
 
     // Construct the scalar type first, then we will convert
     // to a vector if needed.
-    const auto *tp_scal = tp->getScalarType();
+    auto *tp_scal = tp->getScalarType();
     llvm::Type *ret_scal_t = nullptr;
 
 #define HEYOKA_LLVM_CLONE_TYPE_IMPL(tid)                                                                               \

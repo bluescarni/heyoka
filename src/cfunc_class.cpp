@@ -206,8 +206,8 @@ struct cfunc<T>::impl {
 
         if (compact_mode) {
             // Build the multi cfunc, and assign the internal members.
-            std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(s, "cfunc", m_fn, m_vars, m_batch_size,
-                                                                              high_accuracy, m_parallel_mode, prec);
+            std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
+                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec);
 
             // Compile.
             std::get<1>(m_states).compile();

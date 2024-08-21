@@ -28,7 +28,7 @@ namespace detail
 // The integral type corresponding to the mpfr_rnd_t enum.
 using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
 
-mpfr_prec_t llvm_is_real(const llvm::Type *);
+mpfr_prec_t llvm_is_real(llvm::Type *);
 
 llvm::Value *llvm_real_fneg(llvm_state &, llvm ::Value *);
 llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, unsigned);

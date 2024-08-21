@@ -78,9 +78,9 @@ llvm::AttributeList get_mpfr_attr_list(llvm::LLVMContext &context)
 
 // Determine if the input type is heyoka.real.N,
 // and, in such case, return N. Otherwise, return 0.
-mpfr_prec_t llvm_is_real(const llvm::Type *t)
+mpfr_prec_t llvm_is_real(llvm::Type *t)
 {
-    if (const auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
+    if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
         const auto sname = ptr->getStructName();
 
         if (
