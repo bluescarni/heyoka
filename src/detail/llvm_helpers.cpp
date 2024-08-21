@@ -1492,7 +1492,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 
 // Small helper to fetch a string representation
 // of an LLVM type.
-std::string llvm_type_name(llvm::Type *t)
+std::string llvm_type_name(const llvm::Type *t)
 {
     assert(t != nullptr);
 
@@ -3356,6 +3356,71 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         throw std::invalid_argument(
             fmt::format("Cannot convert an unsigned integral value to the LLVM type '{}'", llvm_type_name(fp_t)));
         // LCOV_EXCL_STOP
+    }
+}
+
+// Utility to create an identical copy of the type tp in the context of the state s.
+llvm::Type *llvm_clone_type(llvm_state &s, const llvm::Type *tp)
+{
+    assert(tp != nullptr);
+
+    // Fetch the target context.
+    auto &ctx = s.context();
+
+    // Construct the scalar type first, then we will convert
+    // to a vector if needed.
+    const auto *tp_scal = tp->getScalarType();
+    llvm::Type *ret_scal_t = nullptr;
+
+#define HEYOKA_LLVM_CLONE_TYPE_IMPL(tid)                                                                               \
+    case llvm::Type::tid##TyID:                                                                                        \
+        ret_scal_t = llvm::Type::get##tid##Ty(ctx);                                                                    \
+        break
+
+    switch (tp_scal->getTypeID()) {
+        HEYOKA_LLVM_CLONE_TYPE_IMPL(Float);
+        HEYOKA_LLVM_CLONE_TYPE_IMPL(Double);
+        HEYOKA_LLVM_CLONE_TYPE_IMPL(X86_FP80);
+        HEYOKA_LLVM_CLONE_TYPE_IMPL(FP128);
+        default: {
+#if defined(HEYOKA_HAVE_REAL)
+
+            if (const auto prec = llvm_is_real(tp_scal); prec != 0) {
+                // tp_scal is the internal counterpart of mppp::real.
+                ret_scal_t = to_internal_llvm_type<mppp::real>(s, prec);
+                break;
+            } else if (tp_scal == to_external_llvm_type<mppp::real>(tp_scal->getContext())) {
+                // tp_scal is mppp::real.
+                ret_scal_t = to_external_llvm_type<mppp::real>(ctx);
+                break;
+            }
+
+#endif
+            // LCOV_EXCL_START
+            throw std::invalid_argument(
+                fmt::format("Cannot clone the LLVM type '{}' to another context", llvm_type_name(tp)));
+            // LCOV_EXCL_STOP
+        }
+    }
+
+#undef HEYOKA_LLVM_CLONE_TYPE_IMPL
+
+    assert(ret_scal_t != nullptr);
+
+    if (tp->isVectorTy()) {
+        // tp is a vector type.
+        if (const auto *vtp = llvm::dyn_cast<llvm_vector_type>(tp)) [[likely]] {
+            return make_vector_type(ret_scal_t, boost::numeric_cast<std::uint32_t>(vtp->getNumElements()));
+        } else {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(fmt::format("Cannot clone the LLVM type '{}' to another context - the type is "
+                                                    "a vector type whose size is not fixed",
+                                                    llvm_type_name(tp)));
+            // LCOV_EXCL_STOP
+        }
+    } else {
+        // tp is a scalar type.
+        return ret_scal_t;
     }
 }
 
