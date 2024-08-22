@@ -3360,9 +3360,10 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 }
 
 // Utility to create an identical copy of the type tp in the context of the state s.
-// NOTE: although it may look like this is a read-only operation on tp, it is not,
+// NOTE: although it may sound like this is a read-only operation on tp, it is not,
 // since we are potentially poking into the context of tp during operations. Thus, this
-// function cannot be called concurrently from multiple threads on the same tp object.
+// function cannot be called concurrently from multiple threads on the same tp object,
+// or even on different tp objects defined in the same context.
 llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 {
     assert(tp != nullptr);
