@@ -3365,7 +3365,7 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 // function cannot be called concurrently from multiple threads on the same tp object,
 // or even on different tp objects defined in the same context.
 // NOTE: this handles only floating-point (vector) types at this time, extending
-// to intgeral types should be fairly easy.
+// to integral types should be fairly easy.
 // NOTE: perhaps this function could be made more generic for arbitrary struct types
 // by (recursively) reading the struct layout and then reproducing it in the target
 // context. Like this, we could avoid special casing for the mppp::real types.
