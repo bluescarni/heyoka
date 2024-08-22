@@ -3364,6 +3364,11 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 // since we are potentially poking into the context of tp during operations. Thus, this
 // function cannot be called concurrently from multiple threads on the same tp object,
 // or even on different tp objects defined in the same context.
+// NOTE: this handles only floating-point (vector) types at this time, extending
+// to intgeral types should be fairly easy.
+// NOTE: perhaps this function could be made more generic for arbitrary struct types
+// by (recursively) reading the struct layout and then reproducing it in the target
+// context. Like this, we could avoid special casing for the mppp::real types.
 llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 {
     assert(tp != nullptr);
@@ -3381,12 +3386,15 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
         ret_scal_t = llvm::Type::get##tid##Ty(ctx);                                                                    \
         break
 
+    // NOTE: gcov seems to get a bit confused by the macro usage.
+    // LCOV_EXCL_START
     switch (tp_scal->getTypeID()) {
         HEYOKA_LLVM_CLONE_TYPE_IMPL(Float);
         HEYOKA_LLVM_CLONE_TYPE_IMPL(Double);
         HEYOKA_LLVM_CLONE_TYPE_IMPL(X86_FP80);
         HEYOKA_LLVM_CLONE_TYPE_IMPL(FP128);
         default: {
+
 #if defined(HEYOKA_HAVE_REAL)
 
             if (const auto prec = llvm_is_real(tp_scal); prec != 0) {
@@ -3400,14 +3408,14 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
             }
 
 #endif
-            // LCOV_EXCL_START
+
             throw std::invalid_argument(
                 fmt::format("Cannot clone the LLVM type '{}' to another context", llvm_type_name(tp)));
-            // LCOV_EXCL_STOP
         }
     }
 
 #undef HEYOKA_LLVM_CLONE_TYPE_IMPL
+    // LCOV_EXCL_STOP
 
     assert(ret_scal_t != nullptr);
 
