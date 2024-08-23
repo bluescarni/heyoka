@@ -1609,6 +1609,11 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                    llvm_func_name_compare>;
 
     // Push back a new state and use it as initial current state.
+    // NOTE: like this, we always end up creating at least one driver
+    // function and a state, even in the degenerate case of an empty decomposition,
+    // which is suboptimal peformance-wise.
+    // I do not think however that it is worth it to complicate the code to avoid
+    // this corner-case pessimisation.
     states.push_back(main_state.make_similar());
     auto *cur_state = &states.back();
 
@@ -1991,7 +1996,7 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
     const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
 
     // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it provided externally from dynamically-allocated memory in order to avoid stack overflow.
+    // but it is provided externally from dynamically-allocated memory in order to avoid stack overflow.
     // This creates a situation in which LLVM cannot elide stores into eval_arr
     // (even if it figures out a way to avoid storing intermediate results into
     // eval_arr) because LLVM must assume that some other function may
