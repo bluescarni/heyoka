@@ -1991,7 +1991,7 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
     const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
 
     // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it provided externally from dynamically-allocated memory in order to avoid stack overflow.
+    // but it is provided externally from dynamically-allocated memory in order to avoid stack overflow.
     // This creates a situation in which LLVM cannot elide stores into eval_arr
     // (even if it figures out a way to avoid storing intermediate results into
     // eval_arr) because LLVM must assume that some other function may
