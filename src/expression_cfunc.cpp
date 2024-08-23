@@ -1609,6 +1609,11 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                    llvm_func_name_compare>;
 
     // Push back a new state and use it as initial current state.
+    // NOTE: like this, we always end up creating at least one driver
+    // function and a state, even in the degenerate case of an empty decomposition,
+    // which is suboptimal peformance-wise.
+    // I do not think however that it is worth it to complicate the code to avoid
+    // this corner-case pessimisation.
     states.push_back(main_state.make_similar());
     auto *cur_state = &states.back();
 
