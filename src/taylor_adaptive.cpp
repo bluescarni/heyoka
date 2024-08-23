@@ -437,8 +437,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     // Add the function for the computation of
     // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, detail::internal_llvm_type_like(m_llvm, m_state[0]), m_dim, m_order, 1,
-                                      high_accuracy);
+    detail::taylor_add_d_out_function(m_llvm, fp_t, m_dim, m_order, 1, high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
     sw.reset();
