@@ -9,7 +9,9 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -689,13 +691,23 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
-                                     const std::vector<std::pair<expression, expression>> &sys,
-                                     std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                     bool parallel_mode, std::uint32_t order)
+std::tuple<taylor_dc_t, std::variant<llvm_state, std::vector<llvm_state>>, std::array<std::size_t, 2>>
+taylor_add_adaptive_step(const llvm_state &tplt, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
+                         const std::vector<std::pair<expression, expression>> &sys, std::uint32_t batch_size,
+                         bool high_accuracy, bool compact_mode, bool parallel_mode, std::uint32_t order)
 {
-    assert(!s.is_compiled());
+    assert(!tplt.is_compiled());
     assert(batch_size > 0u);
+
+    // Setup the return state(s) and fetch the main state.
+    auto ret_states = [compact_mode, &tplt]() -> std::variant<llvm_state, std::vector<llvm_state>> {
+        if (compact_mode) {
+            return std::vector{tplt.make_similar()};
+        } else {
+            return tplt.make_similar();
+        }
+    }();
+    auto &s = compact_mode ? std::get<1>(ret_states)[0] : std::get<0>(ret_states);
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -715,14 +727,17 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
     auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
+    //
     // - pointer to the current state vector (read & write),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
     // - pointer to the array of max timesteps (read & write),
-    // - pointer to the Taylor coefficients output (write only).
+    // - pointer to the Taylor coefficients output (write only),
+    // - pointer to the tape (read & write, compact mode only).
+    //
     // These pointers cannot overlap.
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(compact_mode ? 6 : 5, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -760,14 +775,22 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
+    llvm::Argument *tape_ptr = nullptr;
+    if (compact_mode) {
+        tape_ptr = tc_ptr + 1;
+        tape_ptr->setName("tape_ptr");
+        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        tape_ptr->addAttr(llvm::Attribute::NoAlias);
+    }
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order,
-                                           batch_size, compact_mode, high_accuracy, parallel_mode);
+    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, tape_ptr, dc, {}, n_eq, n_uvars,
+                                           order, batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto *h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,

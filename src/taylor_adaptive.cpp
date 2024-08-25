@@ -180,7 +180,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
@@ -386,12 +386,15 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     m_order = detail::taylor_order_from_tol(m_tol);
 
     // Determine the external fp type.
-    auto *ext_fp_t = detail::to_external_llvm_type<T>(m_llvm.context());
+    auto *ext_fp_t = detail::to_external_llvm_type<T>(std::get<0>(m_llvm_state).context());
 
     // Determine the internal fp type.
     // NOTE: in case of mppp::real, we ensured earlier that the tolerance value
     // has the correct precision, so that internal_llvm_type_like() will yield the correct internal type.
-    auto *fp_t = detail::internal_llvm_type_like(m_llvm, m_tol);
+    auto *fp_t = detail::internal_llvm_type_like(std::get<0>(m_llvm_state), m_tol);
+
+    // The state(s) which will be returned by the construction of the stepper function.
+    std::variant<llvm_state, std::vector<llvm_state>> states;
 
     // Add the stepper function.
     if (with_events) {
@@ -404,11 +407,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
             ee.push_back(ev.get_expression());
         }
 
-        m_dc = detail::taylor_add_adaptive_step_with_events(m_llvm, ext_fp_t, fp_t, "step_e", sys, 1, compact_mode, ee,
-                                                            high_accuracy, parallel_mode, m_order);
+        std::tie(m_dc, states)
+            = detail::taylor_add_adaptive_step_with_events(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step_e", sys, 1,
+                                                           compact_mode, ee, high_accuracy, parallel_mode, m_order);
     } else {
-        m_dc = detail::taylor_add_adaptive_step(m_llvm, ext_fp_t, fp_t, "step", sys, 1, high_accuracy, compact_mode,
-                                                parallel_mode, m_order);
+        std::tie(m_dc, states)
+            = detail::taylor_add_adaptive_step(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step", sys, 1, high_accuracy,
+                                               compact_mode, parallel_mode, m_order);
     }
 
     // Fix m_pars' size, if necessary.
