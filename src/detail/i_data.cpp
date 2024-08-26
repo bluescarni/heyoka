@@ -217,6 +217,25 @@ HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real)
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST
 
+// Helper to initialise the compact-mode tape. Assumes an empty tape.
+template <typename T>
+void taylor_adaptive_batch<T>::i_data::init_cm_tape()
+{
+    assert(!m_tape);
+
+    const auto [sz, al] = m_tape_sa;
+
+    if (m_compact_mode) {
+        assert(sz != 0u);
+        assert(al != 0u);
+
+        m_tape = detail::make_aligned_buffer(sz, al);
+    } else {
+        assert(sz == 0u);
+        assert(al == 0u);
+    }
+}
+
 template <typename T>
 void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
@@ -224,13 +243,15 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
     ar << m_state;
     ar << m_time_hi;
     ar << m_time_lo;
-    ar << m_llvm;
+    ar << m_llvm_state;
+    ar << m_tplt_state;
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
     ar << m_tol;
     ar << m_high_accuracy;
     ar << m_compact_mode;
+    ar << m_tape_sa;
     ar << m_pars;
     ar << m_tc;
     ar << m_last_h;
@@ -262,13 +283,15 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_state;
     ar >> m_time_hi;
     ar >> m_time_lo;
-    ar >> m_llvm;
+    ar >> m_llvm_state;
+    ar >> m_tplt_state;
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
     ar >> m_tol;
     ar >> m_high_accuracy;
     ar >> m_compact_mode;
+    ar >> m_tape_sa;
     ar >> m_pars;
     ar >> m_tc;
     ar >> m_last_h;
@@ -293,20 +316,31 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_tm_data;
 
     // Recover the function pointers.
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+
+    // Reconstruct the compact mode tape, if necessary.
+    m_tape.reset();
+    init_cm_tape();
 }
 
+// NOTE: this ctor provides only partial initialisation of the data members.
+// The rest of the initialisation is performed from the integrator ctor.
+// NOTE: m_llvm_state is inited as a single llvm_state regardless of the use
+// of compact mode. It will be converted into a multi state if needed at a
+// later stage.
 template <typename T>
-taylor_adaptive_batch<T>::i_data::i_data(llvm_state s) : m_llvm(std::move(s))
+taylor_adaptive_batch<T>::i_data::i_data(llvm_state s)
+    : m_llvm_state(std::move(s)), m_tplt_state(std::get<0>(m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
 taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_llvm_state(other.m_llvm_state), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
+      m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
+      m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
+      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
@@ -314,7 +348,11 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time), m_vsys(other.m_vsys),
       m_tm_data(other.m_tm_data)
 {
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    // Recover the function pointers.
+    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+
+    // Init the compact mode tape, if necessary.
+    init_cm_tape();
 }
 
 template <typename T>

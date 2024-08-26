@@ -909,6 +909,7 @@ private:
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+    HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
     using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
@@ -952,7 +953,7 @@ public:
 
     ~taylor_adaptive_batch();
 
-    [[nodiscard]] const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const std::variant<llvm_state, llvm_multi_state> &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 

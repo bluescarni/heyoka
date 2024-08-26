@@ -108,7 +108,7 @@ TEST_CASE("copy semantics")
                                   kw::fast_math = true,
                                   kw::mname = "sample state"};
 
-        const auto &s = ta.get_llvm_state();
+        const auto &s = std::get<0>(ta.get_llvm_state());
 
         REQUIRE(s.module_name() == "sample state");
         REQUIRE(s.get_opt_level() == 2u);

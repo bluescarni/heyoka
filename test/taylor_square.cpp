@@ -90,7 +90,7 @@ TEST_CASE("taylor square")
                                             kw::pars = {fp_t{2}}};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_pos_small_int_2.par_num"));
+                REQUIRE(ir_contains(ta, "pow_pos_small_int_2.par_num"));
             }
 
             ta.step(true);
@@ -141,7 +141,7 @@ TEST_CASE("taylor square")
                                                   kw::pars = {fp_t{0}, fp_t{0}, fp_t{2}, fp_t{2}}};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_pos_small_int_2.par_num"));
+                REQUIRE(ir_contains(ta, "pow_pos_small_int_2.par_num"));
             }
 
             ta.step(true);
@@ -272,7 +272,7 @@ TEST_CASE("taylor square")
                                                   kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}}};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_pos_small_int_2.par_num"));
+                REQUIRE(ir_contains(ta, "pow_pos_small_int_2.par_num"));
             }
 
             ta.step(true);
@@ -326,7 +326,7 @@ TEST_CASE("taylor square")
                                             kw::opt_level = opt_level};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_square.var_num"));
+                REQUIRE(ir_contains(ta, "pow_square.var_num"));
             }
 
             ta.step(true);
@@ -349,7 +349,7 @@ TEST_CASE("taylor square")
                                                   kw::opt_level = opt_level};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_square.var_num"));
+                REQUIRE(ir_contains(ta, "pow_square.var_num"));
             }
 
             ta.step(true);
@@ -378,7 +378,7 @@ TEST_CASE("taylor square")
                                             kw::opt_level = opt_level};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_square.var_num"));
+                REQUIRE(ir_contains(ta, "pow_square.var_num"));
             }
 
             ta.step(true);
@@ -403,7 +403,7 @@ TEST_CASE("taylor square")
                                                   kw::opt_level = opt_level};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_square.var_num"));
+                REQUIRE(ir_contains(ta, "pow_square.var_num"));
             }
 
             ta.step(true);
@@ -439,7 +439,7 @@ TEST_CASE("taylor square")
                                                   kw::opt_level = opt_level};
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "pow_square.var_num"));
+                REQUIRE(ir_contains(ta, "pow_square.var_num"));
             }
 
             ta.step(true);

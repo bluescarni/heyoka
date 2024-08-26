@@ -1070,7 +1070,7 @@ void s11n_test_impl()
             ia >> ta;
         }
 
-        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(std::get<1>(ta.get_llvm_state()).get_ir() == std::get<1>(ta_copy.get_llvm_state()).get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
         REQUIRE(ta.get_tol() == ta_copy.get_tol());
@@ -1143,7 +1143,7 @@ void s11n_test_impl()
             ia >> ta;
         }
 
-        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(std::get<0>(ta.get_llvm_state()).get_ir() == std::get<0>(ta_copy.get_llvm_state()).get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
         REQUIRE(ta.get_tol() == ta_copy.get_tol());
@@ -2130,7 +2130,7 @@ TEST_CASE("pow rho sleef")
     auto ta = taylor_adaptive_batch<double>{
         {prime(x) = rhs_x, prime(v) = rhs_v}, std::vector<double>(8u, 0.), 4u, kw::tol = 1e-6};
 
-    const auto ir = ta.get_llvm_state().get_ir();
+    const auto ir = std::get<0>(ta.get_llvm_state()).get_ir();
 
     // NOTE: run the check only if avx2 is available.
     if (!boost::algorithm::contains(ir, "+avx2")) {

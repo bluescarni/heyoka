@@ -145,8 +145,12 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<T> m_state;
     // Times.
     std::vector<T> m_time_hi, m_time_lo;
-    // The LLVM machinery.
-    llvm_state m_llvm;
+    // The LLVM (multi)state.
+    std::variant<llvm_state, llvm_multi_state> m_llvm_state;
+    // A template LLVM state we keep around to create states
+    // similar to m_llvm_state as needed. This is created with the
+    // same settings as m_llvm_state.
+    llvm_state m_tplt_state;
     // Dimension of the system.
     std::uint32_t m_dim{};
     // Taylor decomposition.
@@ -159,10 +163,18 @@ struct taylor_adaptive_batch<T>::i_data {
     bool m_high_accuracy{};
     // Compact mode.
     bool m_compact_mode{};
-    // The steppers.
+    // The stepper types (non-compact mode).
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
-    std::variant<step_f_t, step_f_e_t> m_step_f;
+    // The stepper types (compact mode). These have an additional argument - the tape pointer.
+    using c_step_f_t = void (*)(T *, const T *, const T *, T *, T *, void *) noexcept;
+    using c_step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *, void *) noexcept;
+    // The stepper.
+    std::variant<step_f_t, step_f_e_t, c_step_f_t, c_step_f_e_t> m_step_f;
+    // Size/alignment for the compact mode tape.
+    std::array<std::size_t, 2> m_tape_sa{};
+    // Compact mode tape.
+    detail::aligned_buffer_t m_tape;
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -221,6 +233,8 @@ public:
     i_data &operator=(i_data &&) noexcept = delete;
 
     ~i_data();
+
+    void init_cm_tape();
 };
 
 HEYOKA_END_NAMESPACE

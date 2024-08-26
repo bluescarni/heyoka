@@ -72,8 +72,8 @@ TEST_CASE("taylor relu relup")
                                                   kw::pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu.par"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup.par"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relu.par"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relup.par"));
             }
 
             ta.step(true);
@@ -118,8 +118,8 @@ TEST_CASE("taylor relu relup")
                                                   kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu.var"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup.var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relu.var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relup.var"));
             }
 
             ta.step(true);
@@ -182,9 +182,9 @@ TEST_CASE("taylor relu relup leaky")
                                               kw::pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".par"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relu_0x"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relup_0x"));
+                REQUIRE(ir_contains(ta, ".par"));
             }
 
             ta.step(true);
@@ -229,9 +229,9 @@ TEST_CASE("taylor relu relup leaky")
                                                   kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relu_0x"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.relup_0x"));
+                REQUIRE(ir_contains(ta, ".var"));
             }
 
             ta.step(true);
