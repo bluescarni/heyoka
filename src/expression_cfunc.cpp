@@ -1568,14 +1568,15 @@ namespace
 // implemented in distinct llvm_state objects.
 //
 // states is the current list of states (to which more will be added by this function), and the last state
-// in the list is the "main" state. s_dc is the segmented decomposition of the function to be compiled.
+// in the list is the "main" state. main_fp_t is the internal scalar floating-point type as defined in the main state.
+// s_dc is the segmented decomposition of the function to be compiled.
 // base_name is the name of the main function from which the drivers are to be invoked. main_eval_arr,
 // main_par_ptr, main_time_ptr and main_stride are, respectively, the pointer to the evaluation tape,
 // the pointer to the parameter values, the pointer to time coordinate(s) and the stride - these are all
 // defined in the main state and they are passed to the driver functions invocations.
-template <typename T, typename SDC>
-void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_dc, std::uint32_t nvars,
-                                   std::uint32_t batch_size, bool high_accuracy, long long prec,
+template <typename SDC>
+void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> &states, const SDC &s_dc,
+                                   std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy,
                                    const std::string &base_name, llvm::Value *main_eval_arr, llvm::Value *main_par_ptr,
                                    llvm::Value *main_time_ptr, llvm::Value *main_stride)
 {
@@ -1608,6 +1609,11 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
                    llvm_func_name_compare>;
 
     // Push back a new state and use it as initial current state.
+    // NOTE: like this, we always end up creating at least one driver
+    // function and a state, even in the degenerate case of an empty decomposition,
+    // which is suboptimal peformance-wise.
+    // I do not think however that it is worth it to complicate the code to avoid
+    // this corner-case pessimisation.
     states.push_back(main_state.make_similar());
     auto *cur_state = &states.back();
 
@@ -1729,7 +1735,7 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
         }
 
         // Fetch the internal fp type and its vector counterpart for the current state.
-        auto *fp_t = to_internal_llvm_type<T>(*cur_state, prec);
+        auto *fp_t = llvm_clone_type(*cur_state, main_fp_t);
         auto *fp_vec_type = make_vector_type(fp_t, batch_size);
 
         // Fetch the current builder.
@@ -1955,17 +1961,13 @@ void multi_cfunc_evaluate_segments(std::list<llvm_state> &states, const SDC &s_d
     // LCOV_EXCL_STOP
 }
 
-// NOTE: here we are forced to use a templated function, rather than passing in the
-// LLVM type fp_t as usual, because we need to re-create the type for every context
-// in every state, and there seems not to be an easy way to transfer/copy a type
-// from one context to the other.
-template <typename T>
-std::array<std::size_t, 2>
-add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                     llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
-                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                     std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy, long long prec,
-                     const std::string &base_name, llvm::Value *eval_arr)
+std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm_state> &states, llvm::Value *out_ptr,
+                                                llvm::Value *in_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                                llvm::Value *stride, const std::vector<expression> &dc,
+                                                std::uint32_t nvars,
+                                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy,
+                                                const std::string &base_name, llvm::Value *eval_arr)
 {
     // Fetch the main state, module, etc.
     auto &main_state = states.back();
@@ -1973,7 +1975,10 @@ add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::
     auto &main_builder = main_state.builder();
 
     // Fetch the fp types for the main state.
-    auto *main_fp_t = to_internal_llvm_type<T>(main_state, prec);
+    // NOTE: cloning is safe here, as even though this function is being invoked
+    // in parallel from multiple threads, we have made sure that each invocation
+    // gets its own cloned copy of fp_t.
+    auto *main_fp_t = llvm_clone_type(main_state, fp_t);
     auto *main_ext_fp_t = make_external_llvm_type(main_fp_t);
     auto *fp_vec_type = make_vector_type(main_fp_t, batch_size);
 
@@ -1991,7 +1996,7 @@ add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::
     const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
 
     // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it provided externally from dynamically-allocated memory in order to avoid stack overflow.
+    // but it is provided externally from dynamically-allocated memory in order to avoid stack overflow.
     // This creates a situation in which LLVM cannot elide stores into eval_arr
     // (even if it figures out a way to avoid storing intermediate results into
     // eval_arr) because LLVM must assume that some other function may
@@ -2015,8 +2020,8 @@ add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::
     });
 
     // Generate the code for the evaluation of all segments.
-    multi_cfunc_evaluate_segments<T>(states, s_dc, nvars, batch_size, high_accuracy, prec, base_name, eval_arr, par_ptr,
-                                     time_ptr, stride);
+    multi_cfunc_evaluate_segments(main_fp_t, states, s_dc, nvars, batch_size, high_accuracy, base_name, eval_arr,
+                                  par_ptr, time_ptr, stride);
 
     // Write the results to the output pointer.
     cfunc_c_write_outputs(main_state, main_fp_t, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
@@ -2027,32 +2032,10 @@ add_multi_cfunc_impl(std::list<llvm_state> &states, llvm::Value *out_ptr, llvm::
     return {sz, al};
 }
 
-} // namespace
-
-// This function will compile several versions of the input function fn, with input variables vars, in compact mode.
-//
-// The compiled functions are implemented across several llvm_states which are collated together and returned as
-// a single llvm_multi_state (this is the first element of the return tuple). If batch_size is 1,
-// then 2 compiled functions are created - a scalar strided and a scalar unstrided version.
-// If batch size is > 1, then an additional batch-mode strided compiled function is returned.
-// The function names are created using "name" as base name and then mangling in the strided/unstrided
-// property and the batch size.
-//
-// The second element of the return tuple is the decomposition of fn.
-//
-// The third element of the return tuple is a vector of pairs, each pair containing the size and alignment requirements
-// for the externally-provided storage for the evaluation tape. If batch_size is 1, then only a single
-// pair is returned, representing the size/alignment requirements for the scalar-mode evaluation tape.
-// If batch_size > 1, then an additional pair is appended representing the size/alignment requirements
-// for the batch-mode evaluation tape.
-//
-// NOTE: there is a bunch of boilerplate logic overlap here with add_cfunc_impl(). Make sure to
-// coordinate changes between the two functions.
-template <typename T>
 std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
-make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vector<expression> &fn,
-                 const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode,
-                 long long prec)
+make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::string &name,
+                      const std::vector<expression> &fn, const std::vector<expression> &vars, std::uint32_t batch_size,
+                      bool high_accuracy, bool parallel_mode)
 {
     if (batch_size == 0u) [[unlikely]] {
         throw std::invalid_argument("The batch size of a compiled function cannot be zero");
@@ -2061,27 +2044,6 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     if (parallel_mode) [[unlikely]] {
         throw std::invalid_argument("Parallel mode has not been implemented yet");
     }
-
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::is_same_v<T, long double>) {
-        throw not_implemented_error("'long double' computations are not supported on PowerPC");
-    }
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
-
-        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("An invalid precision value of {} was passed to make_multi_cfunc() (the "
-                            "value must be in the [{}, {}] range)",
-                            sprec, mppp::real_prec_min(), mppp::real_prec_max()));
-        }
-    }
-
-#endif
 
     if (name.empty()) [[unlikely]] {
         throw std::invalid_argument("A non-empty function name is required when invoking make_multi_cfunc()");
@@ -2126,9 +2088,26 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         tape_size_align.resize(2);
     }
 
-    // Helper to create a cfunc.
+    // NOTE: this is ugly, but needed. Cloning an LLVM type into another
+    // context is not a thread-safe operation as we might be poking into
+    // the context of the original type. Thus, we first make 2 or 3 clones
+    // of fp_t each associated to a different llvm_state without any multithreading,
+    // and then we use these clones for further cloning while parallel invoking
+    // create_cfunc().
+    std::vector<std::pair<llvm_state, llvm::Type *>> fp_t_clones;
+    fp_t_clones.reserve(3);
+    for (auto i = 0; i < (batch_size == 1u ? 2 : 3); ++i) {
+        // Create a new state and clone fp_t into it.
+        auto new_state = tplt.make_similar();
+        auto *new_fp_t = llvm_clone_type(new_state, fp_t);
+
+        fp_t_clones.emplace_back(std::move(new_state), new_fp_t);
+    }
+
+    // Helper to create a single cfunc.
     auto create_cfunc = [&states_lists, &tape_size_align, &tplt, &name, &dc = std::as_const(dc), nvars, nuvars,
-                         high_accuracy, prec](bool strided, std::uint32_t cur_batch_size) {
+                         high_accuracy,
+                         &fp_t_clones = std::as_const(fp_t_clones)](bool strided, std::uint32_t cur_batch_size) {
         // NOTE: the batch unstrided variant is not supposed to be requested.
         assert(strided || cur_batch_size == 1u);
 
@@ -2144,6 +2123,9 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         auto &states = states_lists[sidx];
 
         assert(states.empty());
+
+        // Fetch the local cloned fp_t.
+        auto *loc_fp_t = fp_t_clones[sidx].second;
 
         // Add a new state and fetch it.
         states.push_back(tplt.make_similar());
@@ -2228,8 +2210,8 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         builder.SetInsertPoint(bb);
 
         // Create the body of the function.
-        const auto tape_sa = add_multi_cfunc_impl<T>(states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars,
-                                                     nuvars, cur_batch_size, high_accuracy, prec, cur_name, tape_ptr);
+        const auto tape_sa = add_multi_cfunc_impl(loc_fp_t, states, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc,
+                                                  nvars, nuvars, cur_batch_size, high_accuracy, cur_name, tape_ptr);
 
         // Add the size/alignment requirements for the tape storage.
         // NOTE: there's no difference in requirements between strided and
@@ -2258,7 +2240,8 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
     //   into a thread-safe tbb vector.
     //
     // At the moment though it looks like the practical gains from such further parallelisation
-    // would not be worth it, perhaps we can reconsider in the future.
+    // would not be worth it, perhaps we can reconsider in the future. It is also not clear how
+    // to deal with thread-unsafe type cloning in this hypothetical scenario.
     if (batch_size == 1u) {
         oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); });
@@ -2285,11 +2268,66 @@ make_multi_cfunc(const llvm_state &tplt, const std::string &name, const std::vec
         std::move(dc), std::move(tape_size_align));
 }
 
+} // namespace
+
+// This function will compile several versions of the input function fn, with input variables vars, in compact mode.
+//
+// The compiled functions are implemented across several llvm_states which are collated together and returned as
+// a single llvm_multi_state (this is the first element of the return tuple). If batch_size is 1,
+// then 2 compiled functions are created - a scalar strided and a scalar unstrided version.
+// If batch size is > 1, then an additional batch-mode strided compiled function is returned.
+// The function names are created using "name" as base name and then mangling in the strided/unstrided
+// property and the batch size.
+//
+// The second element of the return tuple is the decomposition of fn.
+//
+// The third element of the return tuple is a vector of pairs, each pair containing the size and alignment requirements
+// for the externally-provided storage for the evaluation tape. If batch_size is 1, then only a single
+// pair is returned, representing the size/alignment requirements for the scalar-mode evaluation tape.
+// If batch_size > 1, then an additional pair is appended representing the size/alignment requirements
+// for the batch-mode evaluation tape.
+//
+// NOTE: there is a bunch of boilerplate logic overlap here with add_cfunc_impl(). Make sure to
+// coordinate changes between the two functions.
+template <typename T>
+std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
+make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<expression> &fn,
+                 const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode,
+                 long long prec)
+{
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
+
+        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("An invalid precision value of {} was passed to make_multi_cfunc() (the "
+                            "value must be in the [{}, {}] range)",
+                            sprec, mppp::real_prec_min(), mppp::real_prec_max()));
+        }
+    }
+
+#endif
+
+    // Fetch the internal scalar fp type from the template state. We will be cloning
+    // this throughout the rest of the implementation.
+    auto *fp_t = to_internal_llvm_type<T>(tplt, prec);
+
+    return make_multi_cfunc_impl(fp_t, tplt, name, fn, vars, batch_size, high_accuracy, parallel_mode);
+}
+
 // Explicit instantiations.
 #define HEYOKA_MAKE_MULTI_CFUNC_INST(T)                                                                                \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>                 \
-        make_multi_cfunc<T>(const llvm_state &, const std::string &, const std::vector<expression> &,                  \
+        make_multi_cfunc<T>(llvm_state, const std::string &, const std::vector<expression> &,                          \
                             const std::vector<expression> &, std::uint32_t, bool, bool, long long);
 
 HEYOKA_MAKE_MULTI_CFUNC_INST(float)

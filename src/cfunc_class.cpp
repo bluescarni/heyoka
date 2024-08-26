@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <new>
 #include <optional>
 #include <ostream>
 #include <stdexcept>
@@ -49,6 +48,7 @@
 
 #endif
 
+#include <heyoka/detail/aligned_buffer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -58,60 +58,6 @@
 #include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
-
-namespace
-{
-
-// Utilities to create and destroy tape arrays for compiled functions
-// in compact mode. These may have custom alignment requirements due
-// to the use of SIMD instructions, hence we need to use aligned new/delete
-// and a custom deleter for the unique ptr.
-struct aligned_array_deleter {
-    std::align_val_t al{};
-    void operator()(void *ptr) const noexcept
-    {
-        // NOTE: here we are using directly the delete operator (which does not invoke destructors),
-        // rather than a delete expression (which would also invoke destructors). However, because
-        // ptr points to a bytes array, we do not need to explicitly call the destructor here, deallocation will be
-        // sufficient.
-        ::operator delete[](ptr, al);
-    }
-};
-
-using aligned_array_t = std::unique_ptr<std::byte[], aligned_array_deleter>;
-
-aligned_array_t make_aligned_array(std::size_t sz, std::size_t al)
-{
-    assert(al > 0u);
-    assert((al & (al - 1u)) == 0u);
-
-    if (sz == 0u) {
-        return {};
-    } else {
-#if defined(_MSC_VER)
-        // MSVC workaround for this issue:
-        // https://developercommunity.visualstudio.com/t/using-c17-new-stdalign-val-tn-syntax-results-in-er/528320
-
-        // Allocate the raw memory.
-        auto *buf = ::operator new[](sz, std::align_val_t{al});
-
-        // Formally construct the bytes array.
-        auto *ptr = ::new (buf) std::byte[sz];
-
-        // Construct and return the unique ptr.
-        return aligned_array_t{ptr, {.al = std::align_val_t{al}}};
-#else
-        return aligned_array_t{::new (std::align_val_t{al}) std::byte[sz], {.al = std::align_val_t{al}}};
-#endif
-    }
-}
-
-} // namespace
-
-} // namespace detail
 
 template <typename T>
 struct cfunc<T>::impl {
@@ -124,7 +70,7 @@ struct cfunc<T>::impl {
     using c_cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, void *, std::size_t) noexcept;
 
     // Thread-local storage for parallel operations.
-    using ets_item_t = detail::aligned_array_t;
+    using ets_item_t = detail::aligned_buffer_t;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
@@ -135,7 +81,7 @@ struct cfunc<T>::impl {
     std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
     std::vector<std::array<std::size_t, 2>> m_tape_sa;
-    std::vector<detail::aligned_array_t> m_tapes;
+    std::vector<detail::aligned_buffer_t> m_tapes;
     std::variant<cfunc_ptr_t, c_cfunc_ptr_t> m_fptr_scal;
     std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_scal_s;
     std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_batch_s;
@@ -223,7 +169,7 @@ struct cfunc<T>::impl {
         assert(m_tapes.empty());
 
         for (const auto [sz, al] : m_tape_sa) {
-            m_tapes.push_back(detail::make_aligned_array(sz, al));
+            m_tapes.push_back(detail::make_aligned_buffer(sz, al));
         }
     }
 
@@ -260,8 +206,8 @@ struct cfunc<T>::impl {
 
         if (compact_mode) {
             // Build the multi cfunc, and assign the internal members.
-            std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(s, "cfunc", m_fn, m_vars, m_batch_size,
-                                                                              high_accuracy, m_parallel_mode, prec);
+            std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
+                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec);
 
             // Compile.
             std::get<1>(m_states).compile();
@@ -845,8 +791,8 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         typename impl::ets_t ets_batch([this, batch_size]() {
             // NOTE: the batch-mode tape is at index 1 only if the batch
             // size is > 1, otherwise we are using the scalar tape.
-            return detail::make_aligned_array(m_impl->m_tape_sa[batch_size > 1u][0],
-                                              m_impl->m_tape_sa[batch_size > 1u][1]);
+            return detail::make_aligned_buffer(m_impl->m_tape_sa[batch_size > 1u][0],
+                                               m_impl->m_tape_sa[batch_size > 1u][1]);
         });
 
         oneapi::tbb::parallel_invoke(
@@ -865,7 +811,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                               // will block as execution in the parallel region of the cfunc begins. The
                                               // blocked thread could then grab another task from the parallel for loop
                                               // we are currently in, and it would then start writing for a second time
-                                              // into the same tape it already begun writing into, leading to UB.
+                                              // into the same tape it already begun writing into.
                                               oneapi::tbb::this_task_arena::isolate(
                                                   [&]() { batch_iter.template operator()<true>(range, tape_ptr); });
                                           });

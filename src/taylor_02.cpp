@@ -671,7 +671,6 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
 
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet().
-// NOTE: order0, par_ptr and time_ptr are external pointers.
 std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     llvm_state &s, llvm::Type *fp_type, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,

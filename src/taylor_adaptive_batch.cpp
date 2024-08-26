@@ -284,8 +284,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
     // Add the function for the computation of
     // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, detail::to_external_llvm_type<T>(m_llvm.context()), m_dim, m_order,
-                                      m_batch_size, high_accuracy);
+    detail::taylor_add_d_out_function(m_llvm, ext_fp_t, m_dim, m_order, m_batch_size, high_accuracy);
 
     detail::get_logger()->trace("Taylor batch dense output runtime: {}", sw);
     sw.reset();

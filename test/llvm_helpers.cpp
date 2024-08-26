@@ -3030,3 +3030,36 @@ TEST_CASE("switch")
 
 #endif
 }
+
+TEST_CASE("clone type")
+{
+    using detail::llvm_clone_type;
+
+    auto tester = []<typename fp_t>(fp_t) {
+        llvm_state source, dest;
+
+        auto *tp_source = detail::to_external_llvm_type<fp_t>(source.context());
+        auto *tp_dest = llvm_clone_type(dest, tp_source);
+        REQUIRE(tp_dest == detail::to_external_llvm_type<fp_t>(dest.context()));
+
+        auto *vec_tp_source = detail::make_vector_type(tp_source, 4);
+        auto *vec_tp_dest = llvm_clone_type(dest, vec_tp_source);
+        REQUIRE(vec_tp_dest == detail::make_vector_type(tp_dest, 4));
+    };
+
+    tuple_for_each(fp_types, tester);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    llvm_state source, dest;
+
+    auto *tp_ext_source = detail::to_external_llvm_type<mppp::real>(source.context());
+    auto *tp_ext_dest = llvm_clone_type(dest, tp_ext_source);
+    REQUIRE(tp_ext_dest == detail::to_external_llvm_type<mppp::real>(dest.context()));
+
+    auto *tp_int_source = detail::to_internal_llvm_type<mppp::real>(source, 11);
+    auto *tp_int_dest = llvm_clone_type(dest, tp_int_source);
+    REQUIRE(tp_int_dest == detail::to_internal_llvm_type<mppp::real>(dest, 11));
+
+#endif
+}
