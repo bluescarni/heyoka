@@ -17,6 +17,7 @@
 #include <limits>
 #include <list>
 #include <map>
+#include <ranges>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -100,8 +101,6 @@ namespace
 // that do not represent state variables) into parallelisable segments. Within a segment,
 // the definition of a u variable does not depend on any u variable defined within that segment.
 // NOTE: the hidden deps are not considered as dependencies.
-// NOTE: the segments in the return value will contain shallow copies of the
-// expressions in dc.
 std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t n_eq)
 {
     // Log runtime in trace mode.
@@ -177,8 +176,8 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     }
 
 #if !defined(NDEBUG)
-    // Verify s_dc.
 
+    // Verify s_dc.
     decltype(dc.size()) counter = 0;
     for (const auto &s : s_dc) {
         // No segment can be empty.
@@ -199,6 +198,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     }
 
     assert(counter == dc.size() - static_cast<decltype(dc.size())>(n_eq) * 2u);
+
 #endif
 
     get_logger()->debug("Taylor decomposition N of segments: {}", s_dc.size());
@@ -502,45 +502,309 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
     });
 }
 
-// Helper to perform the computation of the Taylor derivatives in compact mode across
-// multiple LLVM states.
-auto taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t, llvm::Value *main_par_ptr,
-                              llvm::Value *main_time_ptr, llvm::Value *main_tape_ptr, const taylor_dc_t &dc,
-                              const std::vector<taylor_dc_t> &s_dc, const std::vector<std::uint32_t> &sv_funcs_dc,
-                              std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                              bool high_accuracy, bool parallel_mode, std::uint32_t max_svf_idx)
+// Helper to create and return the prototype of a driver function for
+// the computation of Taylor derivatives in compact mode. s is the llvm state
+// in which we are operating, cur_idx the index of the driver.
+llvm::Function *taylor_cm_make_driver_proto(llvm_state &s, unsigned cur_idx)
+{
+    auto &builder = s.builder();
+    auto &md = s.module();
+    auto &ctx = s.context();
+
+    // The arguments to the driver are:
+    // - a pointer to the tape,
+    // - pointers to par and time,
+    // - the current diff order.
+    auto *ptr_tp = llvm::PointerType::getUnqual(ctx);
+    std::vector<llvm::Type *> fargs{ptr_tp, ptr_tp, ptr_tp, builder.getInt32Ty()};
+
+    // The driver does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+
+    // Now create the driver.
+    const auto cur_name = fmt::format("heyoka.cm_jet.driver_{}", cur_idx);
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
+    // NOTE: the driver cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
+
+    // Add the arguments' attributes.
+    // NOTE: no aliasing is assumed between the pointer
+    // arguments.
+    auto *tape_arg = f->args().begin();
+    tape_arg->setName("tape_ptr");
+    tape_arg->addAttr(llvm::Attribute::NoCapture);
+    tape_arg->addAttr(llvm::Attribute::NoAlias);
+
+    auto *par_ptr_arg = tape_arg + 1;
+    par_ptr_arg->setName("par_ptr");
+    par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+    par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *time_ptr_arg = tape_arg + 2;
+    time_ptr_arg->setName("time_ptr");
+    time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+    time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *order_arg = tape_arg + 3;
+    order_arg->setName("order");
+
+    return f;
+}
+
+// Helper to codegen the computation of the Taylor derivatives for a block.
+//
+// s is the llvm state in which we are operating, func is the LLVM function for the computation of the Taylor
+// derivative in the block, ncalls the number of times it must be called, gens the generators for the
+// function arguments, tape/par/time_ptr the pointers to the tape/parameter value(s)/time value(s),
+// cur_order the order of the derivative, fp_vec_type the internal vector type used for computations,
+// n_uvars the total number of u variables.
+void taylor_cm_codegen_block_diff(llvm_state &s, llvm::Function *func, std::uint32_t ncalls, const auto &gens,
+                                  llvm::Value *tape_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                  llvm::Value *cur_order, llvm::Type *fp_vec_type, std::uint32_t n_uvars)
+{
+    // LCOV_EXCL_START
+    assert(ncalls > 0u);
+    assert(!gens.empty());
+    assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
+    // LCOV_EXCL_STOP
+
+    // Fetch the builder for the current state.
+    auto &bld = s.builder();
+
+    // We will be manually unrolling loops if ncalls is small enough.
+    // This seems to help with compilation times.
+    constexpr auto max_unroll_n = 5u;
+
+    if (ncalls > max_unroll_n) {
+        // Loop over the number of calls.
+        llvm_loop_u32(s, bld.getInt32(0), bld.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u index of the variable,
+            // - tape of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, bld.CreateCall(func, args));
+        });
+    } else {
+        // The manually-unrolled version of the above.
+        for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
+            auto *cur_call_idx = bld.getInt32(idx);
+            auto u_idx = gens[0](cur_call_idx);
+            std::vector<llvm::Value *> args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
+
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, bld.CreateCall(func, args));
+        }
+    }
+}
+
+// List of evaluation functions in a segment.
+//
+// This map contains a list of functions for the compact-mode evaluation of Taylor derivatives.
+// Each function is mapped to a pair, containing:
+//
+// - the number of times the function is to be invoked,
+// - a list of functors (generators) that generate the arguments for
+//   the invocation.
+//
+// NOTE: we use maps with name-based comparison for the functions. This ensures that the order in which these
+// functions are invoked is always the same. If we used directly pointer
+// comparisons instead, the order could vary across different executions and different platforms. The name
+// mangling we do when creating the function names should ensure that there are no possible name collisions.
+using taylor_cm_seg_f_list_t
+    = std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+               llvm_func_name_compare>;
+
+// Helper to codegen the computation of the Taylor derivatives for a segment.
+//
+// seg is the segment, start_u_idx the index of the first u variable in the segment, s the llvm state
+// we are operating in, fp_t the internal scalar floating-point type, batch_size the batch size, n_uvars
+// the total number of u variables, high_accuracy the high accuracy flag.
+taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint32_t start_u_idx, llvm_state &s,
+                                                      llvm::Type *fp_t, std::uint32_t batch_size, std::uint32_t n_uvars,
+                                                      bool high_accuracy)
+{
+    // Fetch the internal vector type.
+    auto *fp_vec_type = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current builder.
+    auto &bld = s.builder();
+
+    // This structure maps a function to sets of arguments
+    // with which the function is to be called. For instance, if function
+    // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
+    // will contain {f : [[a, b, c], [d, e, f]]}.
+    // After construction, we have verified that for each function
+    // in the map the sets of arguments have all the same size.
+    // NOTE: again, here and below we use name-based ordered maps for the functions.
+    // This ensures that the invocations of cm_make_arg_gen_*(), which create several
+    // global variables, always happen in a well-defined order. If we used an unordered map instead,
+    // the variables would be created in a "random" order, which would result in a
+    // unnecessary miss for the in-memory cache machinery when two logically-identical
+    // LLVM modules are considered different because of the difference in the order
+    // of declaration of global variables.
+    std::map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>, llvm_func_name_compare>
+        tmp_map;
+
+    for (const auto &ex : seg) {
+        // Get the function for the computation of the derivative.
+        auto *func = taylor_c_diff_func(s, fp_t, ex.first, n_uvars, batch_size, high_accuracy);
+
+        // Insert the function into tmp_map.
+        const auto [it, is_new_func] = tmp_map.try_emplace(func);
+
+        assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
+
+        // Convert the variables/constants in the current dc
+        // element into a set of indices/constants.
+        const auto cdiff_args = udef_to_variants(ex.first, ex.second);
+
+        // LCOV_EXCL_START
+        if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
+            throw std::invalid_argument(
+                fmt::format("Inconsistent arity detected in a Taylor derivative function in compact "
+                            "mode: the same function is being called with both {} and {} arguments",
+                            it->second.back().size() - 1u, cdiff_args.size()));
+        }
+        // LCOV_EXCL_STOP
+
+        // Add the new set of arguments.
+        it->second.emplace_back();
+        // Add the idx of the u variable.
+        it->second.back().emplace_back(start_u_idx);
+        // Add the actual function arguments.
+        it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
+
+        // Update start_u_idx.
+        ++start_u_idx;
+    }
+
+    // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
+    // to {f : [[a, d], [b, e], [c, f]]}.
+    std::map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>,
+             llvm_func_name_compare>
+        tmp_map_transpose;
+    for (const auto &[func, vv] : tmp_map) {
+        assert(!vv.empty()); // LCOV_EXCL_LINE
+
+        // Add the function.
+        const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
+        assert(ins_status); // LCOV_EXCL_LINE
+
+        const auto n_calls = vv.size();
+        const auto n_args = vv[0].size();
+        // NOTE: n_args must be at least 1 because the u idx
+        // is prepended to the actual function arguments in
+        // the tmp_map entries.
+        assert(n_args >= 1u); // LCOV_EXCL_LINE
+
+        for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
+            // Build the vector of values corresponding
+            // to the current argument index.
+            std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+            for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
+                tmp_c_vec.push_back(vv[j][i]);
+            }
+
+            // Turn tmp_c_vec (a vector of variants) into a variant
+            // of vectors, and insert the result.
+            it->second.push_back(vv_transpose(tmp_c_vec));
+        }
+    }
+
+    // Create the taylor_cm_seg_f_list_t for the current segment.
+    taylor_cm_seg_f_list_t seg_map;
+
+    for (const auto &[func, vv] : tmp_map_transpose) {
+        // NOTE: vv.size() is now the number of arguments. We know it cannot
+        // be zero because the functions to compute the Taylor derivatives
+        // in compact mode always have at least 1 argument (i.e., the index
+        // of the u variable whose derivative is being computed).
+        assert(!vv.empty()); // LCOV_EXCL_LINE
+
+        // Add the function.
+        const auto [it, ins_status] = seg_map.try_emplace(func);
+        assert(ins_status); // LCOV_EXCL_LINE
+
+        // Set the number of calls for this function.
+        it->second.first
+            = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
+        assert(it->second.first > 0u); // LCOV_EXCL_LINE
+
+        // Create the g functions for each argument.
+        for (const auto &v : vv) {
+            it->second.second.push_back(std::visit(
+                [&s, fp_t](const auto &x) {
+                    using type = uncvref_t<decltype(x)>;
+
+                    if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
+                        return cm_make_arg_gen_vidx(s, x);
+                    } else {
+                        return cm_make_arg_gen_vc(s, fp_t, x);
+                    }
+                },
+                v));
+        }
+    }
+
+    // Fetch the arguments from the driver prototype.
+    auto *driver_f = bld.GetInsertBlock()->getParent();
+    assert(driver_f != nullptr);
+    assert(driver_f->arg_size() == 4u);
+    auto *tape_ptr = driver_f->args().begin();
+    auto *par_ptr = driver_f->args().begin() + 1;
+    auto *time_ptr = driver_f->args().begin() + 2;
+    auto *cur_order = driver_f->args().begin() + 3;
+
+    // Compute the derivatives for this segment.
+    for (const auto &[func, fpair] : seg_map) {
+        const auto &[ncalls, gens] = fpair;
+
+        taylor_cm_codegen_block_diff(s, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order, fp_vec_type,
+                                     n_uvars);
+    }
+
+    return seg_map;
+}
+
+// Helper to codegen the computation of the Taylor derivatives in compact mode via
+// driver functions implemented across multiple LLVM states. main_state is the state in which the stepper is defined,
+// main_fp_t the internal scalar floating-point type as defined in the main state,
+// main_par/main_time/main_tape_ptr the parameters/time/tape pointers as defined in the
+// main state, dc the Taylor decomposition, s_dc its segmented counterpart, n_eq the number
+// of equations/state variables, order the Taylor order, batch_size the batch size,
+// high_accuracy the high accuracy flag, parallel_mode the parallel mode flag, max_svf_idx
+// the maximum index in the decomposition of the sv funcs (or zero if there are no sv funcs).
+//
+// The return value is a list of states in which the driver functions have been defined.
+std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t,
+                                                 llvm::Value *main_par_ptr, llvm::Value *main_time_ptr,
+                                                 llvm::Value *main_tape_ptr, const taylor_dc_t &dc,
+                                                 const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
+                                                 std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                                 bool high_accuracy, bool parallel_mode, std::uint32_t max_svf_idx)
 {
     // TODO implement.
     (void)parallel_mode;
-
-    // Generate the global arrays for the computation of the derivatives
-    // of the state variables in the main state.
-    const auto svd_gl = taylor_c_make_sv_diff_globals(main_state, main_fp_t, dc, n_uvars);
-
-    // Structure used to log, in trace mode, the breakdown of each segment.
-    // For each segment, this structure contains the number of invocations
-    // of each function in the segment. It will be unused if we are not tracing.
-    std::vector<std::vector<std::uint32_t>> segment_bd;
-
-    // Are we tracing?
-    const auto is_tracing = get_logger()->should_log(spdlog::level::trace);
-
-    // List of evaluation functions in a segment.
-    //
-    // This map contains a list of functions for the compact-mode evaluation of Taylor derivatives.
-    // Each function is mapped to a pair, containing:
-    //
-    // - the number of times the function is to be invoked,
-    // - a list of functors (generators) that generate the arguments for
-    //   the invocation.
-    //
-    // NOTE: we use maps with name-based comparison for the functions. This ensures that the order in which these
-    // functions are invoked is always the same. If we used directly pointer
-    // comparisons instead, the order could vary across different executions and different platforms. The name
-    // mangling we do when creating the function names should ensure that there are no possible name collisions.
-    using seg_f_list_t
-        = std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
-                   llvm_func_name_compare>;
 
     // Init the list of states.
     // NOTE: we use lists here because it is convenient to have
@@ -557,115 +821,23 @@ auto taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t, llv
     states.push_back(main_state.make_similar());
     auto *cur_state = &states.back();
 
+    // Generate the global arrays for the computation of the derivatives
+    // of the state variables in the main state.
+    const auto svd_gl = taylor_c_make_sv_diff_globals(main_state, main_fp_t, dc, n_uvars);
+
+    // Structure used to log, in trace mode, the breakdown of each segment.
+    // For each segment, this structure contains the number of invocations
+    // of each function in the segment. It will be unused if we are not tracing.
+    std::vector<std::vector<std::uint32_t>> segment_bd;
+
+    // Are we tracing?
+    const auto is_tracing = get_logger()->should_log(spdlog::level::trace);
+
+    // Do we need to compute the last-order derivatives for the sv_funcs?
+    const auto need_svf_lo = max_svf_idx >= n_eq;
+
     // Index of the state we are currently operating on.
     boost::safe_numerics::safe<unsigned> cur_state_idx = 0;
-
-    // Helper to create and return the prototype of a driver function in the state s.
-    auto make_driver_proto = [](llvm_state &s, unsigned cur_idx) {
-        auto &builder = s.builder();
-        auto &md = s.module();
-        auto &ctx = s.context();
-
-        // The arguments to the driver are:
-        // - a pointer to the tape,
-        // - pointers to par and time,
-        // - the current diff order.
-        auto *ptr_tp = llvm::PointerType::getUnqual(ctx);
-        std::vector<llvm::Type *> fargs{ptr_tp, ptr_tp, ptr_tp, builder.getInt32Ty()};
-
-        // The driver does not return anything.
-        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-        assert(ft != nullptr); // LCOV_EXCL_LINE
-
-        // Now create the driver.
-        const auto cur_name = fmt::format("heyoka.cm_jet.driver_{}", cur_idx);
-        auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, cur_name, &md);
-        // NOTE: the driver cannot call itself recursively.
-        f->addFnAttr(llvm::Attribute::NoRecurse);
-
-        // Add the arguments' attributes.
-        // NOTE: no aliasing is assumed between the pointer
-        // arguments.
-        auto *tape_arg = f->args().begin();
-        tape_arg->setName("tape_ptr");
-        tape_arg->addAttr(llvm::Attribute::NoCapture);
-        tape_arg->addAttr(llvm::Attribute::NoAlias);
-
-        auto *par_ptr_arg = tape_arg + 1;
-        par_ptr_arg->setName("par_ptr");
-        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
-        par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
-        par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
-
-        auto *time_ptr_arg = tape_arg + 2;
-        time_ptr_arg->setName("time_ptr");
-        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
-        time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
-        time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
-
-        return f;
-    };
-
-    // TODO doc fix.
-    // Helper to compute the Taylor derivatives for a block.
-    // func is the LLVM function for the computation of the Taylor derivative in the block,
-    // ncalls the number of times it must be called, gens the generators for the
-    // function arguments and cur_order the order of the derivative. s is the llvm state
-    // in which we are computing the derivatives.
-    auto block_diff = [n_uvars](llvm_state &s, llvm::Function *func, std::uint32_t ncalls, const auto &gens,
-                                llvm::Value *tape_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                llvm::Value *cur_order, llvm::Type *fp_vec_type) {
-        // LCOV_EXCL_START
-        assert(ncalls > 0u);
-        assert(!gens.empty());
-        assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
-        // LCOV_EXCL_STOP
-
-        // Fetch the builder for the current state.
-        auto &bld = s.builder();
-
-        // We will be manually unrolling loops if ncalls is small enough.
-        // This seems to help with compilation times.
-        constexpr auto max_unroll_n = 5u;
-
-        if (ncalls > max_unroll_n) {
-            // Loop over the number of calls.
-            llvm_loop_u32(s, bld.getInt32(0), bld.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                // Create the u variable index from the first generator.
-                auto u_idx = gens[0](cur_call_idx);
-
-                // Initialise the vector of arguments with which func must be called. The following
-                // initial arguments are always present:
-                // - current Taylor order,
-                // - u index of the variable,
-                // - tape of derivatives,
-                // - pointer to the param values,
-                // - pointer to the time value(s).
-                std::vector<llvm::Value *> args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
-
-                // Create the other arguments via the generators.
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
-                }
-
-                // Calculate the derivative and store the result.
-                taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, bld.CreateCall(func, args));
-            });
-        } else {
-            // The manually-unrolled version of the above.
-            for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
-                auto *cur_call_idx = bld.getInt32(idx);
-                auto u_idx = gens[0](cur_call_idx);
-                std::vector<llvm::Value *> args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
-
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
-                }
-
-                taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, bld.CreateCall(func, args));
-            }
-        }
-    };
 
     // NOTE: unlike in compiled functions, we cannot at the same time
     // declare and invoke the drivers from the main module as the invocation
@@ -677,12 +849,17 @@ auto taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t, llv
     // Declarations of the drivers in the main state.
     std::vector<llvm::Function *> main_driver_decls;
     // Add the declaration for the first driver.
-    main_driver_decls.push_back(make_driver_proto(main_state, cur_state_idx));
+    main_driver_decls.push_back(taylor_cm_make_driver_proto(main_state, cur_state_idx));
+
+    // The driver function for the evaluation of the segment
+    // containing max_svf_idx. Will remain null if we do not need
+    // to compute the last-order derivatives for the sv funcs.
+    llvm::Function *max_svf_driver = nullptr;
 
     // Add the driver declaration to the current state,
     // and start insertion into the driver.
-    cur_state->builder().SetInsertPoint(
-        llvm::BasicBlock::Create(cur_state->context(), "entry", make_driver_proto(*cur_state, cur_state_idx)));
+    cur_state->builder().SetInsertPoint(llvm::BasicBlock::Create(
+        cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
 
     // Variable to keep track of how many blocks have been codegenned
     // in the current state.
@@ -693,174 +870,80 @@ auto taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t, llv
     // needs more investigation.
     constexpr auto max_n_cg_blocks = 20u;
 
-    // Variable to keep track of the u variable
-    // on whose definition we are operating.
-    auto cur_u_idx = n_eq;
+    // Variable to keep track of the index of the first u variable
+    // in a segment.
+    auto start_u_idx = n_eq;
 
-    // Iterate over the segments in s_dc.
+    // Helper to finalise the current driver function and create a new one.
+    auto start_new_driver = [&cur_state, &states, &main_state, &n_cg_blocks, &cur_state_idx, &main_driver_decls]() {
+        // Finalise the current driver.
+        cur_state->builder().CreateRetVoid();
+
+        // Create the new current state.
+        states.push_back(main_state.make_similar());
+        cur_state = &states.back();
+
+        // Reset/update the counters.
+        n_cg_blocks = 0;
+        ++cur_state_idx;
+
+        // Add the driver declaration to the main state.
+        main_driver_decls.push_back(taylor_cm_make_driver_proto(main_state, cur_state_idx));
+
+        // Add the driver declaration to the current state,
+        // and start insertion into the driver.
+        cur_state->builder().SetInsertPoint(llvm::BasicBlock::Create(
+            cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
+    };
+
+    // Iterate over the segments in s_dc and codegen the code for the
+    // computation of Taylor derivatives.
     for (const auto &seg : s_dc) {
-        if (n_cg_blocks > max_n_cg_blocks) {
-            // We have codegenned enough blocks for this state. Create the return
-            // value for the current driver, and move to the next one.
-            cur_state->builder().CreateRetVoid();
+        // Cache the number of expressions in the segment.
+        const auto seg_n_ex = static_cast<std::uint32_t>(seg.size());
 
-            // Create the new current state.
-            states.push_back(main_state.make_similar());
-            cur_state = &states.back();
+        // Are we in the segment containing max_svf_idx? We are if:
+        //
+        // - we need to compute the last-order derivatives of the sv funcs,
+        // - max_svf_idx is somewhere within this segment.
+        //
+        // In such a case, we create a driver specifically for this segment, which we will
+        // invoke again at the end of this function to compute the last-order derivatives
+        // of the sv funcs.
+        const auto is_svf_seg = need_svf_lo && max_svf_idx >= start_u_idx && max_svf_idx < (start_u_idx + seg_n_ex);
 
-            // Reset/update the counters.
-            n_cg_blocks = 0;
-            ++cur_state_idx;
+        if (n_cg_blocks > max_n_cg_blocks || is_svf_seg) {
+            // Either we have codegenned enough blocks for this state, or we are
+            // in the max_svf_idx state. Finalise the current driver and start the new one.
+            start_new_driver();
 
-            // Add the driver declaration to the main state.
-            main_driver_decls.push_back(make_driver_proto(main_state, cur_state_idx));
-
-            // Add the driver declaration to the current state,
-            // and start insertion into the driver.
-            cur_state->builder().SetInsertPoint(
-                llvm::BasicBlock::Create(cur_state->context(), "entry", make_driver_proto(*cur_state, cur_state_idx)));
+            // Assign max_svf_driver if needed.
+            if (is_svf_seg) {
+                assert(max_svf_driver == nullptr);
+                max_svf_driver = main_driver_decls.back();
+            }
         }
 
-        // Fetch the internal fp type and its vector counterpart for the current state.
+        // Fetch the internal fp type for the current state.
         auto *fp_t = llvm_clone_type(*cur_state, main_fp_t);
-        auto *fp_vec_type = make_vector_type(fp_t, batch_size);
 
-        // Fetch the current builder.
-        auto &cur_builder = cur_state->builder();
-
-        // This structure maps a function to sets of arguments
-        // with which the function is to be called. For instance, if function
-        // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
-        // will contain {f : [[a, b, c], [d, e, f]]}.
-        // After construction, we have verified that for each function
-        // in the map the sets of arguments have all the same size.
-        // NOTE: again, here and below we use name-based ordered maps for the functions.
-        // This ensures that the invocations of cm_make_arg_gen_*(), which create several
-        // global variables, always happen in a well-defined order. If we used an unordered map instead,
-        // the variables would be created in a "random" order, which would result in a
-        // unnecessary miss for the in-memory cache machinery when two logically-identical
-        // LLVM modules are considered different because of the difference in the order
-        // of declaration of global variables.
-        std::map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>,
-                 llvm_func_name_compare>
-            tmp_map;
-
-        for (const auto &ex : seg) {
-            // Get the function for the computation of the derivative.
-            auto *func = taylor_c_diff_func(*cur_state, fp_t, ex.first, n_uvars, batch_size, high_accuracy);
-
-            // Insert the function into tmp_map.
-            const auto [it, is_new_func] = tmp_map.try_emplace(func);
-
-            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
-
-            // Convert the variables/constants in the current dc
-            // element into a set of indices/constants.
-            const auto cdiff_args = udef_to_variants(ex.first, ex.second);
-
-            // LCOV_EXCL_START
-            if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
-                throw std::invalid_argument(
-                    fmt::format("Inconsistent arity detected in a Taylor derivative function in compact "
-                                "mode: the same function is being called with both {} and {} arguments",
-                                it->second.back().size() - 1u, cdiff_args.size()));
-            }
-            // LCOV_EXCL_STOP
-
-            // Add the new set of arguments.
-            it->second.emplace_back();
-            // Add the idx of the u variable.
-            it->second.back().emplace_back(cur_u_idx);
-            // Add the actual function arguments.
-            it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
-
-            ++cur_u_idx;
-        }
-
-        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
-        // to {f : [[a, d], [b, e], [c, f]]}.
-        std::map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>,
-                 llvm_func_name_compare>
-            tmp_map_transpose;
-        for (const auto &[func, vv] : tmp_map) {
-            assert(!vv.empty()); // LCOV_EXCL_LINE
-
-            // Add the function.
-            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
-            assert(ins_status); // LCOV_EXCL_LINE
-
-            const auto n_calls = vv.size();
-            const auto n_args = vv[0].size();
-            // NOTE: n_args must be at least 1 because the u idx
-            // is prepended to the actual function arguments in
-            // the tmp_map entries.
-            assert(n_args >= 1u); // LCOV_EXCL_LINE
-
-            for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
-                // Build the vector of values corresponding
-                // to the current argument index.
-                std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
-                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
-                    tmp_c_vec.push_back(vv[j][i]);
-                }
-
-                // Turn tmp_c_vec (a vector of variants) into a variant
-                // of vectors, and insert the result.
-                it->second.push_back(vv_transpose(tmp_c_vec));
-            }
-        }
-
-        // Create the seg_f_list_t for the current segment.
-        seg_f_list_t seg_map;
-
-        for (const auto &[func, vv] : tmp_map_transpose) {
-            // NOTE: vv.size() is now the number of arguments. We know it cannot
-            // be zero because the functions to compute the Taylor derivatives
-            // in compact mode always have at least 1 argument (i.e., the index
-            // of the u variable whose derivative is being computed).
-            assert(!vv.empty()); // LCOV_EXCL_LINE
-
-            // Add the function.
-            const auto [it, ins_status] = seg_map.try_emplace(func);
-            assert(ins_status); // LCOV_EXCL_LINE
-
-            // Set the number of calls for this function.
-            it->second.first
-                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(it->second.first > 0u); // LCOV_EXCL_LINE
-
-            // Create the g functions for each argument.
-            for (const auto &v : vv) {
-                it->second.second.push_back(std::visit(
-                    [cur_state, fp_t](const auto &x) {
-                        using type = uncvref_t<decltype(x)>;
-
-                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            return cm_make_arg_gen_vidx(*cur_state, x);
-                        } else {
-                            return cm_make_arg_gen_vc(*cur_state, fp_t, x);
-                        }
-                    },
-                    v));
-            }
-        }
-
-        // Fetch the arguments from the driver prototype.
-        auto *driver_f = cur_builder.GetInsertBlock()->getParent();
-        auto *tape_ptr = driver_f->args().begin();
-        auto *par_ptr = driver_f->args().begin() + 1;
-        auto *time_ptr = driver_f->args().begin() + 2;
-        auto *cur_order = driver_f->args().begin() + 3;
-
-        // Compute the derivatives for this segment.
-        for (const auto &[func, fpair] : seg_map) {
-            const auto &[ncalls, gens] = fpair;
-
-            block_diff(*cur_state, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order, fp_vec_type);
-        }
+        // Codegen the computation of the derivatives for this segment.
+        const auto seg_map
+            = taylor_cm_codegen_segment_diff(seg, start_u_idx, *cur_state, fp_t, batch_size, n_uvars, high_accuracy);
 
         // Update the number of codegenned blocks.
         n_cg_blocks += seg_map.size();
+
+        // Update start_u_idx.
+        start_u_idx += seg_n_ex;
+
+        // If we codegenned the max_svf_idx driver, start immediately a new driver.
+        // We want the max_svf_idx driver to contain the codegen for a single segment
+        // and nothing more, otherwise we end up doing unnecessary work when computing
+        // the last-order derivatives of the sv funcs.
+        if (is_svf_seg) {
+            start_new_driver();
+        }
 
         // LCOV_EXCL_START
         // Update segment_bd if needed.
@@ -907,40 +990,43 @@ auto taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t, llv
     taylor_c_compute_sv_diffs(main_state, main_fp_t, svd_gl, main_tape_ptr, main_par_ptr, n_uvars,
                               main_bld.getInt32(order), batch_size);
 
-    // Compute the last-order derivatives for the sv_funcs, if any. Because the sv funcs
+    // Finally, we compute the last-order derivatives for the sv_funcs, if needed. Because the sv funcs
     // correspond to u variables somewhere in the decomposition, we will have to compute the
     // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
     // have been properly computed.
-    if (max_svf_idx >= n_eq) {
-        // Monitor the starting index of the current
-        // segment while iterating on the segments.
-        auto cur_start_u_idx = n_eq;
+    if (need_svf_lo) {
+        assert(max_svf_driver != nullptr);
 
-        for (decltype(s_dc.size()) seg_idx = 0; seg_idx < s_dc.size(); ++seg_idx) {
-            if (cur_start_u_idx > max_svf_idx) {
-                // We computed all the necessary derivatives, break out.
+        // What we do here is to iterate over all the drivers, invoke them one by one,
+        // and break out when we have detected max_svf_driver.
+        for (auto *cur_driver_f : main_driver_decls) {
+            main_bld.CreateCall(cur_driver_f, {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(order)});
+
+            if (cur_driver_f == max_svf_driver) {
                 break;
             }
-
-            // Invoke the driver for the current segment.
-            main_bld.CreateCall(main_driver_decls[seg_idx],
-                                {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(order)});
-
-            // Update cur_start_u_idx.
-            cur_start_u_idx += static_cast<std::uint32_t>(s_dc[seg_idx].size());
         }
     }
+
+    // Return the states.
+    // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
+    // the custom transform:
+    //
+    // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
+    auto sview = states | std::views::transform([](auto &s) -> auto && { return std::move(s); });
+    return std::vector(std::ranges::begin(sview), std::ranges::end(sview));
 }
 
 // Helper for the computation of a jet of derivatives in compact mode,
-// used in taylor_compute_jet(). The return value are the size/alignment
-// requirements for the tape of derivatives. All LLVM values and types
-// passed to this function are defined in the main state.
-std::array<std::size_t, 2> taylor_compute_jet_compact_mode(
+// used in taylor_compute_jet(). The return values are the size/alignment
+// requirements for the tape of derivatives and the list of states in which
+// the drivers are implemented. All LLVM values and types passed to this function are defined in the main state.
+std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_jet_compact_mode(
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    llvm_state &main_state, llvm::Type *main_fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
-    llvm::Value *tape_ptr, const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
-    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode)
+    llvm_state &main_state, llvm::Type *main_fp_t, llvm::Value *order0, llvm::Value *main_par_ptr,
+    llvm::Value *main_time_ptr, llvm::Value *main_tape_ptr, const taylor_dc_t &dc,
+    const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+    std::uint32_t batch_size, bool high_accuracy, bool parallel_mode)
 {
     auto &main_bld = main_state.builder();
     auto &main_md = main_state.module();
@@ -990,9 +1076,9 @@ std::array<std::size_t, 2> taylor_compute_jet_compact_mode(
     // lifetime of tape_ptr begins here and ends at the end of the function,
     // so that LLVM can assume that any value stored in it cannot be possibly
     // used outside this function.
-    main_bld.CreateLifetimeStart(tape_ptr, main_bld.getInt64(tape_sz));
+    main_bld.CreateLifetimeStart(main_tape_ptr, main_bld.getInt64(tape_sz));
 
-    // Copy over the order-0 derivatives of the state variables.
+    // Copy the order-0 derivatives of the state variables into the tape.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(main_state, main_bld.getInt32(0), main_bld.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from order0.
@@ -1003,13 +1089,17 @@ std::array<std::size_t, 2> taylor_compute_jet_compact_mode(
         auto *vec = ext_load_vector_from_memory(main_state, main_fp_t, ptr, batch_size);
 
         // Store into tape_ptr.
-        taylor_c_store_diff(main_state, main_fp_vec_t, tape_ptr, n_uvars, main_bld.getInt32(0), cur_var_idx, vec);
+        taylor_c_store_diff(main_state, main_fp_vec_t, main_tape_ptr, n_uvars, main_bld.getInt32(0), cur_var_idx, vec);
     });
+
+    // Codegen the computation of the Taylor derivatives across multiple states.
+    auto states = taylor_compute_jet_multi(main_state, main_fp_t, main_par_ptr, main_time_ptr, main_tape_ptr, dc, s_dc,
+                                           n_eq, n_uvars, order, batch_size, high_accuracy, parallel_mode, max_svf_idx);
 
     get_logger()->trace("Taylor IR creation compact mode runtime: {}", sw);
 
-    // Return the array of derivatives of the u variables and its type.
-    return std::make_pair(diff_arr, static_cast<llvm::Type *>(diff_array_type));
+    // Return the tape size/alignment and the list of states containing the drivers.
+    return std::make_pair(std::array<std::size_t, 2>{tape_sz, tape_al}, std::move(states));
 }
 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
@@ -1054,10 +1144,11 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 // order0, par_ptr and time_ptr are all external pointers.
 //
 // The return value is a variant containing either:
-// - in compact mode, the size/alignment requirements for the tape of derivatives,
-// - otherwise, the jet of derivatives of the state variables and sv_funcs
+// - in compact mode, the size/alignment requirements for the tape of derivatives
+//   and the list of states in which the driver functions are implemented, or
+// - the jet of derivatives of the state variables and sv_funcs
 //   up to order 'order'.
-std::variant<std::array<std::size_t, 2>, std::vector<llvm::Value *>>
+std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    llvm::Value *tape_ptr, const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc,
                    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,

@@ -119,6 +119,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_state;
     ar << m_time;
     ar << m_llvm_state;
+    ar << m_tplt_state;
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
@@ -140,6 +141,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_state;
     ar >> m_time;
     ar >> m_llvm_state;
+    ar >> m_tplt_state;
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
@@ -168,16 +170,18 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
 // of compact mode. It will be converted into a multi state if needed at a
 // later stage.
 template <typename T>
-taylor_adaptive<T>::i_data::i_data(llvm_state s) : m_llvm_state(std::move(s))
+taylor_adaptive<T>::i_data::i_data(llvm_state s)
+    : m_llvm_state(std::move(s)), m_tplt_state(std::get<0>(m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
 taylor_adaptive<T>::i_data::i_data(const i_data &other)
-    : m_state(other.m_state), m_time(other.m_time), m_llvm_state(other.m_llvm_state), m_dim(other.m_dim),
-      m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
-      m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys), m_tm_data(other.m_tm_data)
+    : m_state(other.m_state), m_time(other.m_time), m_llvm_state(other.m_llvm_state), m_tplt_state(other.m_tplt_state),
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
+      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa),
+      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
+      m_tm_data(other.m_tm_data)
 {
     // Recover the function pointers.
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);

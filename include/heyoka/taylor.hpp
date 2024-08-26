@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -98,17 +99,19 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Type *, ll
 HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *,
                                            llvm::Value *, llvm::Value *);
 
-taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
-                                                 const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-                                                 bool, const std::vector<expression> &, bool, bool, std::uint32_t);
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, const std::string &,
+                                     const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool,
+                                     const std::vector<expression> &, bool, bool, std::uint32_t);
 
-taylor_dc_t taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
-                                     const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool, bool,
-                                     bool, std::uint32_t);
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
+                         const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool, bool, bool,
+                         std::uint32_t);
 
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
-std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>>
+std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *,
                    const taylor_dc_t &, const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t,
                    std::uint32_t, bool, bool, bool);
@@ -507,6 +510,7 @@ private:
     explicit taylor_adaptive(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+    HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
     using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
@@ -548,7 +552,7 @@ public:
 
     ~taylor_adaptive();
 
-    [[nodiscard]] const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const std::variant<llvm_state, llvm_multi_state> &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 

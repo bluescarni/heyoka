@@ -69,6 +69,10 @@ struct taylor_adaptive<T>::i_data {
     detail::dfloat<T> m_time;
     // The LLVM (multi)state.
     std::variant<llvm_state, llvm_multi_state> m_llvm_state;
+    // A template LLVM state we keep around to create states
+    // similar to m_llvm_state as needed. This is created with the
+    // same settings as m_llvm_state.
+    llvm_state m_tplt_state;
     // Dimension of the system.
     std::uint32_t m_dim{};
     // Taylor decomposition.

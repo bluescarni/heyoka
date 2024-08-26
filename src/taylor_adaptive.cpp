@@ -43,6 +43,7 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
+#include <heyoka/detail/aligned_buffer.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
@@ -56,6 +57,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
@@ -174,13 +176,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             std::vector<nt_event_t> ntes, bool parallel_mode,
                                             [[maybe_unused]] std::optional<long long> prec)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
@@ -191,6 +193,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -394,7 +398,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     auto *fp_t = detail::internal_llvm_type_like(std::get<0>(m_llvm_state), m_tol);
 
     // The state(s) which will be returned by the construction of the stepper function.
-    std::variant<llvm_state, std::vector<llvm_state>> states;
+    // If we are not in compact mode, this vector will remain empty.
+    std::vector<llvm_state> states;
 
     // Add the stepper function.
     if (with_events) {
@@ -407,11 +412,10 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, states)
-            = detail::taylor_add_adaptive_step_with_events(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step_e", sys, 1,
-                                                           compact_mode, ee, high_accuracy, parallel_mode, m_order);
+        std::tie(m_dc, m_tape_sa, states) = detail::taylor_add_adaptive_step_with_events(
+            std::get<0>(m_llvm_state), fp_t, "step_e", sys, 1, compact_mode, ee, high_accuracy, parallel_mode, m_order);
     } else {
-        std::tie(m_dc, states)
+        std::tie(m_dc, m_tape_sa, states)
             = detail::taylor_add_adaptive_step(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step", sys, 1, high_accuracy,
                                                compact_mode, parallel_mode, m_order);
     }
@@ -440,27 +444,43 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // Log runtimes in trace mode.
     spdlog::stopwatch sw;
 
-    // Add the function for the computation of
-    // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, fp_t, m_dim, m_order, 1, high_accuracy);
+    // Add the function for the computation of the dense output.
+    // NOTE: in compact mode, the dense output function will be added to the main state.
+    detail::taylor_add_d_out_function(std::get<0>(m_llvm_state), fp_t, m_dim, m_order, 1, high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
     sw.reset();
 
-    // Run the jit.
-    m_llvm.compile();
+    // Run the jit compilation.
+    if (compact_mode) {
+        // Add the main state to the list of states.
+        states.push_back(std::move(std::get<0>(m_llvm_state)));
+
+        // Reverse the list of states so that we start with the
+        // compilation of the main state first, which may be bigger.
+        std::ranges::reverse(states);
+
+        // Create the multi state and assign it.
+        m_llvm_state = llvm_multi_state(std::move(states));
+
+        // Compile.
+        std::get<1>(m_llvm_state).compile();
+
+        // Create the storage for the tape of derivatives.
+        const auto [sz, al] = m_tape_sa;
+        m_tape = detail::make_aligned_buffer(sz, al);
+    } else {
+        std::get<0>(m_llvm_state).compile();
+    }
 
     detail::get_logger()->trace("Taylor LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
-    if (with_events) {
-        m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
-    } else {
-        m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_llvm.jit_lookup("step"));
-    }
+    assign_stepper(with_events);
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<typename i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = std::visit(
+        [](auto &s) { return reinterpret_cast<typename i_data::d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Setup the vector for the Taylor coefficients.
     using su32_t = boost::safe_numerics::safe<std::uint32_t>;
@@ -489,27 +509,27 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 #endif
 
     // Init the event data structure if needed.
-    // NOTE: this can be done in parallel with the rest of the constructor,
+    // NOTE: in principle this can be done in parallel with the rest of the constructor,
     // once we have m_order/m_dim and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
-                                              m_state[0]);
+        m_ed_data = std::make_unique<ed_data>(m_tplt_state.make_similar(), std::move(tes), std::move(ntes), m_order,
+                                              m_dim, m_state[0]);
     }
 
     if (auto_ic_setup) {
         // Finish the automatic setup of the ics for a variational
         // integrator.
-        detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, &m_time.hi, std::get<1>(vsys), 1, m_high_accuracy,
-                                         m_compact_mode);
+        detail::setup_variational_ics_t0(m_tplt_state, m_state, m_pars, &m_time.hi, std::get<1>(vsys), 1,
+                                         m_high_accuracy, m_compact_mode);
     }
 
     if (is_variational) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tm_data.emplace(std::get<1>(vsys), static_cast<long long>(this->get_prec()), m_llvm, 1);
+            m_tm_data.emplace(std::get<1>(vsys), static_cast<long long>(this->get_prec()), m_tplt_state, 1);
         } else {
 #endif
-            m_tm_data.emplace(std::get<1>(vsys), 0, m_llvm, 1);
+            m_tm_data.emplace(std::get<1>(vsys), 0, m_tplt_state, 1);
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -548,11 +568,7 @@ taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data)),
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
-    if (m_ed_data) {
-        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
-    } else {
-        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
-    }
+    assign_stepper(static_cast<bool>(m_ed_data));
 }
 
 template <typename T>
@@ -615,12 +631,8 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
         ar >> m_i_data;
         ar >> m_ed_data;
 
-        // Recover the function pointers.
-        if (m_ed_data) {
-            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
-        } else {
-            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
-        }
+        // Recover the stepper.
+        assign_stepper(static_cast<bool>(m_ed_data));
         // LCOV_EXCL_START
     } catch (...) {
         // Reset to def-cted state in case of exceptions.
@@ -706,14 +718,20 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
 
     auto h = max_delta_t;
 
-    if (m_step_f.index() == 0u) {
+    if (m_step_f.index() == 0u || m_step_f.index() == 2u) {
         assert(!m_ed_data); // LCOV_EXCL_LINE
 
         // Invoke the vanilla stepper.
-        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
+        if (m_step_f.index() == 0u) {
+            std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
+        } else {
+            std::get<2>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr,
+                                  m_tape.get());
+        }
 
         // Update the time.
         m_time += h;
@@ -737,7 +755,12 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
         auto max_abs_state = detail::num_zero_like(h);
-        std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
+        if (m_step_f.index() == 1u) {
+            std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
+        } else {
+            std::get<3>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state,
+                                  m_tape.get());
+        }
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
@@ -1043,7 +1066,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
 
     // Check the current time.
@@ -1129,7 +1152,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
             }
 
             // Construct the return value.
-            continuous_output<T> ret(m_llvm.make_similar());
+            continuous_output<T> ret(m_tplt_state.make_similar());
 
             // Fill in the data.
             ret.m_tcs = std::move(c_out_tcs);
@@ -1661,9 +1684,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 }
 
 template <typename T>
-const llvm_state &taylor_adaptive<T>::get_llvm_state() const
+const std::variant<llvm_state, llvm_multi_state> &taylor_adaptive<T>::get_llvm_state() const
 {
-    return m_i_data->m_llvm;
+    return m_i_data->m_llvm_state;
 }
 
 template <typename T>
@@ -1891,6 +1914,29 @@ void taylor_adaptive<T>::check_variational(const char *fname) const
     if (!is_variational()) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("The function '{}()' cannot be invoked on non-variational integrators", fname));
+    }
+}
+
+// Helper to fetch the stepper function from m_llvm_state.
+template <typename T>
+void taylor_adaptive<T>::assign_stepper(bool with_events)
+{
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+
+    if (with_events) {
+        if (m_compact_mode) {
+            m_step_f = reinterpret_cast<typename i_data::c_step_f_e_t>(std::get<1>(m_llvm_state).jit_lookup("step_e"));
+        } else {
+            m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
+        }
+    } else {
+        if (m_compact_mode) {
+            m_step_f = reinterpret_cast<typename i_data::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
+        } else {
+            m_step_f = reinterpret_cast<typename i_data::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
+        }
     }
 }
 
