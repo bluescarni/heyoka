@@ -1106,38 +1106,19 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     builder.SetInsertPoint(orig_bb);
 }
 
-} // namespace detail
-
-HEYOKA_END_NAMESPACE
-
-// NOTE: this is the worker function that is invoked to compute
-// in parallel all the derivatives of a block in parallel mode.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_looper(std::uint32_t ncalls,
-                                                       void (*fptr)(std::uint32_t, std::uint32_t) noexcept) noexcept
-{
-    try {
-        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, ncalls),
-                                  [fptr](const auto &range) { fptr(range.begin(), range.end()); });
-        // LCOV_EXCL_START
-    } catch (const std::exception &ex) {
-        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode looper: {}", ex.what());
-    } catch (...) {
-        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode looper");
-    }
-    // LCOV_EXCL_STOP
-}
-
-HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
-
 namespace
 {
 
-// NOTE: use typedef to minimise issues
-// when mucking around with the preprocessor.
-using par_f_ptr = void (*)() noexcept;
+// NOTE: this is the function which computes the
+// Taylor derivatives for a subrange in a block.
+// A block consists of ncalls invocations of the same
+// Taylor derivative function with different arguments.
+// [begin, end) is a subrange of [0, ncalls). tape_ptr
+// is a pointer to the tape of derivatives, par_ptr and
+// time_ptr are pointers to the arrays of parameter value(s)
+// and time value(s). cur_order is the current Taylor order.
+using block_subrange_f = void (*)(std::uint32_t begin, std::uint32_t end, void *tape_ptr, const void *par_ptr,
+                                  const void *time_ptr, std::uint32_t cur_order) noexcept;
 
 } // namespace
 
@@ -1145,25 +1126,38 @@ using par_f_ptr = void (*)() noexcept;
 
 HEYOKA_END_NAMESPACE
 
-// NOTE: this is the parallel invoker that gets called from LLVM
-// to run multiple parallel workers within a segment at the same time, i.e.,
-// to process multiple blocks within a segment concurrently.
-// We need to generate multiple instantiatiation of this function
-// up to the limit HEYOKA_CM_PAR_MAX_INVOKE_N defined in config.hpp.
+// This function computes the Taylor derivatives for a segment in parallel mode.
+//
+// f_arr is the array of functions for the computations of the derivatives in the block
+// subranges, ncalls_ptr is an array containing the number of times each function in
+// f_arr must be called. Both f_arr and ncalls_ptr are arrays of size nfuncs.
+// tape/par/time_ptr are pointers to the tape/parameter/time values. cur_order is the Taylor
+// order at which the computation of the derivatives must be performed.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_taylor_cm_par_segment(const heyoka::detail::block_subrange_f *f_arr,
+                                                               const std::uint32_t *ncalls_ptr, std::uint32_t nfuncs,
+                                                               void *tape_ptr, const void *par_ptr,
+                                                               const void *time_ptr, std::uint32_t cur_order) noexcept
+{
+    try {
+        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, nfuncs),
+                                  [ncalls_ptr, f_arr, tape_ptr, par_ptr, time_ptr, cur_order](const auto &func_range) {
+                                      for (auto f_idx = func_range.begin(); f_idx != func_range.end(); ++f_idx) {
+                                          const auto cur_ncalls = ncalls_ptr[f_idx];
+                                          auto *cur_f = f_arr[f_idx];
 
-#define HEYOKA_CM_PAR_INVOKE(_0, N, _1)                                                                                \
-    extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_invoke_##N(                                                        \
-        BOOST_PP_ENUM_PARAMS(N, heyoka::detail::par_f_ptr f)) noexcept                                                 \
-    {                                                                                                                  \
-        try {                                                                                                          \
-            BOOST_PP_IF(BOOST_PP_SUB(N, 1), oneapi::tbb::parallel_invoke(BOOST_PP_ENUM_PARAMS(N, f)), f0());           \
-        } catch (const std::exception &ex) {                                                                           \
-            heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker: {}", ex.what());    \
-        } catch (...) {                                                                                                \
-            heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker");                   \
-        }                                                                                                              \
+                                          oneapi::tbb::parallel_for(
+                                              oneapi::tbb::blocked_range<std::uint32_t>(0, cur_ncalls),
+                                              [cur_f, tape_ptr, par_ptr, time_ptr, cur_order](const auto &call_range) {
+                                                  cur_f(call_range.begin(), call_range.end(), tape_ptr, par_ptr,
+                                                        time_ptr, cur_order);
+                                              });
+                                      }
+                                  });
+        // LCOV_EXCL_START
+    } catch (const std::exception &ex) {
+        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker: {}", ex.what());
+    } catch (...) {
+        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker");
     }
-
-BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_ADD(HEYOKA_CM_PAR_MAX_INVOKE_N, 1), HEYOKA_CM_PAR_INVOKE, _0)
-
-#undef HEYOKA_CM_PAR_INVOKE
+    // LCOV_EXCL_STOP
+}

@@ -634,6 +634,193 @@ using taylor_cm_seg_f_list_t
     = std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
                llvm_func_name_compare>;
 
+// Helper to codegen the computation of the Taylor derivatives for a segment
+// from a taylor_cm_seg_f_list_t in sequential mode.
+//
+// s is the llvm state in which we are operating, fp_vec_type the internal vector type we are using
+// for computations, seg_map is the taylor_cm_seg_f_list_t containing the list of functions for the computation
+// of Taylor derivatives within a segment, n_uvars the total number of u variables in the decomposition.
+void taylor_cm_codegen_segment_diff_sequential(llvm_state &s, llvm::Type *fp_vec_type,
+                                               const taylor_cm_seg_f_list_t &seg_map, std::uint32_t n_uvars)
+{
+    // Fetch the current builder.
+    auto &bld = s.builder();
+
+    // Fetch the arguments from the driver prototype.
+    auto *driver_f = bld.GetInsertBlock()->getParent();
+    assert(driver_f != nullptr);
+    assert(driver_f->arg_size() == 4u);
+    auto *tape_ptr = driver_f->args().begin();
+    auto *par_ptr = driver_f->args().begin() + 1;
+    auto *time_ptr = driver_f->args().begin() + 2;
+    auto *cur_order = driver_f->args().begin() + 3;
+
+    // Compute the derivatives for this segment.
+    for (const auto &[func, fpair] : seg_map) {
+        const auto &[ncalls, gens] = fpair;
+
+        taylor_cm_codegen_block_diff(s, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order, fp_vec_type,
+                                     n_uvars);
+    }
+}
+
+// Helper to codegen the computation of the Taylor derivatives for a segment
+// from a taylor_cm_seg_f_list_t in parallel mode.
+//
+// s is the llvm state in which we are operating, fp_vec_type the internal vector type we are using
+// for computations, seg_map is the taylor_cm_seg_f_list_t containing the list of functions for the computation
+// of Taylor derivatives within a segment, n_uvars the total number of u variables in the decomposition.
+void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_type,
+                                             const taylor_cm_seg_f_list_t &seg_map, std::uint32_t n_uvars)
+{
+    // NOTE: in parallel mode, we introduce worker functions that operate similarly to
+    // taylor_cm_codegen_block_diff(), except that they do not process an entire block
+    // but only a subrange of a block. These worker functions are then invoked in parallel
+    // by heyoka_taylor_cm_par_segment(). In order to pass the worker functions to
+    // heyoka_taylor_cm_par_segment(), we need to store pointers to them in global arrays,
+    // together with the information on how many times each function must be called.
+
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+    auto &md = s.module();
+
+    // Fetch the current insertion block, so that we can restore it later.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // Fetch several types for the current context.
+    auto *ptr_tp = llvm::PointerType::getUnqual(ctx);
+    auto *i32_tp = bld.getInt32Ty();
+    auto *void_tp = bld.getVoidTy();
+
+    // Init the vectors with the constant initializers for the workers/ncalls arrays.
+    std::vector<llvm::Constant *> workers_arr, ncalls_arr;
+
+    // Generate the workers for each block.
+    for (const auto &[func, fpair] : seg_map) {
+        const auto &[ncalls, gens] = fpair;
+
+        // Create the prototype for the current worker. The arguments are:
+        //
+        // - int32 begin/end call indices,
+        // - tape pointer (read & write),
+        // - par pointer (read-only),
+        // - time pointer (read-only),
+        // - int32 current Taylor order.
+        //
+        // The pointer arguments cannot overlap.
+        std::vector<llvm::Type *> worker_args{i32_tp, i32_tp, ptr_tp, ptr_tp, ptr_tp, i32_tp};
+
+        // The worker does not return anything.
+        auto *worker_proto = llvm::FunctionType::get(void_tp, worker_args, false);
+        assert(worker_proto != nullptr); // LCOV_EXCL_LINE
+
+        // Create the worker.
+        auto *worker = llvm::Function::Create(worker_proto, llvm::Function::InternalLinkage, "", &md);
+
+        // NOTE: the worker cannot call itself recursively.
+        worker->addFnAttr(llvm::Attribute::NoRecurse);
+
+        // Add the arguments' attributes.
+        auto *begin_arg = worker->args().begin();
+        begin_arg->setName("begin");
+
+        auto *end_arg = worker->args().begin() + 1;
+        end_arg->setName("end");
+
+        auto *tape_ptr_arg = worker->args().begin() + 2;
+        tape_ptr_arg->setName("tape_ptr");
+        tape_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        tape_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+
+        auto *par_ptr_arg = worker->args().begin() + 3;
+        par_ptr_arg->setName("par_ptr");
+        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+        par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *time_ptr_arg = worker->args().begin() + 4;
+        time_ptr_arg->setName("time_ptr");
+        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
+        time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+        auto *order_arg = worker->args().begin() + 5;
+        order_arg->setName("order");
+
+        // Create a new basic block to start insertion into.
+        auto *bb = llvm::BasicBlock::Create(ctx, "entry", worker);
+        assert(bb != nullptr); // LCOV_EXCL_LINE
+        bld.SetInsertPoint(bb);
+
+        // Loop over the begin/end range.
+        llvm_loop_u32(s, begin_arg, end_arg, [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u index of the variable,
+            // - tape of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{order_arg, u_idx, tape_ptr_arg, par_ptr_arg, time_ptr_arg};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, fp_vec_type, tape_ptr_arg, n_uvars, order_arg, u_idx, bld.CreateCall(func, args));
+        });
+
+        // Return.
+        bld.CreateRetVoid();
+
+        // Add a pointer to the current worker to workers_arr.
+        workers_arr.push_back(worker);
+
+        // Add ncalls to ncalls_arr.
+        ncalls_arr.push_back(bld.getInt32(boost::numeric_cast<std::uint32_t>(ncalls)));
+    }
+
+    // Restore the original insertion block in the driver.
+    bld.SetInsertPoint(orig_bb);
+
+    // Generate the global variables for workers_arr and ncalls_arr, and fetch pointers
+    // to their first elements.
+    auto *workers_arr_tp = llvm::ArrayType::get(ptr_tp, boost::numeric_cast<std::uint64_t>(workers_arr.size()));
+    auto *workers_arr_carr = llvm::ConstantArray::get(workers_arr_tp, workers_arr);
+    auto *workers_arr_gv = new llvm::GlobalVariable(md, workers_arr_carr->getType(), true,
+                                                    llvm::GlobalVariable::InternalLinkage, workers_arr_carr);
+    auto *workers_ptr
+        = bld.CreateInBoundsGEP(workers_arr_carr->getType(), workers_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
+
+    auto *ncalls_arr_tp = llvm::ArrayType::get(ptr_tp, boost::numeric_cast<std::uint64_t>(ncalls_arr.size()));
+    auto *ncalls_arr_carr = llvm::ConstantArray::get(ncalls_arr_tp, ncalls_arr);
+    auto *ncalls_arr_gv = new llvm::GlobalVariable(md, ncalls_arr_carr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, ncalls_arr_carr);
+    auto *ncalls_ptr
+        = bld.CreateInBoundsGEP(ncalls_arr_carr->getType(), ncalls_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
+
+    // Fetch the arguments for heyoka_taylor_cm_par_segment() from the driver prototype.
+    auto *driver_f = bld.GetInsertBlock()->getParent();
+    assert(driver_f != nullptr);
+    assert(driver_f->arg_size() == 4u);
+    auto *tape_ptr = driver_f->args().begin();
+    auto *par_ptr = driver_f->args().begin() + 1;
+    auto *time_ptr = driver_f->args().begin() + 2;
+    auto *cur_order = driver_f->args().begin() + 3;
+
+    // Invoke heyoka_taylor_cm_par_segment().
+    llvm_invoke_external(s, "heyoka_taylor_cm_par_segment", void_tp,
+                         {workers_ptr, ncalls_ptr, bld.getInt32(boost::numeric_cast<std::uint32_t>(seg_map.size())),
+                          tape_ptr, par_ptr, time_ptr, cur_order},
+                         llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
+                                                  {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+}
+
 // Helper to codegen the computation of the Taylor derivatives for a segment.
 //
 // seg is the segment, start_u_idx the index of the first u variable in the segment, s the llvm state
@@ -641,13 +828,10 @@ using taylor_cm_seg_f_list_t
 // the total number of u variables, high_accuracy the high accuracy flag.
 taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint32_t start_u_idx, llvm_state &s,
                                                       llvm::Type *fp_t, std::uint32_t batch_size, std::uint32_t n_uvars,
-                                                      bool high_accuracy)
+                                                      bool high_accuracy, bool parallel_mode)
 {
     // Fetch the internal vector type.
     auto *fp_vec_type = make_vector_type(fp_t, batch_size);
-
-    // Fetch the current builder.
-    auto &bld = s.builder();
 
     // This structure maps a function to sets of arguments
     // with which the function is to be called. For instance, if function
@@ -766,21 +950,10 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
         }
     }
 
-    // Fetch the arguments from the driver prototype.
-    auto *driver_f = bld.GetInsertBlock()->getParent();
-    assert(driver_f != nullptr);
-    assert(driver_f->arg_size() == 4u);
-    auto *tape_ptr = driver_f->args().begin();
-    auto *par_ptr = driver_f->args().begin() + 1;
-    auto *time_ptr = driver_f->args().begin() + 2;
-    auto *cur_order = driver_f->args().begin() + 3;
-
-    // Compute the derivatives for this segment.
-    for (const auto &[func, fpair] : seg_map) {
-        const auto &[ncalls, gens] = fpair;
-
-        taylor_cm_codegen_block_diff(s, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order, fp_vec_type,
-                                     n_uvars);
+    if (parallel_mode) {
+        taylor_cm_codegen_segment_diff_parallel(s, fp_vec_type, seg_map, n_uvars);
+    } else {
+        taylor_cm_codegen_segment_diff_sequential(s, fp_vec_type, seg_map, n_uvars);
     }
 
     return seg_map;
@@ -803,9 +976,6 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
                                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                                                  bool high_accuracy, bool parallel_mode, std::uint32_t max_svf_idx)
 {
-    // TODO implement.
-    (void)parallel_mode;
-
     // Init the list of states.
     // NOTE: we use lists here because it is convenient to have
     // pointer/reference stability when iteratively constructing
@@ -928,8 +1098,8 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         auto *fp_t = llvm_clone_type(*cur_state, main_fp_t);
 
         // Codegen the computation of the derivatives for this segment.
-        const auto seg_map
-            = taylor_cm_codegen_segment_diff(seg, start_u_idx, *cur_state, fp_t, batch_size, n_uvars, high_accuracy);
+        const auto seg_map = taylor_cm_codegen_segment_diff(seg, start_u_idx, *cur_state, fp_t, batch_size, n_uvars,
+                                                            high_accuracy, parallel_mode);
 
         // Update the number of codegenned blocks.
         n_cg_blocks += seg_map.size();
