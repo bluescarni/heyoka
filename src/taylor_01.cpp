@@ -25,11 +25,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/preprocessor/arithmetic/add.hpp>
-#include <boost/preprocessor/arithmetic/sub.hpp>
-#include <boost/preprocessor/control/if.hpp>
-#include <boost/preprocessor/repetition/enum_params.hpp>
-#include <boost/preprocessor/repetition/repeat_from_to.hpp>
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
@@ -1109,16 +1104,20 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
 namespace
 {
 
-// NOTE: this is the function which computes the
+// NOTE: this is the worker function type which computes the
 // Taylor derivatives for a subrange in a block.
 // A block consists of ncalls invocations of the same
 // Taylor derivative function with different arguments.
+// Workers are created on the LLVM side when parallel mode is
+// active.
+//
 // [begin, end) is a subrange of [0, ncalls). tape_ptr
 // is a pointer to the tape of derivatives, par_ptr and
 // time_ptr are pointers to the arrays of parameter value(s)
-// and time value(s). cur_order is the current Taylor order.
-using block_subrange_f = void (*)(std::uint32_t begin, std::uint32_t end, void *tape_ptr, const void *par_ptr,
-                                  const void *time_ptr, std::uint32_t cur_order) noexcept;
+// and time value(s). order is the desired Taylor order for
+// the computation of the derivatives.
+using block_worker_f = void (*)(std::uint32_t begin, std::uint32_t end, void *tape_ptr, const void *par_ptr,
+                                const void *time_ptr, std::uint32_t order) noexcept;
 
 } // namespace
 
@@ -1126,38 +1125,40 @@ using block_subrange_f = void (*)(std::uint32_t begin, std::uint32_t end, void *
 
 HEYOKA_END_NAMESPACE
 
-// This function computes the Taylor derivatives for a segment in parallel mode.
+// This function computes the Taylor derivatives for a segment in parallel mode. It is invoked
+// from LLVM after the creation of the worker functions that compute the Taylor derivatives
+// for a subrange in a block.
 //
-// f_arr is the array of functions for the computations of the derivatives in the block
-// subranges, ncalls_ptr is an array containing the number of times each function in
-// f_arr must be called. Both f_arr and ncalls_ptr are arrays of size nfuncs.
-// tape/par/time_ptr are pointers to the tape/parameter/time values. cur_order is the Taylor
-// order at which the computation of the derivatives must be performed.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_taylor_cm_par_segment(const heyoka::detail::block_subrange_f *f_arr,
-                                                               const std::uint32_t *ncalls_ptr, std::uint32_t nfuncs,
+// worker_arr is the array of worker functions for the computations of the derivatives in the block
+// subranges, ncalls_arr is an array containing the number of times each function in
+// worker_arr must be called. Both worker_arr and ncalls_arr are arrays of size nfuncs.
+// tape/par/time_ptr are pointers to the tape/parameter/time values. order is the desired Taylor order for
+// the computation of the derivatives.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_taylor_cm_par_segment(const heyoka::detail::block_worker_f *worker_arr,
+                                                               const std::uint32_t *ncalls_arr, std::uint32_t nfuncs,
                                                                void *tape_ptr, const void *par_ptr,
-                                                               const void *time_ptr, std::uint32_t cur_order) noexcept
+                                                               const void *time_ptr, std::uint32_t order) noexcept
 {
     try {
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, nfuncs),
-                                  [ncalls_ptr, f_arr, tape_ptr, par_ptr, time_ptr, cur_order](const auto &func_range) {
+                                  [ncalls_arr, worker_arr, tape_ptr, par_ptr, time_ptr, order](const auto &func_range) {
                                       for (auto f_idx = func_range.begin(); f_idx != func_range.end(); ++f_idx) {
-                                          const auto cur_ncalls = ncalls_ptr[f_idx];
-                                          auto *cur_f = f_arr[f_idx];
+                                          const auto cur_ncalls = ncalls_arr[f_idx];
+                                          auto *cur_f = worker_arr[f_idx];
 
                                           oneapi::tbb::parallel_for(
                                               oneapi::tbb::blocked_range<std::uint32_t>(0, cur_ncalls),
-                                              [cur_f, tape_ptr, par_ptr, time_ptr, cur_order](const auto &call_range) {
+                                              [cur_f, tape_ptr, par_ptr, time_ptr, order](const auto &call_range) {
                                                   cur_f(call_range.begin(), call_range.end(), tape_ptr, par_ptr,
-                                                        time_ptr, cur_order);
+                                                        time_ptr, order);
                                               });
                                       }
                                   });
         // LCOV_EXCL_START
     } catch (const std::exception &ex) {
-        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker: {}", ex.what());
+        heyoka::detail::get_logger()->critical("Exception caught in heyoka_taylor_cm_par_segment(): {}", ex.what());
     } catch (...) {
-        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker");
+        heyoka::detail::get_logger()->critical("Exception caught in heyoka_taylor_cm_par_segment()");
     }
     // LCOV_EXCL_STOP
 }

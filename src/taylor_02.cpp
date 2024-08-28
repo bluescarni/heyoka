@@ -655,7 +655,7 @@ void taylor_cm_codegen_segment_diff_sequential(llvm_state &s, llvm::Type *fp_vec
     auto *time_ptr = driver_f->args().begin() + 2;
     auto *cur_order = driver_f->args().begin() + 3;
 
-    // Compute the derivatives for this segment.
+    // Generate the code for the computation of the derivatives for this segment.
     for (const auto &[func, fpair] : seg_map) {
         const auto &[ncalls, gens] = fpair;
 
@@ -680,6 +680,7 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
     // heyoka_taylor_cm_par_segment(), we need to store pointers to them in global arrays,
     // together with the information on how many times each function must be called.
 
+    // Fetch builder/context/module.
     auto &bld = s.builder();
     auto &ctx = s.context();
     auto &md = s.module();
@@ -687,7 +688,7 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
     // Fetch the current insertion block, so that we can restore it later.
     auto *orig_bb = bld.GetInsertBlock();
 
-    // Fetch several types for the current context.
+    // Fetch several types from the current context.
     auto *ptr_tp = llvm::PointerType::getUnqual(ctx);
     auto *i32_tp = bld.getInt32Ty();
     auto *void_tp = bld.getVoidTy();
@@ -701,11 +702,11 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
 
         // Create the prototype for the current worker. The arguments are:
         //
-        // - int32 begin/end call indices,
+        // - int32 begin/end call range,
         // - tape pointer (read & write),
         // - par pointer (read-only),
         // - time pointer (read-only),
-        // - int32 current Taylor order.
+        // - int32 Taylor order.
         //
         // The pointer arguments cannot overlap.
         std::vector<llvm::Type *> worker_args{i32_tp, i32_tp, ptr_tp, ptr_tp, ptr_tp, i32_tp};
@@ -811,12 +812,12 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
     auto *tape_ptr = driver_f->args().begin();
     auto *par_ptr = driver_f->args().begin() + 1;
     auto *time_ptr = driver_f->args().begin() + 2;
-    auto *cur_order = driver_f->args().begin() + 3;
+    auto *order = driver_f->args().begin() + 3;
 
     // Invoke heyoka_taylor_cm_par_segment().
     llvm_invoke_external(s, "heyoka_taylor_cm_par_segment", void_tp,
                          {workers_ptr, ncalls_ptr, bld.getInt32(boost::numeric_cast<std::uint32_t>(seg_map.size())),
-                          tape_ptr, par_ptr, time_ptr, cur_order},
+                          tape_ptr, par_ptr, time_ptr, order},
                          llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
                                                   {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 }
@@ -950,6 +951,7 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
         }
     }
 
+    // Generate the code for the computation of the Taylor derivatives.
     if (parallel_mode) {
         taylor_cm_codegen_segment_diff_parallel(s, fp_vec_type, seg_map, n_uvars);
     } else {
