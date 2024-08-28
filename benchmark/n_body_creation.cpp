@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <iostream>
 #include <numeric>
+#include <variant>
 #include <vector>
 
 #include <boost/program_options.hpp>
@@ -56,7 +57,13 @@ int main(int argc, char *argv[])
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << ta.get_llvm_state().get_ir() << '\n';
+    if (compact_mode) {
+        for (auto ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+            std::cout << ir << '\n';
+        }
+    } else {
+        std::cout << std::get<0>(ta.get_llvm_state()).get_ir() << '\n';
+    }
 
     auto counter = 0u;
     for (const auto &ex : ta.get_decomposition()) {
