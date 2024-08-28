@@ -1551,6 +1551,8 @@ struct multi_jit {
     // NOTE: this is the total number of modules, including
     // the master module.
     const unsigned m_n_modules = 0;
+    // Flag to signal that we are enabling parallel compilation.
+    const bool m_parjit;
     // NOTE: enumerate the LLVM members here in the same order
     // as llvm_state, as this is important to ensure proper
     // destruction order.
@@ -1570,7 +1572,7 @@ struct multi_jit {
     std::vector<std::string> m_ir_snapshots;
     std::vector<std::string> m_bc_snapshots;
 
-    explicit multi_jit(unsigned, unsigned, code_model, bool, bool);
+    explicit multi_jit(unsigned, unsigned, code_model, bool, bool, bool);
     multi_jit(const multi_jit &) = delete;
     multi_jit(multi_jit &&) noexcept = delete;
     llvm_multi_state &operator=(const multi_jit &) = delete;
@@ -1613,8 +1615,9 @@ constexpr auto master_module_name = "heyoka.master";
 
 // NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
 // NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
-multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model, bool force_avx512, bool slp_vectorize)
-    : m_n_modules(n_modules)
+multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model, bool force_avx512, bool slp_vectorize,
+                     bool parjit)
+    : m_n_modules(n_modules), m_parjit(parjit)
 {
     assert(n_modules >= 2u);
 
@@ -1637,31 +1640,37 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
     lljit_builder.setJITTargetMachineBuilder(jtmb);
 
 #if 0
-    // Create a task dispatcher.
-    auto tdisp = std::make_unique<tbb_task_dispatcher>();
 
-    // Create an ExecutorProcessControl.
-    auto epc = llvm::orc::SelfExecutorProcessControl::Create(nullptr, std::move(tdisp));
-    // LCOV_EXCL_START
-    if (!epc) {
-        auto err = epc.takeError();
+    if (m_parjit) {
+        // Create a task dispatcher.
+        auto tdisp = std::make_unique<tbb_task_dispatcher>();
 
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
+        // Create an ExecutorProcessControl.
+        auto epc = llvm::orc::SelfExecutorProcessControl::Create(nullptr, std::move(tdisp));
+        // LCOV_EXCL_START
+        if (!epc) {
+            auto err = epc.takeError();
 
-        ostr << err;
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
 
-        throw std::invalid_argument(
-            fmt::format("Could not create a SelfExecutorProcessControl. The full error message is:\n{}", ostr.str()));
+            ostr << err;
+
+            throw std::invalid_argument(fmt::format(
+                "Could not create a SelfExecutorProcessControl. The full error message is:\n{}", ostr.str()));
+        }
+        // LCOV_EXCL_STOP
+
+        // Set it in the lljit builder.
+        lljit_builder.setExecutorProcessControl(std::move(*epc));
     }
-    // LCOV_EXCL_STOP
 
-    // Set it in the lljit builder.
-    lljit_builder.setExecutorProcessControl(std::move(*epc));
 #else
 
-    // Set the number of compilation threads.
-    lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
+    if (m_parjit) {
+        // Set the number of compilation threads.
+        lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
+    }
 
 #endif
 
@@ -1815,6 +1824,9 @@ struct llvm_multi_state::impl {
         // Store the states.
         ar << m_states;
 
+        // Store the parjit flag.
+        ar << m_jit->m_parjit;
+
         // Store the object files and the snapshots. These may be empty.
         ar << m_jit->m_object_files;
         ar << m_jit->m_ir_snapshots;
@@ -1837,10 +1849,14 @@ struct llvm_multi_state::impl {
 
         assert(!m_states.empty());
 
+        // Load the parjit flag.
+        bool parjit{};
+        ar >> parjit;
+
         // Reset the jit with a new one.
-        m_jit = std::make_unique<detail::multi_jit>(boost::safe_numerics::safe<unsigned>(m_states.size()) + 1,
-                                                    m_states[0].get_opt_level(), m_states[0].get_code_model(),
-                                                    m_states[0].force_avx512(), m_states[0].get_slp_vectorize());
+        m_jit = std::make_unique<detail::multi_jit>(
+            boost::safe_numerics::safe<unsigned>(m_states.size()) + 1, m_states[0].get_opt_level(),
+            m_states[0].get_code_model(), m_states[0].force_avx512(), m_states[0].get_slp_vectorize(), parjit);
 
         // Load the object files and the snapshots.
         ar >> m_jit->m_object_files;
@@ -1871,7 +1887,7 @@ struct llvm_multi_state::impl {
 
 llvm_multi_state::llvm_multi_state() = default;
 
-llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_)
+llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_, bool parjit)
 {
     // Fetch a const ref, as we want to make extra sure we do not modify
     // states_ until we move it to construct the impl.
@@ -1940,7 +1956,7 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_)
 
     // Create the multi_jit.
     auto jit = std::make_unique<detail::multi_jit>(boost::safe_numerics::safe<unsigned>(states.size()) + 1, opt_level,
-                                                   c_model, force_avx512, slp_vectorize);
+                                                   c_model, force_avx512, slp_vectorize, parjit);
 
     // Build and assign the implementation.
     impl imp{.m_states = std::move(states_), .m_jit = std::move(jit)};
@@ -1956,7 +1972,7 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
     impl imp{.m_states = other.m_impl->m_states,
              .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
                                                           other.get_code_model(), other.force_avx512(),
-                                                          other.get_slp_vectorize())};
+                                                          other.get_slp_vectorize(), other.get_parjit())};
     m_impl = std::make_unique<impl>(std::move(imp));
 
     if (other.is_compiled()) {
@@ -2129,6 +2145,11 @@ bool llvm_multi_state::get_slp_vectorize() const noexcept
 code_model llvm_multi_state::get_code_model() const noexcept
 {
     return m_impl->m_states[0].get_code_model();
+}
+
+bool llvm_multi_state::get_parjit() const noexcept
+{
+    return m_impl->m_jit->m_parjit;
 }
 
 bool llvm_multi_state::is_compiled() const noexcept
@@ -2346,6 +2367,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_multi_state &s)
     oss << "SLP vectorization : " << s.get_slp_vectorize() << '\n';
     oss << "Code model        : " << s.get_code_model() << '\n';
     oss << "Optimisation level: " << s.get_opt_level() << '\n';
+    oss << "Parallel JIT      : " << s.get_parjit() << '\n';
     oss << "Data layout       : " << s.m_impl->m_states[0].m_jitter->m_lljit->getDataLayout().getStringRepresentation()
         << '\n';
     oss << "Target triple     : " << s.m_impl->m_states[0].m_jitter->get_target_triple().str() << '\n';
