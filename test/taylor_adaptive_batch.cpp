@@ -1105,6 +1105,12 @@ void s11n_test_impl()
         ta_copy.update_d_output({-.1, -.11}, true);
 
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        // Also run a propagation with continuous output to test that
+        // the m_tplt_state member is correctly copied.
+        auto prop_res = ta.propagate_for(10., kw::c_output = true);
+        auto prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+        REQUIRE((*std::get<0>(prop_res))(4.1) == (*std::get<0>(prop_copy_res))(4.1));
     }
 
     // A test with events.
@@ -1730,6 +1736,12 @@ TEST_CASE("copy semantics")
     REQUIRE(ta.get_state() == ta_copy.get_state());
     REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 
+    // Also run a propagation with continuous output to test that
+    // the m_tplt_state member is correctly copied.
+    auto prop_res = ta.propagate_for(10., kw::c_output = true);
+    auto prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+    REQUIRE((*std::get<0>(prop_res))(4.1) == (*std::get<0>(prop_copy_res))(4.1));
+
     ta_copy = taylor_adaptive_batch<fp_t>{};
     ta_copy = ta;
 
@@ -1746,6 +1758,10 @@ TEST_CASE("copy semantics")
 
     REQUIRE(ta.get_state() == ta_copy.get_state());
     REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+
+    prop_res = ta.propagate_for(10., kw::c_output = true);
+    prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+    REQUIRE((*std::get<0>(prop_res))(14.1) == (*std::get<0>(prop_copy_res))(14.1));
 }
 
 // Test case for the propagate_*() functions not considering
