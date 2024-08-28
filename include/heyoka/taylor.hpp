@@ -1193,7 +1193,8 @@ namespace detail
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
 // - 5: removed m_state_vars/m_rhs, variational ODE data.
-inline constexpr int taylor_adaptive_s11n_version = 5;
+// - 6: added parallel JIT compilation for compact mode.
+inline constexpr int taylor_adaptive_s11n_version = 6;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
@@ -1201,7 +1202,8 @@ inline constexpr int taylor_adaptive_s11n_version = 5;
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
 // - 4: removed m_state_vars/m_rhs, variational ODE data.
-inline constexpr int taylor_adaptive_batch_s11n_version = 4;
+// - 5: added parallel JIT compilation for compact mode.
+inline constexpr int taylor_adaptive_batch_s11n_version = 5;
 
 } // namespace detail
 
