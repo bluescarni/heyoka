@@ -1701,6 +1701,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
 
         REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
                 == value_type_index(ta_copy.get_t_events()[0].get_callback()));
@@ -1763,6 +1765,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_ir() == std::get<0>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_bc() == std::get<0>(ta.get_llvm_state()).get_bc());
 
         // Take a step in ta and in ta_copy.
         ta.step(true);
@@ -1826,6 +1830,14 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 
     ta_copy = taylor_adaptive<fp_t>{};
     ta_copy = ta;
@@ -1835,6 +1847,14 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 }
 
 #if defined(HEYOKA_ARCH_PPC)

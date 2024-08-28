@@ -1083,6 +1083,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
 
         REQUIRE(ta.get_step_res() == ta_copy.get_step_res());
         REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
@@ -1154,6 +1156,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_ir() == std::get<0>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_bc() == std::get<0>(ta.get_llvm_state()).get_bc());
 
         REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
                 == value_type_index(ta_copy.get_t_events()[0].get_callback()));
@@ -1717,6 +1721,14 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 
     ta_copy = taylor_adaptive_batch<fp_t>{};
     ta_copy = ta;
@@ -1726,6 +1738,14 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 }
 
 // Test case for the propagate_*() functions not considering
