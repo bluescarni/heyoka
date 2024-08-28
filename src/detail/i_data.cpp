@@ -103,13 +103,13 @@ void taylor_adaptive<T>::i_data::init_cm_tape()
     const auto [sz, al] = m_tape_sa;
 
     if (m_compact_mode) {
-        assert(sz != 0u);
-        assert(al != 0u);
+        assert(sz != 0u); // LCOV_EXCL_LINE
+        assert(al != 0u); // LCOV_EXCL_LINE
 
         m_tape = detail::make_aligned_buffer(sz, al);
     } else {
-        assert(sz == 0u);
-        assert(al == 0u);
+        assert(sz == 0u); // LCOV_EXCL_LINE
+        assert(al == 0u); // LCOV_EXCL_LINE
     }
 }
 
@@ -157,6 +157,9 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_tm_data;
 
     // Recover the function pointers.
+    // NOTE: here we are recovering only the dense output function pointer because recovering
+    // the correct stepper requires information which is available only from the integrator
+    // class (hence, we do it from there).
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Reconstruct the compact mode tape, if necessary.
@@ -184,6 +187,9 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
       m_tm_data(other.m_tm_data)
 {
     // Recover the function pointers.
+    // NOTE: here we are recovering only the dense output function pointer because recovering
+    // the correct stepper requires information which is available only from the integrator
+    // class (hence, we do it from there).
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Init the compact mode tape, if necessary.
@@ -226,13 +232,13 @@ void taylor_adaptive_batch<T>::i_data::init_cm_tape()
     const auto [sz, al] = m_tape_sa;
 
     if (m_compact_mode) {
-        assert(sz != 0u);
-        assert(al != 0u);
+        assert(sz != 0u); // LCOV_EXCL_LINE
+        assert(al != 0u); // LCOV_EXCL_LINE
 
         m_tape = detail::make_aligned_buffer(sz, al);
     } else {
-        assert(sz == 0u);
-        assert(al == 0u);
+        assert(sz == 0u); // LCOV_EXCL_LINE
+        assert(al == 0u); // LCOV_EXCL_LINE
     }
 }
 
@@ -316,6 +322,9 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_tm_data;
 
     // Recover the function pointers.
+    // NOTE: here we are recovering only the dense output function pointer because recovering
+    // the correct stepper requires information which is available only from the integrator
+    // class (hence, we do it from there).
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Reconstruct the compact mode tape, if necessary.
@@ -349,6 +358,9 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_tm_data(other.m_tm_data)
 {
     // Recover the function pointers.
+    // NOTE: here we are recovering only the dense output function pointer because recovering
+    // the correct stepper requires information which is available only from the integrator
+    // class (hence, we do it from there).
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Init the compact mode tape, if necessary.

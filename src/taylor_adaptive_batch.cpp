@@ -2322,6 +2322,8 @@ void taylor_adaptive_batch<T>::check_variational(const char *fname) const
 }
 
 // Helper to fetch the stepper function from m_llvm_state.
+// NOTE: this is exactly identical to the scalar integrator code.
+// Should we write a separate common helper for this at one point?
 template <typename T>
 void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 {
