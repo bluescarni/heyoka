@@ -351,9 +351,9 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc
 // There is evidence of an LLVM thread scheduling bug when parallel compilation
 // is active, that rarely results in multiply-defined symbols for external C
 // functions, which leads to compilation failure. So far, we have been able to
-// trigger this issue only on Linux aarch64.
+// trigger this issue only on 64-bit arm.
 inline constexpr bool default_parjit =
-#if defined(HEYOKA_ARCH_ARM) && defined(__linux__)
+#if defined(HEYOKA_ARCH_ARM)
     false
 #else
     true
