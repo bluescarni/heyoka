@@ -53,13 +53,17 @@
 
 // NOTE: handy Boost library for this since 1.73:
 // https://www.boost.org/doc/libs/1_73_0/libs/predef/doc/index.html
+//
+// NOTE: it makes sense here to handle only the GCC/MSVC macros here
+// (on the assumption that clang is identical to GCC in this respect).
+// No point in using macros provided by compilers we do not test on.
 #if defined(_ARCH_PPC) || defined(_M_PPC)
 
 #define HEYOKA_ARCH_PPC
 
 #endif
 
-#if defined(__arm__) || defined(_M_ARM) || defined(__arm) || defined(__aarch64__)
+#if defined(__arm__) || defined(_M_ARM) || defined(_M_ARMT) || defined(__aarch64__) || defined(_M_ARM64)
 
 #define HEYOKA_ARCH_ARM
 
