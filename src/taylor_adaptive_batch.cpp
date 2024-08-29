@@ -62,7 +62,7 @@
 // NOTE: this is a helper macro to reduce typing when accessing the
 // data members of i_data.
 // NOLINTNEXTLINE(bugprone-macro-parentheses)
-#define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) auto &name = m_i_data->name
+#define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) [[maybe_unused]] auto &name = m_i_data->name
 
 HEYOKA_BEGIN_NAMESPACE
 
