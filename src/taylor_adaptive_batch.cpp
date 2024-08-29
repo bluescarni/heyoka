@@ -76,7 +76,7 @@ template <typename T>
 void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, std::uint32_t batch_size,
                                                   std::vector<T> time, std::optional<T> tol, bool high_accuracy,
                                                   bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                                  std::vector<nt_event_t> ntes, bool parallel_mode)
+                                                  std::vector<nt_event_t> ntes, bool parallel_mode, bool parjit)
 {
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -309,7 +309,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
         std::ranges::reverse(states);
 
         // Create the multi state and assign it.
-        m_llvm_state = llvm_multi_state(std::move(states));
+        m_llvm_state = llvm_multi_state(std::move(states), parjit);
 
         // Compile.
         std::get<1>(m_llvm_state).compile();

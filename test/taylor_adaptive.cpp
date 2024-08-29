@@ -44,6 +44,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
@@ -1657,7 +1658,8 @@ void s11n_test_impl()
                                           kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
                                           kw::pars = std::vector<double>{-1e-4},
                                           kw::high_accuracy = true,
-                                          kw::compact_mode = true};
+                                          kw::compact_mode = true,
+                                          kw::parjit = detail::default_parjit};
 
         REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
         REQUIRE(ta.get_high_accuracy());
@@ -1703,6 +1705,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
         REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
         REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
 
         REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
                 == value_type_index(ta_copy.get_t_events()[0].get_callback()));
@@ -1827,7 +1830,8 @@ TEST_CASE("copy semantics")
                                     kw::pars = std::vector<fp_t>{-1e-4},
                                     kw::high_accuracy = true,
                                     kw::compact_mode = true,
-                                    kw::tol = 1e-11};
+                                    kw::tol = 1e-11,
+                                    kw::parjit = detail::default_parjit};
 
     auto ta_copy = ta;
 
@@ -1838,6 +1842,7 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
     REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
     REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
 
     ta.step();
     ta_copy.step();
@@ -1861,6 +1866,7 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
     REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
     REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
 
     ta.step();
     ta_copy.step();

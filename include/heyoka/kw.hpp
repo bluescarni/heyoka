@@ -21,7 +21,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace kw
 {
 
-// llvm_state.
+// llvm_state/llvm_multi_state.
 IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
@@ -34,6 +34,7 @@ IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
 IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
 IGOR_MAKE_NAMED_ARGUMENT(code_model);
+IGOR_MAKE_NAMED_ARGUMENT(parjit);
 
 // cfunc API.
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);

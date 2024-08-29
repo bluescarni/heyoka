@@ -235,7 +235,20 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
+    // Parallel JIT compilation.
+    auto parjit = [&p]() -> bool {
+        if constexpr (p.has(kw::parjit)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::parjit))>>) {
+                return static_cast<bool>(p(kw::parjit));
+            } else {
+                static_assert(always_false_v<T>, "Invalid type for the 'parjit' keyword argument.");
+            }
+        } else {
+            return default_parjit;
+        }
+    }();
+
+    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode, parjit};
 }
 
 // Small helper to construct a default value for the max_delta_t
@@ -443,7 +456,7 @@ private:
     // Private implementation-detail constructor machinery.
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
-                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>, bool);
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, const KwArgs &...kw_args)
     {
@@ -463,7 +476,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -499,7 +512,7 @@ private:
 
             finalise_ctor_impl(std::move(sys), std::move(state), std::move(tm), std::move(tol), high_accuracy,
                                compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode,
-                               std::move(prec));
+                               std::move(prec), parjit);
         }
     }
 
@@ -853,7 +866,7 @@ private:
     // Private implementation-detail constructor machinery.
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
-                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, bool);
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
     {
@@ -875,7 +888,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -898,7 +911,7 @@ private:
 
             finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(tm), std::move(tol),
                                high_accuracy, compact_mode, std::move(pars), std::move(tes), std::move(ntes),
-                               parallel_mode);
+                               parallel_mode, parjit);
         }
     }
 

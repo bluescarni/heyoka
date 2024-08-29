@@ -174,7 +174,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             std::optional<T> time, std::optional<T> tol, bool high_accuracy,
                                             bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                             std::vector<nt_event_t> ntes, bool parallel_mode,
-                                            [[maybe_unused]] std::optional<long long> prec)
+                                            [[maybe_unused]] std::optional<long long> prec, bool parjit)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
@@ -461,7 +461,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         std::ranges::reverse(states);
 
         // Create the multi state and assign it.
-        m_llvm_state = llvm_multi_state(std::move(states));
+        m_llvm_state = llvm_multi_state(std::move(states), parjit);
 
         // Compile.
         std::get<1>(m_llvm_state).compile();

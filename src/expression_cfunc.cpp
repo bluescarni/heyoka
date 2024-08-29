@@ -2035,7 +2035,7 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
 std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::string &name,
                       const std::vector<expression> &fn, const std::vector<expression> &vars, std::uint32_t batch_size,
-                      bool high_accuracy, bool parallel_mode)
+                      bool high_accuracy, bool parallel_mode, bool parjit)
 {
     if (batch_size == 0u) [[unlikely]] {
         throw std::invalid_argument("The batch size of a compiled function cannot be zero");
@@ -2264,7 +2264,8 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
     //
     // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
     return std::make_tuple(
-        llvm_multi_state(states_lists[0] | std::views::transform([](auto &s) -> auto && { return std::move(s); })),
+        llvm_multi_state(states_lists[0] | std::views::transform([](auto &s) -> auto && { return std::move(s); }),
+                         parjit),
         std::move(dc), std::move(tape_size_align));
 }
 
@@ -2293,7 +2294,7 @@ template <typename T>
 std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<expression> &fn,
                  const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode,
-                 long long prec)
+                 long long prec, bool parjit)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -2320,7 +2321,7 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
     // this throughout the rest of the implementation.
     auto *fp_t = to_internal_llvm_type<T>(tplt, prec);
 
-    return make_multi_cfunc_impl(fp_t, tplt, name, fn, vars, batch_size, high_accuracy, parallel_mode);
+    return make_multi_cfunc_impl(fp_t, tplt, name, fn, vars, batch_size, high_accuracy, parallel_mode, parjit);
 }
 
 // Explicit instantiations.
@@ -2328,7 +2329,7 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>                 \
         make_multi_cfunc<T>(llvm_state, const std::string &, const std::vector<expression> &,                          \
-                            const std::vector<expression> &, std::uint32_t, bool, bool, long long);
+                            const std::vector<expression> &, std::uint32_t, bool, bool, long long, bool);
 
 HEYOKA_MAKE_MULTI_CFUNC_INST(float)
 HEYOKA_MAKE_MULTI_CFUNC_INST(double)

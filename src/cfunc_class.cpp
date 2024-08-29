@@ -182,7 +182,7 @@ struct cfunc<T>::impl {
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
-                  long long prec, bool check_prec)
+                  long long prec, bool check_prec, bool parjit)
         : m_fn(std::move(fn)), m_vars(std::move(vars)), m_states(std::array{s, s, s}), m_prec(prec),
           m_check_prec(check_prec), m_high_accuracy(high_accuracy), m_compact_mode(compact_mode),
           m_parallel_mode(parallel_mode)
@@ -207,7 +207,7 @@ struct cfunc<T>::impl {
         if (compact_mode) {
             // Build the multi cfunc, and assign the internal members.
             std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
-                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec);
+                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec, parjit);
 
             // Compile.
             std::get<1>(m_states).compile();
@@ -308,15 +308,15 @@ template <typename T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
                 // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool> tup)
+                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool, bool> tup)
 {
     // Unpack the tuple.
-    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec] = tup;
+    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec, parjit] = tup;
 
     // Construct the impl.
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_impl = std::make_unique<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
-                                    compact_mode, parallel_mode, prec, check_prec);
+                                    compact_mode, parallel_mode, prec, check_prec, parjit);
 }
 
 template <typename T>

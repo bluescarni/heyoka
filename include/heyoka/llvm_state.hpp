@@ -388,7 +388,8 @@ public:
     template <typename R>
         requires std::ranges::input_range<R>
                  && std::same_as<llvm_state, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
-    explicit llvm_multi_state(R &&rng) : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)))
+    explicit llvm_multi_state(R &&rng, bool parjit = detail::default_parjit)
+        : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)), parjit)
     {
     }
     llvm_multi_state(const llvm_multi_state &);
