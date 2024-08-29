@@ -70,7 +70,7 @@ heyoka (and all its dependencies) have been compiled with a compiler supporting 
 128-bit precision
 ^^^^^^^^^^^^^^^^^
 
-On platforms where ``long double`` is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
+On platforms where ``long double`` is a quadruple-precision floating-point datatype (e.g., 64-bit Linux ARM),
 quadruple-precision integrations are always supported via ``long double``. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:
 
