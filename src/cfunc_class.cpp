@@ -945,53 +945,7 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
     // - the batch size.
 
     // Cost of a scalar fp operation.
-    constexpr auto fp_unit_cost = []() -> double {
-        if constexpr (std::same_as<float, T> || std::same_as<double, T>) {
-            // float and double.
-            return 1;
-        } else if constexpr (std::same_as<long double, T>) {
-            // long double.
-            if constexpr (detail::is_ieee754_binary64<T>) {
-                return 1;
-            } else if constexpr (detail::is_x86_fp80<T>) {
-                return 5;
-            } else if constexpr (detail::is_ieee754_binary128<T>) {
-#if defined(HEYOKA_ARCH_PPC)
-                return 10;
-#else
-                return 100;
-#endif
-            } else {
-#if defined(HEYOKA_ARCH_PPC)
-                // Double-double implementation.
-                return 5;
-#else
-                static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
-#endif
-            }
-        }
-#if defined(HEYOKA_HAVE_REAL128)
-        else if constexpr (std::same_as<mppp::real128, T>) {
-#if defined(HEYOKA_ARCH_PPC)
-            return 10;
-#else
-            return 100;
-#endif
-        }
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-        else if constexpr (std::same_as<mppp::real, T>) {
-            // NOTE: this should be improved to take into account
-            // the selected precision.
-            // NOTE: for reference, mppp::real with 113 bits of precision
-            // is slightly slower than software-implemented quadmath.
-            return 1000;
-        }
-#endif
-        else {
-            static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
-        }
-    }();
+    const auto fp_unit_cost = detail::get_fp_unit_cost<T>();
 
     // Total number of fp operations: number of elementary subexpressions in the
     // decomposition * ncols.

@@ -139,6 +139,9 @@ inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>();
 template <typename T>
 inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
 
+template <typename T>
+double get_fp_unit_cost();
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
