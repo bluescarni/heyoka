@@ -35,7 +35,7 @@ namespace detail
 //
 // The cost is calibrated to be 1 for single/double precision values,
 // so that the unit of measure for the cost is a (very rough) approximation
-// of clock cycles.
+// of a clock cycle.
 template <typename T>
 double get_fp_unit_cost()
 {
