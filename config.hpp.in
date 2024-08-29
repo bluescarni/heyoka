@@ -75,10 +75,6 @@
 
 #endif
 
-// Maximum number of blocks that can be processed in parallel
-// when computing the Taylor derivatives in parallel mode.
-#define HEYOKA_CM_PAR_MAX_INVOKE_N 20
-
 // Setup of the ABI versioning and tagging
 // machinery.
 
