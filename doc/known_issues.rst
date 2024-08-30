@@ -18,6 +18,14 @@ Unsolved
 
   The root cause is most likely a code-generation/optimisation problem in LLVM.
   This issue is currently under investigation.
+* The parallel compilation feature (added in heyoka 6.0.0) is currently disabled
+  by default on 64-bit ARM processors (this includes the Apple M1 and its successors).
+  The reason is a likely thread scheduling bug in LLVM's parallel compilation facilities
+  that very rarely results in a multiply-defined symbol, which ultimately leads to compilation
+  failure. The issue is currently under investigation by the LLVM developers. In the
+  meantime, you can explicitly turn on parallel compilation via the ``kw::parjit``
+  :ref:`keyword argument <kwargs>` when constructing an integrator or a compiled
+  function.
 
 Solved
 ======
