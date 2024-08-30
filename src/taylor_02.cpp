@@ -953,6 +953,15 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
 
     // Generate the code for the computation of the Taylor derivatives.
     if (parallel_mode) {
+        // NOTE: in principle here we could implement a cost model to decide at runtime
+        // whether or not it is worth it to run the parallel implementation depending
+        // on the current Taylor order. The cost model for the computation of the Taylor
+        // derivatives is quite simple (as all AD formulae basically boild down to
+        // sums of products), apart from order 0 where we may have operations with
+        // wildly different costs (e.g., a cos() vs a simple addition). We made an attempt
+        // at implementing such a cost model at one point, but there were no benefits
+        // (even a small slowdown) in the large N-body problem used as a test case.
+        // Thus, for now, let us keep things simple.
         taylor_cm_codegen_segment_diff_parallel(s, fp_vec_type, seg_map, n_uvars);
     } else {
         taylor_cm_codegen_segment_diff_sequential(s, fp_vec_type, seg_map, n_uvars);

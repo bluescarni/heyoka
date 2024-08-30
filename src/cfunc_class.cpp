@@ -943,6 +943,12 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
     // - the value of ncols,
     // - the floating-point type in use,
     // - the batch size.
+    //
+    // Note that this cost model is very rough and does not take into account,
+    // for instance, that different elementary operations may have very different
+    // costs (e.g., a trig function vs a simple add). Perhaps we can re-evaluate this
+    // in the future and maybe just remove it and parallelise regardless to simplify
+    // the logic.
 
     // Cost of a scalar fp operation.
     const auto fp_unit_cost = detail::get_fp_unit_cost<T>();
