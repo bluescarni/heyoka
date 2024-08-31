@@ -1049,6 +1049,13 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // Limit of codegenned blocks per state.
     // NOTE: this has not been really properly tuned,
     // needs more investigation.
+    // NOTE: it would probably be better here to keep track of the
+    // total number of function calls per segment, rather than
+    // the number of blocks. The reason for this is that each
+    // function call in principle increases the size of the
+    // auxiliary global arrays used by the compact mode
+    // argument generators, which in turns increases the code
+    // generation time.
     constexpr auto max_n_cg_blocks = 20u;
 
     // Variable to keep track of the index of the first u variable

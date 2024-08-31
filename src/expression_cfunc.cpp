@@ -1704,6 +1704,13 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
     // Limit of codegenned blocks per state.
     // NOTE: this has not been really properly tuned,
     // needs more investigation.
+    // NOTE: it would probably be better here to keep track of the
+    // total number of function calls per segment, rather than
+    // the number of blocks. The reason for this is that each
+    // function call in principle increases the size of the
+    // auxiliary global arrays used by the compact mode
+    // argument generators, which in turn increases the code
+    // generation time.
     constexpr auto max_n_cg_blocks = 20u;
 
     // Variable to keep track of the u variable
