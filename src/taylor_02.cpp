@@ -1054,7 +1054,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // the number of blocks. The reason for this is that each
     // function call in principle increases the size of the
     // auxiliary global arrays used by the compact mode
-    // argument generators, which in turns increases the code
+    // argument generators, which in turn increases the code
     // generation time.
     constexpr auto max_n_cg_blocks = 20u;
 
