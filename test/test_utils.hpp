@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -21,7 +22,10 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
 
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xfixed.hpp>
@@ -284,6 +288,16 @@ std::vector<T> tc_to_jet(const heyoka::taylor_adaptive_batch<T> &);
 template <typename T>
 void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned, bool, bool,
                           std::mt19937 &, float, float, T = T(1000.));
+
+bool ir_contains(const auto &ta, const char *str)
+{
+    if (ta.get_compact_mode()) {
+        return std::ranges::any_of(std::get<1>(ta.get_llvm_state()).get_ir(),
+                                   [&](const auto &ir) { return boost::contains(ir, str); });
+    } else {
+        return boost::contains(std::get<0>(ta.get_llvm_state()).get_ir(), str);
+    }
+}
 
 } // namespace heyoka_test
 

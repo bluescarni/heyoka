@@ -37,6 +37,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -135,13 +136,9 @@ TEST_CASE("basic")
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
-        if (cf0.get_compact_mode()) {
-            REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == 3u);
-        } else {
-            REQUIRE(std::get<0>(cf0.get_llvm_states())[0].get_opt_level() == 3u);
-            REQUIRE(std::get<0>(cf0.get_llvm_states())[1].get_opt_level() == 3u);
-            REQUIRE(std::get<0>(cf0.get_llvm_states())[2].get_opt_level() == 3u);
-        }
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[0].get_opt_level() == 3u);
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[1].get_opt_level() == 3u);
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[2].get_opt_level() == 3u);
         REQUIRE(cf0.get_high_accuracy() == false);
         REQUIRE(cf0.get_compact_mode() == false);
         REQUIRE(cf0.get_parallel_mode() == true);
@@ -165,13 +162,15 @@ TEST_CASE("basic")
                           kw::batch_size = custom_batch_size,
                           kw::opt_level = opt_level,
                           kw::high_accuracy = high_accuracy,
-                          kw::compact_mode = compact_mode};
+                          kw::compact_mode = compact_mode,
+                          kw::parjit = detail::default_parjit};
 
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
         REQUIRE(!cf0.get_dc().empty());
         if (cf0.get_compact_mode()) {
             REQUIRE(std::get<1>(cf0.get_llvm_states()).get_opt_level() == opt_level);
+            REQUIRE(std::get<1>(cf0.get_llvm_states()).get_parjit() == detail::default_parjit);
         } else {
             REQUIRE(std::get<0>(cf0.get_llvm_states())[0].get_opt_level() == opt_level);
             REQUIRE(std::get<0>(cf0.get_llvm_states())[1].get_opt_level() == opt_level);

@@ -347,6 +347,19 @@ struct llvm_mc_value {
 std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &, unsigned);
 void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc_value);
 
+// The default setting for the parjit flag for llvm_multi_state.
+// There is evidence of an LLVM thread scheduling bug when parallel compilation
+// is active, that rarely results in multiply-defined symbols for external C
+// functions, which leads to compilation failure. So far, we have been able to
+// trigger this issue only on 64-bit arm.
+inline constexpr bool default_parjit =
+#if defined(HEYOKA_ARCH_ARM)
+    false
+#else
+    true
+#endif
+    ;
+
 } // namespace detail
 
 class HEYOKA_DLL_PUBLIC llvm_multi_state
@@ -371,11 +384,12 @@ class HEYOKA_DLL_PUBLIC llvm_multi_state
 
 public:
     llvm_multi_state();
-    explicit llvm_multi_state(std::vector<llvm_state>);
+    explicit llvm_multi_state(std::vector<llvm_state>, bool = detail::default_parjit);
     template <typename R>
         requires std::ranges::input_range<R>
                  && std::same_as<llvm_state, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
-    explicit llvm_multi_state(R &&rng) : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)))
+    explicit llvm_multi_state(R &&rng, bool parjit = detail::default_parjit)
+        : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)), parjit)
     {
     }
     llvm_multi_state(const llvm_multi_state &);
@@ -393,6 +407,7 @@ public:
     [[nodiscard]] unsigned get_opt_level() const noexcept;
     [[nodiscard]] bool get_slp_vectorize() const noexcept;
     [[nodiscard]] code_model get_code_model() const noexcept;
+    [[nodiscard]] bool get_parjit() const noexcept;
 
     [[nodiscard]] std::vector<std::string> get_ir() const;
     [[nodiscard]] std::vector<std::string> get_bc() const;

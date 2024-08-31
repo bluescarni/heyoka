@@ -104,7 +104,7 @@ TEST_CASE("taylor kepE")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.num_num"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.kepE.num_num"));
             }
 
             ta.step(true);
@@ -306,7 +306,7 @@ TEST_CASE("taylor kepE")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.var_num"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.kepE.var_num"));
             }
 
             ta.step(true);
@@ -552,7 +552,7 @@ TEST_CASE("taylor kepE")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.num_var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.kepE.num_var"));
             }
 
             ta.step(true);
@@ -773,7 +773,7 @@ TEST_CASE("taylor kepE")
                                             kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.var_var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.kepE.var_var"));
             }
 
             ta.step(true);

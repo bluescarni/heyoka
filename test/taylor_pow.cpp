@@ -59,35 +59,35 @@ TEST_CASE("taylor pow approx")
     {
         auto ta = taylor_adaptive{{prime(x) = pow(x, -1.5) + pow(x, 1 / 3.)}, {2.}, kw::tol = .1, kw::opt_level = 0};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.pow"));
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.sqrt"));
+        REQUIRE(ir_contains(ta, "@llvm.pow"));
+        REQUIRE(ir_contains(ta, "@llvm.sqrt"));
     }
 
     {
         auto ta = taylor_adaptive{std::vector{std::pair{x, pow(par[0], -1.5)}}, {2.}, kw::tol = .1, kw::opt_level = 0};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.sqrt"));
+        REQUIRE(ir_contains(ta, "@llvm.sqrt"));
     }
 
     {
         auto ta
             = taylor_adaptive{std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, {2.}, kw::tol = .1, kw::opt_level = 0};
 
-        REQUIRE(!boost::contains(ta.get_llvm_state().get_ir(), "@llvm.sqrt"));
+        REQUIRE(!ir_contains(ta, "@llvm.sqrt"));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, -1.5) + pow(x, 1 / 3.)}}, {2.}, kw::tol = .1, kw::opt_level = 0};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.pow"));
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.sqrt"));
+        REQUIRE(ir_contains(ta, "@llvm.pow"));
+        REQUIRE(ir_contains(ta, "@llvm.sqrt"));
     }
 
     {
         auto ta = taylor_adaptive{std::vector{std::pair{x, pow(par[0], -1.5)}}, {2.}, kw::tol = .1, kw::opt_level = 0};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@llvm.sqrt"));
+        REQUIRE(ir_contains(ta, "@llvm.sqrt"));
     }
 
     {
@@ -97,28 +97,28 @@ TEST_CASE("taylor pow approx")
                                   kw::opt_level = 0,
                                   kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow."));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, 2_dbl)}}, {2.}, kw::tol = .1, kw::opt_level = 0, kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_square."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_square."));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, .5_dbl)}}, {2.}, kw::tol = .1, kw::opt_level = 0, kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_sqrt."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_sqrt."));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, 1.5_dbl)}}, {2.}, kw::tol = .1, kw::opt_level = 0, kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_pos_small_half_3."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_pos_small_half_3."));
     }
 
     {
@@ -128,21 +128,21 @@ TEST_CASE("taylor pow approx")
                                   kw::opt_level = 0,
                                   kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_neg_small_half_3."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_neg_small_half_3."));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, 4_dbl)}}, {2.}, kw::tol = .1, kw::opt_level = 0, kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_pos_small_int_4."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_pos_small_int_4."));
     }
 
     {
         auto ta = taylor_adaptive{
             std::vector{std::pair{x, pow(x, -4_dbl)}}, {2.}, kw::tol = .1, kw::opt_level = 0, kw::compact_mode = true};
 
-        REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.pow_neg_small_int_4."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.pow_neg_small_int_4."));
     }
 }
 
@@ -168,7 +168,7 @@ TEST_CASE("taylor pow")
                                             kw::pars = {fp_t{1} / fp_t{3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.pow.num_par"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.pow.num_par"));
             }
 
             ta.step(true);
@@ -422,7 +422,7 @@ TEST_CASE("taylor pow")
                                         kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.pow.var_num"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.pow.var_num"));
             }
 
             ta.step(true);

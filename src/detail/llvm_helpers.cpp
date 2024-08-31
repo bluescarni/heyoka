@@ -1358,6 +1358,8 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         // Add the function attributes.
         callee_f->setAttributes(attrs);
     } else {
+        // LCOV_EXCL_START
+
         // The function declaration exists already. Check that it is only a
         // declaration and not a definition.
         if (!callee_f->isDeclaration()) {
@@ -1374,6 +1376,8 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         }
         // NOTE: in the future we should consider adding more checks here
         // (e.g., argument types, return type, attributes, etc.).
+
+        // LCOV_EXCL_STOP
     }
 
     // Create the function call.

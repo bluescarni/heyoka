@@ -460,9 +460,8 @@ TEST_CASE("taylor_adaptive")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(
-                    boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and.var_var_num."));
-                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or"));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.logical_and.var_var_num."));
+                REQUIRE(!ir_contains(ta2, "heyoka.taylor_c_diff.logical_or"));
             }
 
             ta1.propagate_until(5.);
@@ -481,8 +480,8 @@ TEST_CASE("taylor_adaptive")
                 kw::pars = {1.24}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or.var_var_par."));
-                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and"));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.logical_or.var_var_par."));
+                REQUIRE(!ir_contains(ta2, "heyoka.taylor_c_diff.logical_and"));
             }
 
             ta1.propagate_until(5.);
@@ -514,9 +513,8 @@ TEST_CASE("taylor_adaptive_batch")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(
-                    boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and.var_var_num."));
-                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or"));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.logical_and.var_var_num."));
+                REQUIRE(!ir_contains(ta2, "heyoka.taylor_c_diff.logical_or"));
             }
 
             ta1.propagate_until(5.);
@@ -541,8 +539,8 @@ TEST_CASE("taylor_adaptive_batch")
                 kw::pars = {1.24, 1.25}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or.var_var_par."));
-                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and"));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.logical_or.var_var_par."));
+                REQUIRE(!ir_contains(ta2, "heyoka.taylor_c_diff.logical_and"));
             }
 
             ta1.propagate_until(5.);

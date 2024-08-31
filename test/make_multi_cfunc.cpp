@@ -33,6 +33,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/sgp4.hpp>
@@ -86,7 +87,8 @@ TEST_CASE("basic")
         llvm_state tplt{kw::opt_level = opt_level};
 
         auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]},
-                                                             {x, y}, 1, false, false, 0);
+                                                             {x, y}, 1, false, false, 0, detail::default_parjit);
+        REQUIRE(ms.get_parjit() == detail::default_parjit);
 
         REQUIRE(sa.size() == 1u);
 
@@ -135,7 +137,7 @@ TEST_CASE("basic")
         llvm_state tplt{kw::opt_level = opt_level};
 
         auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + y + heyoka::time, x - y - par[0]},
-                                                             {x, y}, 2, false, false, 0);
+                                                             {x, y}, 2, false, false, 0, detail::default_parjit);
 
         REQUIRE(sa.size() == 2u);
 
@@ -213,8 +215,9 @@ TEST_CASE("sgp4")
 
     llvm_state tplt;
 
-    auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", model::sgp4(),
-                                                         std::vector(inputs.begin(), inputs.end()), 1, false, false, 0);
+    auto [ms, dc, sa]
+        = detail::make_multi_cfunc<double>(tplt, "test", model::sgp4(), std::vector(inputs.begin(), inputs.end()), 1,
+                                           false, false, 0, detail::default_parjit);
 
     REQUIRE(sa.size() == 1u);
 
@@ -281,7 +284,8 @@ TEST_CASE("nbody")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
+            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0,
+                                                                 detail::default_parjit);
 
             ms.compile();
 
@@ -402,7 +406,8 @@ TEST_CASE("nbody mp")
         std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
         std::ranges::sort(vars, std::less<expression>{});
 
-        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec,
+                                                                 detail::default_parjit);
 
         ms.compile();
 
@@ -507,7 +512,8 @@ TEST_CASE("nbody par")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0);
+            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", exs, vars, batch_size, false, false, 0,
+                                                                 detail::default_parjit);
 
             ms.compile();
 
@@ -701,7 +707,8 @@ TEST_CASE("nbody par mp")
         std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
         std::ranges::sort(vars, std::less<expression>{});
 
-        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec);
+        auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", exs, vars, 1, false, false, prec,
+                                                                 detail::default_parjit);
 
         ms.compile();
 
@@ -858,8 +865,8 @@ TEST_CASE("numparams")
 
             std::generate(pars.begin(), pars.end(), gen);
 
-            auto [ms, dc, sa]
-                = detail::make_multi_cfunc<double>(tplt, "test", {1_dbl, par[0]}, {}, batch_size, false, false, 0);
+            auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {1_dbl, par[0]}, {}, batch_size, false,
+                                                                 false, 0, detail::default_parjit);
 
             REQUIRE(((batch_size == 1u && sa.size() == 1u) || (batch_size > 1u && sa.size() == 2u)));
 
@@ -936,7 +943,7 @@ TEST_CASE("numparams mp")
         std::generate(outs.begin(), outs.end(), gen);
 
         auto [ms, dc, sa] = detail::make_multi_cfunc<mppp::real>(tplt, "test", {1_dbl, par[0], par[1], -2_dbl}, {}, 1,
-                                                                 false, false, prec);
+                                                                 false, false, prec, detail::default_parjit);
 
         ms.compile();
 
@@ -1006,8 +1013,9 @@ TEST_CASE("bogus stride")
         std::generate(ins.begin(), ins.end(), gen);
         std::generate(pars.begin(), pars.end(), gen);
 
-        auto [ms, dc, sa] = detail::make_multi_cfunc<double>(tplt, "test", {x + 2_dbl * y + par[0] * z, par[1] - x * y},
-                                                             {x, y, z}, batch_size, false, false, 0);
+        auto [ms, dc, sa]
+            = detail::make_multi_cfunc<double>(tplt, "test", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
+                                               batch_size, false, false, 0, detail::default_parjit);
 
         ms.compile();
 
@@ -1047,13 +1055,13 @@ TEST_CASE("failure modes")
 {
     using Catch::Matchers::Message;
 
-    REQUIRE_THROWS_MATCHES(
-        detail::make_multi_cfunc<double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 0, false, false, 0),
-        std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
+    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 0, false, false,
+                                                            0, detail::default_parjit),
+                           std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
 
-    REQUIRE_THROWS_MATCHES(
-        detail::make_multi_cfunc<double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, true, 0),
-        std::invalid_argument, Message("Parallel mode has not been implemented yet"));
+    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, true,
+                                                            0, detail::default_parjit),
+                           std::invalid_argument, Message("Parallel mode has not been implemented yet"));
 
 #if defined(HEYOKA_ARCH_PPC)
 
@@ -1065,16 +1073,17 @@ TEST_CASE("failure modes")
 
 #if defined(HEYOKA_HAVE_REAL)
 
-    REQUIRE_THROWS_MATCHES(
-        detail::make_multi_cfunc<mppp::real>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, false, 0),
-        std::invalid_argument,
-        Message(fmt::format("An invalid precision value of 0 was passed to make_multi_cfunc() (the "
-                            "value must be in the [{}, {}] range)",
-                            mppp::real_prec_min(), mppp::real_prec_max())));
+    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<mppp::real>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false,
+                                                                false, 0, detail::default_parjit),
+                           std::invalid_argument,
+                           Message(fmt::format("An invalid precision value of 0 was passed to make_multi_cfunc() (the "
+                                               "value must be in the [{}, {}] range)",
+                                               mppp::real_prec_min(), mppp::real_prec_max())));
 
 #endif
 
-    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<double>(llvm_state{}, "", {1_dbl, par[0]}, {}, 1, false, false, 0),
+    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<double>(llvm_state{}, "", {1_dbl, par[0]}, {}, 1, false, false, 0,
+                                                            detail::default_parjit),
                            std::invalid_argument,
                            Message("A non-empty function name is required when invoking make_multi_cfunc()"));
 }

@@ -44,6 +44,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
@@ -1657,7 +1658,8 @@ void s11n_test_impl()
                                           kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
                                           kw::pars = std::vector<double>{-1e-4},
                                           kw::high_accuracy = true,
-                                          kw::compact_mode = true};
+                                          kw::compact_mode = true,
+                                          kw::parjit = detail::default_parjit};
 
         REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
         REQUIRE(ta.get_high_accuracy());
@@ -1688,7 +1690,7 @@ void s11n_test_impl()
             ia >> ta;
         }
 
-        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(std::get<1>(ta.get_llvm_state()).get_ir() == std::get<1>(ta_copy.get_llvm_state()).get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
         REQUIRE(ta.get_tol() == ta_copy.get_tol());
@@ -1701,6 +1703,9 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+        REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
 
         REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
                 == value_type_index(ta_copy.get_t_events()[0].get_callback()));
@@ -1725,6 +1730,12 @@ void s11n_test_impl()
         ta_copy.update_d_output(-.1, true);
 
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        // Also run a propagation with continuous output to test that
+        // the m_tplt_state member is correctly copied.
+        auto prop_res = ta.propagate_for(10., kw::c_output = true);
+        auto prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+        REQUIRE((*std::get<4>(prop_res))(4.1) == (*std::get<4>(prop_copy_res))(4.1));
     }
 
     // Test without events.
@@ -1753,7 +1764,7 @@ void s11n_test_impl()
             ia >> ta;
         }
 
-        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(std::get<0>(ta.get_llvm_state()).get_ir() == std::get<0>(ta_copy.get_llvm_state()).get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
         REQUIRE(ta.get_dim() == ta_copy.get_dim());
@@ -1763,6 +1774,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_tc() == ta_copy.get_tc());
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_ir() == std::get<0>(ta.get_llvm_state()).get_ir());
+        REQUIRE(std::get<0>(ta_copy.get_llvm_state()).get_bc() == std::get<0>(ta.get_llvm_state()).get_bc());
 
         // Take a step in ta and in ta_copy.
         ta.step(true);
@@ -1817,7 +1830,8 @@ TEST_CASE("copy semantics")
                                     kw::pars = std::vector<fp_t>{-1e-4},
                                     kw::high_accuracy = true,
                                     kw::compact_mode = true,
-                                    kw::tol = 1e-11};
+                                    kw::tol = 1e-11,
+                                    kw::parjit = detail::default_parjit};
 
     auto ta_copy = ta;
 
@@ -1826,6 +1840,21 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+
+    // Also run a propagation with continuous output to test that
+    // the m_tplt_state member is correctly copied.
+    auto prop_res = ta.propagate_for(10., kw::c_output = true);
+    auto prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+    REQUIRE((*std::get<4>(prop_res))(4.1) == (*std::get<4>(prop_copy_res))(4.1));
 
     ta_copy = taylor_adaptive<fp_t>{};
     ta_copy = ta;
@@ -1835,6 +1864,19 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_tol() == ta.get_tol());
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_ir() == std::get<1>(ta.get_llvm_state()).get_ir());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_bc() == std::get<1>(ta.get_llvm_state()).get_bc());
+    REQUIRE(std::get<1>(ta_copy.get_llvm_state()).get_parjit() == std::get<1>(ta.get_llvm_state()).get_parjit());
+
+    ta.step();
+    ta_copy.step();
+
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+
+    prop_res = ta.propagate_for(10., kw::c_output = true);
+    prop_copy_res = ta_copy.propagate_for(10., kw::c_output = true);
+    REQUIRE((*std::get<4>(prop_res))(14.1) == (*std::get<4>(prop_copy_res))(14.1));
 }
 
 #if defined(HEYOKA_ARCH_PPC)

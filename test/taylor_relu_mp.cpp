@@ -54,8 +54,8 @@ TEST_CASE("relu")
                                                         kw::opt_level = opt_level};
 
                         if (opt_level == 0u && cm) {
-                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relu.var"));
-                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relup.var"));
+                            REQUIRE(ir_contains(ta, "heyoka.taylor_c_diff.relu.var"));
+                            REQUIRE(ir_contains(ta, "heyoka.taylor_c_diff.relup.var"));
                         }
 
                         ta.step(true);
@@ -95,9 +95,9 @@ TEST_CASE("relu leaky")
                                                         kw::opt_level = opt_level};
 
                         if (opt_level == 0u && cm) {
-                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relu_0x"));
-                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relup_0x"));
-                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".var"));
+                            REQUIRE(ir_contains(ta, "heyoka.taylor_c_diff.relu_0x"));
+                            REQUIRE(ir_contains(ta, "heyoka.taylor_c_diff.relup_0x"));
+                            REQUIRE(ir_contains(ta, ".var"));
                         }
 
                         ta.step(true);

@@ -699,7 +699,7 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
 template <typename>
 std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std::size_t, 2>>>
 make_multi_cfunc(llvm_state, const std::string &, const std::vector<expression> &, const std::vector<expression> &,
-                 std::uint32_t, bool, bool, long long);
+                 std::uint32_t, bool, bool, long long, bool);
 
 } // namespace detail
 
@@ -818,13 +818,27 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
             }
         }();
 
+        // Parallel JIT compilation.
+        auto parjit = [&p]() -> bool {
+            if constexpr (p.has(kw::parjit)) {
+                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::parjit))>>) {
+                    return static_cast<bool>(p(kw::parjit));
+                } else {
+                    static_assert(detail::always_false_v<T>, "Invalid type for the 'parjit' keyword argument.");
+                }
+            } else {
+                return detail::default_parjit;
+            }
+        }();
+
         // Build the template llvm_state from the keyword arguments.
         llvm_state s(kw_args...);
 
-        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec);
+        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec,
+                               parjit);
     }
     explicit cfunc(std::vector<expression>, std::vector<expression>,
-                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool>);
+                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool, bool>);
 
     HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 

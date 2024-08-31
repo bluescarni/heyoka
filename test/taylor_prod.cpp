@@ -158,7 +158,7 @@ TEST_CASE("taylor mul")
                                                   kw::pars = {fp_t{0}, fp_t{0}, fp_t{3}, fp_t{3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod_neg."));
             }
 
             ta.step(true);
@@ -205,7 +205,7 @@ TEST_CASE("taylor mul")
                                             kw::pars = {fp_t{-2}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod_neg."));
             }
 
             ta.step(true);
@@ -603,8 +603,8 @@ TEST_CASE("taylor mul")
                                             kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod_neg."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod."));
             }
 
             ta.step(true);
@@ -675,8 +675,8 @@ TEST_CASE("taylor mul")
                                                   kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod_neg."));
+                REQUIRE(ir_contains(ta, "taylor_c_diff.prod."));
             }
 
             ta.step(true);

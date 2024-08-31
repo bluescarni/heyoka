@@ -100,6 +100,7 @@ TEST_CASE("basic")
         REQUIRE(ms.get_code_model() == code_model::large);
         REQUIRE(ms.get_n_modules() == 5u);
         REQUIRE(!ms.is_compiled());
+        REQUIRE(ms.get_parjit() == detail::default_parjit);
 
         ms.compile();
 
@@ -121,7 +122,7 @@ TEST_CASE("basic")
         llvm_state s{kw::opt_level = 1u, kw::fast_math = true, kw::force_avx512 = true, kw::slp_vectorize = true,
                      kw::code_model = code_model::large};
 
-        llvm_multi_state ms{{s, s, s, s}};
+        llvm_multi_state ms{{s, s, s, s}, false};
 
         auto ms2 = std::move(ms);
 
@@ -132,6 +133,7 @@ TEST_CASE("basic")
         REQUIRE(ms2.get_code_model() == code_model::large);
         REQUIRE(ms2.get_n_modules() == 5u);
         REQUIRE(!ms2.is_compiled());
+        REQUIRE(!ms2.get_parjit());
 
         ms2.compile();
 
@@ -163,7 +165,7 @@ TEST_CASE("copy semantics")
     add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
 
-    llvm_multi_state ms{{s1, s2}};
+    llvm_multi_state ms{{s1, s2}, false};
 
     auto ms_copy = ms;
 
@@ -175,6 +177,7 @@ TEST_CASE("copy semantics")
     REQUIRE(ms_copy.get_opt_level() == ms.get_opt_level());
     REQUIRE(ms_copy.get_slp_vectorize() == ms.get_slp_vectorize());
     REQUIRE(ms_copy.get_code_model() == ms.get_code_model());
+    REQUIRE(!ms_copy.get_parjit());
     REQUIRE_THROWS_MATCHES(
         ms_copy.get_object_code(), std::invalid_argument,
         Message("The function 'get_object_code' can be invoked only after the llvm_multi_state has been compiled"));
@@ -227,6 +230,7 @@ TEST_CASE("copy semantics")
     REQUIRE(ms_copy2.get_opt_level() == ms.get_opt_level());
     REQUIRE(ms_copy2.get_slp_vectorize() == ms.get_slp_vectorize());
     REQUIRE(ms_copy2.get_code_model() == ms.get_code_model());
+    REQUIRE(!ms_copy2.get_parjit());
     REQUIRE_NOTHROW(ms_copy2.jit_lookup("f1"));
     REQUIRE_NOTHROW(ms_copy2.jit_lookup("f2"));
 
@@ -259,6 +263,7 @@ TEST_CASE("copy semantics")
     REQUIRE(ms_copy3.get_opt_level() == ms.get_opt_level());
     REQUIRE(ms_copy3.get_slp_vectorize() == ms.get_slp_vectorize());
     REQUIRE(ms_copy3.get_code_model() == ms.get_code_model());
+    REQUIRE(!ms_copy3.get_parjit());
     REQUIRE_NOTHROW(ms_copy3.jit_lookup("f1"));
     REQUIRE_NOTHROW(ms_copy3.jit_lookup("f2"));
 
@@ -298,7 +303,7 @@ TEST_CASE("s11n")
     add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
 
     // Uncompiled.
-    llvm_multi_state ms{{s1, s2}};
+    llvm_multi_state ms{{s1, s2}, false};
 
     std::stringstream ss;
 
@@ -322,6 +327,7 @@ TEST_CASE("s11n")
     REQUIRE(ms_copy.get_opt_level() == ms.get_opt_level());
     REQUIRE(ms_copy.get_slp_vectorize() == ms.get_slp_vectorize());
     REQUIRE(ms_copy.get_code_model() == ms.get_code_model());
+    REQUIRE(!ms_copy.get_parjit());
     REQUIRE_THROWS_MATCHES(
         ms_copy.get_object_code(), std::invalid_argument,
         Message("The function 'get_object_code' can be invoked only after the llvm_multi_state has been compiled"));
@@ -353,6 +359,7 @@ TEST_CASE("s11n")
     REQUIRE(ms_copy.get_opt_level() == ms.get_opt_level());
     REQUIRE(ms_copy.get_slp_vectorize() == ms.get_slp_vectorize());
     REQUIRE(ms_copy.get_code_model() == ms.get_code_model());
+    REQUIRE(!ms_copy.get_parjit());
     REQUIRE_NOTHROW(ms_copy.jit_lookup("f1"));
     REQUIRE_NOTHROW(ms_copy.jit_lookup("f2"));
 

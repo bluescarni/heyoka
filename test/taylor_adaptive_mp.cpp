@@ -1113,7 +1113,7 @@ TEST_CASE("s11n")
                 ia >> ta;
             }
 
-            REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+            REQUIRE(std::get<1>(ta.get_llvm_state()).get_ir() == std::get<1>(ta_copy.get_llvm_state()).get_ir());
             REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
             REQUIRE(ta.get_order() == ta_copy.get_order());
             REQUIRE(ta.get_tol() == ta_copy.get_tol());

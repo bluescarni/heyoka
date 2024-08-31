@@ -67,9 +67,11 @@ TEST_CASE("nbody")
 
         // Check that llvm.pow appears only maximum 3 times: its declaration plus 2 uses
         // for determining the timestep size. Vectorisation may further reduce this number.
-        std::vector<boost::iterator_range<std::string::const_iterator>> pow_matches;
-        boost::find_all(pow_matches, ta.get_llvm_state().get_ir(), "@llvm.pow");
-        REQUIRE(pow_matches.size() <= 3u);
+        for (auto cur_ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+            std::vector<boost::iterator_range<std::string::const_iterator>> pow_matches;
+            boost::find_all(pow_matches, cur_ir, "@llvm.pow");
+            REQUIRE(pow_matches.size() <= 3u);
+        }
 
         llvm_state s;
         std::vector<expression> vars;

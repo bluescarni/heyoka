@@ -8,8 +8,9 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
+#include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -93,20 +94,20 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
 }
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
-// following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
-// the jet of derivatives for the state variables and the sv_funcs. h_ptr is an external pointer containing
-// the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array containing the
-// values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
-// state vector (including sv_funcs, if any) will be written into it (max_abs_state_ptr is an external pointer).
-llvm::Value *
-taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
-                   const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
-                   const std::vector<std::uint32_t> &sv_funcs_dc,
-                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                   llvm::Value *svf_ptr, llvm::Value *h_ptr,
-                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                   std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                   llvm::Value *max_abs_state_ptr)
+// following Jorba's prescription. diff_variant is the output of taylor_compute_jet(). h_ptr is an external pointer
+// containing the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array
+// containing the values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the state
+// vector (including sv_funcs, if any) will be written into it (max_abs_state_ptr is an external pointer).
+// tape_ptr is the pointer to the tape of derivatives in compact mode, or a null pointer otherwise.
+llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
+                                const std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>,
+                                                   std::vector<llvm::Value *>> &diff_variant,
+                                const std::vector<std::uint32_t> &sv_funcs_dc,
+                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                                std::uint32_t batch_size, llvm::Value *max_abs_state_ptr, llvm::Value *tape_ptr)
 {
     assert(batch_size != 0u);
 #if !defined(NDEBUG)
@@ -128,7 +129,8 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
-        auto *diff_arr = std::get<0>(diff_variant).first;
+        assert(tape_ptr != nullptr);
+        auto *diff_arr = tape_ptr;
 
         // These will end up containing the norm infinity of the state vector + sv_funcs and the
         // norm infinity of the derivatives at orders order and order - 1.
@@ -194,6 +196,7 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         max_abs_diff_om1 = builder.CreateLoad(vec_t, max_abs_diff_om1);
     } else {
         // Non-compact mode.
+        assert(tape_ptr == nullptr);
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
         const auto n_sv_funcs = static_cast<std::uint32_t>(sv_funcs_dc.size());
@@ -269,23 +272,24 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
 }
 
 // Run the Horner scheme to propagate an ODE state via the evaluation of the Taylor polynomials.
-// diff_var contains either the derivatives for all u variables (in compact mode) or only
-// for the state variables (non-compact mode). The evaluation point (i.e., the timestep)
+// diff_var is the output of taylor_compute_jet(). The evaluation point (i.e., the timestep)
 // is h. The evaluation is run in parallel over the polynomials of all the state
-// variables.
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
-                       const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
-                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars,
-                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                       std::uint32_t order, std::uint32_t batch_size)
+// variables. tape_ptr is the pointer to the tape of derivatives in compact mode, or a null pointer otherwise.
+std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
+    llvm_state &s, llvm::Type *fp_t,
+    const std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
+        &diff_var,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    std::uint32_t order, std::uint32_t batch_size, llvm::Value *tape_ptr)
 {
     auto &builder = s.builder();
 
     if (diff_var.index() == 0u) {
         // Compact mode.
-        auto *diff_arr = std::get<0>(diff_var).first;
+        assert(tape_ptr != nullptr);
+        auto *diff_arr = tape_ptr;
 
         // Create the array storing the results of the evaluation.
         auto *fp_vec_t = make_vector_type(fp_t, batch_size);
@@ -323,6 +327,7 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
         return res_arr;
     } else {
         // Non-compact mode.
+        assert(tape_ptr == nullptr);
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
 
         // Init the return value, filling it with the values of the
@@ -345,18 +350,21 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
 
 // Same as taylor_run_multihorner(), but instead of the Horner scheme this implementation uses
 // a compensated summation over the naive evaluation of monomials.
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
-                 const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
-                 llvm::Value *h,
-                 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, std::uint32_t batch_size)
+std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_ceval(
+    llvm_state &s, llvm::Type *fp_t,
+    const std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
+        &diff_var,
+    llvm::Value *h,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, std::uint32_t batch_size,
+    llvm::Value *tape_ptr)
 {
     auto &builder = s.builder();
 
     if (diff_var.index() == 0u) {
         // Compact mode.
-        auto *diff_arr = std::get<0>(diff_var).first;
+        assert(tape_ptr != nullptr);
+        auto *diff_arr = tape_ptr;
 
         // Create the arrays storing the results of the evaluation and the running compensations.
         auto *fp_vec_t = make_vector_type(fp_t, batch_size);
@@ -414,6 +422,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
         return res_arr;
     } else {
         // Non-compact mode.
+        assert(tape_ptr == nullptr);
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
 
         // Init the return values with the order-0 monomials, and the running
@@ -451,13 +460,15 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
 // Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
 // first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
-// tc_ptr is an external pointer.
-void taylor_write_tc(
-    llvm_state &s, llvm::Type *fp_t,
-    const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
-    const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
-    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+// tc_ptr is an external pointer. tape_ptr is the pointer to the tape of derivatives in compact mode, or a null pointer
+// otherwise.
+void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
+                     const std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>,
+                                        std::vector<llvm::Value *>> &diff_variant,
+                     const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
+                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                     std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                     llvm::Value *tape_ptr)
 {
     // LCOV_EXCL_START
     assert(batch_size != 0u);
@@ -497,8 +508,8 @@ void taylor_write_tc(
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
-
-        auto *diff_arr = std::get<0>(diff_variant).first;
+        assert(tape_ptr != nullptr);
+        auto *diff_arr = tape_ptr;
 
         // Write out the Taylor coefficients for the state variables.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
@@ -544,7 +555,7 @@ void taylor_write_tc(
         }
     } else {
         // Non-compact mode.
-
+        assert(tape_ptr == nullptr);
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
         for (std::uint32_t j = 0; j < n_eq + n_sv_funcs; ++j) {
@@ -576,12 +587,11 @@ void taylor_write_tc(
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t,
-                                                 const std::string &name,
-                                                 const std::vector<std::pair<expression, expression>> &sys,
-                                                 std::uint32_t batch_size, bool compact_mode,
-                                                 const std::vector<expression> &evs, bool high_accuracy,
-                                                 bool parallel_mode, std::uint32_t order)
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std::string &name,
+                                     const std::vector<std::pair<expression, expression>> &sys,
+                                     std::uint32_t batch_size, bool compact_mode, const std::vector<expression> &evs,
+                                     bool high_accuracy, bool parallel_mode, std::uint32_t order)
 {
     assert(!s.is_compiled());
     assert(batch_size != 0u);
@@ -601,14 +611,17 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
+    //
     // - pointer to the output jet of derivative (write only),
     // - pointer to the current state vector (read only),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
     // - pointer to the array of max timesteps (read & write),
-    // - pointer to the max_abs_state output variable (write only).
+    // - pointer to the max_abs_state output variable (write only),
+    // - pointer to the tape (read & write, compact mode only).
+    //
     // These pointers cannot overlap.
-    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(compact_mode ? 7 : 6, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -653,6 +666,14 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     max_abs_state_ptr->addAttr(llvm::Attribute::NoAlias);
     max_abs_state_ptr->addAttr(llvm::Attribute::WriteOnly);
 
+    llvm::Argument *tape_ptr = nullptr;
+    if (compact_mode) {
+        tape_ptr = max_abs_state_ptr + 1;
+        tape_ptr->setName("tape_ptr");
+        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        tape_ptr->addAttr(llvm::Attribute::NoAlias);
+    }
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
@@ -663,36 +684,40 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     auto *svf_ptr = compact_mode ? taylor_c_make_sv_funcs_arr(s, ev_dc) : nullptr;
 
     // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
-                                           batch_size, compact_mode, high_accuracy, parallel_mode);
+    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, tape_ptr, dc, ev_dc, n_eq, n_uvars,
+                                           order, batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto *h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                 max_abs_state_ptr);
+                                 max_abs_state_ptr, tape_ptr);
 
     // Store h to memory.
     ext_store_vector_to_memory(s, h_ptr, h);
 
     // Copy the jet of derivatives to jet_ptr.
-    taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
+    taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size, tape_ptr);
 
     // End the lifetime of the array of derivatives, if we are in compact mode.
     if (compact_mode) {
-        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
-                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+        const auto [sz, al] = std::get<0>(diff_variant).first;
+        builder.CreateLifetimeEnd(tape_ptr, builder.getInt64(boost::numeric_cast<std::uint64_t>(sz)));
     }
 
     // Create the return value.
     builder.CreateRetVoid();
 
-    return dc;
+    if (compact_mode) {
+        return {std::move(dc), std::move(std::get<0>(diff_variant).first), std::move(std::get<0>(diff_variant).second)};
+    } else {
+        return {std::move(dc), {}, {}};
+    }
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
-                                     const std::vector<std::pair<expression, expression>> &sys,
-                                     std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                     bool parallel_mode, std::uint32_t order)
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
+                         const std::vector<std::pair<expression, expression>> &sys, std::uint32_t batch_size,
+                         bool high_accuracy, bool compact_mode, bool parallel_mode, std::uint32_t order)
 {
     assert(!s.is_compiled());
     assert(batch_size > 0u);
@@ -715,14 +740,17 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
     auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
+    //
     // - pointer to the current state vector (read & write),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
     // - pointer to the array of max timesteps (read & write),
-    // - pointer to the Taylor coefficients output (write only).
+    // - pointer to the Taylor coefficients output (write only),
+    // - pointer to the tape (read & write, compact mode only).
+    //
     // These pointers cannot overlap.
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(compact_mode ? 6 : 5, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -760,23 +788,32 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
+    llvm::Argument *tape_ptr = nullptr;
+    if (compact_mode) {
+        tape_ptr = tc_ptr + 1;
+        tape_ptr->setName("tape_ptr");
+        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        tape_ptr->addAttr(llvm::Attribute::NoAlias);
+    }
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
-    // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order,
-                                           batch_size, compact_mode, high_accuracy, parallel_mode);
+    // Generate the code for the computation of the jet of derivatives at the given order.
+    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, tape_ptr, dc, {}, n_eq, n_uvars,
+                                           order, batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto *h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                 nullptr);
+                                 nullptr, tape_ptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
-        = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy, batch_size)
-                        : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order, batch_size);
+        = high_accuracy
+              ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy, batch_size, tape_ptr)
+              : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order, batch_size, tape_ptr);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,
@@ -814,7 +851,7 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
         [&]() {
             // tc_ptr is not null: copy the Taylor coefficients
             // for the state variables.
-            taylor_write_tc(s, fp_t, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size);
+            taylor_write_tc(s, fp_t, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size, tape_ptr);
         },
         []() {
             // Taylor coefficients were not requested,
@@ -823,14 +860,18 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
 
     // End the lifetime of the array of derivatives, if we are in compact mode.
     if (compact_mode) {
-        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
-                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+        const auto [sz, al] = std::get<0>(diff_variant).first;
+        builder.CreateLifetimeEnd(tape_ptr, builder.getInt64(boost::numeric_cast<std::uint64_t>(sz)));
     }
 
     // Create the return value.
     builder.CreateRetVoid();
 
-    return dc;
+    if (compact_mode) {
+        return {std::move(dc), std::move(std::get<0>(diff_variant).first), std::move(std::get<0>(diff_variant).second)};
+    } else {
+        return {std::move(dc), {}, {}};
+    }
 }
 
 } // namespace detail

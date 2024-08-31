@@ -182,7 +182,7 @@ struct cfunc<T>::impl {
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
-                  long long prec, bool check_prec)
+                  long long prec, bool check_prec, bool parjit)
         : m_fn(std::move(fn)), m_vars(std::move(vars)), m_states(std::array{s, s, s}), m_prec(prec),
           m_check_prec(check_prec), m_high_accuracy(high_accuracy), m_compact_mode(compact_mode),
           m_parallel_mode(parallel_mode)
@@ -207,7 +207,7 @@ struct cfunc<T>::impl {
         if (compact_mode) {
             // Build the multi cfunc, and assign the internal members.
             std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
-                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec);
+                std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec, parjit);
 
             // Compile.
             std::get<1>(m_states).compile();
@@ -308,15 +308,15 @@ template <typename T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
                 // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool> tup)
+                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool, bool> tup)
 {
     // Unpack the tuple.
-    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec] = tup;
+    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec, parjit] = tup;
 
     // Construct the impl.
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_impl = std::make_unique<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
-                                    compact_mode, parallel_mode, prec, check_prec);
+                                    compact_mode, parallel_mode, prec, check_prec, parjit);
 }
 
 template <typename T>
@@ -943,55 +943,15 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
     // - the value of ncols,
     // - the floating-point type in use,
     // - the batch size.
+    //
+    // Note that this cost model is very rough and does not take into account,
+    // for instance, that different elementary operations may have very different
+    // costs (e.g., a trig function vs a simple add). Perhaps we can re-evaluate this
+    // in the future and maybe just remove it and parallelise regardless to simplify
+    // the logic.
 
     // Cost of a scalar fp operation.
-    constexpr auto fp_unit_cost = []() -> double {
-        if constexpr (std::same_as<float, T> || std::same_as<double, T>) {
-            // float and double.
-            return 1;
-        } else if constexpr (std::same_as<long double, T>) {
-            // long double.
-            if constexpr (detail::is_ieee754_binary64<T>) {
-                return 1;
-            } else if constexpr (detail::is_x86_fp80<T>) {
-                return 5;
-            } else if constexpr (detail::is_ieee754_binary128<T>) {
-#if defined(HEYOKA_ARCH_PPC)
-                return 10;
-#else
-                return 100;
-#endif
-            } else {
-#if defined(HEYOKA_ARCH_PPC)
-                // Double-double implementation.
-                return 5;
-#else
-                static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
-#endif
-            }
-        }
-#if defined(HEYOKA_HAVE_REAL128)
-        else if constexpr (std::same_as<mppp::real128, T>) {
-#if defined(HEYOKA_ARCH_PPC)
-            return 10;
-#else
-            return 100;
-#endif
-        }
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-        else if constexpr (std::same_as<mppp::real, T>) {
-            // NOTE: this should be improved to take into account
-            // the selected precision.
-            // NOTE: for reference, mppp::real with 113 bits of precision
-            // is slightly slower than software-implemented quadmath.
-            return 1000;
-        }
-#endif
-        else {
-            static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
-        }
-    }();
+    const auto fp_unit_cost = detail::get_fp_unit_cost<T>();
 
     // Total number of fp operations: number of elementary subexpressions in the
     // decomposition * ncols.

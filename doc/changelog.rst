@@ -7,6 +7,11 @@ Changelog
 New
 ~~~
 
+- Implement parallel compilation for Taylor integrators
+  and compiled functions
+  (`#446 <https://github.com/bluescarni/heyoka/pull/446>`__,
+  `#444 <https://github.com/bluescarni/heyoka/pull/444>`__,
+  `#441 <https://github.com/bluescarni/heyoka/pull/441>`__).
 - Add the possibility of specifying the LLVM code model
   used for JIT compilation
   (`#440 <https://github.com/bluescarni/heyoka/pull/440>`__).

@@ -1,6 +1,16 @@
+# NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
+# of locating Boost in recent Boost/CMake versions. If we fail, we try again in
+# MODULE mode as last resort.
 # NOTE: don't find a specific version as we already checked
 # outside that the Boost version is appropriate.
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost QUIET COMPONENTS program_options CONFIG)
+if(NOT ${Boost_FOUND})
+    message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
+    find_package(Boost QUIET MODULE COMPONENTS program_options)
+endif()
+if(NOT ${Boost_FOUND})
+    message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
+endif()
 if(NOT TARGET Boost::program_options)
     message(STATUS "The 'Boost::program_options' imported target is missing, creating it.")
     add_library(Boost::program_options UNKNOWN IMPORTED)
@@ -73,6 +83,7 @@ ADD_HEYOKA_BENCHMARK(sims_flanagan_jac)
 ADD_HEYOKA_BENCHMARK(cfunc_mt)
 ADD_HEYOKA_BENCHMARK(diff_tensors)
 ADD_HEYOKA_BENCHMARK(var_construction)
+ADD_HEYOKA_BENCHMARK(sgp4_dynamics)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_BENCHMARK(pendulum_mp)

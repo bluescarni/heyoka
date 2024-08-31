@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -98,20 +99,22 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Type *, ll
 HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *,
                                            llvm::Value *, llvm::Value *);
 
-taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
-                                                 const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-                                                 bool, const std::vector<expression> &, bool, bool, std::uint32_t);
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, const std::string &,
+                                     const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool,
+                                     const std::vector<expression> &, bool, bool, std::uint32_t);
 
-taylor_dc_t taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
-                                     const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool, bool,
-                                     bool, std::uint32_t);
+std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
+                         const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool, bool, bool,
+                         std::uint32_t);
 
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
-std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
-                   const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool,
-                   bool, bool);
+std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
+taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *,
+                   const taylor_dc_t &, const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t,
+                   std::uint32_t, bool, bool, bool);
 
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t, std::uint32_t,
@@ -232,7 +235,20 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
+    // Parallel JIT compilation.
+    auto parjit = [&p]() -> bool {
+        if constexpr (p.has(kw::parjit)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::parjit))>>) {
+                return static_cast<bool>(p(kw::parjit));
+            } else {
+                static_assert(always_false_v<T>, "Invalid type for the 'parjit' keyword argument.");
+            }
+        } else {
+            return default_parjit;
+        }
+    }();
+
+    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode, parjit};
 }
 
 // Small helper to construct a default value for the max_delta_t
@@ -440,7 +456,7 @@ private:
     // Private implementation-detail constructor machinery.
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
-                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>, bool);
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, const KwArgs &...kw_args)
     {
@@ -460,7 +476,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -496,7 +512,7 @@ private:
 
             finalise_ctor_impl(std::move(sys), std::move(state), std::move(tm), std::move(tol), high_accuracy,
                                compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode,
-                               std::move(prec));
+                               std::move(prec), parjit);
         }
     }
 
@@ -507,6 +523,7 @@ private:
     explicit taylor_adaptive(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+    HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
     using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
@@ -548,7 +565,7 @@ public:
 
     ~taylor_adaptive();
 
-    [[nodiscard]] const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const std::variant<llvm_state, llvm_multi_state> &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
@@ -849,7 +866,7 @@ private:
     // Private implementation-detail constructor machinery.
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
-                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, bool);
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
     {
@@ -871,7 +888,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -894,7 +911,7 @@ private:
 
             finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(tm), std::move(tol),
                                high_accuracy, compact_mode, std::move(pars), std::move(tes), std::move(ntes),
-                               parallel_mode);
+                               parallel_mode, parjit);
         }
     }
 
@@ -905,6 +922,7 @@ private:
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+    HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
     using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
@@ -948,7 +966,7 @@ public:
 
     ~taylor_adaptive_batch();
 
-    [[nodiscard]] const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const std::variant<llvm_state, llvm_multi_state> &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
@@ -1188,7 +1206,8 @@ namespace detail
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
 // - 5: removed m_state_vars/m_rhs, variational ODE data.
-inline constexpr int taylor_adaptive_s11n_version = 5;
+// - 6: added parallel JIT compilation for compact mode.
+inline constexpr int taylor_adaptive_s11n_version = 6;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
@@ -1196,7 +1215,8 @@ inline constexpr int taylor_adaptive_s11n_version = 5;
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
 // - 4: removed m_state_vars/m_rhs, variational ODE data.
-inline constexpr int taylor_adaptive_batch_s11n_version = 4;
+// - 5: added parallel JIT compilation for compact mode.
+inline constexpr int taylor_adaptive_batch_s11n_version = 5;
 
 } // namespace detail
 

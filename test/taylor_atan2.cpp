@@ -116,7 +116,7 @@ TEST_CASE("taylor atan2")
                                             kw::pars = {b}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.num_par"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.atan2.num_par"));
             }
 
             ta.step(true);
@@ -321,7 +321,7 @@ TEST_CASE("taylor atan2")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.var_num"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.atan2.var_num"));
             }
 
             ta.step(true);
@@ -545,7 +545,7 @@ TEST_CASE("taylor atan2")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.num_var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.atan2.num_var"));
             }
 
             ta.step(true);
@@ -770,7 +770,7 @@ TEST_CASE("taylor atan2")
                                             kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.var_var"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.atan2.var_var"));
             }
 
             ta.step(true);

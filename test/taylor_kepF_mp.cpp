@@ -62,8 +62,7 @@ TEST_CASE("kepF")
                                                         kw::pars = {fp_t(.1, prec)}};
 
                         if (opt_level == 0u && cm) {
-                            REQUIRE(
-                                boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.kepF.num_par_var"));
+                            REQUIRE(ir_contains(ta, "heyoka.taylor_c_diff.kepF.num_par_var"));
                         }
 
                         ta.step(true);

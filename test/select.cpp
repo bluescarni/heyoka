@@ -269,7 +269,7 @@ TEST_CASE("taylor_adaptive")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_var_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.var_var_num."));
             }
 
             ta1.propagate_until(5.);
@@ -287,7 +287,7 @@ TEST_CASE("taylor_adaptive")
                                   kw::pars = {1.}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_par_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.var_par_num."));
             }
 
             ta1.propagate_until(5.);
@@ -305,7 +305,7 @@ TEST_CASE("taylor_adaptive")
                                   kw::pars = {1.}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.par_par_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.par_par_num."));
             }
 
             ta1.propagate_until(5.);
@@ -337,7 +337,7 @@ TEST_CASE("taylor_adaptive_batch")
                 kw::opt_level = opt_level};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_var_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.var_var_num."));
             }
 
             ta1.propagate_until(5.);
@@ -362,7 +362,7 @@ TEST_CASE("taylor_adaptive_batch")
                 kw::pars = {1., 1.}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_par_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.var_par_num."));
             }
 
             ta1.propagate_until(5.);
@@ -386,7 +386,7 @@ TEST_CASE("taylor_adaptive_batch")
                                         kw::pars = {1., 1.}};
 
             if (opt_level == 0u && cm) {
-                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.par_par_num."));
+                REQUIRE(ir_contains(ta2, "heyoka.taylor_c_diff.select.par_par_num."));
             }
 
             ta1.propagate_until(5.);
