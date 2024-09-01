@@ -1066,7 +1066,7 @@ TEST_CASE("failure modes")
 #if defined(HEYOKA_ARCH_PPC)
 
     REQUIRE_THROWS_MATCHES(
-        detail::make_multi_cfunc<long double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, false, 0),
+        detail::make_multi_cfunc<long double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, false, 0, detail::default_parjit),
         not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
 
 #endif
