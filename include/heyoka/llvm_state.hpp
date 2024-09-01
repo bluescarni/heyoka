@@ -353,7 +353,7 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc
 // functions, which leads to compilation failure. So far, we have been able to
 // trigger this issue only on 64-bit arm.
 inline constexpr bool default_parjit =
-#if defined(HEYOKA_ARCH_ARM)
+#if defined(HEYOKA_ARCH_ARM) || defined(_MSC_VER)
     false
 #else
     true
