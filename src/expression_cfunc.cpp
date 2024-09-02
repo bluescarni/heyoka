@@ -1697,21 +1697,14 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
     cur_state->builder().SetInsertPoint(
         llvm::BasicBlock::Create(cur_state->context(), "entry", make_driver_proto(*cur_state, cur_state_idx)));
 
-    // Variable to keep track of how many blocks have been codegenned
-    // in the current state.
-    boost::safe_numerics::safe<unsigned> n_cg_blocks = 0;
+    // Variable to keep track of how many evaluation functions have
+    // been invoked in the current state.
+    boost::safe_numerics::safe<std::size_t> n_evalf = 0;
 
-    // Limit of codegenned blocks per state.
+    // Limit of function evaluations per state.
     // NOTE: this has not been really properly tuned,
     // needs more investigation.
-    // NOTE: it would probably be better here to keep track of the
-    // total number of function calls per segment, rather than
-    // the number of blocks. The reason for this is that each
-    // function call in principle increases the size of the
-    // auxiliary global arrays used by the compact mode
-    // argument generators, which in turn increases the code
-    // generation time.
-    constexpr auto max_n_cg_blocks = 20u;
+    constexpr auto max_n_evalf = 100u;
 
     // Variable to keep track of the u variable
     // on whose definition we are operating.
@@ -1719,7 +1712,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
 
     // Iterate over the segments in s_dc.
     for (const auto &seg : s_dc) {
-        if (n_cg_blocks > max_n_cg_blocks) {
+        if (n_evalf > max_n_evalf) {
             // We have codegenned enough blocks for this state. Create the return
             // value for the current driver, and move to the next one.
             cur_state->builder().CreateRetVoid();
@@ -1729,7 +1722,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
             cur_state = &states.back();
 
             // Reset/update the counters.
-            n_cg_blocks = 0;
+            n_evalf = 0;
             ++cur_state_idx;
 
             // Add the driver declaration to the main state, and invoke it.
@@ -1898,6 +1891,9 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
             assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
             // LCOV_EXCL_STOP
 
+            // Update the number of invoked evaluation functions.
+            n_evalf += ncalls;
+
             // We will be manually unrolling loops if ncalls is small enough.
             // This seems to help with compilation times.
             constexpr auto max_unroll_n = 5u;
@@ -1941,9 +1937,6 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                 }
             }
         }
-
-        // Update the number of codegenned blocks.
-        n_cg_blocks += seg_map.size();
 
         // LCOV_EXCL_START
         // Update segment_bd if needed.
