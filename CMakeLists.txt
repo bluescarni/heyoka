@@ -517,7 +517,7 @@ if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 message(STATUS "Found Boost version ${Boost_VERSION}.")
-target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
+target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization Boost::disable_autolinking Boost::dynamic_linking)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
