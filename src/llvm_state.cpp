@@ -1667,10 +1667,16 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
+    // NOTE: never enable parallel compilation on Windows due to
+    // segfaults under heavy load.
+#if !defined(_WIN32)
+
     if (m_parjit) {
         // Set the number of compilation threads.
         lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
     }
+
+#endif
 
 #endif
 
