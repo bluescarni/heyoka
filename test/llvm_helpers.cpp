@@ -20,7 +20,6 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/multiprecision/cpp_bin_float.hpp>
 
 #include <fmt/format.h>
 
@@ -1671,16 +1670,18 @@ TEST_CASE("eft_product scalar")
 
                 REQUIRE(x == a * b);
 
+#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                 if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
-                    namespace bmp = boost::multiprecision;
-                    using mp_fp_t
-                        = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
 
-                    REQUIRE(mp_fp_t(x) + mp_fp_t(y) == mp_fp_t(a) * mp_fp_t(b));
+                    using mp_fp_t = mppp::real;
+                    const auto prec = std::numeric_limits<fp_t>::digits * 2;
+
+                    REQUIRE(mp_fp_t(x, prec) + mp_fp_t(y, prec) == mp_fp_t(a, prec) * mp_fp_t(b, prec));
 #if defined(HEYOKA_HAVE_REAL128)
                 }
+#endif
 #endif
             }
         }
@@ -1759,16 +1760,17 @@ TEST_CASE("eft_product batch")
 
                         REQUIRE(xv == a * b);
 
+#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                         if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
-                            namespace bmp = boost::multiprecision;
-                            using mp_fp_t = bmp::number<
-                                bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
+                            using mp_fp_t = mppp::real;
+                            const auto prec = std::numeric_limits<fp_t>::digits * 2;
 
-                            REQUIRE(mp_fp_t(xv) + mp_fp_t(yv) == mp_fp_t(a) * mp_fp_t(b));
+                            REQUIRE(mp_fp_t(xv, prec) + mp_fp_t(yv, prec) == mp_fp_t(a, prec) * mp_fp_t(b, prec));
 #if defined(HEYOKA_HAVE_REAL128)
                         }
+#endif
 #endif
                     }
                 }
@@ -2526,12 +2528,12 @@ TEST_CASE("dl modulus scalar")
             auto f_ptr
                 = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t, fp_t, fp_t, fp_t)>(s.jit_lookup("hey_dl_modulus"));
 
+#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
             if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
-                namespace bmp = boost::multiprecision;
-                using mp_fp_t
-                    = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
+                using mp_fp_t = mppp::real;
+                const auto prec = std::numeric_limits<fp_t>::digits * 2;
 
                 std::uniform_real_distribution<fp_t> op_dist(fp_t(-1e6), fp_t(1e6)), quo_dist(fp_t(.1), fp_t(10.));
 
@@ -2542,13 +2544,14 @@ TEST_CASE("dl modulus scalar")
 
                     f_ptr(&res_hi, &res_lo, x, 0, y, 0);
 
-                    auto res_mp = mp_fp_t(x) - mp_fp_t(y) * floor(mp_fp_t(x) / mp_fp_t(y));
+                    auto res_mp = mp_fp_t(x, prec) - mp_fp_t(y, prec) * floor(mp_fp_t(x, prec) / mp_fp_t(y, prec));
 
                     REQUIRE(res_hi == approximately(static_cast<fp_t>(res_mp), fp_t(10)));
                 }
 
 #if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
 #endif
         }
     };
@@ -2608,12 +2611,12 @@ TEST_CASE("dl modulus batch")
                 auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *, fp_t *, fp_t *, fp_t *)>(
                     s.jit_lookup("hey_dl_modulus"));
 
+#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                 if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
-                    namespace bmp = boost::multiprecision;
-                    using mp_fp_t
-                        = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
+                    using mp_fp_t = mppp::real;
+                    const auto prec = std::numeric_limits<fp_t>::digits * 2;
 
                     std::uniform_real_distribution<fp_t> op_dist(fp_t(-1e6), fp_t(1e6)), quo_dist(fp_t(.1), fp_t(10.));
 
@@ -2634,8 +2637,9 @@ TEST_CASE("dl modulus batch")
                               b_lo_vec.data());
 
                         for (auto i = 0u; i < batch_size; ++i) {
-                            auto res_mp = mp_fp_t(a_hi_vec[i])
-                                          - mp_fp_t(b_hi_vec[i]) * floor(mp_fp_t(a_hi_vec[i]) / mp_fp_t(b_hi_vec[i]));
+                            auto res_mp = mp_fp_t(a_hi_vec[i], prec)
+                                          - mp_fp_t(b_hi_vec[i], prec)
+                                                * floor(mp_fp_t(a_hi_vec[i], prec) / mp_fp_t(b_hi_vec[i], prec));
 
                             REQUIRE(x_vec[i] == approximately(static_cast<fp_t>(res_mp), fp_t(10)));
                         }
@@ -2643,6 +2647,7 @@ TEST_CASE("dl modulus batch")
 
 #if defined(HEYOKA_HAVE_REAL128)
                 }
+#endif
 #endif
             }
         }
