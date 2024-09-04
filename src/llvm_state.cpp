@@ -309,17 +309,17 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 
     // LCOV_EXCL_START
 
-#if LLVM_VERSION_MAJOR >= 17
-
     // NOTE: the code model setup is working only on LLVM>=19 (or at least
     // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
     //
     // https://github.com/llvm/llvm-project/issues/88115
     //
     // Additionally, there are indications from our CI that attempting to set
-    // the code model before LLVM 17 might just be buggy, as we see widespread
+    // the code model before LLVM 17 or on Windows might just be buggy, as we see widespread
     // ASAN failures all over the place. Thus, let us not do anything with the code
-    // model setting before LLVM 17.
+    // model setting before LLVM 17 or on Windows.
+
+#if LLVM_VERSION_MAJOR >= 17 && !defined(_WIN32)
 
     // Setup the code model.
     switch (c_model) {
@@ -1667,10 +1667,16 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
+    // NOTE: never enable parallel compilation on Windows due to
+    // segfaults under heavy load.
+#if !defined(_WIN32)
+
     if (m_parjit) {
         // Set the number of compilation threads.
         lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
     }
+
+#endif
 
 #endif
 

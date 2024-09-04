@@ -18,14 +18,18 @@ Unsolved
 
   The root cause is most likely a code-generation/optimisation problem in LLVM.
   This issue is currently under investigation.
-* The parallel compilation feature (added in heyoka 6.0.0) is currently disabled
-  by default on 64-bit ARM processors (this includes the Apple M1 and its successors).
+* The parallel compilation feature (added in heyoka 6.0.0) is currently turned
+  off by default on all platforms and completely disabled on Windows.
   The reason is a likely thread scheduling bug in LLVM's parallel compilation facilities
-  that very rarely results in a multiply-defined symbol, which ultimately leads to compilation
-  failure. The issue is currently under investigation by the LLVM developers. In the
-  meantime, you can explicitly turn on parallel compilation via the ``kw::parjit``
+  which, on Unix systems, rarely results in a multiply-defined symbol, ultimately leading to a compilation
+  failure. On Windows, parallel compilation under heavy loads results in segmentation faults.
+  The issue is currently under investigation by the LLVM developers. In the
+  meantime, you can explicitly turn on parallel compilation on Unix systems via the ``kw::parjit``
   :ref:`keyword argument <kwargs>` when constructing an integrator or a compiled
   function.
+* The option for selecting the code used model for JIT compilation
+  (added in heyoka 6.0.0) is currently disabled on Windows due to what
+  looks like an LLVM bug. The issue is currently under investigation.
 
 Solved
 ======

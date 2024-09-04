@@ -17,6 +17,7 @@
 #include <limits>
 #include <list>
 #include <map>
+#include <numeric>
 #include <ranges>
 #include <stdexcept>
 #include <type_traits>
@@ -1042,28 +1043,25 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     cur_state->builder().SetInsertPoint(llvm::BasicBlock::Create(
         cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
 
-    // Variable to keep track of how many blocks have been codegenned
-    // in the current state.
-    boost::safe_numerics::safe<unsigned> n_cg_blocks = 0;
+    // Variable to keep track of how many evaluation functions have
+    // been invoked in the current state.
+    boost::safe_numerics::safe<std::size_t> n_evalf = 0;
 
-    // Limit of codegenned blocks per state.
+    // Limit of function evaluations per state.
     // NOTE: this has not been really properly tuned,
-    // needs more investigation.
-    // NOTE: it would probably be better here to keep track of the
-    // total number of function calls per segment, rather than
-    // the number of blocks. The reason for this is that each
-    // function call in principle increases the size of the
-    // auxiliary global arrays used by the compact mode
-    // argument generators, which in turn increases the code
-    // generation time.
-    constexpr auto max_n_cg_blocks = 20u;
+    // needs more investigation. In any case, this should
+    // be smaller than the corresponding limit in cfunc
+    // because here we are typically more work for function
+    // evaluation (as each function evaluation implements
+    // an AD formula).
+    constexpr auto max_n_evalf = 20u;
 
     // Variable to keep track of the index of the first u variable
     // in a segment.
     auto start_u_idx = n_eq;
 
     // Helper to finalise the current driver function and create a new one.
-    auto start_new_driver = [&cur_state, &states, &main_state, &n_cg_blocks, &cur_state_idx, &main_driver_decls]() {
+    auto start_new_driver = [&cur_state, &states, &main_state, &n_evalf, &cur_state_idx, &main_driver_decls]() {
         // Finalise the current driver.
         cur_state->builder().CreateRetVoid();
 
@@ -1072,7 +1070,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         cur_state = &states.back();
 
         // Reset/update the counters.
-        n_cg_blocks = 0;
+        n_evalf = 0;
         ++cur_state_idx;
 
         // Add the driver declaration to the main state.
@@ -1100,7 +1098,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         // of the sv funcs.
         const auto is_svf_seg = need_svf_lo && max_svf_idx >= start_u_idx && max_svf_idx < (start_u_idx + seg_n_ex);
 
-        if (n_cg_blocks > max_n_cg_blocks || is_svf_seg) {
+        if (n_evalf > max_n_evalf || is_svf_seg) {
             // Either we have codegenned enough blocks for this state, or we are
             // in the max_svf_idx state. Finalise the current driver and start the new one.
             start_new_driver();
@@ -1119,8 +1117,9 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         const auto seg_map = taylor_cm_codegen_segment_diff(seg, start_u_idx, *cur_state, fp_t, batch_size, n_uvars,
                                                             high_accuracy, parallel_mode);
 
-        // Update the number of codegenned blocks.
-        n_cg_blocks += seg_map.size();
+        // Update the number of invoked evaluation functions.
+        n_evalf = std::accumulate(seg_map.begin(), seg_map.end(), n_evalf,
+                                  [](auto a, const auto &p) { return a + p.second.first; });
 
         // Update start_u_idx.
         start_u_idx += seg_n_ex;
