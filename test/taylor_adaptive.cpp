@@ -2191,18 +2191,6 @@ TEST_CASE("ctad")
 #endif
 }
 
-// Test to trigger the empty state check early in the
-// construction process.
-TEST_CASE("early empty state check")
-{
-    using Catch::Matchers::Message;
-
-    auto [x, v] = make_vars("x", "v");
-
-    REQUIRE_THROWS_MATCHES(taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{}), std::invalid_argument,
-                           Message("Cannot initialise an adaptive integrator with an empty state vector"));
-}
-
 // Test to check that event callbacks which alter the time coordinate
 // result in an exception being thrown.
 TEST_CASE("event cb time")

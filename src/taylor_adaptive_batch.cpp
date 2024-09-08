@@ -145,7 +145,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
     // Init the data members.
     m_batch_size = batch_size;
-    m_state = std::move(state);
     m_time_hi = std::move(time);
     m_time_lo.resize(m_time_hi.size());
     m_pars = std::move(pars);
@@ -157,12 +156,28 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
     }
 
-    if (m_state.size() % m_batch_size != 0u) {
+    if (state.size() % m_batch_size != 0u) {
         throw std::invalid_argument(
             fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
                         "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})",
-                        m_state.size(), m_batch_size));
+                        state.size(), m_batch_size));
     }
+
+    // Fetch the original number of equations/state variables.
+    const auto n_orig_sv = is_variational ? std::get<1>(vsys).get_n_orig_sv()
+                                          : boost::numeric_cast<std::uint32_t>(std::get<0>(vsys).size());
+    // NOTE: this is ensured by validate_ode_sys().
+    assert(n_orig_sv != 0u);
+
+    // Zero init the state vector, if empty.
+    if (state.empty()) {
+        // NOTE: we will perform further initialisation for the variational quantities
+        // at a later stage, if needed.
+        state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv), static_cast<T>(0));
+    }
+
+    // Assign the state.
+    m_state = std::move(state);
 
     // NOTE: keep track of whether or not we need to automatically setup the initial
     // conditions in a variational integrator. This is needed because we need
@@ -171,9 +186,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     bool auto_ic_setup = false;
     if (m_state.size() / m_batch_size != sys.size()) {
         if (is_variational) {
-            // Fetch the original number of equations/state variables.
-            const auto n_orig_sv = std::get<1>(vsys).get_n_orig_sv();
-
             if (m_state.size() / m_batch_size == n_orig_sv) [[likely]] {
                 // Automatic setup of the initial conditions for the derivatives wrt
                 // variables and parameters.
