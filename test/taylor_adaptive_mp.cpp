@@ -145,8 +145,8 @@ TEST_CASE("ctors prec")
         // Check init with an empty state vector and explicit precision.
         ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}}, {}, kw::compact_mode = cm,
                                          kw::opt_level = 0u, kw::prec = 23);
-        REQUIRE(std::ranges::all_of(ta.get_state(), [](const auto &x) { return x.get_prec() == 23; }));
-        REQUIRE(std::ranges::all_of(ta.get_pars(), [](const auto &x) { return x.get_prec() == 23; }));
+        REQUIRE(std::ranges::all_of(ta.get_state(), [](const auto &val) { return val.get_prec() == 23; }));
+        REQUIRE(std::ranges::all_of(ta.get_pars(), [](const auto &val) { return val.get_prec() == 23; }));
 
         // Check that it does not matter if the state vector has different precisions.
         ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
