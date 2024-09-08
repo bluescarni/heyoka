@@ -51,6 +51,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
@@ -2524,4 +2525,19 @@ TEST_CASE("invalid initial state")
         (taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0.05}}), std::invalid_argument,
         Message("Inconsistent sizes detected in the initialization of an adaptive Taylor "
                 "integrator: the state vector has a dimension of 1, while the number of equations is 2"));
+}
+
+TEST_CASE("empty init state")
+{
+    const auto dyn = model::pendulum();
+
+    {
+        auto ta = taylor_adaptive<double>{dyn};
+        REQUIRE(ta.get_state() == std::vector{0., 0.});
+    }
+
+    {
+        auto ta = taylor_adaptive<double>{var_ode_sys(dyn, var_args::vars)};
+        REQUIRE(ta.get_state() == std::vector{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
+    }
 }

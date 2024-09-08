@@ -26,6 +26,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -1156,5 +1157,24 @@ TEST_CASE("s11n")
 
             REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
         }
+    }
+}
+
+TEST_CASE("empty init state")
+{
+    const auto dyn = model::pendulum();
+
+    const auto prec = 23;
+
+    {
+        auto ta = taylor_adaptive<mppp::real>{dyn, kw::prec = prec};
+        REQUIRE(ta.get_state() == std::vector<mppp::real>{0., 0.});
+        REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
+    }
+
+    {
+        auto ta = taylor_adaptive<mppp::real>{var_ode_sys(dyn, var_args::vars), kw::prec = prec};
+        REQUIRE(ta.get_state() == std::vector<mppp::real>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
+        REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
     }
 }

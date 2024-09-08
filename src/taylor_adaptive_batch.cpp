@@ -173,7 +173,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     if (state.empty()) {
         // NOTE: we will perform further initialisation for the variational quantities
         // at a later stage, if needed.
-        state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv), static_cast<T>(0));
+        state.resize(boost::safe_numerics::safe<decltype(state.size())>(n_orig_sv) * m_batch_size, static_cast<T>(0));
     }
 
     // Assign the state.
