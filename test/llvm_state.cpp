@@ -444,8 +444,8 @@ TEST_CASE("code model")
         REQUIRE(oss.str() == "small");
     }
 
-    // code_model::tiny not supported on x86 or ppc.
-#if defined(HEYOKA_ARCH_X86) || defined(HEYOKA_ARCH_PPC)
+    // code_model::tiny not supported on x86 or ppc or OSX
+#if defined(HEYOKA_ARCH_X86) || defined(HEYOKA_ARCH_PPC) || defined(__APPLE__)
 
     {
         std::ostringstream oss;
