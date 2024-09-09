@@ -293,7 +293,11 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 #if defined(HEYOKA_ARCH_X86)
         code_model::small, code_model::kernel, code_model::medium, code_model::large
 #elif defined(HEYOKA_ARCH_ARM)
-        code_model::tiny, code_model::small, code_model::large
+    // NOTE: tiny code model not supported on OSX.
+#if !defined(__APPLE__)
+        code_model::tiny,
+#endif
+        code_model::small, code_model::large
 #elif defined(HEYOKA_ARCH_PPC)
         code_model::small, code_model::medium, code_model::large
 #else
