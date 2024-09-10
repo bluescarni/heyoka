@@ -1283,7 +1283,7 @@ TEST_CASE("stream output")
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
                                                   {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                                   2u,
-                                                  kw::pars = std::vector{fp_t(-1e-4), fp_t(-1.1e-4)}};
+                                                  kw::pars = std::vector{fp_t(-1e-4), fp_t(-1.1e-4), fp_t(0), fp_t(0)}};
 
             std::ostringstream oss;
 

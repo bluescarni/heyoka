@@ -8,6 +8,19 @@ Breaking changes
 6.0.0
 -----
 
+API/behaviour changes
+~~~~~~~~~~~~~~~~~~~~~
+
+In heyoka 6.0.0, the array of parameter values passed to the constructor
+of a Taylor integrator must either be empty (in which case the parameter
+values will be zero-inited), or it must have the correct size.
+
+In previous versions, heyoka would pad with zeroes the array of parameter values
+if its size was less than the correct one.
+
+General
+~~~~~~~
+
 - Support for LLVM<15 has been dropped.
 
 .. _bchanges_4_0_0:

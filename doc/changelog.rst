@@ -25,6 +25,12 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the array of parameter values passed to the
+  constructor of a Taylor integrator must now either be empty
+  (in which case the parameter values will be zero-inited),
+  or have the correct size
+  (`#451 <https://github.com/bluescarni/heyoka/pull/451>`__).
+  This is a :ref:`breaking change <bchanges_6_0_0>`.
 - **BREAKING**: the minimum required LLVM version is now 15
   (`#444 <https://github.com/bluescarni/heyoka/pull/444>`__).
   This is a :ref:`breaking change <bchanges_6_0_0>`.
