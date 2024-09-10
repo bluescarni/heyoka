@@ -161,10 +161,10 @@ TEST_CASE("ctors prec")
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
 
         // Try with several different precisions for the data.
-        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
-                                         {mppp::real{1, prec}, mppp::real{1, prec - 1}}, kw::compact_mode = cm,
-                                         kw::opt_level = 0u, kw::prec = prec + 1, kw::pars = {mppp::real{-1, prec - 2}},
-                                         kw::time = mppp::real{0, prec + 3}, kw::tol = mppp::real{1e-1, prec + 4});
+        ta = taylor_adaptive<mppp::real>(
+            {{x, x + par[0]}, {y, y + par[1]}}, {mppp::real{1, prec}, mppp::real{1, prec - 1}}, kw::compact_mode = cm,
+            kw::opt_level = 0u, kw::prec = prec + 1, kw::pars = {mppp::real{-1, prec - 2}, mppp::real{-1, prec - 3}},
+            kw::time = mppp::real{0, prec + 3}, kw::tol = mppp::real{1e-1, prec + 4});
         REQUIRE(ta.get_tol().get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().first.get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().second.get_prec() == prec + 1);
@@ -1174,6 +1174,33 @@ TEST_CASE("empty init state")
 
     {
         auto ta = taylor_adaptive<mppp::real>{var_ode_sys(dyn, var_args::vars), kw::prec = prec};
+        REQUIRE(ta.get_state() == std::vector<mppp::real>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
+        REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
+    }
+}
+
+TEST_CASE("pars handling")
+{
+    const auto dyn = model::pendulum(kw::gconst = par[3]);
+
+    const auto prec = 23;
+
+    // Empty pars array.
+    {
+        auto ta = taylor_adaptive<mppp::real>{dyn, kw::prec = prec};
+        REQUIRE(ta.get_pars() == std::vector<mppp::real>{0., 0., 0., 0.});
+        REQUIRE(std::ranges::all_of(ta.get_pars(), [&](const auto &val) { return val.get_prec() == prec; }));
+    }
+    {
+        auto ta = taylor_adaptive<mppp::real>{dyn, kw::prec = prec, kw::pars = std::vector<mppp::real>{}};
+        REQUIRE(ta.get_pars() == std::vector<mppp::real>{0., 0., 0., 0.});
+        REQUIRE(std::ranges::all_of(ta.get_pars(), [&](const auto &val) { return val.get_prec() == prec; }));
+    }
+
+    // Pars array with correct size but wrong precision.
+    {
+        auto ta = taylor_adaptive<mppp::real>{var_ode_sys(dyn, var_args::vars), kw::prec = prec,
+                                              kw::pars = std::vector<mppp::real>(4, mppp::real{})};
         REQUIRE(ta.get_state() == std::vector<mppp::real>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
         REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
     }

@@ -1562,9 +1562,9 @@ TEST_CASE("cb interrupt")
     }
 }
 
-// Test excessive number of params provided upon construction
+// Test wrong number of params provided upon construction
 // of the integrator.
-TEST_CASE("param too many")
+TEST_CASE("param wrong number")
 {
     using Catch::Matchers::Message;
 
@@ -1576,9 +1576,36 @@ TEST_CASE("param too many")
                                        kw::pars = std::vector{1., 2.},
                                        kw::t_events = {t_event<double>(v - par[0])}}),
         std::invalid_argument,
-        Message(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: 2 parameter value(s) were passed, but the ODE system contains only 1 parameter(s)"));
+        Message("Invalid number of parameter values passed to the constructor of an adaptive "
+                "Taylor integrator: 2 parameter value(s) were passed, but the ODE system contains 1 parameter(s)"));
+
+    REQUIRE_THROWS_MATCHES(
+        (void)(taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {0.05, 0.025},
+                                       kw::pars = std::vector{1.},
+                                       kw::t_events = {t_event<double>(v - par[1])}}),
+        std::invalid_argument,
+        Message("Invalid number of parameter values passed to the constructor of an adaptive "
+                "Taylor integrator: 1 parameter value(s) were passed, but the ODE system contains 2 parameter(s)"));
+}
+
+// Test to check that the parameter values are zeroed out
+// when an empty pars array is passed on construction.
+TEST_CASE("param auto setup")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {t_event<double>(v - par[3])}};
+    REQUIRE(ta.get_pars() == std::vector{0., 0., 0., 0.});
+
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                 {0.05, 0.025},
+                                 kw::pars = std::vector<double>{},
+                                 kw::t_events = {t_event<double>(v - par[3])}};
+    REQUIRE(ta.get_pars() == std::vector{0., 0., 0., 0.});
 }
 
 // Test case for bug: parameters in event equations are ignored

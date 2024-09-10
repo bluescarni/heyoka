@@ -257,7 +257,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                          mppp::real{mppp::real_kind::zero, this->get_prec()});
         } else {
 #endif
-            state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv), static_cast<T>(0));
+            state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv));
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -358,13 +358,40 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 #endif
     }
 
-    // Parameter values.
+    // Compute the total number of params, including the rhs and the event functions.
+    const auto tot_n_pars = detail::tot_n_pars_in_ode_sys(sys, tes, ntes);
+
+    // Check/setup pars.
+    if (pars.empty()) {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::same_as<T, mppp::real>) {
+            // For mppp::real, ensure that the parameter
+            // values all have the inferred precision.
+            pars.resize(boost::numeric_cast<decltype(pars.size())>(tot_n_pars),
+                        mppp::real{mppp::real_kind::zero, this->get_prec()});
+        } else {
+#endif
+            pars.resize(boost::numeric_cast<decltype(pars.size())>(tot_n_pars));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    } else if (pars.size() != tot_n_pars) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter value(s) were passed, but the ODE system contains {} parameter(s)",
+            pars.size(), tot_n_pars));
+    }
+
+    // Assign the parameter values.
     m_pars = std::move(pars);
 
 #if defined(HEYOKA_HAVE_REAL)
 
     // Enforce the correct precision for mppp::real.
-    if constexpr (std::is_same_v<T, mppp::real>) {
+    // NOTE: this is redundant in case pars was originally empty,
+    // but let us keep it like this in order not to complicate further
+    // the logic.
+    if constexpr (std::same_as<T, mppp::real>) {
         for (auto &val : m_pars) {
             val.prec_round(this->get_prec());
         }
@@ -409,9 +436,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
-    // Compute the total number of params, including the rhs and the event functions.
-    const auto tot_n_pars = detail::tot_n_pars_in_ode_sys(sys, tes, ntes);
-
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
@@ -447,27 +471,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         std::tie(m_dc, m_tape_sa, states)
             = detail::taylor_add_adaptive_step(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step", sys, 1, high_accuracy,
                                                compact_mode, parallel_mode, m_order);
-    }
-
-    // Fix m_pars' size, if necessary.
-    if (m_pars.size() < tot_n_pars) {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            // For mppp::real, ensure that the appended parameter
-            // values all have the inferred precision.
-            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(tot_n_pars),
-                          mppp::real{mppp::real_kind::zero, this->get_prec()});
-        } else {
-#endif
-            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(tot_n_pars));
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
-    } else if (m_pars.size() > tot_n_pars) {
-        throw std::invalid_argument(fmt::format(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter value(s) were passed, but the ODE system contains only {} parameter(s)",
-            m_pars.size(), tot_n_pars));
     }
 
     // Log runtimes in trace mode.

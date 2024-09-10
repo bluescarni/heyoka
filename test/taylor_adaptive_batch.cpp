@@ -950,9 +950,9 @@ TEST_CASE("cb interrupt")
     }
 }
 
-// Test excessive number of params provided upon construction
+// Test wrong number of params provided upon construction
 // of the integrator.
-TEST_CASE("param too many")
+TEST_CASE("param wrong number")
 {
     using Catch::Matchers::Message;
 
@@ -963,9 +963,9 @@ TEST_CASE("param too many")
                                                                 2u,
                                                                 kw::pars = std::vector{1., 2., 3.}}),
                            std::invalid_argument,
-                           Message("Excessive number of parameter values passed to the constructor of an adaptive "
+                           Message("Invalid number of parameter values passed to the constructor of an adaptive "
                                    "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
-                                   "system contains only 1 parameter(s) "
+                                   "system contains 1 parameter(s) "
                                    "(in batches of 2)"));
 
     REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -974,10 +974,42 @@ TEST_CASE("param too many")
                                                                 kw::pars = std::vector{1., 2., 3.},
                                                                 kw::t_events = {t_event_batch<double>(v - par[0])}}),
                            std::invalid_argument,
-                           Message("Excessive number of parameter values passed to the constructor of an adaptive "
+                           Message("Invalid number of parameter values passed to the constructor of an adaptive "
                                    "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
-                                   "system contains only 1 parameter(s) "
+                                   "system contains 1 parameter(s) "
                                    "(in batches of 2)"));
+
+    REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v + par[3], prime(v) = -9.8 * sin(x)},
+                                                                {0.05, 0.06, 0.025, 0.026},
+                                                                2u,
+                                                                kw::pars = std::vector{1., 2., 3.}}),
+                           std::invalid_argument,
+                           Message("Invalid number of parameter values passed to the constructor of an adaptive "
+                                   "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
+                                   "system contains 4 parameter(s) "
+                                   "(in batches of 2)"));
+}
+
+// Test to check that the parameter values are zeroed out
+// when an empty pars array is passed on construction.
+TEST_CASE("param auto setup")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {0.05, 0.06, 0.025, 0.026},
+                                            2u,
+                                            kw::t_events = {t_event_batch<double>(v - par[3])}};
+    REQUIRE(ta.get_pars() == std::vector{0., 0., 0., 0., 0., 0., 0., 0.});
+
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {0.05, 0.06, 0.025, 0.026},
+                                       2u,
+                                       kw::pars = std::vector<double>{},
+                                       kw::t_events = {t_event_batch<double>(v - par[3])}};
+    REQUIRE(ta.get_pars() == std::vector{0., 0., 0., 0., 0., 0., 0., 0.});
 }
 
 // Test case for bug: parameters in event equations are ignored
@@ -1251,7 +1283,7 @@ TEST_CASE("stream output")
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
                                                   {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                                   2u,
-                                                  kw::pars = std::vector{fp_t(-1e-4), fp_t(-1.1e-4)}};
+                                                  kw::pars = std::vector{fp_t(-1e-4), fp_t(-1.1e-4), fp_t(0), fp_t(0)}};
 
             std::ostringstream oss;
 
