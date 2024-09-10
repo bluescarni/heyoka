@@ -51,6 +51,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
@@ -2191,18 +2192,6 @@ TEST_CASE("ctad")
 #endif
 }
 
-// Test to trigger the empty state check early in the
-// construction process.
-TEST_CASE("early empty state check")
-{
-    using Catch::Matchers::Message;
-
-    auto [x, v] = make_vars("x", "v");
-
-    REQUIRE_THROWS_MATCHES(taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{}), std::invalid_argument,
-                           Message("Cannot initialise an adaptive integrator with an empty state vector"));
-}
-
 // Test to check that event callbacks which alter the time coordinate
 // result in an exception being thrown.
 TEST_CASE("event cb time")
@@ -2536,4 +2525,19 @@ TEST_CASE("invalid initial state")
         (taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0.05}}), std::invalid_argument,
         Message("Inconsistent sizes detected in the initialization of an adaptive Taylor "
                 "integrator: the state vector has a dimension of 1, while the number of equations is 2"));
+}
+
+TEST_CASE("empty init state")
+{
+    const auto dyn = model::pendulum();
+
+    {
+        auto ta = taylor_adaptive<double>{dyn};
+        REQUIRE(ta.get_state() == std::vector{0., 0.});
+    }
+
+    {
+        auto ta = taylor_adaptive<double>{var_ode_sys(dyn, var_args::vars)};
+        REQUIRE(ta.get_state() == std::vector{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
+    }
 }

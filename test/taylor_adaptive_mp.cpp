@@ -26,6 +26,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -112,7 +113,7 @@ TEST_CASE("ctors prec")
                                         kw::opt_level = 0u),
             std::invalid_argument,
             Message("The precision deduced automatically from the initial state vector in a multiprecision "
-                    "adaptive Taylor integrator is 30, but values with different precision(s) were "
+                    "adaptive Taylor integrator is 30, but one or more values with a different precision were "
                     "detected in the state vector"));
 
         // Check that wrong precision in the pars if automatically corrected.
@@ -126,6 +127,14 @@ TEST_CASE("ctors prec")
         ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
                                          kw::opt_level = 0u, kw::prec = prec + 1);
 
+        // Check that attempting to init with an empty state vector and no prec throws.
+        REQUIRE_THROWS_MATCHES(taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}}, {},
+                                                           kw::compact_mode = cm, kw::opt_level = 0u),
+                               std::invalid_argument,
+                               Message("A multiprecision integrator can be initialised with an empty state vector "
+                                       "only if the desired precision is explicitly passed to the constructor (we "
+                                       "cannot deduce the desired precision from an empty state vector)"));
+
         // Check that time and state are automatically adjusted.
         REQUIRE(ta.get_dtime().first.get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().second.get_prec() == prec + 1);
@@ -133,6 +142,12 @@ TEST_CASE("ctors prec")
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
         REQUIRE(std::all_of(ta.get_pars().begin(), ta.get_pars().end(),
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
+
+        // Check init with an empty state vector and explicit precision.
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}}, {}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::prec = 23);
+        REQUIRE(std::ranges::all_of(ta.get_state(), [](const auto &val) { return val.get_prec() == 23; }));
+        REQUIRE(std::ranges::all_of(ta.get_pars(), [](const auto &val) { return val.get_prec() == 23; }));
 
         // Check that it does not matter if the state vector has different precisions.
         ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
@@ -1142,5 +1157,24 @@ TEST_CASE("s11n")
 
             REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
         }
+    }
+}
+
+TEST_CASE("empty init state")
+{
+    const auto dyn = model::pendulum();
+
+    const auto prec = 23;
+
+    {
+        auto ta = taylor_adaptive<mppp::real>{dyn, kw::prec = prec};
+        REQUIRE(ta.get_state() == std::vector<mppp::real>{0., 0.});
+        REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
+    }
+
+    {
+        auto ta = taylor_adaptive<mppp::real>{var_ode_sys(dyn, var_args::vars), kw::prec = prec};
+        REQUIRE(ta.get_state() == std::vector<mppp::real>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0});
+        REQUIRE(std::ranges::all_of(ta.get_state(), [&](const auto &val) { return val.get_prec() == prec; }));
     }
 }

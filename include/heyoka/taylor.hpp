@@ -50,6 +50,7 @@
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -533,6 +534,7 @@ public:
     taylor_adaptive();
 
     template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                              const KwArgs &...kw_args)
         : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
@@ -540,20 +542,22 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
-                             const KwArgs &...kw_args)
-        : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, const KwArgs &...kw_args)
+        : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
     {
     }
     template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, const KwArgs &...kw_args)
         : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive(var_ode_sys sys, std::initializer_list<T> state, const KwArgs &...kw_args)
-        : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit taylor_adaptive(var_ode_sys sys, const KwArgs &...kw_args)
+        : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
     {
     }
 
@@ -693,6 +697,16 @@ public:
         return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), std::move(cb));
     }
 };
+
+// Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
+template <typename T, typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>,
+                         const KwArgs &...) -> taylor_adaptive<T>;
+
+template <typename T, typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, const KwArgs &...) -> taylor_adaptive<T>;
 
 // Prevent implicit instantiations.
 // NOLINTBEGIN
@@ -932,6 +946,7 @@ public:
     taylor_adaptive_batch();
 
     template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                                    std::uint32_t batch_size, const KwArgs &...kw_args)
         : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
@@ -939,12 +954,14 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
-                                   std::uint32_t batch_size, const KwArgs &...kw_args)
-        : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::uint32_t batch_size,
+                                   const KwArgs &...kw_args)
+        : taylor_adaptive_batch(std::move(sys), std::vector<T>{}, batch_size, kw_args...)
     {
     }
     template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
                                    const KwArgs &...kw_args)
         : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
@@ -952,9 +969,9 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch(var_ode_sys sys, std::initializer_list<T> state, std::uint32_t batch_size,
-                                   const KwArgs &...kw_args)
-        : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::uint32_t batch_size, const KwArgs &...kw_args)
+        : taylor_adaptive_batch(std::move(sys), std::vector<T>{}, batch_size, kw_args...)
     {
     }
 
@@ -1119,6 +1136,17 @@ public:
     }
     [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const;
 };
+
+// Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
+template <typename T, typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, std::uint32_t,
+                               const KwArgs &...) -> taylor_adaptive_batch<T>;
+
+template <typename T, typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t,
+                               const KwArgs &...) -> taylor_adaptive_batch<T>;
 
 // Prevent implicit instantiations.
 #define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F) extern template class taylor_adaptive_batch<F>;

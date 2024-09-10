@@ -45,6 +45,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
@@ -2216,4 +2217,19 @@ TEST_CASE("invalid initial state")
                            Message("Inconsistent sizes detected in the initialization of an adaptive Taylor "
                                    "integrator: the state vector has a dimension of 1 and a batch size of 2, "
                                    "while the number of equations is 2"));
+}
+
+TEST_CASE("empty init state")
+{
+    const auto dyn = model::pendulum();
+
+    {
+        auto ta = taylor_adaptive_batch<double>{dyn, 2u};
+        REQUIRE(ta.get_state() == std::vector{0., 0., 0., 0.});
+    }
+
+    {
+        auto ta = taylor_adaptive_batch<double>{var_ode_sys(dyn, var_args::vars), 2u};
+        REQUIRE(ta.get_state() == std::vector{0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0});
+    }
 }

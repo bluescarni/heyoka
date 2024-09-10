@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -223,55 +224,86 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // just re-validate for peace of mind.
     validate_ode_sys(sys, tes, ntes);
 
-    // Run an immediate check on state. This is a bit redundant with other checks
-    // later (e.g., state.size() must be consistent with the ODE definition, which in
-    // turn cannot consist of zero equations), but it's handy to do it here so that,
-    // e.g., we can immediately infer the precision if T == mppp::real.
-    if (state.empty()) {
-        throw std::invalid_argument("Cannot initialise an adaptive integrator with an empty state vector");
-    }
-
-    // Assign the state.
-    m_state = std::move(state);
-
 #if defined(HEYOKA_HAVE_REAL)
 
-    // Setup the precision: it is either passed by the user
-    // or automatically inferred from the state vector.
-    // NOTE: this must be done early so that the precision of the integrator
-    // is available for other checks later.
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        this->m_prec = prec ? boost::numeric_cast<mpfr_prec_t>(*prec) : m_state[0].get_prec();
-
-        if (prec) {
-            // If the user explicitly specifies a precision, enforce that precision
-            // on the state vector.
-            // NOTE: if the user specifies an invalid precision, we are sure
-            // here that an exception will be thrown: m_state is not empty
-            // and prec_round() will check the input precision value.
-            for (auto &val : m_state) {
-                // NOTE: use directly this->m_prec in order to avoid
-                // triggering an assertion in get_prec() if a bogus
-                // prec value was provided by the user.
-                val.prec_round(this->m_prec);
-            }
-        } else {
-            // If the precision is automatically deduced, ensure that
-            // the same precision is used for all initial values.
-            // NOTE: the automatically-deduced precision will be a valid one,
-            // as it is taken from a valid mppp::real (i.e., m_state[0]).
-            if (std::any_of(m_state.begin() + 1, m_state.end(),
-                            [this](const auto &val) { return val.get_prec() != this->get_prec(); })) {
-                throw std::invalid_argument(
-                    fmt::format("The precision deduced automatically from the initial state vector in a multiprecision "
-                                "adaptive Taylor integrator is {}, but values with different precision(s) were "
-                                "detected in the state vector",
-                                this->get_prec()));
-            }
+    // Setup the m_prec data member for multiprecision integrations.
+    if constexpr (std::same_as<T, mppp::real>) {
+        if (!prec && state.empty()) [[unlikely]] {
+            throw std::invalid_argument("A multiprecision integrator can be initialised with an empty state vector "
+                                        "only if the desired precision is explicitly passed to the constructor (we "
+                                        "cannot deduce the desired precision from an empty state vector)");
         }
+
+        // The precision is either passed by the user or automatically inferred from the (nonempty) state vector.
+        this->m_prec = prec ? boost::numeric_cast<mpfr_prec_t>(*prec) : state[0].get_prec();
     }
 
 #endif
+
+    // Fetch the original number of equations/state variables.
+    const auto n_orig_sv = is_variational ? std::get<1>(vsys).get_n_orig_sv()
+                                          : boost::numeric_cast<std::uint32_t>(std::get<0>(vsys).size());
+    // NOTE: this is ensured by validate_ode_sys().
+    assert(n_orig_sv != 0u);
+
+    // Zero init the state vector, if empty.
+    if (state.empty()) {
+        // NOTE: we will perform further initialisation for the variational quantities
+        // at a later stage, if needed.
+
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::same_as<T, mppp::real>) {
+            state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv),
+                         mppp::real{mppp::real_kind::zero, this->get_prec()});
+        } else {
+#endif
+            state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv), static_cast<T>(0));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    } else {
+#if defined(HEYOKA_HAVE_REAL)
+
+        if constexpr (std::same_as<T, mppp::real>) {
+            // The user passed in a non-empty multiprecision state. We need
+            // to either enforce the desired precision, or to check that the
+            // values in the state have all the same precision.
+            if (prec) {
+                // If the user explicitly specifies a precision, enforce that precision
+                // on the state vector.
+                // NOTE: if the user specifies an invalid precision, we are sure
+                // here that an exception will be thrown: state is not empty
+                // and prec_round() will check the input precision value.
+                for (auto &val : state) {
+                    // NOTE: use directly this->m_prec in order to avoid
+                    // triggering an assertion in get_prec() if a bogus
+                    // prec value was provided by the user.
+                    val.prec_round(this->m_prec);
+                }
+            } else {
+                // If the precision is automatically deduced, ensure that
+                // the same precision is used for all initial values.
+                // NOTE: the automatically-deduced precision will be a valid one,
+                // as it is taken from a valid mppp::real (i.e., state[0]).
+                if (std::any_of(state.begin() + 1, state.end(),
+                                [this](const auto &val) { return val.get_prec() != this->get_prec(); })) {
+                    throw std::invalid_argument(fmt::format(
+                        "The precision deduced automatically from the initial state vector in a multiprecision "
+                        "adaptive Taylor integrator is {}, but one or more values with a different precision were "
+                        "detected in the state vector",
+                        this->get_prec()));
+                }
+            }
+        }
+
+#endif
+    }
+
+    // NOTE: at this point, state must be a non-empty vector.
+    assert(!state.empty());
+
+    // Assign the state.
+    m_state = std::move(state);
 
     // Check the input state size.
     // NOTE: keep track of whether or not we need to automatically setup the initial
@@ -281,9 +313,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     bool auto_ic_setup = false;
     if (m_state.size() != sys.size()) {
         if (is_variational) {
-            // Fetch the original number of equations/state variables.
-            const auto n_orig_sv = std::get<1>(vsys).get_n_orig_sv();
-
             if (m_state.size() == n_orig_sv) [[likely]] {
                 // Automatic setup of the initial conditions for the derivatives wrt
                 // variables and parameters.
