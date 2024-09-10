@@ -265,7 +265,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 #if defined(HEYOKA_HAVE_REAL)
 
         if constexpr (std::same_as<T, mppp::real>) {
-            // The user passed in a non-empty multiprecision state.
+            // The user passed in a non-empty multiprecision state. We need
+            // to either enforce the desired precision, or to check that the
+            // values in the state have all the same precision.
             if (prec) {
                 // If the user explicitly specifies a precision, enforce that precision
                 // on the state vector.

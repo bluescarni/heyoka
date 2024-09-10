@@ -152,11 +152,11 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     m_compact_mode = compact_mode;
 
     // Check several input params.
-    if (m_batch_size == 0u) {
+    if (m_batch_size == 0u) [[unlikely]] {
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
     }
 
-    if (state.size() % m_batch_size != 0u) {
+    if (state.size() % m_batch_size != 0u) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
                         "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})",
