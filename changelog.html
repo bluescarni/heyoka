@@ -605,6 +605,10 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Link to this heading">#</a></h3>
 <ul class="simple">
+<li><p>It is now possible to initialise a Taylor integrator
+with an empty initial state vector. This will result
+in zero-initialization of the state vector
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/449">#449</a>).</p></li>
 <li><p>Implement parallel compilation for Taylor integrators
 and compiled functions
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/446">#446</a>,
@@ -620,6 +624,12 @@ used for JIT compilation
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Link to this heading">#</a></h3>
 <ul class="simple">
+<li><p><strong>BREAKING</strong>: the array of parameter values passed to the
+constructor of a Taylor integrator must now either be empty
+(in which case the parameter values will be zero-inited),
+or have the correct size
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/451">#451</a>).
+This is a <a class="reference internal" href="breaking_changes.html#bchanges-6-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
 <li><p><strong>BREAKING</strong>: the minimum required LLVM version is now 15
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/444">#444</a>).
 This is a <a class="reference internal" href="breaking_changes.html#bchanges-6-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
