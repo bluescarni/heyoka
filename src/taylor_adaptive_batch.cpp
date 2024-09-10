@@ -147,7 +147,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     m_batch_size = batch_size;
     m_time_hi = std::move(time);
     m_time_lo.resize(m_time_hi.size());
-    m_pars = std::move(pars);
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
@@ -173,7 +172,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     if (state.empty()) {
         // NOTE: we will perform further initialisation for the variational quantities
         // at a later stage, if needed.
-        state.resize(boost::safe_numerics::safe<decltype(state.size())>(n_orig_sv) * m_batch_size, static_cast<T>(0));
+        state.resize(boost::safe_numerics::safe<decltype(state.size())>(n_orig_sv) * m_batch_size);
     }
 
     // Assign the state.
@@ -252,6 +251,22 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     }
     // LCOV_EXCL_STOP
 
+    // Check/setup pars.
+    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto pars_req_size = su32_t(tot_n_pars) * m_batch_size;
+    if (pars.empty()) {
+        pars.resize(pars_req_size);
+    } else if (pars.size() != pars_req_size) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid number of parameter values passed to the constructor of an adaptive "
+                        "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
+                        "system contains {} parameter(s) (in batches of {})",
+                        pars.size(), tot_n_pars, m_batch_size));
+    }
+
+    // Assign pars.
+    m_pars = std::move(pars);
+
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
@@ -286,19 +301,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
         std::tie(m_dc, m_tape_sa, states)
             = detail::taylor_add_adaptive_step(std::get<0>(m_llvm_state), ext_fp_t, fp_t, "step", sys, batch_size,
                                                high_accuracy, compact_mode, parallel_mode, m_order);
-    }
-
-    // Fix m_pars' size, if necessary.
-    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
-    const auto pars_req_size = su32_t(tot_n_pars) * m_batch_size;
-    if (m_pars.size() < pars_req_size) {
-        m_pars.resize(pars_req_size);
-    } else if (m_pars.size() > pars_req_size) {
-        throw std::invalid_argument(
-            fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
-                        "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
-                        "system contains only {} parameter(s) (in batches of {})",
-                        m_pars.size(), tot_n_pars, m_batch_size));
     }
 
     // Log runtimes in trace mode.
