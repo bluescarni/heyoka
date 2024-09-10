@@ -10,7 +10,7 @@ New
 - It is now possible to initialise a Taylor integrator
   with an empty initial state vector. This will result
   in zero-initialization of the state vector
-  (`#449 <https://github.com/bluescarni/heyoka/pull/449 >`__).
+  (`#449 <https://github.com/bluescarni/heyoka/pull/449>`__).
 - Implement parallel compilation for Taylor integrators
   and compiled functions
   (`#446 <https://github.com/bluescarni/heyoka/pull/446>`__,
