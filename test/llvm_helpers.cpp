@@ -3068,3 +3068,513 @@ TEST_CASE("clone type")
 
 #endif
 }
+
+TEST_CASE("trunc scalar")
+{
+    using detail::llvm_trunc;
+    using detail::to_external_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_external_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{val_t};
+            auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_trunc", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            builder.CreateRet(llvm_trunc(s, x));
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<fp_t (*)(fp_t)>(s.jit_lookup("hey_trunc"));
+
+            REQUIRE(f_ptr(fp_t(2) / 7) == 0);
+            REQUIRE(f_ptr(fp_t(8) / 7) == 1);
+            REQUIRE(f_ptr(fp_t(-2) / 7) == 0);
+            REQUIRE(f_ptr(fp_t(-8) / 7) == -1);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("trunc batch")
+{
+    using detail::llvm_trunc;
+    using detail::to_external_llvm_type;
+    using std::trunc;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_external_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(val_t));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_trunc", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto x_ptr = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto ret = llvm_trunc(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size));
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                builder.CreateRetVoid();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *)>(s.jit_lookup("hey_trunc"));
+
+                // Setup the argument and the output value.
+                std::vector<fp_t> ret_vec(batch_size), a_vec(ret_vec);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    a_vec[i] = fp_t(i + 1u) / 3 * (i % 2u == 0 ? 1 : -1);
+                }
+
+                f_ptr(ret_vec.data(), a_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(ret_vec[i] == trunc(a_vec[i]));
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("trunc scalar mp")
+{
+    using detail::llvm_trunc;
+    using detail::to_external_llvm_type;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *val_t = to_external_llvm_type<fp_t>(context);
+        auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
+
+        auto *ft = llvm::FunctionType::get(
+            builder.getVoidTy(), {llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "trunc", &md);
+
+        auto *ret_ptr = f->args().begin();
+        auto *in_ptr = f->args().begin() + 1;
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *x = detail::ext_load_vector_from_memory(s, real_t, in_ptr, 1u);
+
+        // Compute the result.
+        auto *ret = llvm_trunc(s, x);
+
+        // Store it.
+        detail::ext_store_vector_to_memory(s, ret_ptr, ret);
+
+        // Return.
+        builder.CreateRetVoid();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("trunc"));
+
+        mppp::real arg{1.5, prec}, out = arg;
+        f_ptr(&out, &arg);
+        REQUIRE(out == 1);
+        arg.set(-1.1);
+        f_ptr(&out, &arg);
+        REQUIRE(out == -1);
+    }
+}
+
+#endif
+
+TEST_CASE("is_finite scalar")
+{
+    using detail::llvm_is_finite;
+    using detail::to_external_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_external_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{val_t};
+            auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_is_finite", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            builder.CreateRet(builder.CreateZExt(llvm_is_finite(s, x), builder.getInt32Ty()));
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<std::uint32_t (*)(fp_t)>(s.jit_lookup("hey_is_finite"));
+
+            REQUIRE(f_ptr(fp_t(123)) == 1);
+            REQUIRE(f_ptr(fp_t(-123)) == 1);
+            REQUIRE(f_ptr(std::numeric_limits<fp_t>::infinity()) == 0);
+            REQUIRE(f_ptr(-std::numeric_limits<fp_t>::infinity()) == 0);
+            REQUIRE(f_ptr(-std::numeric_limits<fp_t>::quiet_NaN()) == 0);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("is_finite batch")
+{
+    using detail::llvm_is_finite;
+    using detail::to_external_llvm_type;
+    using std::isfinite;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_external_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(context));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_is_finite", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto x_ptr = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto *ret = llvm_is_finite(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size));
+                ret = builder.CreateZExt(ret, detail::make_vector_type(builder.getInt32Ty(), batch_size));
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                builder.CreateRetVoid();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup("hey_is_finite"));
+
+                // Setup the argument and the output value.
+                std::vector<std::uint32_t> ret_vec(batch_size);
+                std::vector<fp_t> a_vec(batch_size);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    if (i == 0u) {
+                        a_vec[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                    } else if (i == 1u) {
+                        a_vec[i] = -std::numeric_limits<fp_t>::infinity();
+                    } else {
+                        a_vec[i] = static_cast<fp_t>(i);
+                    }
+                }
+
+                f_ptr(ret_vec.data(), a_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    if (i == 0u || i == 1u) {
+                        REQUIRE(ret_vec[i] == 0u);
+                    } else {
+                        REQUIRE(ret_vec[i] == 1u);
+                    }
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("is_finite scalar mp")
+{
+    using detail::llvm_is_finite;
+    using detail::to_external_llvm_type;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *val_t = to_external_llvm_type<fp_t>(context);
+        auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "is_finite", &md);
+
+        auto *in_ptr = f->args().begin();
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *x = detail::ext_load_vector_from_memory(s, real_t, in_ptr, 1u);
+
+        // Compute the result.
+        auto *ret = llvm_is_finite(s, x);
+
+        // Return it.
+        builder.CreateRet(builder.CreateZExt(ret, builder.getInt32Ty()));
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<std::uint32_t (*)(const fp_t *)>(s.jit_lookup("is_finite"));
+
+        mppp::real arg{1.5, prec};
+        REQUIRE(f_ptr(&arg) == 1u);
+        arg.set(std::numeric_limits<double>::infinity());
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(std::numeric_limits<double>::quiet_NaN());
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(-123);
+        REQUIRE(f_ptr(&arg) == 1u);
+    }
+}
+
+#endif
+
+TEST_CASE("is_natural scalar")
+{
+    using detail::llvm_is_natural;
+    using detail::to_external_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_external_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{val_t};
+            auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_is_natural", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            builder.CreateRet(builder.CreateZExt(llvm_is_natural(s, x), builder.getInt32Ty()));
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<std::uint32_t (*)(fp_t)>(s.jit_lookup("hey_is_natural"));
+
+            REQUIRE(f_ptr(fp_t(123.1)) == 0);
+            REQUIRE(f_ptr(fp_t(123)) == 1);
+            REQUIRE(f_ptr(fp_t(-123)) == 0);
+            REQUIRE(f_ptr(std::numeric_limits<fp_t>::infinity()) == 0);
+            REQUIRE(f_ptr(-std::numeric_limits<fp_t>::infinity()) == 0);
+            REQUIRE(f_ptr(-std::numeric_limits<fp_t>::quiet_NaN()) == 0);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("is_natural batch")
+{
+    using detail::llvm_is_natural;
+    using detail::to_external_llvm_type;
+    using std::isfinite;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_external_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(context));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_is_natural", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto x_ptr = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto *ret = llvm_is_natural(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size));
+                ret = builder.CreateZExt(ret, detail::make_vector_type(builder.getInt32Ty(), batch_size));
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                builder.CreateRetVoid();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup("hey_is_natural"));
+
+                // Setup the argument and the output value.
+                std::vector<std::uint32_t> ret_vec(batch_size);
+                std::vector<fp_t> a_vec(batch_size);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    if (i == 0u) {
+                        a_vec[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                    } else if (i == 1u) {
+                        a_vec[i] = -std::numeric_limits<fp_t>::infinity();
+                    } else if (i == 2u) {
+                        a_vec[i] = static_cast<fp_t>(i) + static_cast<fp_t>(.1);
+                    } else if (i == 3u) {
+                        a_vec[i] = -static_cast<fp_t>(i);
+                    } else {
+                        a_vec[i] = static_cast<fp_t>(i);
+                    }
+                }
+
+                f_ptr(ret_vec.data(), a_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    if (i <= 3u) {
+                        REQUIRE(ret_vec[i] == 0u);
+                    } else {
+                        REQUIRE(ret_vec[i] == 1u);
+                    }
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("is_natural scalar mp")
+{
+    using detail::llvm_is_natural;
+    using detail::to_external_llvm_type;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *val_t = to_external_llvm_type<fp_t>(context);
+        auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "is_natural", &md);
+
+        auto *in_ptr = f->args().begin();
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *x = detail::ext_load_vector_from_memory(s, real_t, in_ptr, 1u);
+
+        // Compute the result.
+        auto *ret = llvm_is_natural(s, x);
+
+        // Return it.
+        builder.CreateRet(builder.CreateZExt(ret, builder.getInt32Ty()));
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<std::uint32_t (*)(const fp_t *)>(s.jit_lookup("is_natural"));
+
+        mppp::real arg{1.5, prec};
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(-1);
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(123);
+        REQUIRE(f_ptr(&arg) == 1u);
+        arg.set(123.1);
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(-123.1);
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(std::numeric_limits<double>::infinity());
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(std::numeric_limits<double>::quiet_NaN());
+        REQUIRE(f_ptr(&arg) == 0u);
+        arg.set(-123);
+        REQUIRE(f_ptr(&arg) == 0u);
+    }
+}
+
+#endif

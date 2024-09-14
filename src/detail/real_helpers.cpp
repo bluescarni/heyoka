@@ -611,6 +611,21 @@ llvm::Value *llvm_real_fnz(llvm_state &s, llvm::Value *x)
     return builder.CreateICmpEQ(ret, llvm::ConstantInt::getNullValue(ret->getType()));
 }
 
+llvm::Value *llvm_real_isfinite(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto &bld = s.builder();
+
+    // Check if x is an ordinary number.
+    auto *f = real_nary_cmp(s, x->getType(), "mpfr_number_p", 1u);
+    auto *ret = bld.CreateCall(f, x);
+
+    return ret;
+}
+
 // Convert the input unsigned integral value n to the real type fp_t.
 llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 {
