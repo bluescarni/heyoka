@@ -157,6 +157,10 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_ui_to_fp(llvm_state &, llvm::Value *, llvm::
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_trunc(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_is_finite(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_is_natural(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);

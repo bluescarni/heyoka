@@ -126,7 +126,7 @@ auto make_vf_map()
     // by sleef, on the assumption that usually sqrt() is implemented directly in hardware
     // and thus there's no need to go through sleef. This is certainly true for x86,
     // but I am not 100% sure for the other archs. Let's keep this in mind.
-    // NOTE: the same holds for things like abs() and floor().
+    // NOTE: the same holds for things like abs(), floor(), trunc(), etc.
 
     // Single-precision.
     add_vfinfo_sleef(retval, "llvm.sin.f32", "sin", "f");

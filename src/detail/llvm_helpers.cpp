@@ -2347,6 +2347,69 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
                           x);
 }
 
+// Trunc.
+llvm::Value *llvm_trunc(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_intr(s, "llvm.trunc",
+#if defined(HEYOKA_HAVE_REAL128)
+                          "truncq",
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                          "mpfr_trunc",
+#endif
+                          x);
+}
+
+// is_finite().
+llvm::Value *llvm_is_finite(llvm_state &s, llvm::Value *x)
+{
+    assert(x != nullptr);
+
+    auto *x_t = x->getType();
+
+    if (x_t->getScalarType()->isFloatingPointTy()) {
+        // Codegen +- inf.
+        auto *pinf = llvm_codegen(s, x_t, number{std::numeric_limits<double>::infinity()});
+        auto *minf = llvm_codegen(s, x_t, number{-std::numeric_limits<double>::infinity()});
+
+        // Check that if x is not +- inf or NaN.
+        auto *x_not_pinf = llvm_fcmp_one(s, x, pinf);
+        auto *x_not_minf = llvm_fcmp_one(s, x, minf);
+
+        // Put the conditions together and return.
+        return s.builder().CreateLogicalAnd(x_not_pinf, x_not_minf);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x_t) != 0) {
+        return llvm_real_isfinite(s, x);
+#endif
+        // LCOV_EXCL_START
+    } else [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid type '{}' encountered in the LLVM implementation of is_finite()", llvm_type_name(x_t)));
+    }
+    // LCOV_EXCL_STOP
+}
+
+// Check if the input floating-point value is a natural number.
+llvm::Value *llvm_is_natural(llvm_state &s, llvm::Value *x)
+{
+    // Is x finite?
+    auto *x_finite = llvm_is_finite(s, x);
+
+    // Is x>=0?
+    auto *x_ge_0 = llvm_fcmp_oge(s, x, llvm_codegen(s, x->getType(), number{0.}));
+
+    // Is x an integral value?
+    auto *x_int = llvm_fcmp_oeq(s, x, llvm_trunc(s, x));
+
+    // Put the conditions together and return.
+    auto &bld = s.builder();
+    auto *ret = bld.CreateLogicalAnd(x_finite, x_ge_0);
+    ret = bld.CreateLogicalAnd(ret, x_int);
+
+    return ret;
+}
+
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
 // and scalar type scal_t.
