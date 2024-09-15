@@ -564,6 +564,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     return ret;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U1, typename U2, std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Value *taylor_diff_pow_impl(llvm_state &, llvm::Type *, const pow_impl &, const U1 &, const U2 &,
@@ -573,6 +575,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &, llvm::Type *, const pow_impl &, 
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Value *taylor_diff_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
@@ -971,6 +975,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U1, typename U2, std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, llvm::Type *, const pow_impl &, const U1 &, const U2 &,
@@ -979,6 +985,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, llvm::Type *, const po
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a pow() in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
