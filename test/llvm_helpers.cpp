@@ -3397,6 +3397,20 @@ TEST_CASE("is_finite scalar mp")
 
 #endif
 
+// NOTE: is_natural() appears not to be working on ppc, giving the following error:
+//
+// LLVM ERROR: Cannot select: 0x63b95812620: v1i128 = bitcast 0x63b957f9700
+//   0x63b957f9700: f128,ch = load<(load (s128) from %ir.2 + 16, align 1)> 0x63b95acca30, 0x63b957f9690, undef:i64
+//     0x63b957f9690: i64 = add nuw 0x63b957f9380, Constant:i64<16>
+//       0x63b957f9380: i64,ch = CopyFromReg 0x63b95acca30, Register:i64 %1
+//         0x63b957f9310: i64 = Register %1
+//       0x63b957f9620: i64 = Constant<16>
+//     0x63b957f9460: i64 = undef
+// In function: hey_is_natural
+//
+// This seems like an instruction selection problem specific to the ppc backend.
+#if !defined(HEYOKA_ARCH_PPC)
+
 TEST_CASE("is_natural scalar")
 {
     using detail::llvm_is_natural;
@@ -3576,5 +3590,7 @@ TEST_CASE("is_natural scalar mp")
         REQUIRE(f_ptr(&arg) == 0u);
     }
 }
+
+#endif
 
 #endif
