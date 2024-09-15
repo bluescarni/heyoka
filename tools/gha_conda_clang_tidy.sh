@@ -14,7 +14,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-mamba create -y -p $deps_dir cmake c-compiler cxx-compiler clang clangxx \
+conda create -y -p $deps_dir cmake c-compiler cxx-compiler clang clangxx \
     clang-tools llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef fmt spdlog ninja
 source activate $deps_dir
 
