@@ -718,28 +718,49 @@ TEST_CASE("taylor pow")
     }
 }
 
-// Small test for the preprocessing that turns pow into exp+log.
+// Tests for the preprocessing that turns pow into exp+log.
 TEST_CASE("pow_to_explog")
 {
     auto [x, y] = make_vars("x", "y");
 
-    auto tmp1 = x + pow(y, par[0]);
-    auto tmp2 = pow(x, tmp1);
-    auto tmp3 = pow(tmp1, y);
+    for (auto cm : {false, true}) {
+        auto tmp1 = x + pow(y, par[0]);
+        auto tmp2 = pow(x, tmp1);
+        auto tmp3 = pow(tmp1, par[1]);
 
-    auto ta = taylor_adaptive<double>{{prime(x) = (tmp1 * tmp2) / tmp3, prime(y) = tmp1}, {}, kw::tol = 1e-1};
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = (tmp1 * tmp2) / tmp3, prime(y) = tmp1}, {.1, .2}, kw::pars = {1.2, 3.4}, kw::compact_mode = cm};
 
-    REQUIRE(ta.get_decomposition().size() == 16u);
+        REQUIRE(ta.get_decomposition().size() == 16u);
 
-    // Count the number of exps and logs.
-    auto n_exp = 0, n_log = 0;
-    for (const auto &[ex, _] : ta.get_decomposition()) {
-        if (const auto *fptr = std::get_if<func>(&ex.value())) {
-            n_exp += (fptr->extract<detail::exp_impl>() != nullptr);
-            n_log += (fptr->extract<detail::log_impl>() != nullptr);
+        // Count the number of exps and logs.
+        auto n_exp = 0, n_log = 0;
+        for (const auto &[ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                n_exp += (fptr->extract<detail::exp_impl>() != nullptr);
+                n_log += (fptr->extract<detail::log_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_exp == 3);
+        REQUIRE(n_log == 3);
+
+        // Create an analogous of ta in which the pars have been hard-coded to numbers.
+        tmp1 = x + pow(y, 1.2);
+        tmp2 = pow(x, tmp1);
+        tmp3 = pow(tmp1, 3.4);
+
+        auto ta_hc = taylor_adaptive<double>{
+            {prime(x) = (tmp1 * tmp2) / tmp3, prime(y) = tmp1}, {.1, .2}, kw::compact_mode = cm};
+
+        // Compute the Taylor coefficients.
+        ta.step(0., true);
+        ta_hc.step(0., true);
+
+        // Compare them.
+        auto n_tc = ta.get_tc().size();
+        for (decltype(n_tc) i = 0; i < n_tc; ++i) {
+            REQUIRE(ta.get_tc()[i] == approximately(ta_hc.get_tc()[i], 1000.));
         }
     }
-
-    REQUIRE(n_exp == 3);
-    REQUIRE(n_log == 3);
 }

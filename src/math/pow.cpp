@@ -528,23 +528,14 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
         auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
-        auto scal_f = [&]() -> llvm::Value * {
-            if constexpr (std::is_same_v<U, number>) {
-                return llvm_codegen(s, vec_t,
-                                    number_like(s, fp_t, static_cast<double>(order)) * num
-                                        - number_like(s, fp_t, static_cast<double>(j))
-                                              * (num + number_like(s, fp_t, 1.)));
-            } else {
-                auto *jvec = llvm_codegen(s, vec_t, number(static_cast<double>(j)));
-                auto *ordvec = llvm_codegen(s, vec_t, number(static_cast<double>(order)));
-                auto *onevec = llvm_codegen(s, vec_t, number(1.));
+        auto *jvec = llvm_codegen(s, vec_t, number(static_cast<double>(j)));
+        auto *ordvec = llvm_codegen(s, vec_t, number(static_cast<double>(order)));
+        auto *onevec = llvm_codegen(s, vec_t, number(1.));
 
-                auto *tmp1 = llvm_fmul(s, ordvec, expo);
-                auto *tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, expo, onevec));
+        auto *tmp1 = llvm_fmul(s, ordvec, expo);
+        auto *tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, expo, onevec));
 
-                return llvm_fsub(s, tmp1, tmp2);
-            }
-        }();
+        auto *scal_f = llvm_fsub(s, tmp1, tmp2);
 
         // Add scal_f*v0*v1 to the sum.
         sum.push_back(llvm_fmul(s, scal_f, llvm_fmul(s, v0, v1)));
@@ -584,6 +575,7 @@ llvm::Value *taylor_diff_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &f,
 {
     assert(f.args().size() == 2u);
 
+    // LCOV_EXCL_START
     if (!deps.empty()) {
         throw std::invalid_argument(
             fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
@@ -591,6 +583,7 @@ llvm::Value *taylor_diff_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &f,
                         "instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
@@ -904,7 +897,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
