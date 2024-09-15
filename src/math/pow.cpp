@@ -539,8 +539,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
                 auto *ordvec = llvm_codegen(s, vec_t, number(static_cast<double>(order)));
                 auto *onevec = llvm_codegen(s, vec_t, number(1.));
 
-                auto tmp1 = llvm_fmul(s, ordvec, expo);
-                auto tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, expo, onevec));
+                auto *tmp1 = llvm_fmul(s, ordvec, expo);
+                auto *tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, expo, onevec));
 
                 return llvm_fsub(s, tmp1, tmp2);
             }
