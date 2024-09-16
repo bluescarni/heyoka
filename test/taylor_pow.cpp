@@ -26,6 +26,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
@@ -97,7 +98,9 @@ TEST_CASE("taylor pow approx")
                                   kw::opt_level = 0,
                                   kw::compact_mode = true};
 
-        REQUIRE(ir_contains(ta, "taylor_c_diff.pow."));
+        REQUIRE(!ir_contains(ta, "taylor_c_diff.pow."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.exp."));
+        REQUIRE(ir_contains(ta, "taylor_c_diff.log."));
     }
 
     {
@@ -167,9 +170,7 @@ TEST_CASE("taylor pow")
                                             kw::opt_level = opt_level,
                                             kw::pars = {fp_t{1} / fp_t{3}}};
 
-            if (opt_level == 0u && compact_mode) {
-                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.pow.num_par"));
-            }
+            REQUIRE(!ir_contains(ta, "@heyoka.taylor_c_diff.pow.num_par"));
 
             ta.step(true);
 
@@ -705,39 +706,6 @@ TEST_CASE("taylor pow")
         compare_batch_scalar<fp_t>({prime(x) = pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
                                     prime(y) = pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
                                    opt_level, high_accuracy, compact_mode, rng, .1f, 20.f);
-
-        // Failure modes for non-implemented cases.
-        {
-            REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<fp_t>{{prime(x) = pow(1_dbl, x)},
-                                                                {fp_t{2}, fp_t{2}, fp_t{3}},
-                                                                3,
-                                                                kw::tol = .1,
-                                                                kw::high_accuracy = high_accuracy,
-                                                                kw::compact_mode = compact_mode,
-                                                                kw::opt_level = opt_level}),
-                                   std::invalid_argument,
-                                   Message(compact_mode
-                                               ? "An invalid argument type was encountered while trying to build the "
-                                                 "Taylor derivative of a pow() in compact mode"
-                                               : "An invalid argument type was encountered while trying to build the "
-                                                 "Taylor derivative of a pow()"));
-        }
-
-        {
-            REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<fp_t>{{prime(y) = pow(y, x), prime(x) = x + y},
-                                                                {fp_t{2}, fp_t{2}, fp_t{3}, fp_t{2}, fp_t{2}, fp_t{3}},
-                                                                3,
-                                                                kw::tol = .1,
-                                                                kw::high_accuracy = high_accuracy,
-                                                                kw::compact_mode = compact_mode,
-                                                                kw::opt_level = opt_level}),
-                                   std::invalid_argument,
-                                   Message(compact_mode
-                                               ? "An invalid argument type was encountered while trying to build the "
-                                                 "Taylor derivative of a pow() in compact mode"
-                                               : "An invalid argument type was encountered while trying to build the "
-                                                 "Taylor derivative of a pow()"));
-        }
     };
 
     for (auto cm : {false, true}) {
@@ -746,6 +714,53 @@ TEST_CASE("taylor pow")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+// Tests for the preprocessing that turns pow into exp+log.
+TEST_CASE("pow_to_explog")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    for (auto cm : {false, true}) {
+        auto tmp1 = x + pow(y, par[0]);
+        auto tmp2 = pow(x, tmp1);
+        auto tmp3 = pow(tmp1, par[1]);
+
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = (tmp1 * tmp2) / tmp3, prime(y) = tmp1}, {.1, .2}, kw::pars = {1.2, 3.4}, kw::compact_mode = cm};
+
+        REQUIRE(ta.get_decomposition().size() == 16u);
+
+        // Count the number of exps and logs.
+        auto n_exp = 0, n_log = 0;
+        for (const auto &[ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                n_exp += (fptr->extract<detail::exp_impl>() != nullptr);
+                n_log += (fptr->extract<detail::log_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_exp == 3);
+        REQUIRE(n_log == 3);
+
+        // Create an analogous of ta in which the pars have been hard-coded to numbers.
+        tmp1 = x + pow(y, 1.2);
+        tmp2 = pow(x, tmp1);
+        tmp3 = pow(tmp1, 3.4);
+
+        auto ta_hc = taylor_adaptive<double>{
+            {prime(x) = (tmp1 * tmp2) / tmp3, prime(y) = tmp1}, {.1, .2}, kw::compact_mode = cm};
+
+        // Compute the Taylor coefficients.
+        ta.step(0., true);
+        ta_hc.step(0., true);
+
+        // Compare them.
+        auto n_tc = ta.get_tc().size();
+        for (decltype(n_tc) i = 0; i < n_tc; ++i) {
+            REQUIRE(ta.get_tc()[i] == approximately(ta_hc.get_tc()[i], 1000.));
         }
     }
 }

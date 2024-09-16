@@ -8,12 +8,14 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <deque>
 #include <exception>
 #include <iterator>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -46,6 +48,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -54,7 +57,11 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/exp.hpp>
+#include <heyoka/math/log.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
@@ -769,6 +776,74 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
     }
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
+expression pow_to_explog(funcptr_map<expression> &func_map, const expression &ex)
+{
+    return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&]<typename T>(const T &v) {
+            if constexpr (std::same_as<T, func>) {
+                const auto *f_id = v.get_ptr();
+
+                // Check if we already performed the transformation on ex.
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Perform the transformation on the function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
+                    new_args.push_back(pow_to_explog(func_map, orig_arg));
+                }
+
+                // Prepare the return value.
+                std::optional<expression> retval;
+
+                if (v.template extract<detail::pow_impl>() != nullptr
+                    && !std::holds_alternative<number>(new_args[1].value())) {
+                    // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
+                    //
+                    // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
+                    // is a number. For instance, if we have pow(2_dbl, par[0]), then we would end up computing
+                    // log(2) in double precision. This would result in an inaccurate result if the fp type
+                    // or precision in use during integration is higher than double.
+                    // NOTE: because the exponent is not a number, no other constant folding should take
+                    // place here.
+                    retval.emplace(exp(new_args[1] * expression{func{detail::log_impl(new_args[0])}}));
+                } else {
+                    // Create a copy of v with the new arguments.
+                    retval.emplace(v.copy(std::move(new_args)));
+                }
+
+                // Put the return value into the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
+                // NOTE: an expression cannot contain itself.
+                assert(flag); // LCOV_EXCL_LINE
+
+                return std::move(*retval);
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+// Helper to transform x**y -> exp(y*log(x)), if y is not a number.
+std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(pow_to_explog(func_map, e));
+    }
+
+    return retval;
+}
+
 } // namespace
 
 } // namespace detail
@@ -797,6 +872,9 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     all_ex.reserve(sys_.size());
     std::ranges::transform(sys_, std::back_inserter(all_ex), &std::pair<expression, expression>::second);
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
+
+    // Transform x**y -> exp(y*log(x)), if y is not a number.
+    all_ex = detail::pow_to_explog(all_ex);
 
     // Transform sums into subs.
     all_ex = detail::sum_to_sub(all_ex);

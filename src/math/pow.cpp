@@ -496,9 +496,14 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     // Fetch the pow eval algo.
     const auto pea = get_pow_eval_algo(f);
 
+    // Codegen the exponent.
+    auto *expo = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
+
+    // Fetch the internal vector type.
+    auto *vec_t = make_vector_type(fp_t, batch_size);
+
     if (order == 0u) {
-        return pea.eval_f(
-            s, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size)});
+        return pea.eval_f(s, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), expo});
     }
 
     // Special case for sqrt().
@@ -514,7 +519,6 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     }
 
     // The general case.
-    auto &builder = s.builder();
 
     // NOTE: iteration in the [0, order) range
     // (i.e., order *not* included).
@@ -524,27 +528,14 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
         auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
-        auto scal_f = [&]() -> llvm::Value * {
-            if constexpr (std::is_same_v<U, number>) {
-                return vector_splat(
-                    builder,
-                    llvm_codegen(s, fp_t,
-                                 number_like(s, fp_t, static_cast<double>(order)) * num
-                                     - number_like(s, fp_t, static_cast<double>(j)) * (num + number_like(s, fp_t, 1.))),
-                    batch_size);
-            } else {
-                auto pc = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
-                auto *jvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
-                auto *ordvec
-                    = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
-                auto *onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(1.)), batch_size);
+        auto *jvec = llvm_codegen(s, vec_t, number(static_cast<double>(j)));
+        auto *ordvec = llvm_codegen(s, vec_t, number(static_cast<double>(order)));
+        auto *onevec = llvm_codegen(s, vec_t, number(1.));
 
-                auto tmp1 = llvm_fmul(s, ordvec, pc);
-                auto tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, pc, onevec));
+        auto *tmp1 = llvm_fmul(s, ordvec, expo);
+        auto *tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, expo, onevec));
 
-                return llvm_fsub(s, tmp1, tmp2);
-            }
-        }();
+        auto *scal_f = llvm_fsub(s, tmp1, tmp2);
 
         // Add scal_f*v0*v1 to the sum.
         sum.push_back(llvm_fmul(s, scal_f, llvm_fmul(s, v0, v1)));
@@ -554,13 +545,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     auto *ret_acc = pairwise_sum(s, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
-    auto *ord_f = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
+    auto *ord_f = llvm_codegen(s, vec_t, number(static_cast<double>(order)));
     auto *b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
     auto *div = llvm_fmul(s, ord_f, b0);
 
     // Compute and return the result: ret_acc / div.
     return llvm_fdiv(s, ret_acc, div);
 }
+
+// LCOV_EXCL_START
 
 // All the other cases.
 template <typename U1, typename U2, std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
@@ -572,12 +565,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &, llvm::Type *, const pow_impl &, 
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
 }
 
+// LCOV_EXCL_STOP
+
 llvm::Value *taylor_diff_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 2u);
 
+    // LCOV_EXCL_START
     if (!deps.empty()) {
         throw std::invalid_argument(
             fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
@@ -585,6 +581,7 @@ llvm::Value *taylor_diff_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &f,
                         "instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
@@ -898,7 +895,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
@@ -969,6 +966,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U1, typename U2, std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, llvm::Type *, const pow_impl &, const U1 &, const U2 &,
@@ -977,6 +976,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, llvm::Type *, const po
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a pow() in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_pow(llvm_state &s, llvm::Type *fp_t, const pow_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
