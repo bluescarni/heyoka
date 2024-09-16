@@ -550,9 +550,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     auto *div = llvm_fmul(s, ord_f, b0);
 
     // Compute and return the result: ret_acc / div.
-    auto *ret = llvm_fdiv(s, ret_acc, div);
-
-    return ret;
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // LCOV_EXCL_START

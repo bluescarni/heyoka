@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Non-number exponents for the ``pow()`` function
+  are now supported in Taylor integrators
+  (`#454 <https://github.com/bluescarni/heyoka/pull/454>`__).
 - It is now possible to initialise a Taylor integrator
   with an empty initial state vector. This will result
   in zero-initialization of the state vector
