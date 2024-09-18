@@ -7,6 +7,7 @@ Changelog
 New
 ~~~
 
+- Support LLVM 19 (`#455 <https://github.com/bluescarni/heyoka/pull/455>`__).
 - Non-number exponents for the ``pow()`` function
   are now supported in Taylor integrators
   (`#454 <https://github.com/bluescarni/heyoka/pull/454>`__).
