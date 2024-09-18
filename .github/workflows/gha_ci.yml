@@ -81,6 +81,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: bash tools/gha_conda_ubsan.sh
+  conda_llvm18_asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash tools/gha_llvm18_conda_asan.sh
   conda_llvm17_asan:
     runs-on: ubuntu-latest
     steps:
