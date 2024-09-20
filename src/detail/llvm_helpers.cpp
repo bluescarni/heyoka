@@ -1165,7 +1165,7 @@ llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
+    if (llvm_is_real(tp->getScalarType()) != 0) {
         // LCOV_EXCL_START
         if (tp->isVectorTy()) {
             throw std::invalid_argument("Cannot gather from memory a vector of reals");
