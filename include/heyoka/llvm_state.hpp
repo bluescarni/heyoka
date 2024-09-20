@@ -41,6 +41,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/rng_to_vec.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/kw.hpp>
@@ -390,7 +391,7 @@ public:
         requires std::ranges::input_range<R>
                  && std::same_as<llvm_state, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
     explicit llvm_multi_state(R &&rng, bool parjit = detail::default_parjit)
-        : llvm_multi_state(std::vector(std::ranges::begin(rng), std::ranges::end(rng)), parjit)
+        : llvm_multi_state(detail::rng_to_vec(std::forward<R>(rng)), parjit)
     {
     }
     llvm_multi_state(const llvm_multi_state &);
