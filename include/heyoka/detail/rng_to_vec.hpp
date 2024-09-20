@@ -9,6 +9,7 @@
 #ifndef HEYOKA_DETAIL_RNG_TO_VEC_HPP
 #define HEYOKA_DETAIL_RNG_TO_VEC_HPP
 
+#include <concepts>
 #include <ranges>
 #include <type_traits>
 #include <utility>
@@ -23,16 +24,28 @@ namespace detail
 
 // Helper to convert an input range R into a vector.
 // The value type is deduced from the reference type of R.
+//
+// NOTE: the need for this helper - as opposed to using directly
+// the std::vector ctor from iterators - arises because the std::vector
+// ctor requires C++17 input iterators, but C++20 input iterators
+// are not necessarily C++17 input iterators. Thus, we go through
+// a range-based for loop in which we push_back() the elements from
+// the input range instead.
 template <typename R>
 auto rng_to_vec(R &&r)
 {
+    static_assert(std::ranges::input_range<R>);
+
     // Deduce the value type.
     using value_type = std::remove_cvref_t<std::ranges::range_reference_t<R>>;
 
     // Prepare the return value, reserving the appropriate
-    // size if R is a sized range.
+    // size if R is a sized range whose size type is an integral type.
     std::vector<value_type> retval;
-    if constexpr (std::ranges::sized_range<R>) {
+    if constexpr (requires {
+                      requires std::ranges::sized_range<R>;
+                      requires std::integral<std::ranges::range_size_t<R>>;
+                  }) {
         retval.reserve(static_cast<decltype(retval.size())>(std::ranges::size(r)));
     }
 
