@@ -1201,8 +1201,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // the custom transform:
     //
     // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
-    auto sview = states | std::views::transform([](llvm_state &s) -> llvm_state && { return std::move(s); });
-    return rng_to_vec(sview);
+    return rng_to_vec(states | std::views::transform([](llvm_state &s) -> llvm_state && { return std::move(s); }));
 }
 
 // Helper for the computation of a jet of derivatives in compact mode,
