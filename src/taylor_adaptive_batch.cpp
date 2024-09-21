@@ -1877,6 +1877,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
                 const auto t_oc = std::get<0>(t);
 
+                // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
                 return t_oc == taylor_outcome::cb_stop || (t_oc > taylor_outcome::success && t_oc < taylor_outcome{0})
                        || t_oc == taylor_outcome::step_limit;
             })) {

@@ -56,6 +56,7 @@ namespace
 
 void validate_var_args(var_args a)
 {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     if (a == var_args{0} || a > var_args::all) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid var_args enumerator detected: the value of the enumerator "
                                                 "must be in the [1, 7] range, but a value of {} was detected instead",

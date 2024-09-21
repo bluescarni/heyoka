@@ -1005,6 +1005,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // integration should continue). Otherwise, either the terminal event
             // has no callback or its callback returned false, meaning that the
             // integration must stop.
+            // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
             return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, std::move(h)};
         }
     }

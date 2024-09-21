@@ -54,6 +54,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/rng_to_vec.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
@@ -461,8 +462,8 @@ public:
     [[nodiscard]] size_type index_of(const iterator &) const;
 
     [[nodiscard]] auto get_derivatives(std::uint32_t) const -> decltype(std::ranges::subrange(begin(), end()));
-    [[nodiscard]] auto get_derivatives(std::uint32_t,
-                                       std::uint32_t) const -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t, std::uint32_t) const
+        -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
     [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
@@ -846,9 +847,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
     template <typename R>
     static auto rng_to_vecex(R &&r)
     {
-        auto tv = r | std::views::transform([]<typename U>(U &&x) { return expression{std::forward<U>(x)}; });
-
-        return std::vector(std::ranges::begin(tv), std::ranges::end(tv));
+        return detail::rng_to_vec(
+            r | std::views::transform([]<typename U>(U &&x) { return expression{std::forward<U>(x)}; }));
     }
 
 public:
