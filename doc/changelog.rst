@@ -1,6 +1,16 @@
 Changelog
 =========
 
+6.0.1 (unreleased)
+------------------
+
+Fix
+~~~
+
+- Workaround for a clang 17 issue that would result in
+  runtime exceptions during (de)serialisation
+  (`#458 <https://github.com/bluescarni/heyoka/pull/458>`__).
+
 6.0.0 (2024-09-21)
 ------------------
 
