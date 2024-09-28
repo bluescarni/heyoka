@@ -11,7 +11,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -p $deps_dir 'c-compiler<1.8' zlib 'cxx-compiler<1.8' libcxx cmake ninja \
+conda create -y -p $deps_dir c-compiler zlib cxx-compiler libcxx cmake ninja \
     llvmdev tbb-devel tbb libboost-devel sleef xtensor xtensor-blas blas \
     blas-devel fmt spdlog 'mppp=1.*'
 source activate $deps_dir
@@ -25,7 +25,7 @@ unset CXXFLAGS
 unset CFLAGS
 
 # Configure.
-CXX=clang++ CC=clang cmake ../ -G Ninja \
+CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
