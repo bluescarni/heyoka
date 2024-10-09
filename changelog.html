@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Changelog &#8212; heyoka 6.0.0 documentation</title>
+    <title>Changelog &#8212; heyoka 6.1.0 documentation</title>
   
   
   
@@ -36,7 +36,7 @@
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="_static/documentation_options.js?v=32485e33"></script>
+    <script src="_static/documentation_options.js?v=ce926bdf"></script>
     <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
@@ -137,8 +137,8 @@
       
     
     
-    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 6.0.0 documentation - Home"/>
-    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 6.0.0 documentation - Home"/>`);</script>
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 6.1.0 documentation - Home"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 6.1.0 documentation - Home"/>`);</script>
   
   
 </a></div>
@@ -401,7 +401,7 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">6.0.1 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">6.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
 </ul>
 </li>
@@ -605,10 +605,13 @@ document.write(`
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">#</a></h1>
 <section id="unreleased">
-<h2>6.0.1 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">#</a></h2>
+<h2>6.1.0 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">#</a></h2>
 <section id="fix">
 <h3>Fix<a class="headerlink" href="#fix" title="Link to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Fix symbols not found by the JIT runtime when heyoka
+is <code class="docutils literal notranslate"><span class="pre">dlopen()</span></code>-ed with <code class="docutils literal notranslate"><span class="pre">RTLD_LOCAL</span></code>
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/460">#460</a>).</p></li>
 <li><p>Workaround for a clang 17 issue that would result in
 runtime exceptions during (de)serialisation
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/458">#458</a>).</p></li>
@@ -1890,7 +1893,7 @@ on more general classes of functions, and add
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">6.0.1 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">6.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
 </ul>
 </li>
