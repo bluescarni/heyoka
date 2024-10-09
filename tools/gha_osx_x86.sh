@@ -13,7 +13,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir c-compiler zlib cxx-compiler libcxx cmake ninja \
     llvmdev tbb-devel tbb libboost-devel sleef xtensor xtensor-blas blas \
-    blas-devel fmt spdlog 'mppp=1.*'
+    blas-devel fmt spdlog 'mppp=1.*' 'clang<19' 'clangxx<19'
 source activate $deps_dir
 
 # Create the build dir and cd into it.
