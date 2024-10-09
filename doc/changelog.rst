@@ -1,12 +1,15 @@
 Changelog
 =========
 
-6.0.1 (unreleased)
+6.1.0 (unreleased)
 ------------------
 
 Fix
 ~~~
 
+- Fix symbols not found by the JIT runtime when heyoka
+  is ``dlopen()``-ed with ``RTLD_LOCAL``
+  (`#460 <https://github.com/bluescarni/heyoka/pull/460>`__).
 - Workaround for a clang 17 issue that would result in
   runtime exceptions during (de)serialisation
   (`#458 <https://github.com/bluescarni/heyoka/pull/458>`__).
