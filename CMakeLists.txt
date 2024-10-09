@@ -194,6 +194,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_buffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"

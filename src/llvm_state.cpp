@@ -102,6 +102,7 @@
 
 #endif
 
+#include <heyoka/detail/get_dl_path.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -720,6 +721,31 @@ struct llvm_state::jit {
         // LCOV_EXCL_STOP
         m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
 
+        // NOTE: we also want to manually inject the symbols from the heyoka shared library
+        // into the JIT runtime.
+        //
+        // The reason for this is that if heyoka is loaded with dlopen() and the RTLD_LOCAL flag,
+        // then the JIT runtime will not be able to resolve symbols defined either in heyoka or
+        // in its dependencies. This will happen for instance in heyoka.py.
+        //
+        // With the following contraption, as far as I have understood, we are manually injecting all the
+        // symbols from heyoka (and, transitively, its dependencies) into the JIT runtime, and the symbols
+        // are thus made available to JIT code despite the use of RTLD_LOCAL.
+        //
+        // This approach was suggested by lhames on the LLVM discord.
+        if (const auto &dl_path = detail::get_dl_path(); !dl_path.empty()) {
+            auto new_dlsg = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(),
+                                                                           m_lljit->getDataLayout().getGlobalPrefix());
+            if (new_dlsg) [[likely]] {
+                m_lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument(
+                    "Could not create the dynamic library search generator for the heyoka library");
+                // LCOV_EXCL_STOP
+            }
+        }
+
         // Keep a target machine around to fetch various
         // properties of the host CPU.
         auto tm = jtmb.createTargetMachine();
@@ -735,7 +761,7 @@ struct llvm_state::jit {
 
         // NOTE: by default, errors in the execution session are printed
         // to screen. A custom error reported can be specified, ideally
-        // we would like th throw here but I am not sure whether throwing
+        // we would like to throw here but I am not sure whether throwing
         // here would disrupt LLVM's cleanup actions?
         // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
 
@@ -1801,6 +1827,30 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
     }
     // LCOV_EXCL_STOP
     m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
+
+    // NOTE: we also want to manually inject the symbols from the heyoka shared library
+    // into the JIT runtime.
+    //
+    // The reason for this is that if heyoka is loaded with dlopen() and the RTLD_LOCAL flag,
+    // then the JIT runtime will not be able to resolve symbols defined either in heyoka or
+    // in its dependencies. This will happen for instance in heyoka.py.
+    //
+    // With the following contraption, as far as I have understood, we are manually injecting all the
+    // symbols from heyoka (and, transitively, its dependencies) into the JIT runtime, and the symbols
+    // are thus made available to JIT code despite the use of RTLD_LOCAL.
+    //
+    // This approach was suggested by lhames on the LLVM discord.
+    if (const auto &dl_path = detail::get_dl_path(); !dl_path.empty()) {
+        auto new_dlsg = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(),
+                                                                       m_lljit->getDataLayout().getGlobalPrefix());
+        if (new_dlsg) [[likely]] {
+            m_lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
+        } else {
+            // LCOV_EXCL_START
+            throw std::invalid_argument("Could not create the dynamic library search generator for the heyoka library");
+            // LCOV_EXCL_STOP
+        }
+    }
 
     // Create the master context.
     m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());

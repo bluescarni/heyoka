@@ -11,9 +11,6 @@
 #include <iostream>
 #include <string>
 
-#include <heyoka/config.hpp>
-#include <heyoka/detail/get_dl_path.hpp>
-
 #if __has_include(<dlfcn.h>)
 
 #define HEYOKA_DETAIL_GET_DL_PATH_DLFCN
@@ -21,6 +18,9 @@
 #include <dlfcn.h>
 
 #endif
+
+#include <heyoka/config.hpp>
+#include <heyoka/detail/get_dl_path.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
