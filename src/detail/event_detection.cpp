@@ -863,9 +863,9 @@ public:
         if (!pc->empty()) {
             const auto op1 = (*pc)[0].size();
 
-            for (const auto &v : *pc) {
-                assert(!v.empty());
-                assert(v.size() == op1);
+            for (const auto &vec : *pc) {
+                assert(!vec.empty());
+                assert(vec.size() == op1);
             }
         }
 
