@@ -38,8 +38,12 @@ template <typename>
 class taylor_pwrap;
 
 // Polynomial cache type. Each entry is a polynomial
-// represented as a vector of coefficients. Used
-// during event detection.
+// represented as a vector of coefficients, in ascending
+// order. Used during event detection.
+//
+// NOTE: a cache must not contain empty coefficient
+// vectors and all polynomials in the cache must have
+// the same order.
 template <typename T>
 using taylor_poly_cache = std::vector<std::vector<T>>;
 

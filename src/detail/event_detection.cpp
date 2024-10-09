@@ -774,13 +774,17 @@ class taylor_pwrap
             auto retval = std::move(pc->back());
             pc->pop_back();
 
+            assert(retval.size() == n + 1u);
+
             return retval;
         }
     }
 
     void back_to_cache()
     {
-        // NOTE: the cache does not allow empty vectors.
+        // NOTE: v will be empty when this has been
+        // moved-from. In that case, we do not want
+        // to send v back to the cache.
         if (!v.empty()) {
             assert(pc->empty() || (*pc)[0].size() == v.size());
 
@@ -799,7 +803,20 @@ public:
     {
         // Make sure we moved from a valid taylor_pwrap.
         assert(!v.empty()); // LCOV_EXCL_LINE
+
+        // NOTE: we must ensure that other.v is cleared out, because
+        // otherwise, when other is destructed, we could end up
+        // returning to the cache a polynomial of the wrong size.
+        //
+        // In basically every existing implementation, moving a std::vector
+        // will leave the original object empty, but technically this
+        // does not seem to be guaranteed by the standard, so, better
+        // safe than sorry. Quick checks on godbolt indicate that compilers
+        // are anyway able to elide this clearing out of the vector.
+        other.v.clear();
     }
+    // NOTE: this does not support self-move, and requires that
+    // the cache of other is the same as the cache of this.
     taylor_pwrap &operator=(taylor_pwrap &&other) noexcept
     {
         // Disallow self move.
@@ -808,8 +825,8 @@ public:
         // Make sure the polyomial caches match.
         assert(pc == other.pc); // LCOV_EXCL_LINE
 
-        // Make sure we are not moving from an
-        // invalid taylor_pwrap.
+        // Make sure we are not moving from a
+        // moved-from taylor_pwrap.
         assert(!other.v.empty()); // LCOV_EXCL_LINE
 
         // Put the current v in the cache.
@@ -817,6 +834,17 @@ public:
 
         // Do the move-assignment.
         v = std::move(other.v);
+
+        // NOTE: we must ensure that other.v is cleared out, because
+        // otherwise, when other is destructed, we could end up
+        // returning to the cache a polynomial of the wrong size.
+        //
+        // In basically every existing implementation, moving a std::vector
+        // will leave the original object empty, but technically this
+        // does not seem to be guaranteed by the standard, so, better
+        // safe than sorry. Quick checks on godbolt indicate that compilers
+        // are anyway able to elide this clearing out of the vector.
+        other.v.clear();
 
         return *this;
     }
@@ -827,6 +855,22 @@ public:
 
     ~taylor_pwrap()
     {
+#if !defined(NDEBUG)
+
+        // Run consistency checks on the cache in debug mode.
+        // The cache must not contain empty vectors
+        // and all vectors in the cache must have the same size.
+        if (!pc->empty()) {
+            const auto op1 = (*pc)[0].size();
+
+            for (const auto &vec : *pc) {
+                assert(!vec.empty());
+                assert(vec.size() == op1);
+            }
+        }
+
+#endif
+
         // Put the current v in the cache.
         back_to_cache();
     }
