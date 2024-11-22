@@ -195,7 +195,7 @@ auto sgp4_init()
 
     // For perigee less than 220 kilometers, the equations are
     // truncated to linear variation in sqrt A and quadratic
-    // variation in mean anomaly.  Also, the C3 term, the
+    // variation in mean anomaly. Also, the C3 term, the
     // delta OMEGA term, and the delta M term are dropped.
     const auto C1SQ = pow(C1, 2.);
     const auto D2 = 4. * A0DP * XI * C1SQ;
