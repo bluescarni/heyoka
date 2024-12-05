@@ -130,16 +130,6 @@ if(YACMA_COMPILER_IS_MSVC)
     list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251" "/wd4661")
     list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251" "/wd4661")
   endif()
-  # Enable strict conformance mode, if supported.
-  set(CMAKE_REQUIRED_QUIET TRUE)
-  check_cxx_compiler_flag("/permissive-" _HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
-  unset(CMAKE_REQUIRED_QUIET)
-  if(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
-    message(STATUS "The '/permissive-' flag is supported, enabling it.")
-    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/permissive-")
-    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/permissive-")
-  endif()
-  unset(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
 endif()
 
 # Mandatory dependency on LLVM.
