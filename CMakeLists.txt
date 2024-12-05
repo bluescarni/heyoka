@@ -162,6 +162,9 @@ if(${LLVM_VERSION_MAJOR} LESS 15 OR ${LLVM_VERSION_MAJOR} GREATER 19)
   message(FATAL_ERROR "LLVM >= 15 and <= 19 is required.")
 endif()
 
+message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
+message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
+
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_00.cpp"
@@ -386,9 +389,6 @@ endif()
 
 # Add a define to signal that we are building the library.
 target_compile_definitions(heyoka PRIVATE HEYOKA_BUILD_LIBRARY)
-
-message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
-message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
 # Define an interface target for linking to the LLVM bits.
 add_library(heyoka_llvm_internal INTERFACE)
