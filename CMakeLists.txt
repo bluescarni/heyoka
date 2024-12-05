@@ -362,7 +362,7 @@ target_compile_options(heyoka PRIVATE
 
 # Ensure that C++20 is employed when both compiling and consuming heyoka.
 target_compile_features(heyoka PUBLIC cxx_std_20)
-# Enforce vanilla C++17 when compiling heyoka.
+# Enforce vanilla C++ when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
 
 target_include_directories(heyoka PUBLIC
