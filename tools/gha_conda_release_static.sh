@@ -15,7 +15,7 @@ export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir c-compiler cxx-compiler ninja cmake \
-    llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor xtensor-blas \
+    llvmdev tbb-devel tbb libboost-devel mppp sleef xtensor xtensor-blas \
     blas blas-devel fmt spdlog zlib
 source activate $deps_dir
 

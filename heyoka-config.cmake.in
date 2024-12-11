@@ -37,7 +37,11 @@ endif()
 
 # Optional public dependency on mp++.
 if(${heyoka_WITH_MPPP})
-    find_package(mp++ @_HEYOKA_MPPP_VERSION@ REQUIRED CONFIG)
+    find_package(mp++ REQUIRED CONFIG)
+    if(${mp++_VERSION_MAJOR} VERSION_LESS @_HEYOKA_MIN_SUPPORTED_MPPP_VERSION@ OR
+       ${mp++_VERSION_MAJOR} VERSION_GREATER @_HEYOKA_MAX_SUPPORTED_MPPP_VERSION@)
+        message(FATAL_ERROR "The supported mp++ versions are in the range [@_HEYOKA_MIN_SUPPORTED_MPPP_VERSION@, @_HEYOKA_MAX_SUPPORTED_MPPP_VERSION@], but version ${mp++_VERSION_MAJOR} was found instead.")
+    endif()
 
     # NOTE: this is necessary for the serialisation of several classes.
     if(NOT mp++_WITH_BOOST_S11N)

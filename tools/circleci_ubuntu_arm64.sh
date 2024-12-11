@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir cxx-compiler c-compiler cmake \
     ninja llvmdev tbb-devel tbb libboost-devel sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog 'mppp=1.*'
+    xtensor-blas blas blas-devel fmt spdlog mppp
 source activate $deps_dir
 
 # Create the build dir and cd into it.

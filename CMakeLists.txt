@@ -526,9 +526,14 @@ if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
 endif()
 
 # Optional dependency on mp++.
-set(_HEYOKA_MPPP_VERSION "1.0.0")
+set(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION 1)
+set(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION 2)
 if(HEYOKA_WITH_MPPP)
-    find_package(mp++ ${_HEYOKA_MPPP_VERSION} REQUIRED CONFIG)
+    find_package(mp++ REQUIRED CONFIG)
+    if(${mp++_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION} OR
+       ${mp++_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION})
+        message(FATAL_ERROR "The supported mp++ versions are in the range [${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION}, ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION}], but version ${mp++_VERSION_MAJOR} was found instead.")
+    endif()
     message(STATUS "mp++ version: ${mp++_VERSION}")
 
     # NOTE: this is necessary for the serialisation of several classes.
@@ -592,7 +597,8 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINAT
 
 # Cleanup.
 unset(_HEYOKA_MIN_BOOST_VERSION)
-unset(_HEYOKA_MPPP_VERSION)
+unset(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION)
+unset(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
