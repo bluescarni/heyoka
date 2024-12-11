@@ -437,7 +437,7 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
 
             // Ensure that the variant is not optimised out because it is not
             // explicitly used in the code.
-            detail::llvm_append_used(s, vf_ptr);
+            llvm_append_used(s, vf_ptr);
         }
 
         // Restore the original insertion block.
