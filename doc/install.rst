@@ -29,7 +29,7 @@ Additionally, heyoka has the following **optional** dependencies:
   an mp++ installation with support for Boost.serialization and for the
   {fmt} library
   (see the :ref:`mp++ installation instructions <mppp:installation>`).
-  heyoka currently requires mp++ 1.x;
+  heyoka currently requires mp++ 1.x or 2.x;
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__

@@ -1,6 +1,14 @@
 Changelog
 =========
 
+6.2.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Enable support for mp++ 2 (`#462 <https://github.com/bluescarni/heyoka/pull/462>`__).
+
 6.1.0 (2024-10-10)
 ------------------
 
