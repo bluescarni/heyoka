@@ -8,6 +8,12 @@ jobs:
     resource_class: large
     steps:
     - checkout
+    # NOTE: temporary workaround for asan failures with too
+    # much entropy. See:
+    # https://github.com/google/sanitizers/issues/1614
+    - run:
+        name: Fix mmap_rnd_bits for asan
+        command: sudo sysctl vm.mmap_rnd_bits=28
     - run:
         name: Build and test
         command: bash ./tools/circleci_conda_asan.sh
