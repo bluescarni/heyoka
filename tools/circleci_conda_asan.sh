@@ -9,6 +9,9 @@ set -e
 # Core deps.
 sudo apt-get install wget
 
+# Debug.
+sudo sysctl vm.mmap_rnd_bits
+
 # Install conda+deps.
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniconda.sh
 export deps_dir=$HOME/local
