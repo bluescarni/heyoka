@@ -9,8 +9,10 @@ set -e
 # Core deps.
 sudo apt-get install wget
 
-# Debug.
-sudo sysctl vm.mmap_rnd_bits
+# NOTE: temporary workaround for asan failures with too
+# much entropy. See:
+# https://github.com/google/sanitizers/issues/1614
+sudo sysctl vm.mmap_rnd_bits=28
 
 # Install conda+deps.
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniconda.sh
