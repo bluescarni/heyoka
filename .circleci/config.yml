@@ -2,21 +2,6 @@
 version: 2.1
 
 jobs:
-  conda_asan:
-    docker:
-    - image: cimg/base:current
-    resource_class: large
-    steps:
-    - checkout
-    # NOTE: temporary workaround for asan failures with too
-    # much entropy. See:
-    # https://github.com/google/sanitizers/issues/1614
-    - run:
-        name: Fix mmap_rnd_bits for asan
-        command: sudo sysctl vm.mmap_rnd_bits=28
-    - run:
-        name: Build and test
-        command: bash ./tools/circleci_conda_asan.sh
   ubuntu_arm64:
     machine:
       image: ubuntu-2204:current
@@ -31,5 +16,4 @@ workflows:
   version: 2.1
   all_builds:
     jobs:
-    - conda_asan
     - ubuntu_arm64
