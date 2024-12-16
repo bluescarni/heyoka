@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 6.1.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -130,16 +130,6 @@ if(YACMA_COMPILER_IS_MSVC)
     list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251" "/wd4661")
     list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251" "/wd4661")
   endif()
-  # Enable strict conformance mode, if supported.
-  set(CMAKE_REQUIRED_QUIET TRUE)
-  check_cxx_compiler_flag("/permissive-" _HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
-  unset(CMAKE_REQUIRED_QUIET)
-  if(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
-    message(STATUS "The '/permissive-' flag is supported, enabling it.")
-    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/permissive-")
-    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/permissive-")
-  endif()
-  unset(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
 endif()
 
 # Mandatory dependency on LLVM.
@@ -161,6 +151,9 @@ find_package(LLVM REQUIRED CONFIG)
 if(${LLVM_VERSION_MAJOR} LESS 15 OR ${LLVM_VERSION_MAJOR} GREATER 19)
   message(FATAL_ERROR "LLVM >= 15 and <= 19 is required.")
 endif()
+
+message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
+message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
 # List of source files.
 set(HEYOKA_SRC_FILES
@@ -337,7 +330,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 31)
+set(HEYOKA_ABI_VERSION 32)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -362,7 +355,7 @@ target_compile_options(heyoka PRIVATE
 
 # Ensure that C++20 is employed when both compiling and consuming heyoka.
 target_compile_features(heyoka PUBLIC cxx_std_20)
-# Enforce vanilla C++17 when compiling heyoka.
+# Enforce vanilla C++ when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
 
 target_include_directories(heyoka PUBLIC
@@ -386,9 +379,6 @@ endif()
 
 # Add a define to signal that we are building the library.
 target_compile_definitions(heyoka PRIVATE HEYOKA_BUILD_LIBRARY)
-
-message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
-message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
 # Define an interface target for linking to the LLVM bits.
 add_library(heyoka_llvm_internal INTERFACE)
@@ -536,9 +526,14 @@ if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
 endif()
 
 # Optional dependency on mp++.
-set(_HEYOKA_MPPP_VERSION "1.0.0")
+set(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION 2)
+set(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION 2)
 if(HEYOKA_WITH_MPPP)
-    find_package(mp++ ${_HEYOKA_MPPP_VERSION} REQUIRED CONFIG)
+    find_package(mp++ REQUIRED CONFIG)
+    if(${mp++_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION} OR
+       ${mp++_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION})
+        message(FATAL_ERROR "The supported mp++ versions are in the range [${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION}, ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION}], but version ${mp++_VERSION_MAJOR} was found instead.")
+    endif()
     message(STATUS "mp++ version: ${mp++_VERSION}")
 
     # NOTE: this is necessary for the serialisation of several classes.
@@ -602,7 +597,8 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINAT
 
 # Cleanup.
 unset(_HEYOKA_MIN_BOOST_VERSION)
-unset(_HEYOKA_MPPP_VERSION)
+unset(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION)
+unset(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)

@@ -1,6 +1,16 @@
 Changelog
 =========
 
+7.0.0 (unreleased)
+------------------
+
+Changes
+~~~~~~~
+
+- **BREAKING**: heyoka now requires mp++ version 2
+  (`#462 <https://github.com/bluescarni/heyoka/pull/462>`__).
+  This is a :ref:`breaking change <bchanges_7_0_0>`.
+
 6.1.0 (2024-10-10)
 ------------------
 

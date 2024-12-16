@@ -3,6 +3,16 @@
 Breaking changes
 ================
 
+.. _bchanges_7_0_0:
+
+7.0.0
+-----
+
+General
+~~~~~~~
+
+heyoka now requires mp++ version 2.
+
 .. _bchanges_6_0_0:
 
 6.0.0

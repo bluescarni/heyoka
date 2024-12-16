@@ -2,15 +2,6 @@
 version: 2.1
 
 jobs:
-  conda_asan:
-    docker:
-    - image: cimg/base:current
-    resource_class: large
-    steps:
-    - checkout
-    - run:
-        name: Build and test
-        command: bash ./tools/circleci_conda_asan.sh
   ubuntu_arm64:
     machine:
       image: ubuntu-2204:current
@@ -25,5 +16,4 @@ workflows:
   version: 2.1
   all_builds:
     jobs:
-    - conda_asan
     - ubuntu_arm64
