@@ -39,7 +39,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-HEYOKA_DLL_PUBLIC std::vector<expression> sgp4();
+HEYOKA_DLL_PUBLIC std::vector<expression> sgp4(const std::vector<expression> & = {});
 
 namespace detail
 {

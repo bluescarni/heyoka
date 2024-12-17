@@ -19,6 +19,7 @@
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/model/sgp4.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -33,9 +34,12 @@ const auto deg2rad = [](auto x) { return x * 2. * boost::math::constants::pi<dou
 
 TEST_CASE("model expression")
 {
+    using namespace heyoka::literals;
+    using Catch::Matchers::Message;
+
     detail::edb_disabler ed;
 
-    const auto outputs = model::sgp4();
+    auto outputs = model::sgp4();
     const auto inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
 
     auto sgp4_cf = cfunc<double>(outputs, inputs);
@@ -127,6 +131,38 @@ TEST_CASE("model expression")
         REQUIRE(outs[5] == approximately(5.588906721377138, 10000.));
         REQUIRE(outs[6] == 0.);
     }
+
+    // Test also non-default expressions for the sgp4 inputs.
+    outputs = model::sgp4({"a"_var, "b"_var, "c"_var, "d"_var, "e"_var, "f"_var, par[0], heyoka::time});
+    const auto inputs2 = make_vars("a", "b", "c", "d", "e", "f");
+
+    sgp4_cf = cfunc<double>(outputs, inputs2);
+
+    {
+        std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                   0.0024963,
+                                   deg2rad(90.2039),
+                                   deg2rad(55.5633),
+                                   deg2rad(320.5956),
+                                   deg2rad(91.4738)},
+                            pars = {0.75863e-3}, outs(7u);
+        double time = 1440.;
+
+        sgp4_cf(outs, ins, kw::pars = pars, kw::time = time);
+
+        REQUIRE(outs[0] == approximately(3134.2015620939, 10000.));
+        REQUIRE(outs[1] == approximately(4604.963663328277, 10000.));
+        REQUIRE(outs[2] == approximately(-4791.661126560278, 10000.));
+        REQUIRE(outs[3] == approximately(2.732034613044249, 10000.));
+        REQUIRE(outs[4] == approximately(3.952589777415254, 10000.));
+        REQUIRE(outs[5] == approximately(5.588906721377138, 10000.));
+        REQUIRE(outs[6] == 0.);
+    }
+
+    // Error checking.
+    REQUIRE_THROWS_MATCHES(model::sgp4({"a"_var, "b"_var, "c"_var, "d"_var}), std::invalid_argument,
+                           Message("Invalid number of inputs passed to the sgp4() function: 8 "
+                                   "expressions are expected but 4 were provided instead"));
 }
 
 TEST_CASE("propagator basics")

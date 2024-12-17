@@ -109,9 +109,13 @@ constexpr auto J4 = -0.00000165597;
 constexpr auto CK4 = -.375 * J4;
 
 // NOTE: this is the first half of the SGP4 algorithm, which does not depend on
-// the propagation time.
-auto sgp4_init()
+// the propagation time. 'inputs' is the set of 8 expressions representing the input
+// quantities for the sgp4 algorithm (if empty, variables with predefined names will be
+// used as inputs).
+auto sgp4_init(const std::vector<expression> &inputs)
 {
+    assert(inputs.empty() || inputs.size() == 8u);
+
     // Several math wrappers used in the original fortran code.
     constexpr auto heyoka_ABS = [](const auto &x) { return select(gte(x, 0.), x, -x); };
 
@@ -119,8 +123,15 @@ auto sgp4_init()
 
     constexpr auto heyoka_MIN = [](const auto &a, const auto &b) { return select(lt(a, b), a, b); };
 
-    // The inputs.
-    const auto [N0, I0, E0, BSTAR, OMEGA0, M0, NODE0] = make_vars("n0", "i0", "e0", "bstar", "omega0", "m0", "node0");
+    // Setup the inputs. If they are provided, use them, otherwise use variables with predefined names.
+    // NOTE: in this function we do not use tsince, i.e., the last element of inputs.
+    const auto [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR] = [&inputs]() {
+        if (inputs.empty()) {
+            return make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
+        } else {
+            return std::array{inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5], inputs[6]};
+        }
+    }();
 
     // Recover original mean motion (N0DP) and semimajor axis (A0DP) from input elements.
     const auto A1 = pow(KE / N0, TOTHRD);
@@ -213,9 +224,13 @@ auto sgp4_init()
 
 // This is the second stage of the SGP4 algorithm, that performs the actual time
 // propagation and returns the Cartesian state. 's' is the array of intermediate quantities
-// computed in the init stage.
-std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE = "tsince"_var)
+// computed by sgp4_init(). 'inputs' is the set of 8 expressions representing the input
+// quantities for the sgp4 algorithm (if empty, variables with predefined names will be
+// used as inputs).
+std::vector<expression> sgp4_time_prop(const std::vector<expression> &inputs, const auto &s)
 {
+    assert(inputs.empty() || inputs.size() == 8u);
+
     // This is an atan2() implementation that returns angles
     // in the [0, 2pi] range.
     constexpr auto ACTAN = [](const auto &a, const auto &b) {
@@ -223,8 +238,15 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
         return select(gte(ret, 0.), ret, 2. * heyoka::pi + ret);
     };
 
-    // Variables representing the orbital elements + bstar (apart from n0 which is not needed).
-    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR] = make_vars("e0", "i0", "node0", "omega0", "m0", "bstar");
+    // Expressions representing the orbital elements, bstar and tsince.
+    // NOTE: in this function we do not use n0, i.e., the first element of 'inputs'.
+    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE] = [&inputs]() {
+        if (inputs.empty()) {
+            return make_vars("e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
+        } else {
+            return std::array{inputs[1], inputs[2], inputs[3], inputs[4], inputs[5], inputs[6], inputs[7]};
+        }
+    }();
 
     // Fetch the expressions for the intermediate quantities.
     const auto &[MDOT, OMGDOT, N0DOT, NODCF, C4, C1, T2COF, MCOF, ETA, DELM0, OMGCOF, PERIGE, C5, SINM0, D2, D3, D4,
@@ -365,10 +387,30 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
 // These involve a handful of checks for special cases (low eccentricity or
 // inclination close to 180 degrees) that may cause numerical issues, and an updated
 // way to "un-Kozai" the mean motion. These updates are noted in the comments.
-std::vector<expression> sgp4()
+//
+// NOTE: 'inputs' is the set of expressions to be used as inputs for the sgp4 algorithm.
+// These must represent, in order:
+//
+// - n0: the mean motion from the TLE (in [rad / min]),
+// - e0: the eccentricity from the TLE,
+// - i0: the inclination from the TLE (in [rad]),
+// - node0: the right ascension of the ascending node from the TLE (in [rad]),
+// - omega0: the argument of perigee from the TLE (in [rad]),
+// - m0: the mean anomaly from the TLE (in [rad]),
+// - bstar: the BSTAR drag term from the TLE (in the same unit as given in the TLE),
+// - tsince: the time elapsed from the TLE epoch (in [min]).
+//
+// If 'inputs' is empty, variables with predefined names will be used as inputs.
+std::vector<expression> sgp4(const std::vector<expression> &inputs)
 {
-    const auto init = sgp4_init();
-    return sgp4_time_prop(init);
+    if (!inputs.empty() && inputs.size() != 8u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid number of inputs passed to the sgp4() function: 8 "
+                                                "expressions are expected but {} were provided instead",
+                                                inputs.size()));
+    }
+
+    const auto init = sgp4_init(inputs);
+    return sgp4_time_prop(inputs, init);
 }
 
 namespace detail
@@ -387,20 +429,33 @@ namespace detail
 // derivatives of the Cartesian state with respect to the diff arguments (if requested).
 sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 {
-    // Variables representing the orbital elements + bstar.
-    // These are also the inputs of the init function.
-    const auto init_inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
+    // Initialise the input quantities for the sgp4 algorithm.
+    // NOTE: these are all the default ones, apart from tsince for which we use heyoka::time
+    // instead of a 'tsince' variable.
+    const auto sgp4_inputs = []() {
+        const auto tmp = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
 
-    // The differentiation arguments.
+        // Add tsince as heyoka::time.
+        std::vector<expression> retval(tmp.begin(), tmp.end());
+        retval.push_back(heyoka::time);
+
+        return retval;
+    }();
+
+    // The differentiation arguments. These are the sgp4 inputs minus tsince.
     // NOTE: if no derivatives are requested, this will remain unused.
-    const auto diff_args = std::vector(init_inputs.begin(), init_inputs.end());
+    const auto diff_args = std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1);
 
-    // Expressions for the intermediate quantities as functions of the orbital elements + bstar.
-    const auto iqs_exprs = sgp4_init();
+    // Compute the expressions for the intermediate quantities as functions of the orbital elements + bstar
+    // (remember that tsince is ignored by sgp4_init()).
+    const auto iqs_exprs = sgp4_init(sgp4_inputs);
 
-    // Begin assembling the init function's outputs with the original elements (minus n0, which is not
-    // needed in the time propagation) and bstar.
-    std::vector func_init(init_inputs.begin() + 1, init_inputs.end());
+    // Start assembling the init function's outputs. We begin with the original elements and bstar,
+    // excluding n0, which will not be needed in the time propagation.
+    // NOTE: we want to include (some of) the original sgp4 inputs in the output of the init
+    // function because like this we can directly forward the init function outputs to the
+    // time propagation function, which also needs (some of) the origina sgp4 inputs.
+    std::vector func_init(sgp4_inputs.begin() + 1, sgp4_inputs.end() - 1);
 
     // Add the iqs and their derivatives, if requested.
     std::optional<dtens> diqs;
@@ -418,9 +473,11 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 
     // Begin assembling the time propagation function and its arguments.
     std::vector<expression> func_tprop;
-    auto func_tprop_args = std::vector(init_inputs.begin() + 1, init_inputs.end());
+    auto func_tprop_args = std::vector(sgp4_inputs.begin() + 1, sgp4_inputs.end() - 1);
 
     // Variables representing the intermediate quantities.
+    // NOTE: the names here are not important, as long as they are unique
+    // and as long as they do not collide with the names used for the sgp4 inputs.
     const auto iqs_vars = make_vars("MDOT", "OMGDOT", "N0DOT", "NODCF", "C4", "C1", "T2COF", "MCOF", "ETA", "DELM0",
                                     "OMGCOF", "PERIGE", "C5", "SINM0", "D2", "D3", "D4", "T3COF", "T4COF", "T5COF",
                                     "A0DP", "AYCOF", "LCOF", "N0DP", "X3THM1", "X1MTH2", "X7THM1", "COSI0", "SINI0");
@@ -441,7 +498,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         });
 
         // Formulate the expressions for the Cartesian state in terms of the dfuns.
-        const auto cart_dfun = sgp4_time_prop(iqs_dfuns, heyoka::time);
+        const auto cart_dfun = sgp4_time_prop(sgp4_inputs, iqs_dfuns);
 
         // Compute the derivatives of cart_dfun wrt the diff arguments.
         cart_dfun_dtens.emplace(diff_tensors(cart_dfun, diff_args, kw::diff_order = order));
@@ -487,11 +544,11 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
     } else {
         // No derivatives requested, the function will contain only
         // the Cartesian state as a function of iqs_vars.
-        func_tprop = sgp4_time_prop(iqs_vars, heyoka::time);
+        func_tprop = sgp4_time_prop(sgp4_inputs, iqs_vars);
         func_tprop_args.insert(func_tprop_args.end(), iqs_vars.begin(), iqs_vars.end());
     }
 
-    return {{std::move(func_init), std::vector(init_inputs.begin(), init_inputs.end())},
+    return {{std::move(func_init), std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1)},
             {std::move(func_tprop), std::move(func_tprop_args)},
             std::move(cart_dfun_dtens)};
 }
