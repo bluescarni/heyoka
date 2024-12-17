@@ -1697,9 +1697,10 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
-    // NOTE: never enable parallel compilation on Windows due to
-    // segfaults under heavy load.
-#if !defined(_WIN32)
+    // NOTE: disable parallel compilation altogether for the time being,
+    // as of LLVM 19 it just seems to be buggy overall. Reconsider for
+    // LLVM 20.
+#if 0
 
     if (m_parjit) {
         // Set the number of compilation threads.
