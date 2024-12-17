@@ -383,9 +383,13 @@ target_compile_definitions(heyoka PRIVATE HEYOKA_BUILD_LIBRARY)
 # Define an interface target for linking to the LLVM bits.
 add_library(heyoka_llvm_internal INTERFACE)
 # Add the definitions required by LLVM.
-target_compile_definitions(heyoka_llvm_internal INTERFACE ${LLVM_DEFINITIONS})
+# NOTE: do not add them when compiling with MSVC as they are seemingly
+# wrong and ignored when strict preprocessor conformance mode is activated.
+if(NOT YACMA_COMPILER_IS_MSVC)
+    target_compile_definitions(heyoka_llvm_internal INTERFACE ${LLVM_DEFINITIONS})
+endif()
 # On MSVC, silence std::iterator warnings coming from the LLVM headers.
-if(MSVC)
+if(YACMA_COMPILER_IS_MSVC)
     target_compile_definitions(heyoka_llvm_internal INTERFACE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
