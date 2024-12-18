@@ -4,9 +4,20 @@ Changelog
 7.0.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- Add a function to determine if an SGP4 GPE is deep-space
+  (`#463 <https://github.com/bluescarni/heyoka/pull/463>`__).
+
 Changes
 ~~~~~~~
 
+- Several small tweaks to the behaviour of the SGP4 propagator:
+  non-normalised double-length Julian dates are now accepted,
+  deep-space GPEs do not result in exceptions any more, and performance
+  improvements for the ``replace_sat_data()`` function
+  (`#463 <https://github.com/bluescarni/heyoka/pull/463>`__).
 - **BREAKING**: heyoka now requires mp++ version 2
   (`#462 <https://github.com/bluescarni/heyoka/pull/462>`__).
   This is a :ref:`breaking change <bchanges_7_0_0>`.
