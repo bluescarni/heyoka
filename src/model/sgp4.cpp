@@ -604,77 +604,39 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 sgp4_propagator<T>::sgp4_propagator() noexcept = default;
 
-namespace detail
+// Detect deep-space sgp4 gpes. The units of measurement here are the
+// usual ones:
+//
+// - n0: the mean motion from the TLE (in [rad / min]),
+// - e0: the eccentricity from the TLE,
+// - i0: the inclination from the TLE (in [rad]).
+bool sgp4_is_deep_space(double n0, double e0, double i0)
 {
-
-namespace
-{
-
-template <typename T>
-void sgp4_check_input_satbuf(const std::vector<T> &sat_buffer)
-{
-    using std::abs;
     using std::cos;
     using std::pow;
     using std::sqrt;
 
-    assert(sat_buffer.size() % 9u == 0u); // LCOV_EXCL_LINE
-    const auto n_sats = sat_buffer.size() / 9u;
+    // NOTE: this chunk of code is taken from the official C++ source.
+    const auto cosio = cos(i0);
+    const auto cosio2 = cosio * cosio;
+    const auto eccsq = e0 * e0;
+    const auto omeosq = 1 - eccsq;
+    const auto rteosq = sqrt(omeosq);
+    const auto d1 = 0.75 * J2 * (3 * cosio2 - 1) / (rteosq * omeosq);
+    const auto ak = pow(KE / n0, 2. / 3);
+    auto del = d1 / (ak * ak);
+    const auto adel = ak * (1 - del * del - del * (1. / 3 + 134 * del * del / 81));
+    del = d1 / (adel * adel);
+    const auto no_unkozai = n0 / (1 + del);
 
-    // Create view for ease of indexing.
-    const typename cfunc<T>::in_2d sat_view(sat_buffer.data(), 9, boost::numeric_cast<std::size_t>(n_sats));
-
-    for (std::size_t i = 0; i < n_sats; ++i) {
-        // Check the epoch.
-        const auto epoch_hi = sat_view(7, i);
-        const auto epoch_lo = sat_view(8, i);
-
-        // NOTE: the magnitude of the high half of the epoch cannot be less than the magnitude
-        // of the low half in order to use double-length arithmetic.
-        if (!(abs(epoch_hi) >= abs(epoch_lo))) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("Invalid reference epoch detected for the satellite at index {}: the magnitude "
-                            "of the Julian date ({}) is less than the magnitude of the fractional correction ({})",
-                            i, epoch_hi, epoch_lo));
-        }
-
-        // Check that we are not in deep space.
-        // NOTE: this chunk of code is taken from the official C++ source.
-        const auto no_kozai = sat_view(0, i);
-        const auto ecco = sat_view(1, i);
-        const auto inclo = sat_view(2, i);
-        const auto cosio = cos(inclo);
-        const auto cosio2 = cosio * cosio;
-        const auto eccsq = ecco * ecco;
-        const auto omeosq = 1 - eccsq;
-        const auto rteosq = sqrt(omeosq);
-        const auto d1 = static_cast<T>(0.75) * static_cast<T>(J2) * (3 * cosio2 - 1) / (rteosq * omeosq);
-        const auto ak = pow(static_cast<T>(KE) / no_kozai, static_cast<T>(2) / 3);
-        auto del = d1 / (ak * ak);
-        const auto adel = ak * (1 - del * del - del * (static_cast<T>(1) / 3 + 134 * del * del / 81));
-        del = d1 / (adel * adel);
-        const auto no_unkozai = no_kozai / (1 + del);
-
-        if (2 * boost::math::constants::pi<T>() / no_unkozai >= 225) [[unlikely]] {
-            throw std::invalid_argument(fmt::format("The satellite at index {} has an orbital period above 225 "
-                                                    "minutes, but deep-space propagation is currently not supported",
-                                                    i));
-        }
-    }
+    return 2 * boost::math::constants::pi<double>() / no_unkozai >= 225;
 }
-
-} // namespace
-
-} // namespace detail
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, cfunc<T>, std::optional<dtens>> tup)
 {
     auto &[sat_buffer, cf_init, cf_tprop, dt] = tup;
-
-    // Check the satellite data.
-    detail::sgp4_check_input_satbuf(sat_buffer);
 
     assert(sat_buffer.size() % 9u == 0u); // LCOV_EXCL_LINE
     const auto n_sats = sat_buffer.size() / 9u;
@@ -768,48 +730,30 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
     auto &sat_buffer = m_impl->m_sat_buffer;
     auto &init_buffer = m_impl->m_init_buffer;
 
-    // Make copies of the existing data for exception safety.
-    // NOTE: the concern here is mostly about sat_buffer, since the user may be
-    // providing invalid data. However, in principle, cf_init could also throw
-    // when invoked, thus we save also init_buffer.
-    const auto old_sat_buffer = sat_buffer;
-    const auto old_init_buffer = init_buffer;
-
-    try {
-        // Write the new data into sat_buffer.
-        const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(sat_buffer.data(),
-                                                                                  new_data.extent(1));
-        for (std::size_t i = 0; i < buffer_span.extent(0); ++i) {
-            for (std::size_t j = 0; j < buffer_span.extent(1); ++j) {
-                buffer_span(i, j) = new_data(i, j);
-            }
+    // Write the new data into sat_buffer.
+    const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(sat_buffer.data(), new_data.extent(1));
+    for (std::size_t i = 0; i < buffer_span.extent(0); ++i) {
+        for (std::size_t j = 0; j < buffer_span.extent(1); ++j) {
+            buffer_span(i, j) = new_data(i, j);
         }
-
-        // Check the new data.
-        detail::sgp4_check_input_satbuf(sat_buffer);
-
-        // Fetch a reference to cf_init.
-        auto &cf_init = m_impl->m_cf_init;
-
-        // Prepare the in/out spans for the invocation of cf_init.
-        // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
-        // the epochs do not matter. Hence, 7 rows instead of 9.
-        // NOTE: static casts are ok, we already inited once during construction.
-        const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
-        const typename cfunc<T>::out_2d init_output(init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
-                                                    static_cast<std::size_t>(nsats));
-
-        // Evaluate the intermediate quantities and their derivatives.
-        cf_init(init_output, init_input);
-    } catch (...) {
-        // Restore the old data before rethrowing.
-        // NOTE: copy, don't move, as we need to make sure to never
-        // destroy/reallocate the existing buffers.
-        std::ranges::copy(old_sat_buffer, sat_buffer.begin());
-        std::ranges::copy(old_init_buffer, init_buffer.begin());
-
-        throw;
     }
+
+    // Fetch a reference to cf_init.
+    auto &cf_init = m_impl->m_cf_init;
+
+    // Prepare the in/out spans for the invocation of cf_init.
+    // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
+    // the epochs do not matter. Hence, 7 rows instead of 9.
+    // NOTE: static casts are ok, we already inited once during construction.
+    const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
+    const typename cfunc<T>::out_2d init_output(init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
+                                                static_cast<std::size_t>(nsats));
+
+    // Evaluate the intermediate quantities and their derivatives.
+    // NOTE: here is where we could potentially throw, as cf_init() may end up being
+    // parallelised which could lead in principle to exceptions being thrown by
+    // the TBB primitives.
+    cf_init(init_output, init_input);
 }
 
 template <typename T>
@@ -916,28 +860,25 @@ namespace
 template <typename SizeType, typename Dates, typename T>
 T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer, std::uint32_t n_sats)
 {
-    using std::abs;
     using dfloat = heyoka::detail::dfloat<T>;
 
-    if (!(abs(dates(i).jd) >= abs(dates(i).frac))) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("Invalid propagation date detected for the satellite at index {}: the magnitude of the Julian "
-                        "date ({}) is less than the magnitude of the fractional correction ({})",
-                        i, dates(i).jd, dates(i).frac));
-    }
-
     // Normalise the propagation date into a double-length number.
-    const auto date = normalise(dfloat(dates(i).jd, dates(i).frac));
+    // NOTE: we use Knuth's EFT here in order to ensure correctness
+    // even if the fractional part of the date is greater in magnitude
+    // than the main part.
+    const auto norm_prop_date = heyoka::detail::eft_add_knuth(dates(i).jd, dates(i).frac);
+    const auto date = dfloat(norm_prop_date.first, norm_prop_date.second);
 
     // Load the reference epoch for the i-th satellite.
     const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
     const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
 
-    // NOTE: this has been checked during construction.
-    assert(abs(epoch_hi) >= abs(epoch_lo)); // LCOV_EXCL_LINE
-
     // Normalise it into a double-length number.
-    const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));
+    // NOTE: we use Knuth's EFT here in order to ensure correctness
+    // even if the fractional part of the epoch is greater in magnitude
+    // than the main part.
+    const auto norm_epoch = heyoka::detail::eft_add_knuth(epoch_hi, epoch_lo);
+    const auto epoch = dfloat(norm_epoch.first, norm_epoch.second);
 
     // Compute the time delta in double-length arithmetic, truncate to a single-length
     // number and convert to minutes.
