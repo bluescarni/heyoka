@@ -7,12 +7,15 @@ Changelog
 New
 ~~~
 
-- Add a function to determine if an SGP4 GPE is deep-space
+- Add a function to determine if a GPE is deep-space
   (`#463 <https://github.com/bluescarni/heyoka/pull/463>`__).
 
 Changes
 ~~~~~~~
 
+- The parallel compilation feature has been temporarily disabled
+  due to several LLVM bugs
+  (`#463 <https://github.com/bluescarni/heyoka/pull/463>`__).
 - Several small tweaks to the behaviour of the SGP4 propagator:
   non-normalised double-length Julian dates are now accepted,
   deep-space GPEs do not result in exceptions any more, and performance
