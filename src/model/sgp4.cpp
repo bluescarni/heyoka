@@ -610,7 +610,7 @@ sgp4_propagator<T>::sgp4_propagator() noexcept = default;
 // - n0: the mean motion from the TLE (in [rad / min]),
 // - e0: the eccentricity from the TLE,
 // - i0: the inclination from the TLE (in [rad]).
-bool sgp4_is_deep_space(double n0, double e0, double i0)
+bool gpe_is_deep_space(double n0, double e0, double i0)
 {
     using std::cos;
     using std::pow;

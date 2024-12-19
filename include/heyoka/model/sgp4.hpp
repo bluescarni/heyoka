@@ -41,7 +41,7 @@ namespace model
 
 HEYOKA_DLL_PUBLIC std::vector<expression> sgp4(const std::vector<expression> & = {});
 
-HEYOKA_DLL_PUBLIC bool sgp4_is_deep_space(double, double, double);
+HEYOKA_DLL_PUBLIC bool gpe_is_deep_space(double, double, double);
 
 namespace detail
 {

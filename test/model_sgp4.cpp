@@ -818,6 +818,6 @@ TEST_CASE("replace_sat_data")
 
 TEST_CASE("deep space detection")
 {
-    REQUIRE(model::sgp4_is_deep_space(revday2radmin(6.), 0.0024963, deg2rad(90.2039)));
-    REQUIRE(!model::sgp4_is_deep_space(revday2radmin(13.75091047972192), 0.0024963, deg2rad(90.2039)));
+    REQUIRE(model::gpe_is_deep_space(revday2radmin(6.), 0.0024963, deg2rad(90.2039)));
+    REQUIRE(!model::gpe_is_deep_space(revday2radmin(13.75091047972192), 0.0024963, deg2rad(90.2039)));
 }
