@@ -19,6 +19,7 @@
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/model/sgp4.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -33,9 +34,12 @@ const auto deg2rad = [](auto x) { return x * 2. * boost::math::constants::pi<dou
 
 TEST_CASE("model expression")
 {
+    using namespace heyoka::literals;
+    using Catch::Matchers::Message;
+
     detail::edb_disabler ed;
 
-    const auto outputs = model::sgp4();
+    auto outputs = model::sgp4();
     const auto inputs = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
 
     auto sgp4_cf = cfunc<double>(outputs, inputs);
@@ -127,6 +131,38 @@ TEST_CASE("model expression")
         REQUIRE(outs[5] == approximately(5.588906721377138, 10000.));
         REQUIRE(outs[6] == 0.);
     }
+
+    // Test also non-default expressions for the sgp4 inputs.
+    outputs = model::sgp4({"a"_var, "b"_var, "c"_var, "d"_var, "e"_var, "f"_var, par[0], heyoka::time});
+    const auto inputs2 = make_vars("a", "b", "c", "d", "e", "f");
+
+    sgp4_cf = cfunc<double>(outputs, inputs2);
+
+    {
+        std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                   0.0024963,
+                                   deg2rad(90.2039),
+                                   deg2rad(55.5633),
+                                   deg2rad(320.5956),
+                                   deg2rad(91.4738)},
+                            pars = {0.75863e-3}, outs(7u);
+        double time = 1440.;
+
+        sgp4_cf(outs, ins, kw::pars = pars, kw::time = time);
+
+        REQUIRE(outs[0] == approximately(3134.2015620939, 10000.));
+        REQUIRE(outs[1] == approximately(4604.963663328277, 10000.));
+        REQUIRE(outs[2] == approximately(-4791.661126560278, 10000.));
+        REQUIRE(outs[3] == approximately(2.732034613044249, 10000.));
+        REQUIRE(outs[4] == approximately(3.952589777415254, 10000.));
+        REQUIRE(outs[5] == approximately(5.588906721377138, 10000.));
+        REQUIRE(outs[6] == 0.);
+    }
+
+    // Error checking.
+    REQUIRE_THROWS_MATCHES(model::sgp4({"a"_var, "b"_var, "c"_var, "d"_var}), std::invalid_argument,
+                           Message("Invalid number of inputs passed to the sgp4() function: 8 "
+                                   "expressions are expected but 4 were provided instead"));
 }
 
 TEST_CASE("propagator basics")
@@ -402,7 +438,6 @@ TEST_CASE("error handling")
     REQUIRE_THROWS_MATCHES((prop_t{md_input_t{input.data(), 0}}), std::invalid_argument,
                            Message("Cannot initialise an sgp4_propagator with an empty list of satellites"));
 
-    // Invalid jd+frac for the epochs.
     std::vector<double> ins = {revday2radmin(13.75091047972192),
                                revday2radmin(15.50103472202482),
                                0.0024963,
@@ -418,46 +453,16 @@ TEST_CASE("error handling")
                                0.75863e-3,
                                .38792e-4,
                                2460486.5,
-                               0.,
+                               2458826.5,
                                0.6478633000000116,
-                               1.};
-
-    REQUIRE_THROWS_MATCHES(
-        (prop_t{md_input_t{ins.data(), 2}}), std::invalid_argument,
-        Message("Invalid reference epoch detected for the satellite at index 1: the magnitude "
-                "of the Julian date (0) is less than the magnitude of the fractional correction (1)"));
-
-    ins = std::vector{revday2radmin(13.75091047972192),
-                      revday2radmin(15.50103472202482),
-                      0.0024963,
-                      0.0007417,
-                      deg2rad(90.2039),
-                      deg2rad(51.6439),
-                      deg2rad(55.5633),
-                      deg2rad(211.2001),
-                      deg2rad(320.5956),
-                      deg2rad(17.6667),
-                      deg2rad(91.4738),
-                      deg2rad(85.6398),
-                      0.75863e-3,
-                      .38792e-4,
-                      2460486.5,
-                      2458826.5,
-                      0.6478633000000116,
-                      0.6933954099999937};
+                               0.6933954099999937};
 
     prop_t prop{md_input_t{ins.data(), 2}};
 
     auto dates = std::array<prop_t::date, 2>{{{2460486.5 + 1, 0.6478633000000116}, {0., 1.}}};
-    prop_t::in_1d<prop_t::date> date_in{dates.data(), 2};
 
     std::vector<double> outs(12u);
     prop_t::out_2d out{outs.data(), 7, 2};
-
-    REQUIRE_THROWS_MATCHES(
-        prop(out, date_in), std::invalid_argument,
-        Message("Invalid propagation date detected for the satellite at index 1: the magnitude of the Julian "
-                "date (0) is less than the magnitude of the fractional correction (1)"));
 
     prop_t::in_1d<prop_t::date> date_in2{dates.data(), 1};
 
@@ -487,13 +492,6 @@ TEST_CASE("error handling")
         prop(out_batch, date_b), std::invalid_argument,
         Message("Invalid array of dates passed to the batch-mode call operator of an sgp4_propagator: the number of "
                 "satellites is 2, while the number of dates is per evaluation is 1"));
-
-    // Deep space satellite.
-    ins[1] = revday2radmin(6.);
-
-    REQUIRE_THROWS_MATCHES((prop_t{md_input_t{ins.data(), 2}}), std::invalid_argument,
-                           Message("The satellite at index 1 has an orbital period above 225 "
-                                   "minutes, but deep-space propagation is currently not supported"));
 
     // Check that requesting diff information throws on a propagator
     // which was constructed without derivatives.
@@ -810,23 +808,16 @@ TEST_CASE("replace_sat_data")
         REQUIRE(orig_out == outs);
     }
 
-    // Check with bad data.
-    ins2[1] = revday2radmin(3);
-
-    REQUIRE_THROWS_MATCHES(prop.replace_sat_data(md_input_t{ins2.data(), 2}), std::invalid_argument,
-                           Message("The satellite at index 1 has an orbital period above 225 minutes, but deep-"
-                                   "space propagation is currently not supported"));
-
-    // Check that the original data was restored after the exception was thrown.
-    REQUIRE(std::vector(prop.get_sat_data().data_handle(), prop.get_sat_data().data_handle() + 18)
-            == std::vector(prop2.get_sat_data().data_handle(), prop2.get_sat_data().data_handle() + 18));
-
-    prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), 2});
-
     REQUIRE(orig_out == outs);
 
     // Error throwing.
     REQUIRE_THROWS_MATCHES((prop.replace_sat_data(md_input_t{ins2.data(), 1})), std::invalid_argument,
                            Message("Invalid array provided to replace_sat_data(): the number of "
                                    "columns (1) does not match the number of satellites (2)"));
+}
+
+TEST_CASE("deep space detection")
+{
+    REQUIRE(model::gpe_is_deep_space(revday2radmin(6.), 0.0024963, deg2rad(90.2039)));
+    REQUIRE(!model::gpe_is_deep_space(revday2radmin(13.75091047972192), 0.0024963, deg2rad(90.2039)));
 }

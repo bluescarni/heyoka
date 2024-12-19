@@ -39,7 +39,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-HEYOKA_DLL_PUBLIC std::vector<expression> sgp4();
+HEYOKA_DLL_PUBLIC std::vector<expression> sgp4(const std::vector<expression> & = {});
+
+HEYOKA_DLL_PUBLIC bool gpe_is_deep_space(double, double, double);
 
 namespace detail
 {
@@ -166,6 +168,14 @@ public:
     [[nodiscard]] std::uint32_t get_nouts() const noexcept;
     [[nodiscard]] mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> get_sat_data() const;
 
+    // NOTE: it is important to document the weak exception safety guarantee here:
+    // in the (very unlikely) case that invoking the init cfunc throws (due to TBB primitives
+    // failing), we may end up with inconsistent data in the propagator that will lead to
+    // wrong results for successive invocations of the call operator. I think this is an ok
+    // compromise for the sake of performance: providing strong exception safety is trivial if
+    // we make temp copy of the internal data, but that means allocating. If this becomes
+    // a problem, we may think of a more complicated scheme involving internal temp buffers
+    // in order to provide better exception safety.
     void replace_sat_data(mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>);
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
