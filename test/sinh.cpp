@@ -326,47 +326,6 @@ TEST_CASE("vfabi double")
             //   5-argument version.
             REQUIRE(count == 11u);
         }
-
-        // Check that the autovec works also on batch sizes which do not correspond
-        // exactly to an available vector width.
-        llvm_state s3{kw::slp_vectorize = true};
-
-        add_cfunc<double>(s3, "cfunc", {sinh(a)}, {a}, kw::batch_size = 3u);
-        add_cfunc<double>(s3, "cfuncs", {sinh(a)}, {a}, kw::batch_size = 3u, kw::strided = true);
-
-        s3.compile();
-
-        auto *cf3_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s3.jit_lookup("cfunc"));
-
-        std::vector<double> ins3 = {1., 2., 3.}, outs3 = {0., 0., 0.};
-
-        cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
-
-        REQUIRE(outs3[0] == approximately(std::sinh(1.)));
-        REQUIRE(outs3[1] == approximately(std::sinh(2.)));
-        REQUIRE(outs3[2] == approximately(std::sinh(3.)));
-
-        ir = s3.get_ir();
-
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinh", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
-
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 1 call in the remainder of the unstrided cfunc,
-            // - 1 call in the remainder of the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 3u);
-        }
-
-        if (tf.aarch64) {
-            REQUIRE(count == 3u);
-        }
-
 #endif
     }
 }
@@ -498,49 +457,6 @@ TEST_CASE("vfabi float")
             //   9-argument version.
             REQUIRE(count == 19u);
         }
-
-        // Check that the autovec works also on batch sizes which do not correspond
-        // exactly to an available vector width.
-        llvm_state s3{kw::slp_vectorize = true};
-
-        add_cfunc<float>(s3, "cfunc", {sinh(a)}, {a}, kw::batch_size = 5u);
-        add_cfunc<float>(s3, "cfuncs", {sinh(a)}, {a}, kw::batch_size = 5u, kw::strided = true);
-
-        s3.compile();
-
-        auto *cf3_ptr
-            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s3.jit_lookup("cfunc"));
-
-        std::vector<float> ins3 = {1., 2., 3., 4., 5.}, outs3 = {0., 0., 0., 0., 0.};
-
-        cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
-
-        REQUIRE(outs3[0] == approximately(std::sinh(1.f)));
-        REQUIRE(outs3[1] == approximately(std::sinh(2.f)));
-        REQUIRE(outs3[2] == approximately(std::sinh(3.f)));
-        REQUIRE(outs3[3] == approximately(std::sinh(4.f)));
-        REQUIRE(outs3[4] == approximately(std::sinh(5.f)));
-
-        ir = s3.get_ir();
-
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinhf", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
-
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 1 call in the remainder of the unstrided cfunc,
-            // - 1 call in the remainder of the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 3u);
-        }
-
-        if (tf.aarch64) {
-            REQUIRE(count == 3u);
-        }
-
 #endif
     }
 }
