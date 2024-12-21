@@ -172,7 +172,7 @@ target_features get_target_features_impl()
     // Fetch the target name.
     const auto target_name = std::string{(*tm)->getTarget().getName()};
 
-    // Flag to establish if we are on a Zen>=4 CPU.
+    // Flag to signal if we are on a Zen>=4 CPU.
     bool zen4_or_later = false;
 
     if (boost::starts_with(target_name, "x86")) {
@@ -202,7 +202,7 @@ target_features get_target_features_impl()
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "znverN".
                 std::uint32_t zen_version{};
-                auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
+                const auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
 
                 if (ret.ec == std::errc{} && zen_version >= 4u) {
                     zen4_or_later = true;
@@ -227,7 +227,7 @@ target_features get_target_features_impl()
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
                 std::uint32_t pwr_idx{};
-                auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
+                const auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
 
                 // NOTE: it looks like VSX3 is supported from Power9,
                 // VSX from Power7.
@@ -441,7 +441,7 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
     // AVX512 setup.
     const auto &tf = get_target_features();
     if (tf.avx512f) {
-        // NOTE: we enable 512-bit vector if either forced by the
+        // NOTE: we enable 512-bit vectors if either forced by the
         // user or if simd_size_dbl is 8 (which means that 512-bit vectors
         // are a performance win).
         if (force_avx512 || tf.simd_size_dbl == 8u) {
@@ -450,8 +450,8 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
             }
         }
 
-        // NOTE: explicitly disable scatter/gather as they can currently
-        // result in slowdowns:
+        // NOTE: explicitly disable scatter/gather when auto-vectorising
+        // as they can currently result in slowdowns:
         //
         // https://github.com/llvm/llvm-project/issues/91370
         for (auto &f : M) {

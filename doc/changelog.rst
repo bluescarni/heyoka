@@ -13,6 +13,8 @@ New
 Changes
 ~~~~~~~
 
+- Enable the use of 512-bit vectors on Zen>=4 cpus
+  (`#464 <https://github.com/bluescarni/heyoka/pull/464>`__).
 - Improve support for non-standard SIMD sizes in vector functions
   (`#464 <https://github.com/bluescarni/heyoka/pull/464>`__).
 - The parallel compilation feature has been temporarily disabled
