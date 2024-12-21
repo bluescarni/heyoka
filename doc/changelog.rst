@@ -13,6 +13,8 @@ New
 Changes
 ~~~~~~~
 
+- Improve support for non-standard SIMD sizes in vector functions
+  (`#464 <https://github.com/bluescarni/heyoka/pull/464>`__).
 - The parallel compilation feature has been temporarily disabled
   due to several LLVM bugs
   (`#463 <https://github.com/bluescarni/heyoka/pull/463>`__).
