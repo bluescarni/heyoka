@@ -460,3 +460,38 @@ TEST_CASE("vfabi float")
 #endif
     }
 }
+
+// This is a test to check the machinery to invoke vector functions
+// on vectors with nonstandard SIMD sizes.
+TEST_CASE("nonstandard batch sizes")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = sinh(x) + cosh(x);
+
+    std::vector<double> in, out;
+
+    for (auto batch_size : {3u, 17u, 20u, 23u}) {
+        for (auto cm : {false, true}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                add_cfunc<double>(s, "cf", {ex}, {x, y}, kw::batch_size = batch_size, kw::compact_mode = cm);
+
+                s.compile();
+
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                    s.jit_lookup("cf"));
+
+                in.resize(2u * batch_size, .3);
+                out.clear();
+                out.resize(batch_size);
+
+                cf_ptr(out.data(), in.data(), nullptr, nullptr);
+
+                std::ranges::for_each(out,
+                                      [](auto val) { REQUIRE(val == approximately(std::sinh(.3) + std::cosh(.3))); });
+            }
+        }
+    }
+}
