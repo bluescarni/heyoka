@@ -549,56 +549,6 @@ llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vecto
         vfi);
 }
 
-llvm::Value *llvm_shuffle_vector(llvm_state &s, llvm::Value *vec, const std::vector<int> &mask)
-{
-#if defined(HEYOKA_ARCH_PPC)
-
-    auto &bld = s.builder();
-
-    const auto out_vec_size = boost::numeric_cast<std::uint32_t>(mask.size());
-
-    auto vec_t = make_vector_type(vec->getType()->getScalarType(), out_vec_size);
-    llvm::Value *ret = llvm::UndefValue::get(vec_t);
-
-    for (std::uint32_t i = 0; i < out_vec_size; ++i) {
-        auto *tmp = bld.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(mask[i]));
-        ret = bld.CreateInsertElement(ret, tmp, i);
-    }
-
-    return ret;
-
-#else
-    return s.builder().CreateShuffleVector(vec, mask);
-#endif
-}
-
-llvm::Value *llvm_concatenate_vectors(llvm_state &s, const std::vector<llvm::Value *> &vecs)
-{
-#if defined(HEYOKA_ARCH_PPC)
-
-    auto &bld = s.builder();
-
-    const auto in_vec_size = get_vector_size(vecs[0]);
-    const auto out_vec_size = boost::safe_numerics::safe<std::uint32_t>(vecs.size()) * in_vec_size;
-
-    auto out_vec_t = make_vector_type(vecs[0]->getType()->getScalarType(), out_vec_size);
-    llvm::Value *ret = llvm::UndefValue::get(out_vec_t);
-
-    std::uint32_t i = 0;
-    for (auto *vec : vecs) {
-        for (std::uint32_t j = 0; j < in_vec_size; ++j) {
-            auto *tmp = bld.CreateExtractElement(vec, j);
-            ret = bld.CreateInsertElement(ret, tmp, i++);
-        }
-    }
-
-    return ret;
-
-#else
-    return llvm::concatenateVectors(s.builder(), vecs);
-#endif
-}
-
 // Helper to invoke an external vector function with arguments args, automatically handling
 // mismatches between the width of the vector function and the width of the arguments.
 //
@@ -694,7 +644,7 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
             // Build the vector of arguments.
             vec_args.clear();
             for (std::size_t arg_idx = 0; arg_idx < nargs; ++arg_idx) {
-                vec_args.push_back(llvm_shuffle_vector(s, orig_args[arg_idx], mask));
+                vec_args.push_back(bld.CreateShuffleVector(orig_args[arg_idx], mask));
             }
 
             // Invoke the vector implementation and add the result to vec_results.
@@ -702,14 +652,14 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
         }
 
         // Reassemble vec_results into a large vector.
-        auto *ret = llvm_concatenate_vectors(s, vec_results);
+        auto *ret = llvm::concatenateVectors(bld, vec_results);
 
         // We need one last shuffle to trim the padded values at the end of ret (if any).
         mask.clear();
         for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
             mask.push_back(boost::numeric_cast<int>(idx));
         }
-        return llvm_shuffle_vector(s, ret, mask);
+        return bld.CreateShuffleVector(ret, mask);
     } else if (vfi_it->width == vector_width) {
         // We have a vector implementation with exactly the correct width. Use it.
         assert(vfi_it->nargs == nargs);
@@ -748,7 +698,7 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
         std::vector<llvm::Value *> vec_args;
         vec_args.reserve(nargs);
         for (std::size_t arg_idx = 0; arg_idx < nargs; ++arg_idx) {
-            vec_args.push_back(llvm_shuffle_vector(s, orig_args[arg_idx], mask));
+            vec_args.push_back(bld.CreateShuffleVector(orig_args[arg_idx], mask));
         }
 
         // Invoke the vector implementation.
@@ -756,7 +706,7 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
 
         // We need one last shuffle to trim the padded values at the end of ret.
         mask.resize(vector_width);
-        return llvm_shuffle_vector(s, ret, mask);
+        return bld.CreateShuffleVector(ret, mask);
     }
 }
 
