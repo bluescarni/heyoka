@@ -153,18 +153,14 @@ const std::regex zen_regex_pattern("znver([1-9]*)");
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
-    // LCOV_EXCL_START
     if (!jtmb) [[unlikely]] {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
-    // LCOV_EXCL_STOP
 
     auto tm = jtmb->createTargetMachine();
-    // LCOV_EXCL_START
     if (!tm) [[unlikely]] {
         throw std::invalid_argument("Error creating the target machine");
     }
-    // LCOV_EXCL_STOP
 
     // Init the return value.
     target_features retval;
