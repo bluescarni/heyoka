@@ -37,6 +37,7 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
+#include <llvm/Analysis/VectorUtils.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -548,6 +549,167 @@ llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vecto
         vfi);
 }
 
+// Helper to invoke an external vector function with arguments args, automatically handling
+// mismatches between the width of the vector function and the width of the arguments.
+//
+// vfi is a vector of vf_info instances listing the available implementations of the vector function
+// (each one supporting a different vector width). attrs is the set of attributes to attach to the
+// invocation(s) of the vector function.
+//
+// This function has several preconditions:
+//
+// - there must be at least 1 arg,
+// - vfi cannot be empty,
+// - all args must be vectors of the same type with a size greater than 1.
+llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto &attrs, auto *...args)
+{
+    constexpr auto nargs = sizeof...(args);
+    static_assert(nargs > 0u);
+    static_assert((std::same_as<llvm::Value *, decltype(args)> && ...));
+
+    assert(((args != nullptr) && ...));
+    assert(!vfi.empty());
+
+    // Build an array with the original arguments.
+    const std::array orig_args{args...};
+
+    // Check that all arguments have the same type.
+    auto *x_t = orig_args[0]->getType();
+    assert(((args->getType() == x_t) && ...));
+
+    // Ensure that the arguments are vectors.
+    auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t);
+    assert(vec_t != nullptr);
+
+    // Fetch the vector width.
+    const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    assert(vector_width > 1u);
+
+    // Fetch the builder.
+    auto &bld = s.builder();
+
+    // Can we use the faster but less precise vectorised implementations?
+    const auto use_fast_math = bld.getFastMathFlags().approxFunc();
+
+    // Lookup a vector implementation with width *greater than or equal to* vector_width.
+    auto vfi_it = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
+                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
+
+    if (vfi_it == vfi.end()) {
+        // All vector implementations have a SIMD width *less than* vector_width. We will need
+        // to decompose the vector arguments into smaller vectors, perform the calculations
+        // on the smaller vectors, and reassemble the results into a single large vector.
+
+        // Step back to the widest available vector implementation and fetch its width.
+        --vfi_it;
+        const auto available_vector_width = vfi_it->width;
+        assert(available_vector_width > 0u);
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector type matching the chosen implementation.
+        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
+
+        // Fetch the vector function name (either the low-precision or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Compute the number of chunks into which the original vector arguments will be split.
+        const auto n_chunks = vector_width / available_vector_width
+                              + static_cast<std::uint32_t>(vector_width % available_vector_width != 0u);
+
+        // Prepare the vector of results of the invocations of the vector implementations.
+        std::vector<llvm::Value *> vec_results;
+        vec_results.reserve(n_chunks);
+
+        // Prepare the vector of arguments for the invocations of the vector implementations.
+        std::vector<llvm::Value *> vec_args;
+        vec_args.reserve(nargs);
+
+        // Prepare the mask vector.
+        std::vector<int> mask;
+        mask.reserve(vector_width);
+
+        for (std::uint32_t i = 0; i < n_chunks; ++i) {
+            // Construct the mask vector for the current iteration.
+            mask.clear();
+            const auto chunk_begin = i * available_vector_width;
+            // NOTE: special case for the last iteration.
+            const auto chunk_end = (i == n_chunks - 1u) ? vector_width : (chunk_begin + available_vector_width);
+            for (auto idx = chunk_begin; idx != chunk_end; ++idx) {
+                mask.push_back(boost::numeric_cast<int>(idx));
+            }
+            // Pad the mask if needed (this will happen only at the last iteration).
+            // NOTE: the pad value is the last value in the original (large) vector.
+            mask.insert(mask.end(), available_vector_width - mask.size(), boost::numeric_cast<int>(vector_width - 1u));
+
+            // Build the vector of arguments.
+            vec_args.clear();
+            for (std::size_t arg_idx = 0; arg_idx < nargs; ++arg_idx) {
+                vec_args.push_back(bld.CreateShuffleVector(orig_args[arg_idx], mask));
+            }
+
+            // Invoke the vector implementation and add the result to vec_results.
+            vec_results.push_back(llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs));
+        }
+
+        // Reassemble vec_results into a large vector.
+        auto *ret = llvm::concatenateVectors(bld, vec_results);
+
+        // We need one last shuffle to trim the padded values at the end of ret (if any).
+        mask.clear();
+        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
+            mask.push_back(boost::numeric_cast<int>(idx));
+        }
+        return bld.CreateShuffleVector(ret, mask);
+    } else if (vfi_it->width == vector_width) {
+        // We have a vector implementation with exactly the correct width. Use it.
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector function name (either the low-precision
+        // or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Invoke it.
+        return llvm_invoke_external(s, vf_name, vec_t, {args...}, attrs);
+    } else {
+        // We have a vector implemention with SIMD width *greater than* vector_width. We need
+        // to pad the input arguments, invoke the SIMD implementation, trim the result and return.
+
+        // Fetch the width of the vector implementation.
+        const auto available_vector_width = vfi_it->width;
+        assert(available_vector_width > 0u);
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector type matching the chosen implementation.
+        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
+
+        // Fetch the vector function name (either the low-precision or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Prepare the mask vector.
+        std::vector<int> mask;
+        mask.reserve(available_vector_width);
+        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
+            mask.push_back(boost::numeric_cast<int>(idx));
+        }
+        // Pad the mask with the last value in the original vector.
+        mask.insert(mask.end(), available_vector_width - vector_width, boost::numeric_cast<int>(vector_width - 1u));
+
+        // Prepare the vector of arguments for the invocation of the vector implementation.
+        std::vector<llvm::Value *> vec_args;
+        vec_args.reserve(nargs);
+        for (std::size_t arg_idx = 0; arg_idx < nargs; ++arg_idx) {
+            vec_args.push_back(bld.CreateShuffleVector(orig_args[arg_idx], mask));
+        }
+
+        // Invoke the vector implementation.
+        auto *ret = llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs);
+
+        // We need one last shuffle to trim the padded values at the end of ret.
+        mask.resize(vector_width);
+        return bld.CreateShuffleVector(ret, mask);
+    }
+}
+
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
 // intr_name is the name of the intrinsic (without type information),
 // f128/real_name are the names of the functions to be used for the
@@ -584,9 +746,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     auto &builder = s.builder();
 
-    // Can we use the faster but less precise vectorised implementations?
-    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
-
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
 
@@ -598,48 +757,23 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
 
         if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
-            // The inputs are vectors. Check if we have a vector implementation
-            // with the correct vector width in vfi.
+            // The inputs are vectors. Fetch their SIMD width.
             const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-            const auto vfi_it
-                = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
-                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
 
-            if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
-                // A vector implementation with precisely the correct width is available, use it.
-                assert(vfi_it->nargs == nargs);
-
-                // Fetch the vector function name (either the low-precision
-                // or standard version).
-                const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
-
-                // NOTE: make sure to use the same attributes as the scalar intrinsic for the vector
-                // call. This ensures that the vector variant is declared with the same attributes as those that would
-                // be declared by invoking llvm_add_vfabi_attrs() on the scalar invocation.
-                return llvm_invoke_external(s, vf_name, vec_t, {args...}, s_intr->getAttributes());
+            if (vector_width == 1u || vfi.empty()) {
+                // If the vector width is 1, or we do not have any vector implementation available,
+                // we let LLVM handle it.
+                return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
+            } else {
+                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                return llvm_invoke_vector_impl(s, vfi, s_intr->getAttributes(), args...);
             }
-
-            if (!vfi.empty()) {
-                // We have *some* vector implementations available (albeit not with the correct
-                // size). Decompose into scalar calls adding the vfabi info to let the LLVM auto-vectorizer do its
-                // thing.
-                return llvm_scalarise_vector_call(
-                    s, {args...},
-                    [&builder, s_intr](const std::vector<llvm::Value *> &scal_args) {
-                        return builder.CreateCall(s_intr, scal_args);
-                    },
-                    vfi);
-            }
-
-            // No vector implementation available, just let LLVM handle it.
-            // NOTE: this will lookup and invoke an intrinsic for vector arguments.
-            return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
+        } else {
+            // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
+            // variants if available.
+            auto *ret = builder.CreateCall(s_intr, {args...});
+            return llvm_add_vfabi_attrs(s, ret, vfi);
         }
-
-        // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
-        // variants if available.
-        auto *ret = builder.CreateCall(s_intr, {args...});
-        return llvm_add_vfabi_attrs(s, ret, vfi);
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -730,9 +864,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
 
     auto &builder = s.builder();
 
-    // Can we use the faster but less precise vectorised implementations?
-    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
-
     // Determine the type and scalar type of the arguments.
     auto *x_t = arg_types[0];
     auto *scal_t = x_t->getScalarType();
@@ -752,35 +883,23 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
         const auto attrs = llvm_ext_math_func_attrs(s);
 
         if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
-            // The inputs are vectors. Check if we have a vector implementation
-            // with the correct vector width in vfi.
+            // The inputs are vectors. Fetch their SIMD width.
             const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-            const auto vfi_it
-                = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
-                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
 
-            if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
-                // A vector implementation with precisely the correct width is available, use it.
-                assert(vfi_it->nargs == nargs);
-
-                // Fetch the vector function name (either the low-precision
-                // or standard version).
-                const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
-
-                return llvm_invoke_external(s, vf_name, vec_t, {args...}, attrs);
+            if (vector_width == 1u || vfi.empty()) {
+                // If the vector width is 1, or we do not have any vector implementation available,
+                // we scalarise the function call.
+                return llvm_scalarise_ext_math_vector_call(s, {args...}, scal_name, vfi, attrs);
+            } else {
+                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                return llvm_invoke_vector_impl(s, vfi, attrs, args...);
             }
-
-            // A vector implementation with the correct width is **not** available: scalarise the
-            // vector call.
-            // NOTE: if there are other vector implementations available, these will be made available
-            // to the autovectorizer via the info contained in vfi.
-            return llvm_scalarise_ext_math_vector_call(s, {args...}, scal_name, vfi, attrs);
+        } else {
+            // The input is **not** a vector. Invoke the scalar function attaching vector
+            // variants if available.
+            auto *ret = llvm_invoke_external(s, scal_name, scal_t, {args...}, attrs);
+            return llvm_add_vfabi_attrs(s, ret, vfi);
         }
-
-        // The input is **not** a vector. Invoke the scalar function attaching vector
-        // variants if available.
-        auto *ret = llvm_invoke_external(s, scal_name, scal_t, {args...}, attrs);
-        return llvm_add_vfabi_attrs(s, ret, vfi);
     }
 
 #if defined(HEYOKA_HAVE_REAL)

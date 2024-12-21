@@ -339,50 +339,6 @@ TEST_CASE("vfabi double")
             REQUIRE(count == 11u);
         }
 
-        // Check that the autovec works also on batch sizes which do not correspond
-        // exactly to an available vector width.
-        llvm_state s3{kw::slp_vectorize = true};
-
-        add_cfunc<double>(s3, "cfunc", {sin(a)}, {a}, kw::batch_size = 3u);
-        add_cfunc<double>(s3, "cfuncs", {sin(a)}, {a}, kw::batch_size = 3u, kw::strided = true);
-
-        s3.compile();
-
-        auto *cf3_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s3.jit_lookup("cfunc"));
-
-        std::vector<double> ins3 = {1., 2., 3.}, outs3 = {0., 0., 0.};
-
-        cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
-
-        REQUIRE(outs3[0] == approximately(std::sin(1.)));
-        REQUIRE(outs3[1] == approximately(std::sin(2.)));
-        REQUIRE(outs3[2] == approximately(std::sin(3.)));
-
-        ir = s3.get_ir();
-
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
-
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 1 call in the remainder of the unstrided cfunc,
-            // - 1 call in the remainder of the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 3u);
-        }
-
-#if LLVM_VERSION_MAJOR >= 16
-
-        if (tf.aarch64) {
-            REQUIRE(count == 3u);
-        }
-
-#endif
-
 #endif
     }
 }
@@ -516,52 +472,41 @@ TEST_CASE("vfabi float")
             REQUIRE(count == 19u);
         }
 
-        // Check that the autovec works also on batch sizes which do not correspond
-        // exactly to an available vector width.
-        llvm_state s3{kw::slp_vectorize = true};
-
-        add_cfunc<float>(s3, "cfunc", {sin(a)}, {a}, kw::batch_size = 5u);
-        add_cfunc<float>(s3, "cfuncs", {sin(a)}, {a}, kw::strided = true, kw::batch_size = 5u);
-
-        s3.compile();
-
-        auto *cf3_ptr
-            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s3.jit_lookup("cfunc"));
-
-        std::vector<float> ins3 = {1., 2., 3., 4., 5.}, outs3 = {0., 0., 0., 0., 0.};
-
-        cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
-
-        REQUIRE(outs3[0] == approximately(std::sin(1.f)));
-        REQUIRE(outs3[1] == approximately(std::sin(2.f)));
-        REQUIRE(outs3[2] == approximately(std::sin(3.f)));
-        REQUIRE(outs3[3] == approximately(std::sin(4.f)));
-        REQUIRE(outs3[4] == approximately(std::sin(5.f)));
-
-        ir = s3.get_ir();
-
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f32", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
-
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 1 call in the remainder of the unstrided cfunc,
-            // - 1 call in the remainder of the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 3u);
-        }
-
-#if LLVM_VERSION_MAJOR >= 16
-
-        if (tf.aarch64) {
-            REQUIRE(count == 3u);
-        }
-
 #endif
+    }
+}
 
-#endif
+// This is a test to check the machinery to invoke vector functions
+// on vectors with nonstandard SIMD sizes.
+TEST_CASE("nonstandard batch sizes")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = sin(x) + cos(x);
+
+    std::vector<double> in, out;
+
+    for (auto batch_size : {3u, 17u, 20u, 23u}) {
+        for (auto cm : {false, true}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                add_cfunc<double>(s, "cf", {ex}, {x, y}, kw::batch_size = batch_size, kw::compact_mode = cm);
+
+                s.compile();
+
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                    s.jit_lookup("cf"));
+
+                in.resize(2u * batch_size, .3);
+                out.clear();
+                out.resize(batch_size);
+
+                cf_ptr(out.data(), in.data(), nullptr, nullptr);
+
+                std::ranges::for_each(out,
+                                      [](auto val) { REQUIRE(val == approximately(std::sin(.3) + std::cos(.3))); });
+            }
+        }
     }
 }
