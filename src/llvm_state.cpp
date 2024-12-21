@@ -144,23 +144,36 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // NOLINTNEXTLINE(cert-err58-cpp)
 const std::regex ppc_regex_pattern("pwr([1-9]*)");
 
+// Regex to check for AMD Zen processors.
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::regex zen_regex_pattern("znver([1-9]*)");
+
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+    // LCOV_EXCL_START
     if (!jtmb) [[unlikely]] {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
+    // LCOV_EXCL_STOP
 
     auto tm = jtmb->createTargetMachine();
+    // LCOV_EXCL_START
     if (!tm) [[unlikely]] {
         throw std::invalid_argument("Error creating the target machine");
     }
+    // LCOV_EXCL_STOP
 
+    // Init the return value.
     target_features retval;
 
+    // Fetch the target name.
     const auto target_name = std::string{(*tm)->getTarget().getName()};
+
+    // Flag to establish if we are on a Zen>=4 CPU.
+    bool zen4_or_later = false;
 
     if (boost::starts_with(target_name, "x86")) {
         const auto t_features = (*tm)->getTargetFeatureString();
@@ -179,6 +192,22 @@ target_features get_target_features_impl()
 
         if (boost::algorithm::contains(t_features, "+sse2")) {
             retval.sse2 = true;
+        }
+
+        // Check if we are on Zen version 4 or later.
+        const auto target_cpu = std::string{(*tm)->getTargetCPU()};
+        std::cmatch m;
+        if (std::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
+            if (m.size() == 2u) {
+                // The CPU name matches and contains a subgroup.
+                // Extract the N from "znverN".
+                std::uint32_t zen_version{};
+                auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
+
+                if (ret.ec == std::errc{} && zen_version >= 4u) {
+                    zen4_or_later = true;
+                }
+            }
         }
     }
 
@@ -217,12 +246,14 @@ target_features get_target_features_impl()
     }
 
     // Compute the recommended SIMD sizes.
-    if (retval.avx512f || retval.avx2 || retval.avx) {
-        // NOTE: keep the recommended SIMD size to
-        // 4/8 also for AVX512 due to perf issues in early
-        // implementations. Revisit this in the future, possibly
-        // making it conditional on the specific CPU model
-        // in use.
+    if (zen4_or_later) {
+        // NOTE: on zen>=4, it is convenient to use 512-bit vectors.
+        retval.simd_size_flt = 16;
+        retval.simd_size_dbl = 8;
+    } else if (retval.avx512f || retval.avx2 || retval.avx) {
+        // NOTE: on Intel processors with avx512, it is difficult
+        // to establish whether or not 512-bit vectors are worth it.
+        // Let us be prudent about this.
         retval.simd_size_flt = 8;
         retval.simd_size_dbl = 4;
     } else if (retval.sse2 || retval.aarch64 || retval.vsx || retval.vsx3) {
@@ -407,10 +438,25 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
         f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
     }
 
-    // Force usage of AVX512 registers, if requested.
-    if (force_avx512 && get_target_features().avx512f) {
+    // AVX512 setup.
+    const auto &tf = get_target_features();
+    if (tf.avx512f) {
+        // NOTE: we enable 512-bit vector if either forced by the
+        // user or if simd_size_dbl is 8 (which means that 512-bit vectors
+        // are a performance win).
+        if (force_avx512 || tf.simd_size_dbl == 8u) {
+            for (auto &f : M) {
+                f.addFnAttr("prefer-vector-width", "512");
+            }
+        }
+
+        // NOTE: explicitly disable scatter/gather as they can currently
+        // result in slowdowns:
+        //
+        // https://github.com/llvm/llvm-project/issues/91370
         for (auto &f : M) {
-            f.addFnAttr("prefer-vector-width", "512");
+            f.addFnAttr("no-gather");
+            f.addFnAttr("no-scatter");
         }
     }
 
