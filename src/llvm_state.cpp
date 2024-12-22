@@ -446,14 +446,21 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
             }
         }
 
+#if LLVM_VERSION_MAJOR >= 18
+
         // NOTE: explicitly disable scatter/gather when auto-vectorising
         // as they can currently result in slowdowns:
         //
         // https://github.com/llvm/llvm-project/issues/91370
+        //
+        // NOTE: it seems like -mno-gather/scatter are available since
+        // LLVM 18.
         for (auto &f : M) {
             f.addFnAttr("no-gather");
             f.addFnAttr("no-scatter");
         }
+
+#endif
     }
 
     // NOTE: adapted from here:
