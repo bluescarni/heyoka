@@ -150,6 +150,22 @@ public:
     };
 
     sgp4_propagator() noexcept;
+    // NOTE: the GPE data is expected as a 9 x n span, where n is the number of satellites
+    // and the rows represent:
+    //
+    // - the mean motion (in [rad / min]),
+    // - the eccentricity,
+    // - the inclination (in [rad]),
+    // - the right ascension of the ascending node (in [rad]),
+    // - the argument of perigee (in [rad]),
+    // - the mean anomaly (in [rad]),
+    // - the BSTAR drag term (in whatever unit is used by the SGP4 GPEs),
+    // - the reference epoch (as a Julian date),
+    // - a fractional correction to the epoch (in Julian days).
+    //
+    // Note that UTC Julian dates will result in slightly incorrect results when
+    // propagating across leap seconds. See the Python tutorial for an explanation.
+    // TAI Julian dates can be used instead for accurate propagation across leap seconds.
     template <typename LayoutPolicy, typename AccessorPolicy, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit sgp4_propagator(
