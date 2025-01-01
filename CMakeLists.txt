@@ -373,7 +373,6 @@ if(HEYOKA_ENABLE_IPO)
     else()
         message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
     endif()
-    unset(_HEYOKA_IPO_RESULT)
     unset(_HEYOKA_IPO_OUTPUT)
 endif()
 
@@ -477,6 +476,10 @@ if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
 
     unset(CMAKE_REQUIRED_QUIET)
 endif()
+
+# Mandatory dependency on the internal erfa library.
+add_subdirectory(src/detail/erfa)
+target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
@@ -608,6 +611,9 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
+if(HEYOKA_ENABLE_IPO)
+    unset(_HEYOKA_IPO_RESULT)
+endif()
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()

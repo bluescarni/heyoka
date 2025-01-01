@@ -6,5 +6,6 @@ coverage:
   - "src/detail/elp2000/.*"
   - "include/heyoka/detail/tanuki*"
   - "include/heyoka/detail/mdspan*"
+  - "src/detail/erfa/.*"
 
 comment: off
