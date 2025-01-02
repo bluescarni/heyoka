@@ -210,8 +210,8 @@ public:
     // NOTE: because of the use of an internal buffer to convert
     // dates to tsinces, the date overloads of these operators are
     // never thread-safe. This needs to be documented properly.
-    // Perhaps this can be fixed one day if we implement the conversion
-    // to dates on-the-fly via double-length primitives.
+    // NOTE: Julian dates are to be provided in the UTC scale of time. Internal conversion
+    // to TAI will ensure correct propagation across leap seconds.
     void operator()(out_2d, in_1d<T>);
     void operator()(out_2d, in_1d<date>);
     void operator()(out_3d, in_2d<T>);
@@ -221,6 +221,10 @@ public:
 // Prevent implicit instantiations.
 extern template class sgp4_propagator<float>;
 extern template class sgp4_propagator<double>;
+
+// Helpers to convert between UTC and TAI Julian dates.
+HEYOKA_DLL_PUBLIC std::pair<double, double> jd_utc_to_tai(double, double);
+HEYOKA_DLL_PUBLIC std::pair<double, double> jd_tai_to_utc(double, double);
 
 } // namespace model
 

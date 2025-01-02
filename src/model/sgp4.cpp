@@ -62,6 +62,12 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
+// The erfa functions for conversion between UTC and TAI Julian dates.
+extern "C" {
+int eraUtctai(double, double, double *, double *);
+int eraTaiutc(double, double, double *, double *);
+}
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace model
@@ -851,9 +857,6 @@ namespace detail
 namespace
 {
 
-// The erfa function for UTC to TAI conversion.
-extern "C" int eraUtctai(double, double, double *, double *);
-
 // Helper to convert a Julian date into a time delta suitable for use in the SGP4 algorithm.
 // The reference epochs for all satellites are stored in sat_buffer, the dates are passed in
 // via the 'dates' argument, n_sats is the total number of satellites and i is the index
@@ -866,25 +869,10 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
     using dfloat = heyoka::detail::dfloat<T>;
 
     // Convert the target propagation date to TAI using erfa.
-    // NOTE: the docs of the erfa routine indicate that we do not have
-    // to normalise the input UTC double-length Julian dates.
-    double tai_prop_date_hi{}, tai_prop_date_lo{};
-    auto res = eraUtctai(dates(i).jd, dates(i).frac, &tai_prop_date_hi, &tai_prop_date_lo);
-    if (res == -1) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("An invalid UTC propagation date ({}, {}) was detected for the satellite at index {}",
-                        dates(i).jd, dates(i).frac, i));
-    }
-
-    // Convert the satellite epoch to TAI.
-    double tai_epoch_hi{}, tai_epoch_lo{};
-    const auto utc_epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
-    const auto utc_epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
-    res = eraUtctai(utc_epoch_hi, utc_epoch_lo, &tai_epoch_hi, &tai_epoch_lo);
-    if (res == -1) [[unlikely]] {
-        throw std::invalid_argument(fmt::format(
-            "An invalid UTC epoch ({}, {}) was detected for the satellite at index {}", utc_epoch_hi, utc_epoch_lo, i));
-    }
+    const auto [tai_prop_date_hi, tai_prop_date_lo] = jd_utc_to_tai(dates(i).jd, dates(i).frac);
+    // Do the same for the satellite epoch.
+    const auto [tai_epoch_hi, tai_epoch_lo] = jd_utc_to_tai(sat_buffer[static_cast<SizeType>(7) * n_sats + i],
+                                                            sat_buffer[static_cast<SizeType>(8) * n_sats + i]);
 
     // Normalise the TAI propagation date into a double-length number.
     // NOTE: we use Knuth's EFT here in order to ensure correctness
@@ -1082,6 +1070,38 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 // Explicit instantiations.
 template class HEYOKA_DLL_PUBLIC sgp4_propagator<float>;
 template class HEYOKA_DLL_PUBLIC sgp4_propagator<double>;
+
+std::pair<double, double> jd_utc_to_tai(double utc1, double utc2)
+{
+    // NOTE: the docs of the erfa routine indicate that we do not have
+    // to normalise the input UTC double-length Julian dates.
+    std::pair<double, double> retval;
+    const auto res = eraUtctai(utc1, utc2, &retval.first, &retval.second);
+    // LCOV_EXCL_START
+    if (res == -1) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot convert the invalid UTC Julian date ({}, {}) to TAI", utc1, utc2));
+    }
+    // LCOV_EXCL_STOP
+
+    return retval;
+}
+
+std::pair<double, double> jd_tai_to_utc(double tai1, double tai2)
+{
+    // NOTE: the docs of the erfa routine indicate that we do not have
+    // to normalise the input TAI double-length Julian dates.
+    std::pair<double, double> retval;
+    const auto res = eraTaiutc(tai1, tai2, &retval.first, &retval.second);
+    // LCOV_EXCL_START
+    if (res == -1) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot convert the invalid TAI Julian date ({}, {}) to UTC", tai1, tai2));
+    }
+    // LCOV_EXCL_STOP
+
+    return retval;
+}
 
 } // namespace model
 
