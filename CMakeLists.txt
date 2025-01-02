@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.0.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.1.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -330,7 +330,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 32)
+set(HEYOKA_ABI_VERSION 33)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -373,7 +373,6 @@ if(HEYOKA_ENABLE_IPO)
     else()
         message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
     endif()
-    unset(_HEYOKA_IPO_RESULT)
     unset(_HEYOKA_IPO_OUTPUT)
 endif()
 
@@ -477,6 +476,10 @@ if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
 
     unset(CMAKE_REQUIRED_QUIET)
 endif()
+
+# Mandatory dependency on the internal erfa library.
+add_subdirectory(src/detail/erfa)
+target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
@@ -608,6 +611,9 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
+if(HEYOKA_ENABLE_IPO)
+    unset(_HEYOKA_IPO_RESULT)
+endif()
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()

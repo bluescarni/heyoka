@@ -163,9 +163,8 @@ public:
     // - the reference epoch (as a Julian date),
     // - a fractional correction to the epoch (in Julian days).
     //
-    // Note that UTC Julian dates will result in slightly incorrect results when
-    // propagating across leap seconds. See the Python tutorial for an explanation.
-    // TAI Julian dates can be used instead for accurate propagation across leap seconds.
+    // Julian dates are to be provided in the UTC scale of time. Internal conversion
+    // to TAI will ensure correct propagation across leap seconds.
     template <typename LayoutPolicy, typename AccessorPolicy, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit sgp4_propagator(

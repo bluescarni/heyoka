@@ -1,6 +1,16 @@
 Changelog
 =========
 
+7.1.0 (2025-01-02)
+------------------
+
+Changes
+~~~~~~~
+
+- The SGP4 propagator now expects epochs and propagation dates
+  as UTC Julian dates
+  (`#466 <https://github.com/bluescarni/heyoka/pull/466>`__).
+
 7.0.0 (2024-12-28)
 ------------------
 

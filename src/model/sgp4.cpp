@@ -851,33 +851,51 @@ namespace detail
 namespace
 {
 
+// The erfa function for UTC to TAI conversion.
+extern "C" int eraUtctai(double, double, double *, double *);
+
 // Helper to convert a Julian date into a time delta suitable for use in the SGP4 algorithm.
 // The reference epochs for all satellites are stored in sat_buffer, the dates are passed in
 // via the 'dates' argument, n_sats is the total number of satellites and i is the index
-// of the satellite on which we are operating. The conversion is done in double-length arithmetic,
-// using the fractional parts of the date and epochs as lower halves of the double-length
-// numbers.
+// of the satellite on which we are operating. The double-length UTC Julian dates are first converted
+// to TAI Julian dates using an erfa routine. The resulting TAI dates are then normalised and
+// subtracted to yield the final time delta.
 template <typename SizeType, typename Dates, typename T>
 T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer, std::uint32_t n_sats)
 {
     using dfloat = heyoka::detail::dfloat<T>;
 
-    // Normalise the propagation date into a double-length number.
+    // Convert the target propagation date to TAI using erfa.
+    // NOTE: the docs of the erfa routine indicate that we do not have
+    // to normalise the input UTC double-length Julian dates.
+    double tai_prop_date_hi{}, tai_prop_date_lo{};
+    auto res = eraUtctai(dates(i).jd, dates(i).frac, &tai_prop_date_hi, &tai_prop_date_lo);
+    if (res == -1) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("An invalid UTC propagation date ({}, {}) was detected for the satellite at index {}",
+                        dates(i).jd, dates(i).frac, i));
+    }
+
+    // Convert the satellite epoch to TAI.
+    double tai_epoch_hi{}, tai_epoch_lo{};
+    const auto utc_epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
+    const auto utc_epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
+    res = eraUtctai(utc_epoch_hi, utc_epoch_lo, &tai_epoch_hi, &tai_epoch_lo);
+    if (res == -1) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "An invalid UTC epoch ({}, {}) was detected for the satellite at index {}", utc_epoch_hi, utc_epoch_lo, i));
+    }
+
+    // Normalise the TAI propagation date into a double-length number.
     // NOTE: we use Knuth's EFT here in order to ensure correctness
     // even if the fractional part of the date is greater in magnitude
     // than the main part.
-    const auto norm_prop_date = heyoka::detail::eft_add_knuth(dates(i).jd, dates(i).frac);
+    const auto norm_prop_date
+        = heyoka::detail::eft_add_knuth(static_cast<T>(tai_prop_date_hi), static_cast<T>(tai_prop_date_lo));
     const auto date = dfloat(norm_prop_date.first, norm_prop_date.second);
 
-    // Load the reference epoch for the i-th satellite.
-    const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
-    const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
-
-    // Normalise it into a double-length number.
-    // NOTE: we use Knuth's EFT here in order to ensure correctness
-    // even if the fractional part of the epoch is greater in magnitude
-    // than the main part.
-    const auto norm_epoch = heyoka::detail::eft_add_knuth(epoch_hi, epoch_lo);
+    // Do the same for the epoch.
+    const auto norm_epoch = heyoka::detail::eft_add_knuth(static_cast<T>(tai_epoch_hi), static_cast<T>(tai_epoch_lo));
     const auto epoch = dfloat(norm_epoch.first, norm_epoch.second);
 
     // Compute the time delta in double-length arithmetic, truncate to a single-length
@@ -909,12 +927,10 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
 
-    // NOTE: we have a rough estimate of <~50 flops for a single execution of sgp4_date_to_tdelta().
+    // NOTE: we have a rough estimate of ~200 flops for a single execution of sgp4_date_to_tdelta().
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
-    // parallelisation if we have 200 satellites or more.
-    // NOTE: as an alternative, if we had double-length add/sub in the expression system,
-    // we could do the transformation on-line as we evaluate the sgp4 propagation.
-    if (n_sats >= 200u) {
+    // parallelisation if we have 50 satellites or more.
+    if (n_sats >= 50u) {
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
                                   [&tms_vec, dates, this, n_sats](const auto &range) {
                                       for (auto i = range.begin(); i != range.end(); ++i) {
@@ -1029,10 +1045,10 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::safe_numerics::safe<tms_vec_size_t>(n_evals) * dates.extent(1));
 
-    // NOTE: we have a rough estimate of <~50 flops for a single execution of sgp4_date_to_tdelta().
+    // NOTE: we have a rough estimate of ~200 flops for a single execution of sgp4_date_to_tdelta().
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
-    // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 200 or more.
-    if (tms_vec.size() >= 200u) {
+    // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 50 or more.
+    if (tms_vec.size() >= 50u) {
         oneapi::tbb::parallel_for(
             oneapi::tbb::blocked_range2d<std::size_t>(0, dates.extent(0), 0, dates.extent(1)),
             [&tms_vec, dates, this, n_sats](const auto &range) {

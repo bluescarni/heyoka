@@ -34,7 +34,6 @@ cmake ../ -G Ninja \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DCMAKE_CXX_CLANG_TIDY=`which clang-tidy` \
-    -DCMAKE_C_CLANG_TIDY=`which clang-tidy` \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++
 
