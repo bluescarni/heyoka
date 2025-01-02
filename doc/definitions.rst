@@ -28,7 +28,7 @@ Macros and definitions
    This name is defined if heyoka was built with support for the mp++ library (see the :ref:`installation instructions <installation>`).
 
 .. c:macro:: HEYOKA_WITH_REAL128
-.. c:macro:: HEYOKA_WITH_REAL
+             HEYOKA_WITH_REAL
 
     These names are defined if heyoka was built with support for, respectively, the :cpp:class:`~mppp::real128` and :cpp:class:`~mppp::real` classes from
     the mp++ library (see the :ref:`installation instructions <installation>`).

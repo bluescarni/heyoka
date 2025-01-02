@@ -17,6 +17,7 @@
 #include <boost/math/constants/constants.hpp>
 
 #include <heyoka/detail/debug.hpp>
+#include <heyoka/detail/dfloat.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/time.hpp>
@@ -820,4 +821,47 @@ TEST_CASE("deep space detection")
 {
     REQUIRE(model::gpe_is_deep_space(revday2radmin(6.), 0.0024963, deg2rad(90.2039)));
     REQUIRE(!model::gpe_is_deep_space(revday2radmin(13.75091047972192), 0.0024963, deg2rad(90.2039)));
+}
+
+TEST_CASE("jd_conversions")
+{
+    // Normal day: 2016-12-30T09:00:00.
+    {
+        // From UTC to TAI.
+        const auto tai_jd = model::jd_utc_to_tai(2457752.875, 0.);
+        const auto [tai_hi, tai_lo] = detail::eft_add_knuth(tai_jd.first, tai_jd.second);
+        // NOTE: these are computed with astropy.
+        const auto [tai_hi_cmp, tai_lo_cmp] = detail::eft_add_knuth(2457753.0, -0.12458333333333332);
+
+        REQUIRE(tai_hi == tai_hi_cmp);
+        REQUIRE(tai_lo == tai_lo_cmp);
+
+        // From TAI to UTC.
+        const auto utc_jd = model::jd_tai_to_utc(tai_hi, tai_lo);
+        const auto [utc_hi, utc_lo] = detail::eft_add_knuth(utc_jd.first, utc_jd.second);
+        const auto [utc_hi_cmp, utc_lo_cmp] = detail::eft_add_knuth(2457753.0, -0.125);
+
+        REQUIRE(utc_hi == utc_hi_cmp);
+        REQUIRE(utc_lo == utc_lo_cmp);
+    }
+
+    // Day with a leap second: 2016-12-31T09:00:00.
+    {
+        // From UTC to TAI.
+        const auto tai_jd = model::jd_utc_to_tai(2457754.0, -0.12500434022754364);
+        const auto [tai_hi, tai_lo] = detail::eft_add_knuth(tai_jd.first, tai_jd.second);
+        // NOTE: these are computed with astropy.
+        const auto [tai_hi_cmp, tai_lo_cmp] = detail::eft_add_knuth(2457754.0, -0.12458333333333332);
+
+        REQUIRE(tai_hi == tai_hi_cmp);
+        REQUIRE(tai_lo == tai_lo_cmp);
+
+        // From TAI to UTC.
+        const auto utc_jd = model::jd_tai_to_utc(tai_hi, tai_lo);
+        const auto [utc_hi, utc_lo] = detail::eft_add_knuth(utc_jd.first, utc_jd.second);
+        const auto [utc_hi_cmp, utc_lo_cmp] = detail::eft_add_knuth(2457754.0, -0.12500434022754364);
+
+        REQUIRE(utc_hi == utc_hi_cmp);
+        REQUIRE(utc_lo == utc_lo_cmp);
+    }
 }
