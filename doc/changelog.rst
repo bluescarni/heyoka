@@ -1,6 +1,15 @@
 Changelog
 =========
 
+7.2.0 (2025-01-02)
+------------------
+
+New
+~~~
+
+- Add helpers to convert between UTC and TAI Julian dates
+  (`#468 <https://github.com/bluescarni/heyoka/pull/468>`__).
+
 7.1.0 (2025-01-02)
 ------------------
 
