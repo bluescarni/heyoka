@@ -199,7 +199,26 @@ int eraDat(int iy, int im, int id, double fd, double *deltat)
    int NDAT;
    eraLEAPSECOND *changes;
 
-   NDAT = eraDatini(_changes, _NDAT, &changes);
+   // NOTE: erfa supports changing at runtime the leap seconds table.
+   // This is accomplished with the help of a couple of global variables
+   // that can be set by the user via eraSetLeapSeconds(). If the user has not
+   // set a custom leap seconds table, the line
+   //
+   // eraDatini(_changes, _NDAT, &changes);
+   //
+   // will set these global variables to _NDAT and _changes (i.e.,
+   // the builtin leap seconds table defined a few lines earlier).
+   //
+   // The problem with this is that access to these global variables is not
+   // thread safe, and invoking the current function from multiple threads
+   // at the same time will result in data races.
+   //
+   // Hence, we remove the invocation of eraDatini() in favour of always using
+   // the builtin leap seconds table.
+   //
+   //NDAT = eraDatini(_changes, _NDAT, &changes);
+   NDAT = _NDAT;
+   changes = (eraLEAPSECOND *)_changes;
 
 /* Miscellaneous local variables */
    int j, i, m;

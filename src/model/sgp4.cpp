@@ -915,10 +915,10 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
 
-    // NOTE: we have a rough estimate of ~200 flops for a single execution of sgp4_date_to_tdelta().
+    // NOTE: we have a rough estimate of ~500 flops for a single execution of sgp4_date_to_tdelta().
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
-    // parallelisation if we have 50 satellites or more.
-    if (n_sats >= 50u) {
+    // parallelisation if we have 20 satellites or more.
+    if (n_sats >= 20u) {
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
                                   [&tms_vec, dates, this, n_sats](const auto &range) {
                                       for (auto i = range.begin(); i != range.end(); ++i) {
@@ -1033,10 +1033,10 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::safe_numerics::safe<tms_vec_size_t>(n_evals) * dates.extent(1));
 
-    // NOTE: we have a rough estimate of ~200 flops for a single execution of sgp4_date_to_tdelta().
+    // NOTE: we have a rough estimate of ~500 flops for a single execution of sgp4_date_to_tdelta().
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
-    // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 50 or more.
-    if (tms_vec.size() >= 50u) {
+    // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 20 or more.
+    if (tms_vec.size() >= 20u) {
         oneapi::tbb::parallel_for(
             oneapi::tbb::blocked_range2d<std::size_t>(0, dates.extent(0), 0, dates.extent(1)),
             [&tms_vec, dates, this, n_sats](const auto &range) {
