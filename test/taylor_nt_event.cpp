@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -192,14 +192,12 @@ TEST_CASE("taylor nte")
             REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
             oss.str("");
 
-            oss << ev_t(
-                v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
+            oss << ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
             REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
             REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
             oss.str("");
 
-            oss << ev_t(
-                v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::negative);
+            oss << ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::negative);
             REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
             oss.str("");
@@ -208,8 +206,7 @@ TEST_CASE("taylor nte")
             ev_t ev0(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}),
                 ev1(
                     v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::negative),
-                ev2(
-                    v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
+                ev2(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
             ev0 = ev1;
             oss << ev0;
             REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));

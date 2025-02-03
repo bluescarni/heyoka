@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -1065,9 +1065,9 @@ TEST_CASE("failure modes")
 
 #if defined(HEYOKA_ARCH_PPC)
 
-    REQUIRE_THROWS_MATCHES(
-        detail::make_multi_cfunc<long double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false, false, 0, detail::default_parjit),
-        not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
+    REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<long double>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false,
+                                                                 false, 0, detail::default_parjit),
+                           not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
 
 #endif
 

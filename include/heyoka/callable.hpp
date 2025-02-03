@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -48,17 +48,11 @@ inline constexpr bool is_any_callable = false;
 // NOTE: we use this rather than, e.g., a null function
 // pointer so that we can enable serialisation of
 // default-constructed callables.
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable {
-    template <typename Archive>
-    void serialize(Archive &, unsigned)
-    {
-    }
-};
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable{template <typename Archive> void serialize(Archive &, unsigned){}};
 
 // Default (empty) implementation of the callable interface.
 template <typename, typename, typename, typename, typename...>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl {
-};
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl{};
 
 // Implementation of the callable interface for invocable objects.
 template <typename Base, typename Holder, typename T, typename R, typename... Args>

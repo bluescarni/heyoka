@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -819,8 +819,7 @@ TEST_CASE("taylor te propagate_grid first step bug")
     using t_ev_t = taylor_adaptive<double>::t_event_t;
 
     {
-        t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<double> &, int) { return true; });
+        t_ev_t ev(v, kw::callback = [](taylor_adaptive<double> &, int) { return true; });
 
         auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {ev}};
 

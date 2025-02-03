@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -87,8 +87,8 @@ auto jb08_tn_common_opts(const KwArgs &...kw_args)
     // 00:00:00 UTC)
     HEYOKA_MODEL_JB08_KWARG(time_expr);
 
-    return std::tuple{std::move(geodetic), std::move(f107a),  std::move(f107), std::move(s107a),
-                      std::move(s107),     std::move(m107a),  std::move(m107), std::move(y107a),
+    return std::tuple{std::move(geodetic), std::move(f107a),  std::move(f107),     std::move(s107a),
+                      std::move(s107),     std::move(m107a),  std::move(m107),     std::move(y107a),
                       std::move(y107),     std::move(dDstdT), std::move(time_expr)};
 }
 
