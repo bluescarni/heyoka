@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -23,7 +23,8 @@ __declspec(dllexport)
 #elif defined(__clang__) || defined(__GNUC__) || defined(__INTEL_COMPILER)
 __attribute__((visibility("default")))
 #endif
-    double heyoka_sleef_dummy_f(double x)
+double
+heyoka_sleef_dummy_f(double x)
 {
     return ::Sleef_sin_u10(x);
 }

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -44,7 +44,7 @@ TEST_CASE("impl")
     // Case 1 - 1st January 00:00:00
     {
         // Prepare the input-output buffers.
-        std::array<double, 6> in{600, 1.2, 3.9,  21.2, 12.2, 22.};
+        std::array<double, 6> in{600, 1.2, 3.9, 21.2, 12.2, 22.};
         std::array<double, 1> out{};
         // Produce the compiled function
         cfunc<double> rho_cf{{rho}, {h, lat, lon, f107, f107a, ap}};
@@ -69,7 +69,8 @@ TEST_CASE("igor_iface")
 {
     auto [h, lat, lon, f107, f107a, ap] = make_vars("h", "lat", "lon", "f107", "f107a", "ap");
     {
-        auto igor_v = model::nrlmsise00_tn(kw::geodetic = {h, lat, lon}, kw::f107 = f107, kw::f107a = f107a, kw::ap = ap, kw::time_expr = heyoka::time / 86400_dbl);
+        auto igor_v = model::nrlmsise00_tn(kw::geodetic = {h, lat, lon}, kw::f107 = f107, kw::f107a = f107a,
+                                           kw::ap = ap, kw::time_expr = heyoka::time / 86400_dbl);
         auto vanilla_v = model::detail::nrlmsise00_tn_impl({h, lat, lon}, f107, f107a, ap, heyoka::time / 86400_dbl);
         REQUIRE(igor_v == vanilla_v);
     }

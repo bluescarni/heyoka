@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -645,7 +645,7 @@ private:
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
     propagate_for_impl(T, std::size_t, T, step_callback<T>, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
-        propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
+    propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
 
 public:
     // NOTE: return values:
@@ -701,8 +701,8 @@ public:
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
-explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>,
-                         const KwArgs &...) -> taylor_adaptive<T>;
+explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, const KwArgs &...)
+    -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
@@ -1145,8 +1145,8 @@ explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, s
 
 template <typename T, typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
-explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t,
-                               const KwArgs &...) -> taylor_adaptive_batch<T>;
+explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, const KwArgs &...)
+    -> taylor_adaptive_batch<T>;
 
 // Prevent implicit instantiations.
 #define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F) extern template class taylor_adaptive_batch<F>;

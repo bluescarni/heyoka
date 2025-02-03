@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022, 2023, 2024 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -91,9 +91,11 @@ auto build_vsop2103_data()
     vsop2013_data_t retval;
 
 #define HEYOKA_VSOP2013_RECORD_DATA(pl_idx, var_idx)                                                                   \
-    retval[{pl_idx, var_idx}]                                                                                          \
-        = std::tuple{std::size(vsop2013_##pl_idx##_##var_idx##_sizes), &vsop2013_##pl_idx##_##var_idx##_sizes[0],      \
-                     &vsop2013_##pl_idx##_##var_idx##_data[0]}
+    retval[{pl_idx, var_idx}] = std::tuple                                                                             \
+    {                                                                                                                  \
+        std::size(vsop2013_##pl_idx##_##var_idx##_sizes), &vsop2013_##pl_idx##_##var_idx##_sizes[0],                   \
+            &vsop2013_##pl_idx##_##var_idx##_data[0]                                                                   \
+    }
 
     HEYOKA_VSOP2013_RECORD_DATA(1, 1);
     HEYOKA_VSOP2013_RECORD_DATA(1, 2);
