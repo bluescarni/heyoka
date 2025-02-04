@@ -77,7 +77,6 @@
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/vector_math.hpp>
@@ -578,7 +577,7 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
     assert(((args->getType() == x_t) && ...));
 
     // Ensure that the arguments are vectors.
-    auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t);
+    auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t);
     assert(vec_t != nullptr);
 
     // Fetch the vector width.
@@ -756,7 +755,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
 
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
+        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
 
@@ -882,7 +881,7 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
         // with the same attributes.
         const auto attrs = llvm_ext_math_func_attrs(s);
 
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
+        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
 
@@ -953,7 +952,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 {
     assert(t != nullptr);
 
-    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(t)) {
+    if (auto *v_t = llvm::dyn_cast<llvm::FixedVectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return fmt::format("{}_{}", llvm_type_name(v_t->getElementType()), v_t->getNumElements());
@@ -964,10 +963,10 @@ std::string llvm_mangle_type(llvm::Type *t)
 }
 
 // Helper to determine the vector size of x. If x is not
-// of type llvm_vector_type, 1 will be returned.
+// of type llvm::FixedVectorType, 1 will be returned.
 std::uint32_t get_vector_size(llvm::Value *x)
 {
-    if (const auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+    if (const auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(x->getType())) {
         return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
     } else {
         return 1;
@@ -1059,7 +1058,7 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     // LCOV_EXCL_START
     assert(vector_size > 0u);
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
-    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
     // LCOV_EXCL_STOP
 
     if (vector_size == 1u) {
@@ -1166,10 +1165,10 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 {
     // LCOV_EXCL_START
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
-    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
     // LCOV_EXCL_STOP
 
-    if (auto *vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
@@ -1258,11 +1257,11 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 // of that size. Otherwise, ptrs must be a single scalar pointer and the returned value is a scalar.
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
-    if (llvm::isa<llvm_vector_type>(vec_tp)) {
+    if (llvm::isa<llvm::FixedVectorType>(vec_tp)) {
         // LCOV_EXCL_START
-        assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
-        assert(llvm::cast<llvm_vector_type>(vec_tp)->getNumElements()
-               == llvm::cast<llvm_vector_type>(ptrs->getType())->getNumElements());
+        assert(llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
+        assert(llvm::cast<llvm::FixedVectorType>(vec_tp)->getNumElements()
+               == llvm::cast<llvm::FixedVectorType>(ptrs->getType())->getNumElements());
         // LCOV_EXCL_STOP
 
         // Fetch the alignment of the scalar type.
@@ -1271,7 +1270,7 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
         return builder.CreateMaskedGather(vec_tp, ptrs, llvm::Align(align));
     } else {
         // LCOV_EXCL_START
-        assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(!llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
         // LCOV_EXCL_STOP
 
         return builder.CreateLoad(vec_tp, ptrs);
@@ -1291,7 +1290,7 @@ llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::
         }
         // LCOV_EXCL_STOP
 
-        assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+        assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
 
         return ext_load_vector_from_memory(s, tp, ptr, 1);
     } else {
@@ -1308,7 +1307,7 @@ llvm::Value *vector_splat(ir_builder &builder, llvm::Value *c, std::uint32_t vec
 {
     // LCOV_EXCL_START
     assert(vector_size > 0u);
-    assert(!llvm::isa<llvm_vector_type>(c->getType()));
+    assert(!llvm::isa<llvm::FixedVectorType>(c->getType()));
     // LCOV_EXCL_STOP
 
     if (vector_size == 1u) {
@@ -1323,13 +1322,13 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
     // LCOV_EXCL_START
     assert(t != nullptr);
     assert(vector_size > 0u);
-    assert(!llvm::isa<llvm_vector_type>(t));
+    assert(!llvm::isa<llvm::FixedVectorType>(t));
     // LCOV_EXCL_STOP
 
     if (vector_size == 1u) {
         return t;
     } else {
-        auto *retval = llvm_vector_type::get(t, boost::numeric_cast<unsigned>(vector_size));
+        auto *retval = llvm::FixedVectorType::get(t, boost::numeric_cast<unsigned>(vector_size));
 
         assert(retval != nullptr); // LCOV_EXCL_LINE
 
@@ -1341,7 +1340,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 // return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
@@ -3524,8 +3523,8 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 #if !defined(NDEBUG)
     if (n->getType()->isVectorTy()) {
         assert(fp_t->isVectorTy());
-        assert(llvm::cast<llvm_vector_type>(n->getType())->getNumElements()
-               == llvm::cast<llvm_vector_type>(fp_t)->getNumElements());
+        assert(llvm::cast<llvm::FixedVectorType>(n->getType())->getNumElements()
+               == llvm::cast<llvm::FixedVectorType>(fp_t)->getNumElements());
     } else {
         assert(!fp_t->isVectorTy());
     }
@@ -3607,7 +3606,7 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
     if (tp->isVectorTy()) {
         // tp is a vector type.
-        if (const auto *vtp = llvm::dyn_cast<llvm_vector_type>(tp)) [[likely]] {
+        if (const auto *vtp = llvm::dyn_cast<llvm::FixedVectorType>(tp)) [[likely]] {
             return make_vector_type(ret_scal_t, boost::numeric_cast<std::uint32_t>(vtp->getNumElements()));
         } else {
             // LCOV_EXCL_START

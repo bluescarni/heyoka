@@ -48,7 +48,6 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
