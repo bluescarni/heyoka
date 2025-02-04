@@ -63,7 +63,6 @@
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/rng_to_vec.hpp>
 #include <heyoka/detail/string_conv.hpp>

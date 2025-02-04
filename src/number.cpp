@@ -59,7 +59,6 @@
 #include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -540,8 +539,8 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
     assert(tp != nullptr);
 
-    // If tp is an llvm_vector_type, codegen the scalar value and splat it.
-    if (const auto *vector_t = llvm::dyn_cast<detail::llvm_vector_type>(tp)) {
+    // If tp is an llvm::FixedVectorType, codegen the scalar value and splat it.
+    if (const auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(tp)) {
         const auto vec_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
         return detail::vector_splat(s.builder(), llvm_codegen(s, vector_t->getScalarType(), n), vec_size);
