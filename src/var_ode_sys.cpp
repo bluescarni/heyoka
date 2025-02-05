@@ -171,7 +171,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
             // NOTE: put twice the double underscore "__", because we know
             // from validate_ode_sys() that there are no variables in the original
             // sys starting with "__", thus by prefixing another "__" we know that
-            // there cannot be name collisions with the "__{}_0" variables tha may have
+            // there cannot be name collisions with the "__{}_0" variables that may have
             // been added earlier.
             vargs.emplace_back("____t_0");
             vargs_hr.push_back(heyoka::time);
@@ -222,7 +222,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
                 // NOTE: put twice the double underscore "__", because we know
                 // from validate_ode_sys() that there are no variables in the original
                 // sys starting with "__", thus by prefixing another "__" we know that
-                // there cannot be name collisions with the "__{}_0" variables tha may have
+                // there cannot be name collisions with the "__{}_0" variables that may have
                 // been added earlier.
                 vargs.emplace_back("____t_0");
             } else [[unlikely]] {
