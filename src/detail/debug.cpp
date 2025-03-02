@@ -22,6 +22,7 @@ namespace
 // Global flag to signal whether or not to enable
 // expensive debug checks. This is just used to avoid
 // excessive runtime in certain unit tests.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 bool edb_is_enabled = true;
 
 } // namespace

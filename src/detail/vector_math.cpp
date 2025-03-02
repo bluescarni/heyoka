@@ -41,7 +41,12 @@ auto make_vfinfo(const char *s_name, std::string v_name, std::string lp_v_name, 
 {
     assert(nargs == 1u || nargs == 2u);
 
-    auto ret = vf_info{std::move(v_name), {}, std::move(lp_v_name), {}, width, nargs};
+    auto ret = vf_info{.name = std::move(v_name),
+                       .vf_abi_attr = {},
+                       .lp_name = std::move(lp_v_name),
+                       .lp_vf_abi_attr = {},
+                       .width = width,
+                       .nargs = nargs};
     ret.vf_abi_attr = fmt::format("_ZGV_LLVM_N{}{}_{}({})", width, nargs == 1u ? "v" : "vv", s_name, ret.name);
     ret.lp_vf_abi_attr = fmt::format("_ZGV_LLVM_N{}{}_{}({})", width, nargs == 1u ? "v" : "vv", s_name, ret.lp_name);
     return ret;
@@ -173,11 +178,10 @@ auto make_vf_map()
     // Checks in debug mode.
     for (const auto &[key, value] : retval) {
         assert(!value.empty());
-        assert(std::none_of(value.begin(), value.end(), [](const auto &v) {
+        assert(std::ranges::none_of(value, [](const auto &v) {
             return v.width == 0u || v.nargs == 0u || v.name.empty() || v.vf_abi_attr.empty();
         }));
-        assert(std::is_sorted(value.begin(), value.end(),
-                              [](const auto &v1, const auto &v2) { return v1.width < v2.width; }));
+        assert(std::ranges::is_sorted(value, [](const auto &v1, const auto &v2) { return v1.width < v2.width; }));
     }
 
 #endif

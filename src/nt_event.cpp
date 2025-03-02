@@ -69,6 +69,7 @@ auto nt_event_def_cb()
     if constexpr (B) {
         return [](taylor_adaptive_batch<T> &, T, int, std::uint32_t) {};
     } else {
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
         return [](taylor_adaptive<T> &, T, int) {};
     }
 }

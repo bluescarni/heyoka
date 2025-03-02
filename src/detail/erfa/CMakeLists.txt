@@ -258,6 +258,9 @@ add_library(heyoka_erfa STATIC "${HEYOKA_ERFA_SRC_FILES}")
 target_compile_features(heyoka_erfa PRIVATE c_std_99)
 # Enforce vanilla C.
 set_property(TARGET heyoka_erfa PROPERTY C_EXTENSIONS NO)
+# NOTE: force clang-tidy OFF as there's too much warnings in the
+# erfa source code.
+set_property(TARGET heyoka_erfa PROPERTY C_CLANG_TIDY "")
 
 # IPO setup.
 if(HEYOKA_ENABLE_IPO)

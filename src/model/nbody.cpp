@@ -226,6 +226,7 @@ expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression 
 
     // The kinetic terms.
     std::vector<expression> kin;
+    kin.reserve(n_massive);
     for (std::uint32_t i = 0; i < n_massive; ++i) {
         kin.push_back(masses_vec[i] * sum({pow(vx_vars[i], 2_dbl), pow(vy_vars[i], 2_dbl), pow(vz_vars[i], 2_dbl)}));
     }
@@ -366,6 +367,7 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
     std::vector<expression> pot;
 
     // Add the potential between the zeroth body and the rest.
+    pot.reserve(n_massive - 1u);
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         pot.push_back(masses_vec[0] * masses_vec[i + 1u]
                       / sqrt(sum({pow(x_vars[i], 2_dbl), pow(y_vars[i], 2_dbl), pow(z_vars[i], 2_dbl)})));

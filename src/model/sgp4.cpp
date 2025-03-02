@@ -514,6 +514,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         // NOTE: in order to do this, we iterate over diqs in order to fetch
         // the multiindices of the derivatives of the iqs wrt the diff arguments.
         std::map<expression, expression> dfun_subs_map;
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         for (const auto &[key, _] : *diqs) {
             const auto &[iq_idx, diff_idx] = key;
 
@@ -554,9 +555,9 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         func_tprop_args.insert(func_tprop_args.end(), iqs_vars.begin(), iqs_vars.end());
     }
 
-    return {{std::move(func_init), std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1)},
-            {std::move(func_tprop), std::move(func_tprop_args)},
-            std::move(cart_dfun_dtens)};
+    return {.init = {std::move(func_init), std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1)},
+            .tprop = {std::move(func_tprop), std::move(func_tprop_args)},
+            .dt = std::move(cart_dfun_dtens)};
 }
 
 // Compile in parallel the init (f1) and tprop (f2) functions.
@@ -776,6 +777,7 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 std::uint32_t sgp4_propagator<T>::get_diff_order() const noexcept
 {
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return m_impl->m_dtens ? m_impl->m_dtens->get_order() : static_cast<std::uint32_t>(0);
 }
 
@@ -785,6 +787,7 @@ const std::vector<expression> &sgp4_propagator<T>::get_diff_args() const
 {
     check_with_diff(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return m_impl->m_dtens->get_args();
 }
 
@@ -794,6 +797,7 @@ std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint
 {
     check_with_diff(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     const auto &dt = *m_impl->m_dtens;
 
     const auto rng = dt.get_derivatives(order);
@@ -809,6 +813,7 @@ std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint
 {
     check_with_diff(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     const auto &dt = *m_impl->m_dtens;
 
     const auto rng = dt.get_derivatives(component, order);
@@ -823,6 +828,7 @@ const dtens::sv_idx_t &sgp4_propagator<T>::get_mindex(std::uint32_t i) const
 {
     check_with_diff(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     const auto &dt = *m_impl->m_dtens;
 
     if (i >= dt.size()) [[unlikely]] {

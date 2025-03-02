@@ -130,6 +130,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
     // The data in tm_data is supposed to be set up correctly once and for all.
     if (dthis->is_variational()) {
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         assert(std::ranges::all_of(dthis->m_i_data->m_tm_data->m_output,
                                    [prec](const auto &x) { return x.get_prec() == prec; }));
     }
@@ -1873,6 +1874,7 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 }
 
 template <typename T>
+// NOLINTNEXTLINE(bugprone-exception-escape)
 const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sys() const noexcept
 {
     return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
@@ -2024,6 +2026,7 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 
     // Run the compiled function.
     assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto &tm_data = *m_i_data->m_tm_data;
     tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
 
@@ -2041,6 +2044,7 @@ const std::vector<T> &taylor_adaptive<T>::get_tstate() const
 {
     check_variational(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return m_i_data->m_tm_data->m_output;
 }
 

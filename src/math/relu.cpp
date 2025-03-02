@@ -69,7 +69,7 @@ std::string relu_name(const char *base, double slope)
         // the decimal point '.' with an underscore '_' (as the '.' is used
         // as a separator in the name mangling scheme for compact mode functions).
         auto ret = fmt::format("{}_{:a}", base, slope);
-        std::replace(ret.begin(), ret.end(), '.', '_');
+        std::ranges::replace(ret, '.', '_');
 
         return ret;
     }

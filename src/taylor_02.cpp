@@ -163,8 +163,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
         // Determine the u indices on which ex depends.
         const auto u_indices = udef_args_indices(ex);
 
-        if (std::any_of(u_indices.begin(), u_indices.end(),
-                        [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
+        if (std::ranges::any_of(u_indices, [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
             // The current expression depends on one or more variables
             // within the current block. Start a new block and
             // update cur_limit_idx with the start index of the new block.
@@ -190,8 +189,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
             // less than counter + n_eq (which is the starting
             // index of the block).
             const auto u_indices = udef_args_indices(ex);
-            assert(std::all_of(u_indices.begin(), u_indices.end(),
-                               [idx_limit = counter + n_eq](auto idx) { return idx < idx_limit; }));
+            assert(std::ranges::all_of(u_indices, [idx_limit = counter + n_eq](auto idx) { return idx < idx_limit; }));
         }
 
         // Update the counter.
@@ -517,7 +515,7 @@ llvm::Function *taylor_cm_make_driver_proto(llvm_state &s, unsigned cur_idx)
     // - pointers to par and time,
     // - the current diff order.
     auto *ptr_tp = llvm::PointerType::getUnqual(ctx);
-    std::vector<llvm::Type *> fargs{ptr_tp, ptr_tp, ptr_tp, builder.getInt32Ty()};
+    const std::vector<llvm::Type *> fargs{ptr_tp, ptr_tp, ptr_tp, builder.getInt32Ty()};
 
     // The driver does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -710,7 +708,7 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
         // - int32 Taylor order.
         //
         // The pointer arguments cannot overlap.
-        std::vector<llvm::Type *> worker_args{i32_tp, i32_tp, ptr_tp, ptr_tp, ptr_tp, i32_tp};
+        const std::vector<llvm::Type *> worker_args{i32_tp, i32_tp, ptr_tp, ptr_tp, ptr_tp, i32_tp};
 
         // The worker does not return anything.
         auto *worker_proto = llvm::FunctionType::get(void_tp, worker_args, false);
@@ -757,7 +755,7 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
         // Loop over the begin/end range.
         llvm_loop_u32(s, begin_arg, end_arg, [&](llvm::Value *cur_call_idx) {
             // Create the u variable index from the first generator.
-            auto u_idx = gens[0](cur_call_idx);
+            auto *u_idx = gens[0](cur_call_idx);
 
             // Initialise the vector of arguments with which func must be called. The following
             // initial arguments are always present:
@@ -907,6 +905,7 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
             // Build the vector of values corresponding
             // to the current argument index.
             std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+            tmp_c_vec.reserve(n_calls);
             for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
                 tmp_c_vec.push_back(vv[j][i]);
             }
@@ -984,6 +983,7 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
 std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t,
                                                  llvm::Value *main_par_ptr, llvm::Value *main_time_ptr,
                                                  llvm::Value *main_tape_ptr, const taylor_dc_t &dc,
+                                                 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                  const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
                                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                                                  bool high_accuracy, bool parallel_mode, std::uint32_t max_svf_idx)
@@ -1242,7 +1242,7 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     // another full column of derivatives, as it is complicated at this stage
     // to know exactly how many slots we will need.
     // NOTE: overflow checking for this computation has been performed externally.
-    const auto tot_tape_N = (max_svf_idx < n_eq) ? (n_uvars * order + n_eq) : (n_uvars * (order + 1u));
+    const auto tot_tape_N = (max_svf_idx < n_eq) ? ((n_uvars * order) + n_eq) : (n_uvars * (order + 1u));
 
     // Total required size in bytes for the tape.
     const auto tape_sz = boost::safe_numerics::safe<std::size_t>(get_size(main_md, main_fp_vec_t)) * tot_tape_N;
@@ -1409,8 +1409,8 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
         // If there are sv funcs, we need to compute their last-order derivatives too:
         // we will need to compute the derivatives of the u variables up to
         // the maximum index in sv_funcs_dc.
-        const auto max_svf_idx = sv_funcs_dc.empty() ? static_cast<std::uint32_t>(0)
-                                                     : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+        const auto max_svf_idx
+            = sv_funcs_dc.empty() ? static_cast<std::uint32_t>(0) : *std::ranges::max_element(sv_funcs_dc);
 
         // NOTE: if there are no sv_funcs, max_svf_idx is set to zero
         // above, thus we never enter the loop.

@@ -69,8 +69,8 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
 
     for (decltype(masses.size()) i = 0; i < n_masses; ++i) {
         const auto diff_x = positions[3u * i] - x;
-        const auto diff_y = positions[3u * i + 1u] - y;
-        const auto diff_z = positions[3u * i + 2u] - z;
+        const auto diff_y = positions[(3u * i) + 1u] - y;
+        const auto diff_z = positions[(3u * i) + 2u] - z;
 
         const auto dist2 = sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)});
         const auto Mrm3 = masses[i] * pow(dist2, -1.5);
@@ -112,8 +112,8 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
 
     for (decltype(masses.size()) i = 0; i < n_masses; ++i) {
         const auto diff_x = positions[3u * i] - x;
-        const auto diff_y = positions[3u * i + 1u] - y;
-        const auto diff_z = positions[3u * i + 2u] - z;
+        const auto diff_y = positions[(3u * i) + 1u] - y;
+        const auto diff_z = positions[(3u * i) + 2u] - z;
 
         auto dist = sqrt(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)}));
 

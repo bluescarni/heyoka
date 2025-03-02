@@ -165,6 +165,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     // exponents are at the end. These constitute the denominator
     // of the product.
     auto tmp_args = args();
+    // NOLINTNEXTLINE(modernize-use-ranges)
     const auto den_it = std::stable_partition(tmp_args.begin(), tmp_args.end(),
                                               [](const auto &ex) { return !ex_is_negative_pow(ex); });
 
@@ -859,6 +860,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
                 } else {
                     // The current function is a prod(). Partition its
                     // arguments according to fpart.
+                    // NOLINTNEXTLINE(modernize-use-ranges)
                     const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
 
                     if (it == new_args.end()) {
@@ -1011,6 +1013,7 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
 expression prod(std::vector<expression> args)
 {
     // Partition args so that all numbers are at the end.
+    // NOLINTNEXTLINE(modernize-use-ranges)
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
@@ -1062,6 +1065,7 @@ expression prod(std::vector<expression> args)
     // NOTE: this results in a semi-canonical representation of products
     // in which numbers are at the beginning. This enables the detection
     // of negations by checking if the first argument is -1.
+    // NOLINTNEXTLINE(modernize-use-ranges)
     std::stable_partition(args.begin(), args.end(),
                           [](const expression &ex) { return std::holds_alternative<number>(ex.value()); });
 

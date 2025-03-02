@@ -311,7 +311,8 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
     }
 
     // Init the pimpl.
-    m_impl = std::make_unique<impl>(impl{std::move(new_sys), std::move(dt_vareq), std::move(vargs_hr)});
+    m_impl = std::make_unique<impl>(
+        impl{.sys = std::move(new_sys), .dt = std::move(dt_vareq), .vargs = std::move(vargs_hr)});
 }
 
 var_ode_sys::var_ode_sys(const var_ode_sys &other) : m_impl{std::make_unique<impl>(*other.m_impl)} {}

@@ -50,9 +50,11 @@ std::string make_dl_path_dlfcn()
             // LCOV_EXCL_START
         } catch (const std::exception &e) {
             std::cerr << "WARNING - exception raised while trying to determine the path of the heyoka library: "
+                      // NOLINTNEXTLINE(performance-avoid-endl)
                       << e.what() << std::endl;
         } catch (...) {
             std::cerr << "WARNING - exception raised while trying to determine the path of the heyoka library"
+                      // NOLINTNEXTLINE(performance-avoid-endl)
                       << std::endl;
         }
     }
@@ -78,6 +80,7 @@ std::string make_dl_path()
 }
 
 // The path to the heyoka shared library.
+// NOLINTNEXTLINE(cert-err58-cpp)
 const std::string dl_path = make_dl_path();
 
 } // namespace

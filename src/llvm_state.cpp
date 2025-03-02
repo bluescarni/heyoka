@@ -589,7 +589,7 @@ public:
         this->init(s.data(), s.data() + s.size(), true);
     }
     // LCOV_EXCL_START
-    llvm::MemoryBuffer::BufferKind getBufferKind() const final
+    [[nodiscard]] llvm::MemoryBuffer::BufferKind getBufferKind() const final
     {
         // Hopefully std::string is not memory-mapped...
         return llvm::MemoryBuffer::BufferKind::MemoryBuffer_Malloc;
@@ -1665,6 +1665,8 @@ struct multi_jit {
     }
 };
 
+// NOTE: keep this around as a tentative implementation of a TBB-based dispatcher.
+// NOLINTNEXTLINE
 #if 0
 
 // A task dispatcher class built on top of TBB's task group.
@@ -1694,6 +1696,7 @@ constexpr auto master_module_name = "heyoka.master";
 
 // NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
 // NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model, bool force_avx512, bool slp_vectorize,
                      bool parjit)
     : m_n_modules(n_modules), m_parjit(parjit)
@@ -1718,6 +1721,8 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
     // https://www.llvm.org/doxygen/classllvm_1_1orc_1_1LLJITBuilder.html
     lljit_builder.setJITTargetMachineBuilder(jtmb);
 
+// NOTE: keep this around as a tentative implementation of a TBB-based dispatcher.
+// NOLINTNEXTLINE
 #if 0
 
     if (m_parjit) {
@@ -1749,6 +1754,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
     // NOTE: disable parallel compilation altogether for the time being,
     // as of LLVM 19 it just seems to be buggy overall. Reconsider for
     // LLVM 20.
+// NOLINTNEXTLINE
 #if 0
 
     if (m_parjit) {
@@ -1783,7 +1789,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
         assert(obj_buffer);
 
         // Lock down for access to m_object_files.
-        std::lock_guard lock{m_object_files_mutex};
+        const std::lock_guard lock{m_object_files_mutex};
 
         assert(m_object_files.size() <= m_n_modules);
 
@@ -1793,7 +1799,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
         // one object file matches the content of obj_buffer.
         if (m_object_files.size() < m_n_modules) {
             // Add obj_buffer.
-            m_object_files.push_back(std::string(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd()));
+            m_object_files.emplace_back(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
         } else {
             // Check that at least one buffer in m_object_files is exactly
             // identical to obj_buffer.
@@ -1859,7 +1865,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
                 auto ir_snap = detail::ir_from_module(M);
 
                 // NOTE: protect for multi-threaded access.
-                std::lock_guard lock{m_ir_bc_mutex};
+                const std::lock_guard lock{m_ir_bc_mutex};
 
                 m_bc_snapshots.push_back(std::move(bc_snap));
                 m_ir_snapshots.push_back(std::move(ir_snap));
@@ -2167,7 +2173,7 @@ void llvm_multi_state::add_obj_triggers()
 
         auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
         assert(ft != nullptr);
-        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname.c_str(), &md);
+        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname, &md);
         assert(f != nullptr);
 
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
@@ -2188,7 +2194,7 @@ void llvm_multi_state::add_obj_triggers()
 
         auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
         assert(ft != nullptr);
-        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname.c_str(), &md);
+        auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, fname, &md);
         assert(f != nullptr);
 
         callees.push_back(f);

@@ -414,7 +414,7 @@ std::array<double, 10> get_vsop2013_mus()
 
     retval[0] = detail::vsop2013_gm_sun;
 
-    std::copy(std::begin(detail::vsop2013_gm_pl), std::end(detail::vsop2013_gm_pl), retval.data() + 1);
+    std::ranges::copy(detail::vsop2013_gm_pl, retval.data() + 1);
 
     return retval;
 }

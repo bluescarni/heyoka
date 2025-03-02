@@ -96,6 +96,7 @@ mppp::real128 factorial<mppp::real128>(std::uint32_t n, long long)
 #if defined(HEYOKA_HAVE_REAL)
 
 template <>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
 {
     mppp::real ret{mppp::real_kind::zero, boost::numeric_cast<mpfr_prec_t>(prec)};
@@ -145,7 +146,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     // - the pointer to the state vector (read-only).
     // All pointers are external. There might be overlap between input,
     // output and state vector pointers.
-    std::vector<llvm::Type *> fargs(3u, ext_ptr_t);
+    const std::vector<llvm::Type *> fargs(3u, ext_ptr_t);
 
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);

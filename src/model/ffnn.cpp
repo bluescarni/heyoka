@@ -93,10 +93,10 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     if (n_out == 0u) {
         throw std::invalid_argument("The number of network outputs cannot be zero.");
     }
-    if (!std::all_of(nn_hidden.begin(), nn_hidden.end(), [](auto item) { return item > 0u; })) {
+    if (!std::ranges::all_of(nn_hidden, [](auto item) { return item > 0u; })) {
         throw std::invalid_argument("The number of neurons for each hidden layer must be greater than zero!");
     }
-    if (std::any_of(activations.begin(), activations.end(), [](const auto &func) { return !func; })) {
+    if (std::ranges::any_of(activations, [](const auto &func) { return !func; })) {
         throw std::invalid_argument("The list of activation functions cannot contain empty functions");
     }
 

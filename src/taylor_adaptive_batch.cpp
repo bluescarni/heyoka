@@ -1295,6 +1295,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
         if (with_c_out) {
 #if !defined(NDEBUG)
             std::vector<detail::dfloat<T>> prev_times;
+            prev_times.reserve(m_batch_size);
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 prev_times.emplace_back(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                         c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
@@ -1783,7 +1784,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         }
 
         // Reset dflags.
-        std::fill(dflags.begin(), dflags.end(), 1u);
+        std::ranges::fill(dflags, 1u);
 
         // Compute the state of the system via dense output for as many grid
         // points as possible, i.e., as long as the grid times
@@ -2205,6 +2206,7 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
 }
 
 template <typename T>
+// NOLINTNEXTLINE(bugprone-exception-escape)
 const std::vector<std::pair<expression, expression>> &taylor_adaptive_batch<T>::get_sys() const noexcept
 {
     return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
@@ -2403,6 +2405,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
 
     // Run the compiled function.
     assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto &tm_data = *m_i_data->m_tm_data;
     tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
 
@@ -2420,6 +2423,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
 {
     check_variational(__func__);
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return m_i_data->m_tm_data->m_output;
 }
 

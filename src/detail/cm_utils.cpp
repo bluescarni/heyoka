@@ -208,7 +208,7 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
             // Iterate over the blocks of repetitions.
             for (decltype(ind.size()) rep_idx = 1; rep_idx < ind.size() / n_reps; ++rep_idx) {
                 for (decltype(ind.size()) i = 1; i < n_reps; ++i) {
-                    const auto cur_idx = rep_idx * n_reps + i;
+                    const auto cur_idx = (rep_idx * n_reps) + i;
 
                     if (ind[cur_idx] != ind[cur_idx - 1u]) {
                         rep_flag = false;
@@ -231,8 +231,9 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
 #if !defined(NDEBUG)
                 // Double-check the result in debug mode.
                 std::vector<std::uint32_t> checker;
+                checker.reserve(ind.size());
                 for (decltype(ind.size()) i = 0; i < ind.size(); ++i) {
-                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + (i / n_reps) * stride));
+                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + ((i / n_reps) * stride)));
                 }
                 assert(checker == ind); // LCOV_EXCL_LINE
 #endif
