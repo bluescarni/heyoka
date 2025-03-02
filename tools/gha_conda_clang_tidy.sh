@@ -38,7 +38,7 @@ cmake ../ -G Ninja \
     -DCMAKE_CXX_COMPILER=clang++
 
 # Build.
-ninja -v
+ninja -v -j2
 
 set +e
 set +x
