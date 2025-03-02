@@ -91,6 +91,7 @@ int sign(const mppp::real &z)
 
     const auto ret = z.sgn();
 
+    // NOLINTNEXTLINE(readability-avoid-nested-conditional-operator)
     return ret == 0 ? 0 : (ret < 0 ? -1 : 1);
 }
 
@@ -190,7 +191,7 @@ int sgn(const mppp::real &val)
 // Evaluate the first derivative of a polynomial.
 // Requires random-access iterator.
 template <typename InputIt, typename T>
-auto poly_eval_1(InputIt a, T x, std::uint32_t n)
+auto poly_eval_1(InputIt a, const T &x, std::uint32_t n)
 {
     assert(n >= 2u); // LCOV_EXCL_LINE
 
@@ -209,7 +210,7 @@ auto poly_eval_1(InputIt a, T x, std::uint32_t n)
 // Evaluate polynomial.
 // Requires random-access iterator.
 template <typename InputIt, typename T>
-auto poly_eval(InputIt a, T x, std::uint32_t n)
+auto poly_eval(InputIt a, const T &x, std::uint32_t n)
 {
     auto ret = a[n];
 

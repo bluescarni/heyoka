@@ -555,7 +555,7 @@ std::vector<expression> dtens::get_gradient() const
     const auto sr = get_derivatives(0, 1);
     std::vector<expression> retval;
     retval.reserve(get_nargs());
-    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+    std::ranges::transform(sr, std::back_inserter(retval), [](const auto &p) { return p.second; });
 
     assert(retval.size() == get_nargs());
 
@@ -575,7 +575,7 @@ std::vector<expression> dtens::get_jacobian() const
     const auto sr = get_derivatives(1);
     std::vector<expression> retval;
     retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(get_nargs()) * get_nouts());
-    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+    std::ranges::transform(sr, std::back_inserter(retval), [](const auto &p) { return p.second; });
 
     assert(retval.size() == boost::safe_numerics::safe<decltype(retval.size())>(get_nargs()) * get_nouts());
 
@@ -601,7 +601,7 @@ std::vector<expression> dtens::get_hessian(std::uint32_t component) const
     std::vector<expression> retval;
     retval.reserve(static_cast<decltype(retval.size())>(std::ranges::size(sr)));
 
-    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+    std::ranges::transform(sr, std::back_inserter(retval), [](const auto &p) { return p.second; });
 
     return retval;
 }

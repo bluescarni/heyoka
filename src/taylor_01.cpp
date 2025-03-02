@@ -91,7 +91,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
                              const std::vector<std::variant<variable, number, param>> &args,
                              std::uint32_t n_hidden_deps)
 {
-    assert(std::find(name.begin(), name.end(), '.') == name.end());
+    assert(std::ranges::find(name, '.') == name.end());
     assert(fp_t != nullptr);
     assert(n_uvars > 0u);
 
@@ -267,7 +267,7 @@ llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint3
     assert(u_idx < n_uvars);
 
     // Compute the index.
-    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
+    const auto idx = (static_cast<decltype(arr.size())>(order) * n_uvars) + u_idx;
     assert(idx < arr.size());
 
     return arr[idx];
@@ -540,8 +540,8 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
-        std::sort(tmp_edges.begin(), tmp_edges.end(),
-                  [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
+        std::ranges::sort(tmp_edges,
+                          [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
 
         // For each out edge of v:
         // - eliminate it;

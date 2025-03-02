@@ -333,7 +333,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
     } else {
         // The llvm.used variable does not exist yet, create it.
         auto *used_array_type = llvm::ArrayType::get(ptr_type, 1);
-        std::vector<llvm::Constant *> arr_values{ptr};
+        const std::vector<llvm::Constant *> arr_values{ptr};
         auto *used_arr = llvm::ConstantArray::get(used_array_type, arr_values);
         auto *g_used_arr = new llvm::GlobalVariable(md, used_arr->getType(), true,
                                                     llvm::GlobalVariable::AppendingLinkage, used_arr, "llvm.used");
@@ -471,8 +471,8 @@ llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args
     assert(std::all_of(args.begin() + 1, args.end(),
                        [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
     // Make sure all arguments are either vectors or scalars.
-    assert(std::all_of(args.begin(), args.end(), [](const auto &arg) { return arg->getType()->isVectorTy(); })
-           || std::all_of(args.begin(), args.end(), [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
+    assert(std::ranges::all_of(args, [](const auto &arg) { return arg->getType()->isVectorTy(); })
+           || std::ranges::all_of(args, [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
 
     auto &builder = s.builder();
 
@@ -715,14 +715,15 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const auto &vfi, const auto 
 // real128/real implementations (if these cannot be implemented
 // on top of the LLVM intrinsics).
 template <typename... Args>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 #if defined(HEYOKA_HAVE_REAL128)
                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                            const std::string f128_name,
+                            const std::string &f128_name,
 #endif
 #if defined(HEYOKA_HAVE_REAL)
                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                            const std::string real_name,
+                            const std::string &real_name,
 #endif
 
                             Args *...args)
@@ -3194,6 +3195,7 @@ llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
+    // NOLINTNEXTLINE(readability-suspicious-call-argument)
     auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
     auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
@@ -3212,6 +3214,7 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
+    // NOLINTNEXTLINE(readability-suspicious-call-argument)
     auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
     auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
@@ -3398,6 +3401,7 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
     if constexpr (std::same_as<T, mppp::real>) {
         // Checks on prec.
         // LCOV_EXCL_START
+        // NOLINTNEXTLINE(misc-redundant-expression)
         if (prec == 0 || prec < mppp::real_prec_min() || prec > mppp::real_prec_max()) [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("An invalid precision value of {} was passed to to_internal_llvm_type()", prec));
@@ -3413,8 +3417,8 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
         // Compute the required number of limbs.
         // NOTE: this is a computation done in the implementation of mppp::real and
         // reproduced here. We should consider exposing this functionality in mp++.
-        const auto nlimbs
-            = boost::numeric_cast<std::uint64_t>(prec / GMP_NUMB_BITS + static_cast<int>((prec % GMP_NUMB_BITS) != 0));
+        const auto nlimbs = boost::numeric_cast<std::uint64_t>((prec / GMP_NUMB_BITS)
+                                                               + static_cast<int>((prec % GMP_NUMB_BITS) != 0));
 
         // Fetch the limb array type.
         auto *limb_arr_t = llvm::ArrayType::get(to_external_llvm_type<mp_limb_t>(c), nlimbs);

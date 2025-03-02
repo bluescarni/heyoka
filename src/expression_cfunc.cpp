@@ -414,8 +414,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
-        std::sort(tmp_edges.begin(), tmp_edges.end(),
-                  [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
+        std::ranges::sort(tmp_edges,
+                          [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
 
         // For each out edge of v:
         // - eliminate it;
@@ -931,6 +931,7 @@ auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vecto
                 // Build the vector of values corresponding
                 // to the current argument index.
                 std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+                tmp_c_vec.reserve(n_calls);
                 for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
                     tmp_c_vec.push_back(vv[j][i]);
                 }
@@ -1576,6 +1577,7 @@ namespace
 // defined in the main state and they are passed to the driver functions invocations.
 template <typename SDC>
 void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> &states, const SDC &s_dc,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                    std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy,
                                    const std::string &base_name, llvm::Value *main_eval_arr, llvm::Value *main_par_ptr,
                                    llvm::Value *main_time_ptr, llvm::Value *main_stride)
@@ -1813,6 +1815,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                 // Build the vector of values corresponding
                 // to the current argument index.
                 std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+                tmp_c_vec.reserve(n_calls);
                 for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
                     tmp_c_vec.push_back(vv[j][i]);
                 }
@@ -1926,7 +1929,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                 // The manually-unrolled version of the above.
                 for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
                     auto *cur_call_idx = cur_builder.getInt32(idx);
-                    auto u_idx = gens[0](cur_call_idx);
+                    auto *u_idx = gens[0](cur_call_idx);
                     std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
 
                     for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -1961,6 +1964,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
     // LCOV_EXCL_STOP
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm_state> &states, llvm::Value *out_ptr,
                                                 llvm::Value *in_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                                 llvm::Value *stride, const std::vector<expression> &dc,

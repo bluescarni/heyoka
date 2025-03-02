@@ -107,6 +107,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                                 llvm::Value *svf_ptr, llvm::Value *h_ptr,
                                 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                 std::uint32_t batch_size, llvm::Value *max_abs_state_ptr, llvm::Value *tape_ptr)
 {
     assert(batch_size != 0u);
@@ -214,8 +215,8 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
             // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
             // state variables and sv funcs (not all u vars), hence the indexing is
             // order * (n_eq + n_sv_funcs).
-            v_max_abs_diff_o.push_back(llvm_abs(s, diff_arr[order * (n_eq + n_sv_funcs) + i]));
-            v_max_abs_diff_om1.push_back(llvm_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]));
+            v_max_abs_diff_o.push_back(llvm_abs(s, diff_arr[(order * (n_eq + n_sv_funcs)) + i]));
+            v_max_abs_diff_om1.push_back(llvm_abs(s, diff_arr[((order - 1u) * (n_eq + n_sv_funcs)) + i]));
         }
 
         // Find the maxima via pairwise reduction.
@@ -333,6 +334,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
         // Init the return value, filling it with the values of the
         // coefficients of the highest-degree monomial in each polynomial.
         std::vector<llvm::Value *> res_arr;
+        res_arr.reserve(n_eq);
         for (std::uint32_t i = 0; i < n_eq; ++i) {
             res_arr.push_back(diff_arr[(n_eq * order) + i]);
         }
@@ -340,7 +342,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
         // Run the Horner scheme simultaneously for all polynomials.
         for (std::uint32_t i = 1; i <= order; ++i) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
-                res_arr[j] = llvm_fadd(s, diff_arr[(order - i) * n_eq + j], llvm_fmul(s, res_arr[j], h));
+                res_arr[j] = llvm_fadd(s, diff_arr[((order - i) * n_eq) + j], llvm_fmul(s, res_arr[j], h));
             }
         }
 
@@ -438,7 +440,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_ceval(
         for (std::uint32_t i = 1; i <= order; ++i) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
                 // Evaluate the current monomial.
-                auto *tmp = llvm_fmul(s, diff_arr[i * n_eq + j], cur_h);
+                auto *tmp = llvm_fmul(s, diff_arr[(i * n_eq) + j], cur_h);
 
                 // Compute the quantities for the compensation.
                 auto *y = llvm_fsub(s, tmp, comp_arr[j]);
@@ -564,13 +566,13 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                 // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
                 // state variables and sv_variable (not all u vars), hence the indexing
                 // is cur_order * (n_eq + n_sv_funcs) + j.
-                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
+                const auto arr_idx = (cur_order * (n_eq + n_sv_funcs)) + j;
                 assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 auto *const val = diff_arr[arr_idx];
 
                 // Index in tc_ptr.
                 const auto out_idx
-                    = static_cast<decltype(diff_arr.size())>(order + 1u) * batch_size * j + cur_order * batch_size;
+                    = (static_cast<decltype(diff_arr.size())>(order + 1u) * batch_size * j) + (cur_order * batch_size);
 
                 // Write to tc_ptr.
                 auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, tc_ptr,
@@ -707,14 +709,14 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     builder.CreateRetVoid();
 
     if (compact_mode) {
-        return {std::move(dc), std::move(std::get<0>(diff_variant).first), std::move(std::get<0>(diff_variant).second)};
+        return {std::move(dc), std::get<0>(diff_variant).first, std::move(std::get<0>(diff_variant).second)};
     } else {
-        return {std::move(dc), {}, {}};
+        return {std::move(dc), std::array<std::size_t, 2>{}, std::vector<llvm_state>{}};
     }
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::tuple<taylor_dc_t, std::array<std::size_t, 2>, std::vector<llvm_state>>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
                          const std::vector<std::pair<expression, expression>> &sys, std::uint32_t batch_size,
                          bool high_accuracy, bool compact_mode, bool parallel_mode, std::uint32_t order)
@@ -868,9 +870,9 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     builder.CreateRetVoid();
 
     if (compact_mode) {
-        return {std::move(dc), std::move(std::get<0>(diff_variant).first), std::move(std::get<0>(diff_variant).second)};
+        return {std::move(dc), std::get<0>(diff_variant).first, std::move(std::get<0>(diff_variant).second)};
     } else {
-        return {std::move(dc), {}, {}};
+        return {std::move(dc), std::array<std::size_t, 2>{}, std::vector<llvm_state>{}};
     }
 }
 

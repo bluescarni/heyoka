@@ -369,7 +369,7 @@ std::vector<std::string> get_variables(const expression &e)
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
-    std::sort(retval.begin(), retval.end());
+    std::ranges::sort(retval);
 
     return retval;
 }
@@ -386,7 +386,7 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
-    std::sort(retval.begin(), retval.end());
+    std::ranges::sort(retval);
 
     return retval;
 }
@@ -1035,13 +1035,13 @@ std::vector<expression> get_params(const expression &ex)
 
     // Transform idx_set into a sorted vector.
     std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::sort(idx_vec.begin(), idx_vec.end());
+    std::ranges::sort(idx_vec);
 
     // Transform the sorted indices into a vector of
     // sorted parameter expressions.
     std::vector<expression> retval;
     retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
 
     return retval;
 }
@@ -1059,13 +1059,13 @@ std::vector<expression> get_params(const std::vector<expression> &v_ex)
 
     // Transform idx_set into a sorted vector.
     std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::sort(idx_vec.begin(), idx_vec.end());
+    std::ranges::sort(idx_vec);
 
     // Transform the sorted indices into a vector of
     // sorted parameter expressions.
     std::vector<expression> retval;
     retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
 
     return retval;
 }

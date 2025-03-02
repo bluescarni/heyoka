@@ -89,6 +89,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     };
 
     auto terms = args();
+    // NOLINTNEXTLINE(modernize-use-ranges)
     const auto neg_it = std::stable_partition(terms.begin(), terms.end(), fpart);
 
     // Helper to stream the positive terms.
@@ -663,6 +664,7 @@ std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 expression sum(std::vector<expression> args)
 {
     // Partition args so that all numbers are at the end.
+    // NOLINTNEXTLINE(modernize-use-ranges)
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
@@ -707,6 +709,7 @@ expression sum(std::vector<expression> args)
     // Re-partition args so that all numbers are at the beginning.
     // NOTE: this results in a semi-canonical representation of sums
     // in which numbers are at the beginning.
+    // NOLINTNEXTLINE(modernize-use-ranges)
     std::stable_partition(args.begin(), args.end(),
                           [](const expression &ex) { return std::holds_alternative<number>(ex.value()); });
 

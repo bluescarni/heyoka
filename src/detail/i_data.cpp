@@ -50,6 +50,7 @@ namespace boost::serialization
 {
 
 template <typename Archive, typename... Args>
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
 {
     auto tf = [&ar](const auto &x) {
@@ -68,6 +69,7 @@ void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, u
 }
 
 template <typename Archive, typename... Args>
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
 {
     auto tf = [&ar](auto &x) {
@@ -85,6 +87,7 @@ void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigne
 }
 
 template <typename Archive, typename... Args>
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
 {
     split_free(ar, tup, v);
@@ -190,6 +193,7 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
     // NOTE: here we are recovering only the dense output function pointer because recovering
     // the correct stepper requires information which is available only from the integrator
     // class (hence, we do it from there).
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Init the compact mode tape, if necessary.
@@ -361,6 +365,7 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
     // NOTE: here we are recovering only the dense output function pointer because recovering
     // the correct stepper requires information which is available only from the integrator
     // class (hence, we do it from there).
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Init the compact mode tape, if necessary.

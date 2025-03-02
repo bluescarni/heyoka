@@ -99,6 +99,9 @@ void validate_ode_sys_impl(const std::vector<std::pair<expression, expression>> 
                     }
                 } else {
                     throw std::invalid_argument(
+                        // NOTE: I think this is another false positive. clang-tidy complains that we are
+                        // printing an uninited value but I cannot see how this is the case.
+                        // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
                         fmt::format("Invalid system of differential equations detected: the "
                                     "left-hand side contains the expression '{}', which is not a variable",
                                     lhs));

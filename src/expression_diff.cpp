@@ -506,10 +506,10 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // NOTE: should we do this for the direct deps as well?
     // NOTE: this can be easily parallelised if needed.
     for (auto &rvec : revdep) {
-        std::sort(rvec.begin(), rvec.end());
+        std::ranges::sort(rvec);
 
         // Check that there are no duplicates.
-        assert(std::adjacent_find(rvec.begin(), rvec.end()) == rvec.end());
+        assert(std::ranges::adjacent_find(rvec) == rvec.end());
     }
 
 #if !defined(NDEBUG)
@@ -601,8 +601,7 @@ dtens_sv_idx_t vidx_s2v(const dtens_ss_idx_t &input)
     dtens_sv_idx_t retval{input.first, {input.second.begin(), input.second.end()}};
 
     // Sort the index/order pairs.
-    std::sort(retval.second.begin(), retval.second.end(),
-              [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
+    std::ranges::sort(retval.second, [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
 
     return retval;
 } // LCOV_EXCL_LINE
@@ -667,7 +666,7 @@ void diff_tensors_forward_impl(
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    const typename DiffMap::iterator prev_begin,
+    const typename DiffMap::iterator &prev_begin,
     // The current derivative order.
     const std::uint32_t cur_order)
 {
@@ -789,10 +788,10 @@ void diff_tensors_forward_impl(
         }
 
         // Sort sorted_in_deps in ascending order.
-        std::sort(sorted_in_deps.begin(), sorted_in_deps.end());
+        std::ranges::sort(sorted_in_deps);
 
         // sorted_in_deps cannot have duplicate values.
-        assert(std::adjacent_find(sorted_in_deps.begin(), sorted_in_deps.end()) == sorted_in_deps.end());
+        assert(std::ranges::adjacent_find(sorted_in_deps) == sorted_in_deps.end());
         // sorted_in_deps either must be empty, or its last index
         // must refer to an output (i.e., the current input must be
         // a dependency for some output).
@@ -997,10 +996,10 @@ void diff_tensors_reverse_impl(
         }
 
         // Sort sorted_out_deps in decreasing order.
-        std::sort(sorted_out_deps.begin(), sorted_out_deps.end(), std::greater{});
+        std::ranges::sort(sorted_out_deps, std::greater{});
 
         // sorted_out_deps cannot have duplicate values.
-        assert(std::adjacent_find(sorted_out_deps.begin(), sorted_out_deps.end()) == sorted_out_deps.end());
+        assert(std::ranges::adjacent_find(sorted_out_deps) == sorted_out_deps.end());
         // sorted_out_deps either must be empty, or its last index
         // must refer to a variable/param (i.e., the current output
         // must have a var/param as last element in the chain of dependencies).
@@ -1155,7 +1154,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 {
     spdlog::stopwatch sw;
 
-    assert(std::all_of(args.begin(), args.end(), [](const auto &arg) {
+    assert(std::ranges::all_of(args, [](const auto &arg) {
         return std::holds_alternative<variable>(arg.value()) || std::holds_alternative<param>(arg.value());
     }));
     assert(std::unordered_set(args.begin(), args.end()).size() == args.size());
@@ -1179,6 +1178,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     // Helper to locate a dtens_sv_idx_t in diff_map. If not present,
     // diff_map.end() will be returned.
     auto search_diff_map = [&diff_map](const dtens_sv_idx_t &v) {
+        // NOLINTNEXTLINE(modernize-use-ranges)
         auto it = std::lower_bound(diff_map.begin(), diff_map.end(), v, [](const auto &item, const auto &vec) {
             return dtens_sv_idx_cmp{}(item.first, vec);
         });
@@ -1292,15 +1292,13 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     retval.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(diff_map));
 
     // Check sorting.
-    assert(std::is_sorted(retval.begin(), retval.end(),
-                          [](const auto &p1, const auto &p2) { return dtens_sv_idx_cmp{}(p1.first, p2.first); }));
+    assert(std::ranges::is_sorted(
+        retval, [](const auto &p1, const auto &p2) { return dtens_sv_idx_cmp{}(p1.first, p2.first); }));
     // Check the variable indices.
-    assert(std::all_of(retval.begin(), retval.end(), [&nargs](const auto &p) {
-        return p.first.second.empty() || p.first.second.back().first < nargs;
-    }));
+    assert(std::ranges::all_of(
+        retval, [&nargs](const auto &p) { return p.first.second.empty() || p.first.second.back().first < nargs; }));
     // No duplicates in the indices vectors.
-    assert(std::adjacent_find(retval.begin(), retval.end(),
-                              [](const auto &p1, const auto &p2) { return p1.first == p2.first; })
+    assert(std::ranges::adjacent_find(retval, [](const auto &p1, const auto &p2) { return p1.first == p2.first; })
            == retval.end());
 
     return retval;
@@ -1356,7 +1354,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
 
     // Ensure that every expression in args is either a variable
     // or a param.
-    if (std::any_of(args.begin(), args.end(), [](const auto &arg) {
+    if (std::ranges::any_of(args, [](const auto &arg) {
             return !std::holds_alternative<variable>(arg.value()) && !std::holds_alternative<param>(arg.value());
         })) {
         throw std::invalid_argument("Derivatives can be computed only with respect to variables and/or parameters");
@@ -1371,7 +1369,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
                         args));
     }
 
-    return dtens{dtens::impl{diff_tensors_impl(v_ex, args, order), std::move(args)}};
+    return dtens{dtens::impl{.m_map = diff_tensors_impl(v_ex, args, order), .m_args = std::move(args)}};
 }
 
 } // namespace detail

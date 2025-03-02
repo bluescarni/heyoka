@@ -325,7 +325,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr *= arcsec;
 
                 V_terms.push_back((cur_A + corr) * cprod[1]);
@@ -680,7 +680,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr *= arcsec;
 
                 U_terms.push_back((cur_A + corr) * cprod[1]);
@@ -1035,7 +1035,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr -= 2 * cur_A * dnu / (3 * nu);
 
                 r_terms.push_back((cur_A + corr) * cprod[0]);

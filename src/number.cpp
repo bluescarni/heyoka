@@ -565,7 +565,7 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // Compute the number of base-10 digits that are necessary to uniquely represent
         // all distinct values of the type tp. See:
         // https://en.cppreference.com/w/cpp/types/numeric_limits/max_digits10
-        const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil(prec * std::log10(2.) + 1));
+        const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil((prec * std::log10(2.)) + 1));
 
 #if !defined(NDEBUG) && defined(HEYOKA_HAVE_REAL128)
 
@@ -606,6 +606,7 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         auto *limb_array_t = llvm::cast<llvm::ArrayType>(struct_tp->elements()[2]);
 
         std::vector<llvm::Constant *> limbs;
+        limbs.reserve(r.get_nlimbs());
         for (std::size_t i = 0; i < r.get_nlimbs(); ++i) {
             limbs.push_back(llvm::ConstantInt::get(limb_array_t->getElementType(),
                                                    boost::numeric_cast<std::uint64_t>(r.get_mpfr_t()->_mpfr_d[i])));

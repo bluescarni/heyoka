@@ -104,6 +104,7 @@ llvm::Function *logical_and_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp
 
 llvm::Value *logical_and_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                            const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                            std::uint32_t batch_size, bool) const
 {
@@ -288,6 +289,7 @@ llvm::Function *logical_or_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_
 
 llvm::Value *logical_or_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                           std::uint32_t batch_size, bool) const
 {

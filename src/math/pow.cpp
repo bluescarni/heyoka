@@ -300,46 +300,55 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
     // Small integral powers.
     if (const auto exp = ex_is_integral(impl.args()[1])) {
         if (*exp >= 0 && *exp <= pow_max_small_pow_n) {
-            return {pow_eval_algo::type::pos_small_int,
-                    [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); }, exp,
-                    fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp))};
+            return {.algo = pow_eval_algo::type::pos_small_int,
+                    .eval_f = [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); },
+                    .exp = exp,
+                    .suffix = fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp))};
         }
 
         if (*exp < 0 && -*exp <= pow_max_small_pow_n) {
-            return {pow_eval_algo::type::neg_small_int,
-                    [e = *exp](auto &s, const auto &args) {
-                        auto *tmp = pow_ebs(s, args[0], -e);
-                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                    },
-                    exp, fmt::format("_neg_small_int_{}", static_cast<std::int64_t>(-*exp))};
+            return {.algo = pow_eval_algo::type::neg_small_int,
+                    .eval_f =
+                        [e = *exp](auto &s, const auto &args) {
+                            auto *tmp = pow_ebs(s, args[0], -e);
+                            return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                        },
+                    .exp = exp,
+                    .suffix = fmt::format("_neg_small_int_{}", static_cast<std::int64_t>(-*exp))};
         }
     }
 
     // Small half-integral powers.
     if (const auto exp2 = ex_is_odd_integral_half(impl.args()[1])) {
         if (*exp2 >= 0 && *exp2 <= pow_max_small_pow_n) {
-            return {pow_eval_algo::type::pos_small_half,
-                    [e2 = *exp2](auto &s, const auto &args) {
-                        auto *tmp = llvm_sqrt(s, args[0]);
-                        return pow_ebs(s, tmp, e2);
-                    },
-                    exp2, fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2))};
+            return {.algo = pow_eval_algo::type::pos_small_half,
+                    .eval_f =
+                        [e2 = *exp2](auto &s, const auto &args) {
+                            auto *tmp = llvm_sqrt(s, args[0]);
+                            return pow_ebs(s, tmp, e2);
+                        },
+                    .exp = exp2,
+                    .suffix = fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2))};
         }
 
         if (*exp2 < 0 && -*exp2 <= pow_max_small_pow_n) {
-            return {pow_eval_algo::type::neg_small_half,
-                    [e2 = *exp2](auto &s, const auto &args) {
-                        auto *tmp = llvm_sqrt(s, args[0]);
-                        tmp = pow_ebs(s, tmp, -e2);
-                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                    },
-                    exp2, fmt::format("_neg_small_half_{}", static_cast<std::int64_t>(-*exp2))};
+            return {.algo = pow_eval_algo::type::neg_small_half,
+                    .eval_f =
+                        [e2 = *exp2](auto &s, const auto &args) {
+                            auto *tmp = llvm_sqrt(s, args[0]);
+                            tmp = pow_ebs(s, tmp, -e2);
+                            return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                        },
+                    .exp = exp2,
+                    .suffix = fmt::format("_neg_small_half_{}", static_cast<std::int64_t>(-*exp2))};
         }
     }
 
     // The general case.
-    return {
-        pow_eval_algo::type::general, [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); }, {}, {}};
+    return {.algo = pow_eval_algo::type::general,
+            .eval_f = [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); },
+            .exp = {},
+            .suffix = {}};
 }
 
 llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
