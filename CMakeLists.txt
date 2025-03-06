@@ -280,6 +280,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nrlmsise00_tn.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/jb08_tn.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sgp4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
