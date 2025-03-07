@@ -42,7 +42,7 @@ public:
 
 } // namespace detail
 
-// A constant representing the difference TT - TAI (32.184s).
+// A constant representing the difference TT - TAI (exactly 32.184s).
 HEYOKA_DLL_PUBLIC extern const expression delta_tt_tai;
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression delta_tdb_tt(const expression & = heyoka::time);

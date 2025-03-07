@@ -65,8 +65,9 @@ HEYOKA_BEGIN_NAMESPACE
 
 // NOTE: there are situations (e.g., ensemble simulations) in which
 // we may end up recompiling over and over the same code for the computation
-// of continuous output. Perhaps we should consider some caching of llvm states
-// containing continuous output functions.
+// of continuous output. We now have the llvm_state cache ameliorating the issue,
+// but maybe we could consider another cache specific to the continuous output
+// to further improve performance especially for short-term integrations.
 template <typename T>
 void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {

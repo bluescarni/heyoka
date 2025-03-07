@@ -12,8 +12,6 @@
 #include <cmath>
 #include <sstream>
 
-#include <boost/algorithm/string/predicate.hpp>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -125,16 +123,6 @@ TEST_CASE("delta_tdb_tt")
 
         cf(out, in, kw::time = 9456 * 86400.);
         REQUIRE(std::abs(out[0] - -0.0011265277862548828) < 4e-5);
-    }
-
-    // Streaming test.
-    {
-        std::ostringstream oss;
-        oss << model::delta_tdb_tt();
-        REQUIRE(boost::algorithm::contains(oss.str(), "delta_tdb_tt_K(1.657e-3)"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "delta_tdb_tt_EB(1.671e-2)"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "delta_tdb_tt_M0(6.239996)"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "delta_tdb_tt_M1(1.99096871e-7)"));
     }
 
     // Serialisation test.

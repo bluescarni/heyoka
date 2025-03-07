@@ -15,7 +15,6 @@
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/model/time_conversions.hpp>
-#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -31,42 +30,6 @@ std::string delta_tt_tai_func::operator()(unsigned) const
     // of this constant in decimal format.
     return "32.184";
 }
-
-namespace
-{
-
-// Constants for the implementation of delta_tdb_tt().
-// NOTE: we have exact representations in decimal format of these constants.
-#define HEYOKA_DEFINE_DELTA_TDB_TT_CONST(cname, cvalue)                                                                \
-    class delta_tdb_tt_##cname##_func                                                                                  \
-    {                                                                                                                  \
-        friend class boost::serialization::access;                                                                     \
-        template <typename Archive>                                                                                    \
-        void serialize(Archive &, unsigned)                                                                            \
-        {                                                                                                              \
-        }                                                                                                              \
-                                                                                                                       \
-    public:                                                                                                            \
-        [[nodiscard]] std::string operator()(unsigned) const                                                           \
-        {                                                                                                              \
-            return #cvalue;                                                                                            \
-        }                                                                                                              \
-    };                                                                                                                 \
-    const expression delta_tdb_tt_##cname(func(constant("delta_tdb_tt_" #cname, detail::delta_tdb_tt_##cname##_func{}, \
-                                                        "delta_tdb_tt_" #cname "(" #cvalue ")")));
-
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_DEFINE_DELTA_TDB_TT_CONST(K, 1.657e-3);
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_DEFINE_DELTA_TDB_TT_CONST(EB, 1.671e-2)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_DEFINE_DELTA_TDB_TT_CONST(M0, 6.239996)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_DEFINE_DELTA_TDB_TT_CONST(M1, 1.99096871e-7)
-
-#undef HEYOKA_DEFINE_DELTA_TDB_TT_CONST
-
-} // namespace
 
 } // namespace detail
 
@@ -94,9 +57,14 @@ const expression delta_tt_tai(func(constant("delta_tt_tai", detail::delta_tt_tai
 // It looks like the erfa model may be implementable in the expression system, keep it in mind for future extensions.
 expression delta_tdb_tt(const expression &time_expr)
 {
-    const auto M = detail::delta_tdb_tt_M0 + detail::delta_tdb_tt_M1 * time_expr;
-    const auto E = M + detail::delta_tdb_tt_EB * sin(M);
-    return detail::delta_tdb_tt_K * sin(E);
+    constexpr auto M0 = 6.239996;
+    constexpr auto M1 = 1.99096871e-7;
+    constexpr auto EB = 1.671e-2;
+    constexpr auto K = 1.657e-3;
+
+    const auto M = M0 + M1 * time_expr;
+    const auto E = M + EB * sin(M);
+    return K * sin(E);
 }
 
 } // namespace model
@@ -105,11 +73,3 @@ HEYOKA_END_NAMESPACE
 
 // NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::model::detail::delta_tt_tai_func, std::string, unsigned)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::model::detail::delta_tdb_tt_K_func, std::string, unsigned)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::model::detail::delta_tdb_tt_EB_func, std::string, unsigned)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::model::detail::delta_tdb_tt_M0_func, std::string, unsigned)
-// NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::model::detail::delta_tdb_tt_M1_func, std::string, unsigned)
