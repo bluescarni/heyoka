@@ -25,7 +25,7 @@ namespace detail
 namespace
 {
 
-// FK5@J2000-> ICRS rotation matrix, stored in row-major format.
+// FK5@J2000->ICRS rotation matrix, stored in row-major format.
 constexpr std::array fk5j2000_icrs_rot = {9.9999999999999278e-01,  1.1102233723050031e-07, 4.4118034269763241e-08,
                                           -1.1102233297408340e-07, 9.9999999999998912e-01, -9.6477927438885170e-08,
                                           -4.4118044980967761e-08, 9.6477922540797404e-08, 9.9999999999999434e-01};
@@ -65,6 +65,7 @@ std::array<expression, 3> fk5j2000_icrs(const std::array<expression, 3> &xyz)
     return detail::fk5j2000_icrs_impl<std::experimental::layout_right>(xyz);
 }
 
+// Inverse of fk5j2000_icrs().
 std::array<expression, 3> icrs_fk5j2000(const std::array<expression, 3> &xyz)
 {
     return detail::fk5j2000_icrs_impl<std::experimental::layout_left>(xyz);

@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MODEL_TIME_CONVERSIONS_HPP
-#define HEYOKA_MODEL_TIME_CONVERSIONS_HPP
+#ifndef HEYOKA_MODEL_FRAME_TRANSFORMATIONS_HPP
+#define HEYOKA_MODEL_FRAME_TRANSFORMATIONS_HPP
 
 #include <array>
 
