@@ -1,3 +1,5 @@
+# NOTE: don't find a specific version as we already checked
+# outside that the Boost version is appropriate.
 find_package(Boost QUIET COMPONENTS program_options CONFIG)
 if(NOT ${Boost_FOUND})
     message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")

@@ -1,6 +1,3 @@
-# NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
-# of locating Boost in recent Boost/CMake versions. If we fail, we try again in
-# MODULE mode as last resort.
 # NOTE: don't find a specific version as we already checked
 # outside that the Boost version is appropriate.
 find_package(Boost QUIET COMPONENTS program_options CONFIG)

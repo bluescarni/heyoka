@@ -507,21 +507,22 @@ find_package(TBB REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE TBB::tbb)
 
 # Mandatory dependency on Boost.
-# NOTE: need 1.69 for safe numerics.
-set(_HEYOKA_MIN_BOOST_VERSION "1.69")
+# NOTE: need 1.85 for charconv.
+set(_HEYOKA_MIN_BOOST_VERSION "1.85")
 # NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
 # of locating Boost in recent Boost/CMake versions. If we fail, we try again in
 # MODULE mode as last resort.
-find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization CONFIG)
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv CONFIG)
 if(NOT ${Boost_FOUND})
     message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
-    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization)
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv)
 endif()
 if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 message(STATUS "Found Boost version ${Boost_VERSION}.")
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
+target_link_libraries(heyoka PRIVATE Boost::charconv)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
