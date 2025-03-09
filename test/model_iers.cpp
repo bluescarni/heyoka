@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <limits>
 #include <string>
 
 #include <heyoka/model/iers.hpp>
@@ -253,4 +254,31 @@ TEST_CASE("parse test")
             model::parse_iers_data(str), std::invalid_argument,
             Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 1 is an infinity"));
     }
+}
+
+TEST_CASE("set/get iers data")
+{
+    auto old_data = model::get_iers_data();
+    REQUIRE(!old_data->empty());
+
+    model::set_iers_data(*old_data);
+
+    REQUIRE(*model::get_iers_data() == *old_data);
+
+    REQUIRE(model::get_iers_data().get() != old_data.get());
+}
+
+TEST_CASE("iers_data_row cmp")
+{
+    REQUIRE(model::iers_data_row{.mjd = 1} != model::iers_data_row{.mjd = 2});
+    REQUIRE(model::iers_data_row{.mjd = 1} == model::iers_data_row{.mjd = 1});
+
+    REQUIRE(model::iers_data_row{.mjd = 1, .delta_ut1_utc = 1.} == model::iers_data_row{.mjd = 1, .delta_ut1_utc = 1.});
+    REQUIRE(model::iers_data_row{.mjd = 1, .delta_ut1_utc = 2.} != model::iers_data_row{.mjd = 1, .delta_ut1_utc = 1.});
+    REQUIRE(model::iers_data_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()}
+            != model::iers_data_row{.mjd = 1, .delta_ut1_utc = 1.});
+    REQUIRE(model::iers_data_row{.mjd = 1, .delta_ut1_utc = 1.}
+            != model::iers_data_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(model::iers_data_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()}
+            == model::iers_data_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
 }

@@ -7,8 +7,11 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <limits>
-#include <memory>
 #include <ranges>
+
+#include <boost/smart_ptr/atomic_shared_ptr.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/iers.hpp>
@@ -19508,7 +19511,7 @@ constinit const model::iers_data_row init_iers_data[19480] = {
 } // namespace
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
-std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data = std::make_shared<const model::iers_data_t>(
+boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data = boost::make_shared<const model::iers_data_t>(
     std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
 
 } // namespace detail

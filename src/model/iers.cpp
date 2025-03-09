@@ -10,13 +10,15 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
-#include <memory>
 #include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
+
+#include <boost/smart_ptr/make_shared.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <fmt/core.h>
 
@@ -28,6 +30,22 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace model
 {
+
+bool iers_data_row::operator==(const iers_data_row &other) const noexcept
+{
+    // NOTE: mjd cannot be nan.
+    if (mjd != other.mjd) {
+        return false;
+    }
+
+    // NOLINTNEXTLINE(readability-implicit-bool-conversion)
+    if (std::isnan(delta_ut1_utc)) {
+        // NOLINTNEXTLINE(readability-implicit-bool-conversion)
+        return std::isnan(other.delta_ut1_utc);
+    }
+
+    return delta_ut1_utc == other.delta_ut1_utc;
+}
 
 namespace detail
 {
@@ -200,7 +218,7 @@ iers_data_t parse_iers_data(const std::string &str)
     return retval;
 }
 
-std::shared_ptr<const iers_data_t> get_iers_data()
+boost::shared_ptr<const iers_data_t> get_iers_data()
 {
     return heyoka::detail::cur_iers_data;
 }
@@ -211,7 +229,7 @@ void set_iers_data(iers_data_t new_data)
     detail::validate_iers_data(new_data);
 
     // Assign.
-    heyoka::detail::cur_iers_data = std::make_shared<const iers_data_t>(std::move(new_data));
+    heyoka::detail::cur_iers_data = boost::make_shared<const iers_data_t>(std::move(new_data));
 }
 
 } // namespace model

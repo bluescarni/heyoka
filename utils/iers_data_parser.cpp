@@ -46,37 +46,14 @@ int main(int argc, char *argv[])
     // Parse it.
     const auto iers_data = heyoka::model::parse_iers_data(file_data);
 
-    // Create the header file first.
-    std::ofstream oheader("iers.hpp");
-    oheader << fmt::format(R"(#ifndef HEYOKA_DETAIL_IERS_IERS_HPP
-#define HEYOKA_DETAIL_IERS_IERS_HPP
-
-#include <memory>
-
-#include <heyoka/config.hpp>
-#include <heyoka/model/iers.hpp>
-
-HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{{
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data;
-
-}} // namespace detail
-
-HEYOKA_END_NAMESPACE
-
-#endif
-)",
-                           iers_data.size());
-
-    // Now the cpp file.
+    // Create the cpp file.
     std::ofstream ocpp("iers.cpp");
     ocpp << fmt::format(R"(#include <limits>
-#include <memory>
 #include <ranges>
+
+#include <boost/smart_ptr/atomic_shared_ptr.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/iers.hpp>
@@ -106,7 +83,7 @@ constinit const model::iers_data_row init_iers_data[{}] = {{)",
 } // namespace
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
-std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data = std::make_shared<const model::iers_data_t>(std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
+boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data = boost::make_shared<const model::iers_data_t>(std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
 
 }
 

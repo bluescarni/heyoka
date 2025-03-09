@@ -9,7 +9,7 @@
 #ifndef HEYOKA_DETAIL_IERS_IERS_HPP
 #define HEYOKA_DETAIL_IERS_IERS_HPP
 
-#include <memory>
+#include <boost/smart_ptr/atomic_shared_ptr.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/model/iers.hpp>
@@ -20,7 +20,7 @@ namespace detail
 {
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data;
+extern boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data;
 
 } // namespace detail
 

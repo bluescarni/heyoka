@@ -9,9 +9,10 @@
 #ifndef HEYOKA_MODEL_IERS_HPP
 #define HEYOKA_MODEL_IERS_HPP
 
-#include <memory>
 #include <string>
 #include <vector>
+
+#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -21,18 +22,22 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-struct iers_data_row {
+struct HEYOKA_DLL_PUBLIC iers_data_row {
     // UTC modified Julian date.
     double mjd = 0;
     // UT1-UTC (seconds).
     double delta_ut1_utc = 0;
+
+    bool operator==(const iers_data_row &) const noexcept;
 };
 
 using iers_data_t = std::vector<iers_data_row>;
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC iers_data_t parse_iers_data(const std::string &);
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::shared_ptr<const iers_data_t> get_iers_data();
+// NOTE: here we have to use boost::shared_ptr instead of std::shared_ptr due to the
+// lack of std::atomic<std::shared_ptr> on OSX.
+[[nodiscard]] HEYOKA_DLL_PUBLIC boost::shared_ptr<const iers_data_t> get_iers_data();
 HEYOKA_DLL_PUBLIC void set_iers_data(iers_data_t);
 
 } // namespace model
