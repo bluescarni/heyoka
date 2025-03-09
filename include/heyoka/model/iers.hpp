@@ -33,7 +33,7 @@ using iers_data_t = std::vector<iers_data_row>;
 [[nodiscard]] HEYOKA_DLL_PUBLIC iers_data_t parse_iers_data(const std::string &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::shared_ptr<const iers_data_t> get_iers_data();
-[[nodiscard]] HEYOKA_DLL_PUBLIC void set_iers_data(iers_data_t);
+HEYOKA_DLL_PUBLIC void set_iers_data(iers_data_t);
 
 } // namespace model
 
