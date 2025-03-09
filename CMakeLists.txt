@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.2.2 LANGUAGES CXX C)
+project(heyoka VERSION 7.3.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -32,6 +32,7 @@ include(YACMACompilerLinkerSettings)
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_BUILD_TUTORIALS "Build tutorials." OFF)
+option(HEYOKA_BUILD_UTILS "Build utilities." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
@@ -266,6 +267,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
+    # IERS details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iers/iers.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
@@ -280,6 +283,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nrlmsise00_tn.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/jb08_tn.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sgp4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iers.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
@@ -330,7 +336,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 34)
+set(HEYOKA_ABI_VERSION 35)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -501,21 +507,22 @@ find_package(TBB REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE TBB::tbb)
 
 # Mandatory dependency on Boost.
-# NOTE: need 1.69 for safe numerics.
-set(_HEYOKA_MIN_BOOST_VERSION "1.69")
+# NOTE: need 1.85 for charconv.
+set(_HEYOKA_MIN_BOOST_VERSION "1.85")
 # NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
 # of locating Boost in recent Boost/CMake versions. If we fail, we try again in
 # MODULE mode as last resort.
-find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization CONFIG)
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv CONFIG)
 if(NOT ${Boost_FOUND})
     message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
-    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization)
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv)
 endif()
 if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 message(STATUS "Found Boost version ${Boost_VERSION}.")
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
+target_link_libraries(heyoka PRIVATE Boost::charconv)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
@@ -626,4 +633,8 @@ endif()
 
 if(HEYOKA_BUILD_TUTORIALS)
     add_subdirectory(tutorial)
+endif()
+
+if(HEYOKA_BUILD_UTILS)
+    add_subdirectory(utils)
 endif()
