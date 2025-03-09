@@ -20,6 +20,14 @@
 #include <boost/smart_ptr/make_shared.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 
+// NOTE: clang implements std::from_chars() for floating-point types
+// only since clang 20. Thus, we will be resorting to the Boost implementation.
+#if defined(__clang__)
+
+#include <boost/charconv.hpp>
+
+#endif
+
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
@@ -56,6 +64,21 @@ namespace
 // The expected line length in a IERS data file.
 constexpr auto iers_data_expected_line_length = 185u;
 
+// NOTE: small wrapper to workaround the lack of std::from_chars for floating-point
+// values on clang.
+auto from_chars(const char *first, const char *last, double &value)
+{
+#if defined(__clang__)
+
+    return boost::charconv::from_chars(first, last, value);
+
+#else
+
+    return std::from_chars(first, last, value);
+
+#endif
+}
+
 // Helper to parse the MJD from a line in a IERS data file.
 double parse_iers_data_mjd(const auto &cur_line)
 {
@@ -71,7 +94,7 @@ double parse_iers_data_mjd(const auto &cur_line)
 
     // Try to parse.
     double mjd{};
-    const auto mjd_parse_res = std::from_chars(mjd_begin, mjd_end, mjd);
+    const auto mjd_parse_res = from_chars(mjd_begin, mjd_end, mjd);
     if (mjd_parse_res.ec != std::errc{} || mjd_parse_res.ptr != mjd_end) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Error parsing a finals2000A.all IERS data file: the string '{}' could not be parsed as a valid MJD",
@@ -101,7 +124,7 @@ double parse_iers_data_delta_ut1_utc(const auto &cur_line)
     // it is not available yet.
     if (begin != end) {
         double delta_ut1_utc{};
-        const auto parse_res = std::from_chars(begin, end, delta_ut1_utc);
+        const auto parse_res = from_chars(begin, end, delta_ut1_utc);
         if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Error parsing a finals2000A.all IERS data file: the bulletin B string for the UT1-UTC "
@@ -127,7 +150,7 @@ double parse_iers_data_delta_ut1_utc(const auto &cur_line)
         return std::numeric_limits<double>::quiet_NaN();
     }
     double delta_ut1_utc{};
-    const auto parse_res = std::from_chars(begin, end, delta_ut1_utc);
+    const auto parse_res = from_chars(begin, end, delta_ut1_utc);
     if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Error parsing a finals2000A.all IERS data file: the bulletin A string for the UT1-UTC "
