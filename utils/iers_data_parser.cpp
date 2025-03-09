@@ -47,21 +47,24 @@ int main(int argc, char *argv[])
     const auto iers_data = heyoka::model::parse_iers_data(file_data);
 
     // Create the header file first.
-    std::ofstream oheader("builtin_iers_data.hpp");
-    oheader << fmt::format(R"(#ifndef HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
-#define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
+    std::ofstream oheader("iers.hpp");
+    oheader << fmt::format(R"(#ifndef HEYOKA_DETAIL_IERS_IERS_HPP
+#define HEYOKA_DETAIL_IERS_IERS_HPP
+
+#include <memory>
 
 #include <heyoka/config.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace detail
 {{
 
-extern const iers_data_row init_iers_data[{}];
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+extern std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data;
 
-}}
+}} // namespace detail
 
 HEYOKA_END_NAMESPACE
 
@@ -70,19 +73,24 @@ HEYOKA_END_NAMESPACE
                            iers_data.size());
 
     // Now the cpp file.
-    std::ofstream ocpp("builtin_iers_data.cpp");
+    std::ofstream ocpp("iers.cpp");
     ocpp << fmt::format(R"(#include <limits>
+#include <memory>
+#include <ranges>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/builtin_iers_data.hpp>
+#include <heyoka/detail/iers/iers.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace detail
 {{
 
-constinit const iers_data_row init_iers_data[{}] = {{)",
+namespace
+{{
+
+constinit const model::iers_data_row init_iers_data[{}] = {{)",
                         iers_data.size());
 
     for (const auto &[mjd, cur_delta_ut1_utc] : iers_data) {
@@ -94,6 +102,11 @@ constinit const iers_data_row init_iers_data[{}] = {{)",
     }
 
     ocpp << R"(};
+
+} // namespace
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
+std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data = std::make_shared<const model::iers_data_t>(std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
 
 }
 

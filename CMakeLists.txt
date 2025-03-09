@@ -268,7 +268,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
     # IERS details.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iers/builtin_iers_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iers/iers.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"

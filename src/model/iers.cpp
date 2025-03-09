@@ -21,7 +21,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/builtin_iers_data.hpp>
+#include <heyoka/detail/iers/iers.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -200,23 +200,9 @@ iers_data_t parse_iers_data(const std::string &str)
     return retval;
 }
 
-namespace detail
-{
-
-namespace
-{
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-interfaces-global-init,cert-err58-cpp)
-std::atomic<std::shared_ptr<const iers_data_t>> cur_iers_data
-    = std::make_shared<const iers_data_t>(std::ranges::begin(init_iers_data), std::ranges::end(init_iers_data));
-
-} // namespace
-
-} // namespace detail
-
 std::shared_ptr<const iers_data_t> get_iers_data()
 {
-    return detail::cur_iers_data;
+    return heyoka::detail::cur_iers_data;
 }
 
 void set_iers_data(iers_data_t new_data)
@@ -225,7 +211,7 @@ void set_iers_data(iers_data_t new_data)
     detail::validate_iers_data(new_data);
 
     // Assign.
-    detail::cur_iers_data = std::make_shared<const iers_data_t>(std::move(new_data));
+    heyoka::detail::cur_iers_data = std::make_shared<const iers_data_t>(std::move(new_data));
 }
 
 } // namespace model

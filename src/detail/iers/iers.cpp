@@ -7,17 +7,22 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <limits>
+#include <memory>
+#include <ranges>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/builtin_iers_data.hpp>
+#include <heyoka/detail/iers/iers.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace detail
 {
 
-constinit const iers_data_row init_iers_data[19480] = {
+namespace
+{
+
+constinit const model::iers_data_row init_iers_data[19480] = {
     {.mjd = 41684, .delta_ut1_utc = 0.8075},
     {.mjd = 41685, .delta_ut1_utc = 0.8044},
     {.mjd = 41686, .delta_ut1_utc = 0.8012},
@@ -19500,6 +19505,12 @@ constinit const iers_data_row init_iers_data[19480] = {
     {.mjd = 61163, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()},
 };
 
-} // namespace model::detail
+} // namespace
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
+std::atomic<std::shared_ptr<const model::iers_data_t>> cur_iers_data = std::make_shared<const model::iers_data_t>(
+    std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
