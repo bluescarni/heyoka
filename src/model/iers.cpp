@@ -187,7 +187,7 @@ iers_data_t parse_iers_data(const std::string &str)
 {
     // Parse line by line, splitting on newlines.
     iers_data_t retval;
-    for (const auto &cur_line : str | std::views::split('\n')) {
+    for (const auto cur_line : str | std::views::split('\n')) {
         // NOTE: finals2000A.all files may have a newline at the end, when we encounter
         // it just break out.
         if (std::ranges::empty(cur_line)) {
