@@ -11,17 +11,6 @@ endif()
 if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
-if(NOT TARGET Boost::program_options)
-    message(STATUS "The 'Boost::program_options' imported target is missing, creating it.")
-    add_library(Boost::program_options UNKNOWN IMPORTED)
-    set_target_properties(Boost::program_options PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${Boost_INCLUDE_DIRS}"
-    )
-    set_target_properties(Boost::program_options PROPERTIES
-        IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-        IMPORTED_LOCATION "${Boost_PROGRAM_OPTIONS_LIBRARY}"
-    )
-endif()
 
 # Find the xtensor bits.
 find_package(xtensor REQUIRED CONFIG)

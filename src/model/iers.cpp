@@ -9,6 +9,7 @@
 #include <cassert>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <ranges>
 #include <stdexcept>
@@ -20,6 +21,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/iers/builtin_iers_data.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -101,7 +103,11 @@ double parse_iers_data_delta_ut1_utc(const auto &cur_line)
     }
     const auto bullA_sv = std::string_view(begin, end);
 
-    // Try to parse.
+    // Try to parse, but only if the bulletin A data is not empty: if empty, it means
+    // that it is not available yet and we will return NaN instead.
+    if (begin == end) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
     double delta_ut1_utc{};
     const auto parse_res = std::from_chars(begin, end, delta_ut1_utc);
     if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
@@ -136,11 +142,12 @@ void validate_iers_data(const std::vector<iers_data_row> &data)
                                                     cur_mjd, i, data[i + 1u].mjd));
         }
 
-        // All UT1-UTC values must be finite.
+        // UT1-UTC values cannot be inf (but they can be NaN if they are missing).
         const auto cur_delta_ut1_utc = data[i].delta_ut1_utc;
-        if (!std::isfinite(cur_delta_ut1_utc)) [[unlikely]] {
+        // NOLINTNEXTLINE(readability-implicit-bool-conversion)
+        if (std::isinf(cur_delta_ut1_utc)) [[unlikely]] {
             throw std::invalid_argument(fmt::format(
-                "Invalid finals2000A.all IERS data file detected: the UT1-UTC value {} on line {} is not finite",
+                "Invalid finals2000A.all IERS data file detected: the UT1-UTC value {} on line {} is an infinity",
                 cur_delta_ut1_utc, i));
         }
     }
@@ -163,6 +170,12 @@ iers_data_t parse_iers_data(const std::string &str)
     // Parse line by line, splitting on newlines.
     iers_data_t retval;
     for (const auto &cur_line : str | std::views::split('\n')) {
+        // NOTE: finals2000A.all files may have a newline at the end, when we encounter
+        // it just break out.
+        if (std::ranges::empty(cur_line)) {
+            break;
+        }
+
         // Check the line length.
         if (std::ranges::size(cur_line) < detail::iers_data_expected_line_length) [[unlikely]] {
             throw std::invalid_argument(fmt::format(
@@ -193,8 +206,9 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-std::atomic<std::shared_ptr<const iers_data_t>> cur_iers_data;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-interfaces-global-init,cert-err58-cpp)
+std::atomic<std::shared_ptr<const iers_data_t>> cur_iers_data
+    = std::make_shared<const iers_data_t>(std::ranges::begin(init_iers_data), std::ranges::end(init_iers_data));
 
 } // namespace
 

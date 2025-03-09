@@ -32,6 +32,7 @@ include(YACMACompilerLinkerSettings)
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_BUILD_TUTORIALS "Build tutorials." OFF)
+option(HEYOKA_BUILD_UTILS "Build utilities." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
@@ -266,6 +267,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
+    # IERS details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iers/builtin_iers_data.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
@@ -629,4 +632,8 @@ endif()
 
 if(HEYOKA_BUILD_TUTORIALS)
     add_subdirectory(tutorial)
+endif()
+
+if(HEYOKA_BUILD_UTILS)
+    add_subdirectory(utils)
 endif()

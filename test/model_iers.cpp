@@ -55,18 +55,51 @@ TEST_CASE("parse test")
         REQUIRE(data[1].delta_ut1_utc == 0.0456841);
     }
 
+    // NOTE: newline at the end.
+    {
+        const std::string str
+            = "25 2 3 60709.00 I  0.099700 0.000012  0.309126 0.000014  I 0.0461909 0.0000082  0.5842 0.0078  I     "
+              "0.383    0.375    -0.034    0.114                                                     \n";
+
+        const auto data = model::parse_iers_data(str);
+
+        REQUIRE(data.size() == 1u);
+
+        REQUIRE(data[0].mjd == 60709);
+        REQUIRE(data[0].delta_ut1_utc == 0.0461909);
+    }
+
+    // NOTE: missing both bulletin A and bulletin B data.
+    {
+        const std::string str
+            = "26 315 61114.00                                                                                         "
+              "                                                                                   \n26 316 61115.00    "
+              "                                                                                                        "
+              "                                                                ";
+
+        const auto data = model::parse_iers_data(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 61114);
+        REQUIRE(std::isnan(data[0].delta_ut1_utc));
+
+        REQUIRE(data[1].mjd == 61115);
+        REQUIRE(std::isnan(data[1].delta_ut1_utc));
+    }
+
     // Parse errors.
 
     // Wrong line length.
     {
         const std::string str
             = "25 2 3 60709.00 I  0.099700 0.000012  0.309126 0.000014  I 0.0461909 0.0000082  0.5842 0.0078  I     "
-              "0.383    0.375    -0.034    0.114                                                     \n";
+              "0.383    0.375    -0.034    0.114                                                     \n ";
 
         REQUIRE_THROWS_MATCHES(
             model::parse_iers_data(str), std::invalid_argument,
             Message("Invalid line detected in a finals2000A.all IERS data file: the expected number of "
-                    "characters in the line is at least 185, but a line with 0 character(s) was detected instead"));
+                    "characters in the line is at least 185, but a line with 1 character(s) was detected instead"));
     }
 
     {
@@ -207,7 +240,7 @@ TEST_CASE("parse test")
 
         REQUIRE_THROWS_MATCHES(
             model::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 0 is not finite"));
+            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 0 is an infinity"));
     }
     {
         const std::string str
@@ -218,6 +251,6 @@ TEST_CASE("parse test")
 
         REQUIRE_THROWS_MATCHES(
             model::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 1 is not finite"));
+            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 1 is an infinity"));
     }
 }
