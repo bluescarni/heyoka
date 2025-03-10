@@ -155,8 +155,10 @@ void validate_iers_data(const std::vector<iers_data_row> &data)
         // to false and we will throw on the next iteration when we detect a non-finite
         // value for the mjd.
         if (i + 1u != n_entries && cur_mjd >= data[i + 1u].mjd) [[unlikely]] {
+            // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format("Invalid finals2000A.all IERS data file detected: the MJD value {} "
                                                     "on line {} is not less than the MJD value in the next line ({})",
+                                                    // LCOV_EXCL_STOP
                                                     cur_mjd, i, data[i + 1u].mjd));
         }
 
