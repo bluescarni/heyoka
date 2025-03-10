@@ -1,6 +1,23 @@
 Changelog
 =========
 
+7.3.0 (unreleased)
+------------------
+
+New
+~~~
+
+- New models: time conversions, frame transformations, Earth
+  rotation angle
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now requires Boost >= 1.85
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+
+
 7.2.1 (2025-01-07)
 ------------------
 
