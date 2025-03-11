@@ -657,7 +657,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -774,7 +774,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -902,7 +902,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.

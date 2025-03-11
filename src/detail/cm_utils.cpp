@@ -268,7 +268,7 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
     // NOTE: naked new here is fine, gvar will be registered in the module
     // object and cleaned up when the module is destroyed.
     auto *gvar
-        = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, const_arr);
+        = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, const_arr);
 
     // Return the generator.
     return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
@@ -310,7 +310,7 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, ll
     assert(const_arr != nullptr); // LCOV_EXCL_LINE
     // NOTE: naked new here is fine, gvar will be registered in the module
     // object and cleaned up when the module is destroyed.
-    auto *gvar = new llvm::GlobalVariable(s.module(), const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
+    auto *gvar = new llvm::GlobalVariable(s.module(), const_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage,
                                           const_arr);
 
     // Return the generator.

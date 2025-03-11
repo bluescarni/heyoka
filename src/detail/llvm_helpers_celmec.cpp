@@ -357,7 +357,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // The return type is tp.
     auto *ft = llvm::FunctionType::get(tp, fargs, false);
     // Create the function
-    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
     assert(f != nullptr);
 
     // Fetch the necessary function arguments.
@@ -716,7 +716,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // The return type is tp.
     auto *ft = llvm::FunctionType::get(tp, fargs, false);
     // Create the function
-    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
     assert(f != nullptr);
 
     // Fetch the necessary function arguments.
@@ -1033,7 +1033,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     // The return type is tp.
     auto *ft = llvm::FunctionType::get(tp, fargs, false);
     // Create the function
-    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
     assert(f != nullptr);
 
     // Fetch the necessary function arguments.

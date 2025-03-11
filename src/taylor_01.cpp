@@ -1037,7 +1037,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm_func_create(ft, external_linkage ? llvm::Function::ExternalLinkage : llvm::Function::InternalLinkage,
+    auto *f = llvm_func_create(ft, external_linkage ? llvm::Function::ExternalLinkage : llvm::Function::PrivateLinkage,
                                "d_out_f", &s.module());
 
     // Set the names/attributes of the function arguments.

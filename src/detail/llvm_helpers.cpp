@@ -1046,7 +1046,7 @@ llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t
     assert(t != nullptr); // LCOV_EXCL_LINE
 
     // Make the global array.
-    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::PrivateLinkage,
                                             llvm::ConstantAggregateZero::get(t));
 
     // Return it.
@@ -2924,7 +2924,7 @@ llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
     // Create the global array.
     auto *bc_const_arr = llvm::ConstantArray::get(arr_type, bc_const);
     auto *g_bc_const_arr = new llvm::GlobalVariable(md, bc_const_arr->getType(), true,
-                                                    llvm::GlobalVariable::InternalLinkage, bc_const_arr);
+                                                    llvm::GlobalVariable::PrivateLinkage, bc_const_arr);
 
     // Get out a pointer to the beginning of the array.
     return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,
