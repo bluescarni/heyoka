@@ -224,7 +224,12 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     assert(types.size() <= nargs);
 
     // Fetch the intrinsic ID from the name.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
+    const auto intrinsic_ID =
+#if LLVM_VERSION_MAJOR < 20
+        llvm::Function::lookupIntrinsicID(name);
+#else
+        llvm::Intrinsic::lookupIntrinsicID(name);
+#endif
     // LCOV_EXCL_START
     if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
         throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
