@@ -64,15 +64,9 @@ TEST_CASE("pow vect")
         REQUIRE(!boost::algorithm::contains(md_ir, "llvm.pow"));
     }
 
-    // NOTE: no idea why, but in LLVM 17 it seems like there's no autovec
-    // happening at all in this specific case. This needs to be investigated.
-#if LLVM_VERSION_MAJOR == 16
-
     if (tf.aarch64) {
         REQUIRE(!boost::algorithm::contains(md_ir, "llvm.pow"));
     }
-
-#endif
 
 #endif
 }

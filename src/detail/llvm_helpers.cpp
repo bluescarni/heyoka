@@ -989,11 +989,7 @@ std::uint32_t gl_arr_size(llvm::Value *v)
 // Fetch the alignment of a type.
 std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 {
-#if LLVM_VERSION_MAJOR >= 16
     return md.getDataLayout().getABITypeAlign(tp).value();
-#else
-    return md.getDataLayout().getABITypeAlignment(tp);
-#endif
 }
 
 // Fetch the alloc size of a type. This should be
@@ -1525,11 +1521,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
 // Append bb to the list of blocks of the function f
 void llvm_append_block(llvm::Function *f, llvm::BasicBlock *bb)
 {
-#if LLVM_VERSION_MAJOR >= 16
     f->insert(f->end(), bb);
-#else
-    f->getBasicBlockList().push_back(bb);
-#endif
 }
 
 // Create an LLVM for loop in the form:
