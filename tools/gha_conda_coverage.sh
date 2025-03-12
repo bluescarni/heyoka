@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir c-compiler cxx-compiler ninja cmake \
     llvmdev tbb-devel tbb libboost-devel mppp sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog lcov
+    xtensor-blas blas blas-devel fmt spdlog lcov openssl
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -33,6 +33,7 @@ cmake ../ -G Ninja \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
+    -DHEYOKA_BUILD_UTILS=ON \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="--coverage" \
@@ -43,6 +44,9 @@ ninja -v
 
 # Run the tests.
 ctest -VV -j4
+
+# Also run the iers data updater.
+./utils/iers_data_updater
 
 # Create lcov report
 lcov --capture --directory . --output-file coverage.info
