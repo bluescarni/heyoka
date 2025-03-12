@@ -180,7 +180,8 @@ iers_data iers_data::fetch_latest()
         // Parse the "last modified field" to construct the timestamp.
         auto timestamp = detail::iers_data_parse_last_modified(res[http::field::last_modified]);
 
-        // Fetch the message body as a string.
+        // Fetch the message body as a string. See:
+        // https://github.com/boostorg/beast/issues/819
         const auto body = boost::beast::buffers_to_string(res.body().data());
 
         // Gracefully close the stream.
