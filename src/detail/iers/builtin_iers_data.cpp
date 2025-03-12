@@ -17,7 +17,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-const char *const builtin_iers_data_ts = "2025_03_06";
+const char *const builtin_iers_data_ts = "2025_03_06_17_50_03";
 
 constinit const iers_row builtin_iers_data[19480] = {
     {.mjd = 41684, .delta_ut1_utc = 0.8075},

@@ -68,6 +68,21 @@ const auto iers_data_date_regexp = std::regex(
 // by the iers_data class.
 std::string iers_data_parse_last_modified(std::string_view lm_field)
 {
+    // Helper to parse an unsigned integral quantity from the range [begin, end). 'name'
+    // is the name of the quantity, to be used only for error reporting.
+    auto uint_parse = [](const char *begin, const char *end, std::string_view name) {
+        unsigned out{};
+        const auto res = std::from_chars(begin, end, out);
+        if (res.ec != std::errc{} || res.ptr != end) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(fmt::format("Could not parse the string '{}' as an integral {} value",
+                                                    std::string_view(begin, end), name));
+            // LCOV_EXCL_STOP
+        }
+
+        return out;
+    };
+
     std::cmatch matches;
     if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, iers_data_date_regexp))
         [[likely]] {
@@ -75,14 +90,7 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
         // NOTE: 7 + 1 because the first match is the entire string.
         if (matches.size() == 8u) [[likely]] {
             // Parse the day
-            unsigned day{};
-            auto res = std::from_chars(matches[2].first, matches[2].second, day);
-            if (res.ec != std::errc{} || res.ptr != matches[2].second) [[unlikely]] {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Could not parse the string '{}' as a day",
-                                                        std::string_view(matches[2].first, matches[2].second)));
-                // LCOV_EXCL_STOP
-            }
+            const auto day = uint_parse(matches[2].first, matches[2].second, "day");
 
             // Parse the month.
             const auto month_str = std::string_view(matches[3].first, matches[3].second);
@@ -91,17 +99,19 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
             const auto month = iers_data_month_names_map.find(month_str)->second;
 
             // Parse the year.
-            unsigned year{};
-            res = std::from_chars(matches[4].first, matches[4].second, year);
-            if (res.ec != std::errc{} || res.ptr != matches[4].second) [[unlikely]] {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Could not parse the string '{}' as a year",
-                                                        std::string_view(matches[4].first, matches[4].second)));
-                // LCOV_EXCL_STOP
-            }
+            const auto year = uint_parse(matches[4].first, matches[4].second, "year");
 
-            // Assemble the year-month-day string.
-            return fmt::format("{:04}_{:02}_{:02}", year, month, day);
+            // Parse the hour.
+            const auto hour = uint_parse(matches[5].first, matches[5].second, "hour");
+
+            // Parse the minute.
+            const auto minute = uint_parse(matches[6].first, matches[6].second, "minute");
+
+            // Parse the second.
+            const auto second = uint_parse(matches[7].first, matches[7].second, "second");
+
+            // Assemble the timestamp.
+            return fmt::format("{:04}_{:02}_{:02}_{:02}_{:02}_{:02}", year, month, day, hour, minute, second);
         }
     }
 
