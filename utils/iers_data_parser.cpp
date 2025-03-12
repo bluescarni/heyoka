@@ -10,6 +10,8 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <regex>
+#include <stdexcept>
 #include <string>
 
 #include <boost/program_options.hpp>
@@ -30,7 +32,7 @@ int main(int argc, char *argv[])
     desc.add_options()("help", "produce help message")("input", po::value<std::string>(&input_file_path)->required(),
                                                        "path to the IERS data file 'finals2000A.all'")(
         "timestamp", po::value<std::string>(&timestamp)->required(),
-        "timestamp for the IERS data file 'finals2000A.all' (YYYY_MM_DD)");
+        "UTC timestamp for the IERS data file 'finals2000A.all' (YYYY_MM_DD)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -41,6 +43,13 @@ int main(int argc, char *argv[])
     }
 
     po::notify(vm);
+
+    // Validate the timestamp format.
+    const std::regex ts_pattern(R"(\d{4}_\d{2}_\d{2})");
+    if (!std::regex_match(timestamp, ts_pattern)) {
+        throw std::invalid_argument(
+            fmt::format("The string '{}' is not a valid timestamp in the YYYY_MM_DD format", timestamp));
+    }
 
     // Read the contents of the file into a string.
     std::ifstream ifile(input_file_path);
