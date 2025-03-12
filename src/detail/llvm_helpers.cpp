@@ -989,11 +989,7 @@ std::uint32_t gl_arr_size(llvm::Value *v)
 // Fetch the alignment of a type.
 std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 {
-#if LLVM_VERSION_MAJOR >= 16
     return md.getDataLayout().getABITypeAlign(tp).value();
-#else
-    return md.getDataLayout().getABITypeAlignment(tp);
-#endif
 }
 
 // Fetch the alloc size of a type. This should be
@@ -1050,7 +1046,7 @@ llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t
     assert(t != nullptr); // LCOV_EXCL_LINE
 
     // Make the global array.
-    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::PrivateLinkage,
                                             llvm::ConstantAggregateZero::get(t));
 
     // Return it.
@@ -1525,11 +1521,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
 // Append bb to the list of blocks of the function f
 void llvm_append_block(llvm::Function *f, llvm::BasicBlock *bb)
 {
-#if LLVM_VERSION_MAJOR >= 16
     f->insert(f->end(), bb);
-#else
-    f->getBasicBlockList().push_back(bb);
-#endif
 }
 
 // Create an LLVM for loop in the form:
@@ -2932,7 +2924,7 @@ llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
     // Create the global array.
     auto *bc_const_arr = llvm::ConstantArray::get(arr_type, bc_const);
     auto *g_bc_const_arr = new llvm::GlobalVariable(md, bc_const_arr->getType(), true,
-                                                    llvm::GlobalVariable::InternalLinkage, bc_const_arr);
+                                                    llvm::GlobalVariable::PrivateLinkage, bc_const_arr);
 
     // Get out a pointer to the beginning of the array.
     return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,

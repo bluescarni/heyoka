@@ -1090,24 +1090,24 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
 
     auto *var_indices_arr = llvm::ConstantArray::get(var_arr_type, var_indices);
     auto *g_var_indices = new llvm::GlobalVariable(md, var_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, var_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, var_indices_arr);
 
     auto *vars_arr = llvm::ConstantArray::get(var_arr_type, vars);
     auto *g_vars
-        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
+        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, vars_arr);
 
     // Numbers.
     auto *num_indices_arr_type
         = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
     auto *num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, num_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, num_indices_arr);
 
     auto *nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
     auto *nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
-        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
+        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, nums_arr);
 
     // Params.
     auto *par_arr_type
@@ -1115,11 +1115,11 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
 
     auto *par_indices_arr = llvm::ConstantArray::get(par_arr_type, par_indices);
     auto *g_par_indices = new llvm::GlobalVariable(md, par_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, par_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, par_indices_arr);
 
     auto *pars_arr = llvm::ConstantArray::get(par_arr_type, pars);
     auto *g_pars
-        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
+        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, pars_arr);
 
     return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_out_vars};
 }
