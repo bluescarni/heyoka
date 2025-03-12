@@ -10,16 +10,16 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/builtin_iers_data.hpp>
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-const char *const builtin_iers_data_ts = "2025-03-06";
+const char *const builtin_iers_data_ts = "2025_03_06";
 
-constinit const model::iers_row builtin_iers_data[19480] = {
+constinit const iers_row builtin_iers_data[19480] = {
     {.mjd = 41684, .delta_ut1_utc = 0.8075},
     {.mjd = 41685, .delta_ut1_utc = 0.8044},
     {.mjd = 41686, .delta_ut1_utc = 0.8012},

@@ -21,12 +21,9 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/builtin_iers_data.hpp>
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace model
-{
 
 // NOTE: we have a custom implementation of this operator
 // because we want to consider NaNs equal to each other.
@@ -220,9 +217,8 @@ iers_table parse_iers_data(const std::string &str)
 } // namespace detail
 
 iers_data::iers_data()
-    : m_data(std::ranges::begin(heyoka::detail::builtin_iers_data),
-             std::ranges::end(heyoka::detail::builtin_iers_data)),
-      m_timestamp(heyoka::detail::builtin_iers_data_ts)
+    : m_data(std::ranges::begin(detail::builtin_iers_data), std::ranges::end(detail::builtin_iers_data)),
+      m_timestamp(detail::builtin_iers_data_ts)
 {
 }
 
@@ -235,7 +231,5 @@ const std::string &iers_data::get_timestamp() const noexcept
 {
     return m_timestamp;
 }
-
-} // namespace model
 
 HEYOKA_END_NAMESPACE

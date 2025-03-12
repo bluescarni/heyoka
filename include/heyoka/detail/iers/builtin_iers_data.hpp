@@ -10,7 +10,7 @@
 #define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
 
 #include <heyoka/config.hpp>
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -19,7 +19,7 @@ namespace detail
 
 extern const char *const builtin_iers_data_ts;
 
-extern const model::iers_row builtin_iers_data[19480];
+extern const iers_row builtin_iers_data[19480];
 
 } // namespace detail
 

@@ -16,7 +16,7 @@
 
 #include <fmt/core.h>
 
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     desc.add_options()("help", "produce help message")("input", po::value<std::string>(&input_file_path)->required(),
                                                        "path to the IERS data file 'finals2000A.all'")(
         "timestamp", po::value<std::string>(&timestamp)->required(),
-        "timestamp for the IERS data file 'finals2000A.all' (YYYY-MM-DD)");
+        "timestamp for the IERS data file 'finals2000A.all' (YYYY_MM_DD)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     const std::string file_data{std::istreambuf_iterator<char>(ifile), std::istreambuf_iterator<char>()};
 
     // Parse it.
-    const auto iers_data = heyoka::model::detail::parse_iers_data(file_data);
+    const auto iers_data = heyoka::detail::parse_iers_data(file_data);
 
     // Create the header file first.
     std::ofstream oheader("builtin_iers_data.hpp");
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 #define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
 
 #include <heyoka/config.hpp>
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -64,7 +64,7 @@ namespace detail
 
 extern const char *const builtin_iers_data_ts;
 
-extern const model::iers_row builtin_iers_data[{}];
+extern const iers_row builtin_iers_data[{}];
 
 }} // namespace detail
 
@@ -80,7 +80,7 @@ HEYOKA_END_NAMESPACE
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/builtin_iers_data.hpp>
-#include <heyoka/model/iers.hpp>
+#include <heyoka/iers_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -89,7 +89,7 @@ namespace detail
 
 const char *const builtin_iers_data_ts = "{}";
 
-constinit const model::iers_row builtin_iers_data[{}] = {{)",
+constinit const iers_row builtin_iers_data[{}] = {{)",
                         timestamp, iers_data.size());
 
     for (const auto &[mjd, cur_delta_ut1_utc] : iers_data) {

@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MODEL_IERS_HPP
-#define HEYOKA_MODEL_IERS_HPP
+#ifndef HEYOKA_IERS_DATA_HPP
+#define HEYOKA_IERS_DATA_HPP
 
 #include <string>
 #include <vector>
@@ -16,9 +16,6 @@
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace model
-{
 
 // Single row in a IERS data table.
 struct HEYOKA_DLL_PUBLIC iers_row {
@@ -53,8 +50,6 @@ namespace detail
 [[nodiscard]] HEYOKA_DLL_PUBLIC iers_table parse_iers_data(const std::string &);
 
 } // namespace detail
-
-} // namespace model
 
 HEYOKA_END_NAMESPACE
 
