@@ -15,7 +15,6 @@
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/frame_transformations.hpp>
-#include <heyoka/model/iers.hpp>
 #include <heyoka/model/jb08_tn.hpp>
 #include <heyoka/model/mascon.hpp>
 #include <heyoka/model/nbody.hpp>
