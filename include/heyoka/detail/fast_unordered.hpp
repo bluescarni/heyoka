@@ -11,25 +11,8 @@
 
 #include <heyoka/config.hpp>
 
-#include <boost/version.hpp>
-
-#if (BOOST_VERSION / 100000 > 1) || (BOOST_VERSION / 100000 == 1 && BOOST_VERSION / 100 % 1000 >= 81)
-
-#define HEYOKA_HAVE_BOOST_UNORDERED_FLAT
-
-#endif
-
-#if defined(HEYOKA_HAVE_BOOST_UNORDERED_FLAT)
-
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
-
-#else
-
-#include <unordered_map>
-#include <unordered_set>
-
-#endif
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -37,31 +20,13 @@ namespace detail
 {
 
 template <typename... Args>
-using fast_uset =
-#if defined(HEYOKA_HAVE_BOOST_UNORDERED_FLAT)
-    boost::unordered_flat_set<Args...>
-#else
-    std::unordered_set<Args...>
-#endif
-    ;
+using fast_uset = boost::unordered_flat_set<Args...>;
 
 template <typename... Args>
-using fast_umap =
-#if defined(HEYOKA_HAVE_BOOST_UNORDERED_FLAT)
-    boost::unordered_flat_map<Args...>
-#else
-    std::unordered_map<Args...>
-#endif
-    ;
+using fast_umap = boost::unordered_flat_map<Args...>;
 
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
-
-#if defined(HEYOKA_HAVE_BOOST_UNORDERED_FLAT)
-
-#undef HEYOKA_HAVE_BOOST_UNORDERED_FLAT
-
-#endif
 
 #endif

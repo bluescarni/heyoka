@@ -529,19 +529,6 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 # NOTE: make sure we do not use deprecated ASIO bits.
 target_compile_definitions(heyoka PRIVATE BOOST_ASIO_NO_DEPRECATED)
 
-# NOTE: recent versions of libcxx remove std::unary_function/std::binary_function
-# (which have been deprecated since long) in C++17 mode. This breaks, e.g., hashing
-# functionality on older Boost versions. See:
-# https://github.com/boostorg/container_hash/issues/22
-# Note that the better approach here would be to detect libcxx rather than
-# just Apple, but at this time it seems like there's no easy way to detect
-# the stdlib implementation/version from CMake.
-if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
-    # NOTE: make this a PUBLIC definition just to err on the side
-    # of caution.
-    target_compile_definitions(heyoka PUBLIC BOOST_NO_CXX98_FUNCTION_BASE)
-endif()
-
 # Optional dependency on mp++.
 set(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION 2)
 set(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION 2)
