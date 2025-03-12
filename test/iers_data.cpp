@@ -7,13 +7,24 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <limits>
+#include <sstream>
 #include <string>
+#include <utility>
 
 #include <heyoka/iers_data.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
+
+TEST_CASE("basic")
+{
+    iers_data idata;
+
+    REQUIRE(!idata.get_table().empty());
+    REQUIRE(!idata.get_timestamp().empty());
+}
 
 TEST_CASE("parse test")
 {
@@ -269,4 +280,29 @@ TEST_CASE("iers_row cmp")
             != iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
     REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()}
             == iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
+}
+
+TEST_CASE("s11n")
+{
+    iers_data idata;
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << idata;
+    }
+
+    // Save the original table.
+    const auto otable = idata.get_table();
+
+    // Reset via move.
+    auto idat2 = std::move(idata);
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> idata;
+    }
+
+    REQUIRE(otable == idata.get_table());
 }

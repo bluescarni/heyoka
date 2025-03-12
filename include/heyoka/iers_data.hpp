@@ -15,6 +15,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -25,16 +26,31 @@ struct HEYOKA_DLL_PUBLIC iers_row {
     // UT1-UTC (seconds).
     double delta_ut1_utc = 0;
 
+    // Comparison operator.
     bool operator==(const iers_row &) const noexcept;
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 // The IERS data table.
 using iers_table = std::vector<iers_row>;
 
+// The IERS data class.
 class HEYOKA_DLL_PUBLIC iers_data
 {
     struct impl;
     std::shared_ptr<const impl> m_impl;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     explicit iers_data(iers_table, std::string);
 

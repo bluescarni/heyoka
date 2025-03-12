@@ -24,6 +24,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/iers/builtin_iers_data.hpp>
 #include <heyoka/iers_data.hpp>
+#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -43,6 +44,18 @@ bool iers_row::operator==(const iers_row &other) const noexcept
     }
 
     return delta_ut1_utc == other.delta_ut1_utc;
+}
+
+void iers_row::save(boost::archive::binary_oarchive &oa, unsigned) const
+{
+    oa << mjd;
+    oa << delta_ut1_utc;
+}
+
+void iers_row::load(boost::archive::binary_iarchive &ia, unsigned)
+{
+    ia >> mjd;
+    ia >> delta_ut1_utc;
 }
 
 namespace detail
@@ -221,7 +234,25 @@ iers_table parse_iers_data(const std::string &str)
 struct iers_data::impl {
     iers_table m_data;
     std::string m_timestamp;
+
+    // Serialization.
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar & m_data;
+        ar & m_timestamp;
+    }
 };
+
+void iers_data::save(boost::archive::binary_oarchive &oa, unsigned) const
+{
+    oa << m_impl;
+}
+
+void iers_data::load(boost::archive::binary_iarchive &ia, unsigned)
+{
+    ia >> m_impl;
+}
 
 iers_data::iers_data(iers_table data, std::string timestamp)
     : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp)))
