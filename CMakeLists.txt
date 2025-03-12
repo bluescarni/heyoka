@@ -570,7 +570,7 @@ endif()
 
 # Mandatory private dependency on openssl.
 find_package(OpenSSL REQUIRED CONFIG)
-target_link_libraries(heyoka PRIVATE OpenSSL::SSL)
+target_link_libraries(heyoka PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
