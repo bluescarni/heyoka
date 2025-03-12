@@ -322,7 +322,7 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
         // Create the function type and the function.
         const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
         auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);
@@ -382,7 +382,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         // Create the function type and the function.
         auto *ret_t = llvm::ArrayType::get(fp_t, 2);
         auto *ft = llvm::FunctionType::get(ret_t, {fp_t}, false);
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);
@@ -453,7 +453,7 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
         // Create the function type and the function.
         const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
         auto *ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);
@@ -665,7 +665,7 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         // Create the function type and the function.
         const std::vector<llvm::Type *> fargs{llvm_int_t};
         auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);
@@ -737,7 +737,7 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
         // Create the function type and the function.
         const std::vector<llvm::Type *> fargs{fp_t};
         auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);

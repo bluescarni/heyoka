@@ -102,7 +102,7 @@ llvm::Function *time_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
 
         // Create a new basic block to start insertion into.
@@ -191,7 +191,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &module);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.

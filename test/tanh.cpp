@@ -238,9 +238,7 @@ TEST_CASE("vfabi double")
         REQUIRE(outs[0] == approximately(std::tanh(.1)));
         REQUIRE(outs[1] == approximately(std::tanh(.2)));
 
-        // NOTE: autovec with external scalar functions seems to work
-        // only since LLVM 16.
-#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+#if defined(HEYOKA_WITH_SLEEF)
 
         const auto &tf = detail::get_target_features();
 
@@ -304,9 +302,7 @@ TEST_CASE("vfabi float")
         REQUIRE(outs[2] == approximately(std::tanh(3.f)));
         REQUIRE(outs[3] == approximately(std::tanh(4.f)));
 
-        // NOTE: autovec with external scalar functions seems to work
-        // only since LLVM 16.
-#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+#if defined(HEYOKA_WITH_SLEEF)
 
         const auto &tf = detail::get_target_features();
 

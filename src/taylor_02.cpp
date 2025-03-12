@@ -227,7 +227,7 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
         }
         auto *sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
         auto *g_sv_funcs_dc = new llvm::GlobalVariable(s.module(), sv_funcs_dc_arr->getType(), true,
-                                                       llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
+                                                       llvm::GlobalVariable::PrivateLinkage, sv_funcs_dc_arr);
 
         // Get out a pointer to the beginning of the array.
         return builder.CreateInBoundsGEP(arr_type, g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
@@ -355,24 +355,24 @@ taylor_c_make_sv_diff_globals(llvm_state &s, llvm::Type *fp_t, const taylor_dc_t
 
     auto *var_indices_arr = llvm::ConstantArray::get(var_arr_type, var_indices);
     auto *g_var_indices = new llvm::GlobalVariable(md, var_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, var_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, var_indices_arr);
 
     auto *vars_arr = llvm::ConstantArray::get(var_arr_type, vars);
     auto *g_vars
-        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
+        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, vars_arr);
 
     // Numbers.
     auto *num_indices_arr_type
         = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
     auto *num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, num_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, num_indices_arr);
 
     auto *nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
     auto *nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
-        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
+        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, nums_arr);
 
     // Params.
     auto *par_arr_type
@@ -380,11 +380,11 @@ taylor_c_make_sv_diff_globals(llvm_state &s, llvm::Type *fp_t, const taylor_dc_t
 
     auto *par_indices_arr = llvm::ConstantArray::get(par_arr_type, par_indices);
     auto *g_par_indices = new llvm::GlobalVariable(md, par_indices_arr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, par_indices_arr);
+                                                   llvm::GlobalVariable::PrivateLinkage, par_indices_arr);
 
     auto *pars_arr = llvm::ConstantArray::get(par_arr_type, pars);
     auto *g_pars
-        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
+        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, pars_arr);
 
     return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_der_vars};
 }
@@ -715,7 +715,7 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
         assert(worker_proto != nullptr); // LCOV_EXCL_LINE
 
         // Create the worker.
-        auto *worker = llvm::Function::Create(worker_proto, llvm::Function::InternalLinkage, "", &md);
+        auto *worker = llvm::Function::Create(worker_proto, llvm::Function::PrivateLinkage, "", &md);
 
         // NOTE: the worker cannot call itself recursively.
         worker->addFnAttr(llvm::Attribute::NoRecurse);
@@ -793,14 +793,14 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
     auto *workers_arr_tp = llvm::ArrayType::get(ptr_tp, boost::numeric_cast<std::uint64_t>(workers_arr.size()));
     auto *workers_arr_carr = llvm::ConstantArray::get(workers_arr_tp, workers_arr);
     auto *workers_arr_gv = new llvm::GlobalVariable(md, workers_arr_carr->getType(), true,
-                                                    llvm::GlobalVariable::InternalLinkage, workers_arr_carr);
+                                                    llvm::GlobalVariable::PrivateLinkage, workers_arr_carr);
     auto *workers_ptr
         = bld.CreateInBoundsGEP(workers_arr_carr->getType(), workers_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
 
     auto *ncalls_arr_tp = llvm::ArrayType::get(ptr_tp, boost::numeric_cast<std::uint64_t>(ncalls_arr.size()));
     auto *ncalls_arr_carr = llvm::ConstantArray::get(ncalls_arr_tp, ncalls_arr);
     auto *ncalls_arr_gv = new llvm::GlobalVariable(md, ncalls_arr_carr->getType(), true,
-                                                   llvm::GlobalVariable::InternalLinkage, ncalls_arr_carr);
+                                                   llvm::GlobalVariable::PrivateLinkage, ncalls_arr_carr);
     auto *ncalls_ptr
         = bld.CreateInBoundsGEP(ncalls_arr_carr->getType(), ncalls_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
 

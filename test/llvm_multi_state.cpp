@@ -576,9 +576,7 @@ TEST_CASE("vfabi double")
 
         ms.compile();
 
-        // NOTE: autovec with external scalar functions seems to work
-        // only since LLVM 16.
-#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+#if defined(HEYOKA_WITH_SLEEF)
 
         for (auto ir : ms.get_ir()) {
             using string_find_iterator = boost::find_iterator<std::string::iterator>;

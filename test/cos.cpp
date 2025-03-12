@@ -275,14 +275,9 @@ TEST_CASE("vfabi double")
             REQUIRE(count == 3u);
         }
 
-#if LLVM_VERSION_MAJOR >= 16
-
-        // NOTE: LLVM16 is currently the version tested in the CI on arm64.
         if (tf.aarch64) {
             REQUIRE(count == 3u);
         }
-
-#endif
 
         // NOTE: currently no auto-vectorization happens on ppc64 due apparently
         // to the way the target machine is being set up by orc/lljit (it works
@@ -344,14 +339,9 @@ TEST_CASE("vfabi float")
             REQUIRE(count == 5u);
         }
 
-#if LLVM_VERSION_MAJOR >= 16
-
-        // NOTE: LLVM16 is currently the version tested in the CI on arm64.
         if (tf.aarch64) {
             REQUIRE(count == 5u);
         }
-
-#endif
 
         // NOTE: currently no auto-vectorization happens on ppc64 due apparently
         // to the way the target machine is being set up by orc/lljit (it works

@@ -872,7 +872,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
 
         // Create a new basic block to start insertion into.

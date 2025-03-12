@@ -287,7 +287,7 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, co
     // The return type is val_t.
     auto *ft = llvm::FunctionType::get(val_t, fargs, false);
     // Create the function
-    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &module);
     assert(f != nullptr);
 
     // Fetch the necessary function arguments.
@@ -549,7 +549,7 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
     // The return type is val_t.
     auto *ft = llvm::FunctionType::get(val_t, fargs, false);
     // Create the function
-    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &module);
     assert(f != nullptr);
 
     // Fetch the necessary function arguments.

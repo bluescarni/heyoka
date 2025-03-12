@@ -14,7 +14,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -p $deps_dir c-compiler cxx-compiler cmake ninja 'llvmdev=17.*' \
+conda create -y -p $deps_dir c-compiler cxx-compiler cmake ninja 'llvmdev='${LLVM_VERSION}'.*' \
     tbb-devel tbb libboost-devel mppp sleef xtensor xtensor-blas blas \
     blas-devel fmt spdlog
 source activate $deps_dir

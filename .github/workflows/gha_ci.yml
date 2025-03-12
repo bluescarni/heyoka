@@ -92,27 +92,35 @@ jobs:
         with:
           name: docs
           path: doc/_build/html
+  conda_llvm19_asan:
+    runs-on: ubuntu-latest
+    env:
+      LLVM_VERSION: 19
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm18_asan:
     runs-on: ubuntu-latest
+    env:
+      LLVM_VERSION: 18
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: bash tools/gha_llvm18_conda_asan.sh
+        run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm17_asan:
     runs-on: ubuntu-latest
+    env:
+      LLVM_VERSION: 17
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: bash tools/gha_llvm17_conda_asan.sh
+        run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm16_asan:
     runs-on: ubuntu-latest
+    env:
+      LLVM_VERSION: 16
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: bash tools/gha_llvm16_conda_asan.sh
-  conda_llvm15_asan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build
-        run: bash tools/gha_llvm15_conda_asan.sh
+        run: bash tools/gha_llvm_n_conda_asan.sh
