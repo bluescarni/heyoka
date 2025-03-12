@@ -207,6 +207,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/iers_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/iers_data_fetch_latest.cpp"
     # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
@@ -525,6 +526,8 @@ target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 target_link_libraries(heyoka PRIVATE Boost::charconv)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
+# NOTE: make sure we do not use deprecated ASIO bits.
+target_compile_definitions(heyoka PRIVATE BOOST_ASIO_NO_DEPRECATED)
 
 # NOTE: recent versions of libcxx remove std::unary_function/std::binary_function
 # (which have been deprecated since long) in C++17 mode. This breaks, e.g., hashing
@@ -577,6 +580,10 @@ if(HEYOKA_WITH_SLEEF)
     find_package(heyoka_SLEEF REQUIRED)
     target_link_libraries(heyoka PRIVATE heyoka::SLEEF)
 endif()
+
+# Mandatory private dependency on openssl.
+find_package(OpenSSL REQUIRED CONFIG)
+target_link_libraries(heyoka PRIVATE OpenSSL::SSL)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)

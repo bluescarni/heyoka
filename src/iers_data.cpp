@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 #include <boost/charconv.hpp>
 
@@ -215,6 +216,11 @@ iers_table parse_iers_data(const std::string &str)
 }
 
 } // namespace detail
+
+iers_data::iers_data(iers_table data, std::string timestamp)
+    : m_data(std::move(data)), m_timestamp(std::move(timestamp))
+{
+}
 
 iers_data::iers_data()
     : m_data(std::ranges::begin(detail::builtin_iers_data), std::ranges::end(detail::builtin_iers_data)),

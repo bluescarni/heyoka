@@ -35,13 +35,15 @@ HEYOKA_DLL_PUBLIC class iers_data
     iers_table m_data;
     std::string m_timestamp;
 
+    explicit iers_data(iers_table, std::string);
+
 public:
     iers_data();
     [[nodiscard]] const iers_table &get_table() const noexcept;
 
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
 
-    // static iers_data fetch_latest();
+    HEYOKA_DLL_PUBLIC static iers_data fetch_latest();
 };
 
 namespace detail

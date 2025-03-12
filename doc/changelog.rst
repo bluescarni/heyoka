@@ -20,6 +20,8 @@ Changes
   (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
 - heyoka now requires Boost >= 1.85
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+- heyoka now depends on OpenSSL
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 
 
 7.2.1 (2025-01-07)

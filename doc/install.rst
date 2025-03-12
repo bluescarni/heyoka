@@ -18,7 +18,8 @@ heyoka has the following **mandatory** dependencies:
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.85),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=11),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
-* the `TBB <https://github.com/oneapi-src/oneTBB>`__ library.
+* the `TBB <https://github.com/oneapi-src/oneTBB>`__ library,
+* the `OpenSSL <https://www.openssl.org/>`__ library.
 
 Additionally, heyoka has the following **optional** dependencies:
 
