@@ -9,6 +9,7 @@
 #ifndef HEYOKA_IERS_DATA_HPP
 #define HEYOKA_IERS_DATA_HPP
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,15 +33,15 @@ using iers_table = std::vector<iers_row>;
 
 class HEYOKA_DLL_PUBLIC iers_data
 {
-    iers_table m_data;
-    std::string m_timestamp;
+    struct impl;
+    std::shared_ptr<const impl> m_impl;
 
     explicit iers_data(iers_table, std::string);
 
 public:
     iers_data();
-    [[nodiscard]] const iers_table &get_table() const noexcept;
 
+    [[nodiscard]] const iers_table &get_table() const noexcept;
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
 
     static iers_data fetch_latest();

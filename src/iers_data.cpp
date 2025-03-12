@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -217,25 +218,31 @@ iers_table parse_iers_data(const std::string &str)
 
 } // namespace detail
 
+struct iers_data::impl {
+    iers_table m_data;
+    std::string m_timestamp;
+};
+
 iers_data::iers_data(iers_table data, std::string timestamp)
-    : m_data(std::move(data)), m_timestamp(std::move(timestamp))
+    : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp)))
 {
 }
 
 iers_data::iers_data()
-    : m_data(std::ranges::begin(detail::builtin_iers_data), std::ranges::end(detail::builtin_iers_data)),
-      m_timestamp(detail::builtin_iers_data_ts)
+    : m_impl(std::make_shared<const impl>(
+          iers_table(std::ranges::begin(detail::builtin_iers_data), std::ranges::end(detail::builtin_iers_data)),
+          detail::builtin_iers_data_ts))
 {
 }
 
 const iers_table &iers_data::get_table() const noexcept
 {
-    return m_data;
+    return m_impl->m_data;
 }
 
 const std::string &iers_data::get_timestamp() const noexcept
 {
-    return m_timestamp;
+    return m_impl->m_timestamp;
 }
 
 HEYOKA_END_NAMESPACE
