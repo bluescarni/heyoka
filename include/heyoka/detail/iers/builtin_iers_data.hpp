@@ -6,10 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_IERS_IERS_HPP
-#define HEYOKA_DETAIL_IERS_IERS_HPP
-
-#include <boost/smart_ptr/atomic_shared_ptr.hpp>
+#ifndef HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
+#define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
 
 #include <heyoka/config.hpp>
 #include <heyoka/model/iers.hpp>
@@ -19,8 +17,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data;
+extern const char *const builtin_iers_data_ts;
+
+extern const model::iers_row builtin_iers_data[19480];
 
 } // namespace detail
 

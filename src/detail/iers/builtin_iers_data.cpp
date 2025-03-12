@@ -7,14 +7,9 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <limits>
-#include <ranges>
-
-#include <boost/smart_ptr/atomic_shared_ptr.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/iers.hpp>
+#include <heyoka/detail/iers/builtin_iers_data.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -22,10 +17,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-namespace
-{
+const char *const builtin_iers_data_ts = "2025-03-06";
 
-constinit const model::iers_data_row init_iers_data[19480] = {
+constinit const model::iers_row builtin_iers_data[19480] = {
     {.mjd = 41684, .delta_ut1_utc = 0.8075},
     {.mjd = 41685, .delta_ut1_utc = 0.8044},
     {.mjd = 41686, .delta_ut1_utc = 0.8012},
@@ -19507,12 +19501,6 @@ constinit const model::iers_data_row init_iers_data[19480] = {
     {.mjd = 61162, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()},
     {.mjd = 61163, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()},
 };
-
-} // namespace
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
-boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data = boost::make_shared<const model::iers_data_t>(
-    std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
 
 } // namespace detail
 

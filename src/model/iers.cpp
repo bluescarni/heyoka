@@ -14,16 +14,13 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <utility>
 
 #include <boost/charconv.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/iers.hpp>
+#include <heyoka/detail/iers/builtin_iers_data.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -31,7 +28,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-bool iers_data_row::operator==(const iers_data_row &other) const noexcept
+// NOTE: we have a custom implementation of this operator
+// because we want to consider NaNs equal to each other.
+bool iers_row::operator==(const iers_row &other) const noexcept
 {
     // NOTE: mjd cannot be nan.
     if (mjd != other.mjd) {
@@ -138,8 +137,8 @@ double parse_iers_data_delta_ut1_utc(const auto &cur_line)
     return delta_ut1_utc;
 }
 
-// Helper to validate IERS data.
-void validate_iers_data(const std::vector<iers_data_row> &data)
+// Helper to validate a IERS data table.
+void validate_iers_data(const iers_table &data)
 {
     const auto n_entries = data.size();
 
@@ -175,8 +174,6 @@ void validate_iers_data(const std::vector<iers_data_row> &data)
 
 } // namespace
 
-} // namespace detail
-
 // NOTE: it is expected that str stores the content of the data file finals2000A.all from:
 //
 // https://maia.usno.navy.mil/ser7/finals2000A.all
@@ -185,10 +182,10 @@ void validate_iers_data(const std::vector<iers_data_row> &data)
 // also including predictions for the future. The format of the file is described here:
 //
 // https://maia.usno.navy.mil/ser7/readme.finals2000A
-iers_data_t parse_iers_data(const std::string &str)
+iers_table parse_iers_data(const std::string &str)
 {
     // Parse line by line, splitting on newlines.
-    iers_data_t retval;
+    iers_table retval;
     for (const auto cur_line : str | std::views::split('\n')) {
         // NOTE: finals2000A.all files may have a newline at the end, when we encounter
         // it just break out.
@@ -220,18 +217,23 @@ iers_data_t parse_iers_data(const std::string &str)
     return retval;
 }
 
-boost::shared_ptr<const iers_data_t> get_iers_data()
+} // namespace detail
+
+iers_data::iers_data()
+    : m_data(std::ranges::begin(heyoka::detail::builtin_iers_data),
+             std::ranges::end(heyoka::detail::builtin_iers_data)),
+      m_timestamp(heyoka::detail::builtin_iers_data_ts)
 {
-    return heyoka::detail::cur_iers_data;
 }
 
-void set_iers_data(iers_data_t new_data)
+const iers_table &iers_data::get_table() const noexcept
 {
-    // Validate.
-    detail::validate_iers_data(new_data);
+    return m_data;
+}
 
-    // Assign.
-    heyoka::detail::cur_iers_data = boost::make_shared<const iers_data_t>(std::move(new_data));
+const std::string &iers_data::get_timestamp() const noexcept
+{
+    return m_timestamp;
 }
 
 } // namespace model

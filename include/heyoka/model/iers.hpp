@@ -12,8 +12,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/smart_ptr/shared_ptr.hpp>
-
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 
@@ -22,23 +20,39 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-struct HEYOKA_DLL_PUBLIC iers_data_row {
+// Single row in a IERS data table.
+struct HEYOKA_DLL_PUBLIC iers_row {
     // UTC modified Julian date.
     double mjd = 0;
     // UT1-UTC (seconds).
     double delta_ut1_utc = 0;
 
-    bool operator==(const iers_data_row &) const noexcept;
+    bool operator==(const iers_row &) const noexcept;
 };
 
-using iers_data_t = std::vector<iers_data_row>;
+// The IERS data table.
+using iers_table = std::vector<iers_row>;
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC iers_data_t parse_iers_data(const std::string &);
+HEYOKA_DLL_PUBLIC class iers_data
+{
+    iers_table m_data;
+    std::string m_timestamp;
 
-// NOTE: here we have to use boost::shared_ptr instead of std::shared_ptr due to the
-// lack of std::atomic<std::shared_ptr> on OSX.
-[[nodiscard]] HEYOKA_DLL_PUBLIC boost::shared_ptr<const iers_data_t> get_iers_data();
-HEYOKA_DLL_PUBLIC void set_iers_data(iers_data_t);
+public:
+    iers_data();
+    [[nodiscard]] const iers_table &get_table() const noexcept;
+
+    [[nodiscard]] const std::string &get_timestamp() const noexcept;
+
+    // static iers_data fetch_latest();
+};
+
+namespace detail
+{
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC iers_table parse_iers_data(const std::string &);
+
+} // namespace detail
 
 } // namespace model
 

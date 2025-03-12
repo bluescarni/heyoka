@@ -23,11 +23,14 @@ int main(int argc, char *argv[])
     namespace po = boost::program_options;
 
     std::string input_file_path;
+    std::string timestamp;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("input", po::value<std::string>(&input_file_path)->required(),
-                                                       "path to the IERS data file 'finals2000A.all'");
+                                                       "path to the IERS data file 'finals2000A.all'")(
+        "timestamp", po::value<std::string>(&timestamp)->required(),
+        "timestamp for the IERS data file 'finals2000A.all' (YYYY-MM-DD)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -44,19 +47,14 @@ int main(int argc, char *argv[])
     const std::string file_data{std::istreambuf_iterator<char>(ifile), std::istreambuf_iterator<char>()};
 
     // Parse it.
-    const auto iers_data = heyoka::model::parse_iers_data(file_data);
+    const auto iers_data = heyoka::model::detail::parse_iers_data(file_data);
 
-    // Create the cpp file.
-    std::ofstream ocpp("iers.cpp");
-    ocpp << fmt::format(R"(#include <limits>
-#include <ranges>
-
-#include <boost/smart_ptr/atomic_shared_ptr.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
+    // Create the header file first.
+    std::ofstream oheader("builtin_iers_data.hpp");
+    oheader << fmt::format(R"(#ifndef HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
+#define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iers/iers.hpp>
 #include <heyoka/model/iers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -64,11 +62,35 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {{
 
-namespace
+extern const char *const builtin_iers_data_ts;
+
+extern const model::iers_row builtin_iers_data[{}];
+
+}} // namespace detail
+
+HEYOKA_END_NAMESPACE
+
+#endif
+)",
+                           iers_data.size());
+
+    // Now the cpp file.
+    std::ofstream ocpp("builtin_iers_data.cpp");
+    ocpp << fmt::format(R"(#include <limits>
+
+#include <heyoka/config.hpp>
+#include <heyoka/detail/iers/builtin_iers_data.hpp>
+#include <heyoka/model/iers.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {{
 
-constinit const model::iers_data_row init_iers_data[{}] = {{)",
-                        iers_data.size());
+const char *const builtin_iers_data_ts = "{}";
+
+constinit const model::iers_row builtin_iers_data[{}] = {{)",
+                        timestamp, iers_data.size());
 
     for (const auto &[mjd, cur_delta_ut1_utc] : iers_data) {
         if (std::isnan(cur_delta_ut1_utc)) {
@@ -80,12 +102,7 @@ constinit const model::iers_data_row init_iers_data[{}] = {{)",
 
     ocpp << R"(};
 
-} // namespace
-
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
-boost::atomic_shared_ptr<const model::iers_data_t> cur_iers_data = boost::make_shared<const model::iers_data_t>(std::ranges::begin(detail::init_iers_data), std::ranges::end(detail::init_iers_data));
-
-}
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 )";
