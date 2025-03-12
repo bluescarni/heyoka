@@ -30,7 +30,7 @@ struct HEYOKA_DLL_PUBLIC iers_row {
 // The IERS data table.
 using iers_table = std::vector<iers_row>;
 
-HEYOKA_DLL_PUBLIC class iers_data
+class HEYOKA_DLL_PUBLIC iers_data
 {
     iers_table m_data;
     std::string m_timestamp;
@@ -43,7 +43,7 @@ public:
 
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
 
-    HEYOKA_DLL_PUBLIC static iers_data fetch_latest();
+    static iers_data fetch_latest();
 };
 
 namespace detail

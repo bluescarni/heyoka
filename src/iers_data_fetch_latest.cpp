@@ -101,7 +101,7 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
             }
 
             // Assemble the year-month-day string.
-            return fmt::format("{}_{}_{}", year, month, day);
+            return fmt::format("{:04}_{:02}_{:02}", year, month, day);
         }
     }
 
