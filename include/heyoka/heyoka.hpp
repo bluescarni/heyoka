@@ -13,6 +13,7 @@
 #include <heyoka/callbacks.hpp>
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/ensemble_propagate.hpp>
+#include <heyoka/eop_data.hpp>
 #include <heyoka/events.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
