@@ -6,12 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
 
-#include <heyoka/iers_data.hpp>
+#include <heyoka/eop_data.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -20,13 +19,14 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    iers_data idata;
+    eop_data idata;
 
     REQUIRE(!idata.get_table().empty());
     REQUIRE(!idata.get_timestamp().empty());
+    REQUIRE(idata.get_identifier() == "finals2000A.all");
 }
 
-TEST_CASE("parse test")
+TEST_CASE("parse_eop_data_usno test")
 {
     using Catch::Matchers::Message;
 
@@ -38,7 +38,7 @@ TEST_CASE("parse test")
               "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        const auto data = detail::parse_iers_data(str);
+        const auto data = detail::parse_eop_data_usno(str);
 
         REQUIRE(data.size() == 2u);
 
@@ -56,7 +56,7 @@ TEST_CASE("parse test")
               "I  0.097391 0.000008  0.309488 0.000011  I 0.0456841 0.0000132  0.4075 0.0064  I     0.391    0.319    "
               "-0.022    0.109                                                     ";
 
-        const auto data = detail::parse_iers_data(str);
+        const auto data = detail::parse_eop_data_usno(str);
 
         REQUIRE(data.size() == 2u);
 
@@ -73,7 +73,7 @@ TEST_CASE("parse test")
             = "25 2 3 60709.00 I  0.099700 0.000012  0.309126 0.000014  I 0.0461909 0.0000082  0.5842 0.0078  I     "
               "0.383    0.375    -0.034    0.114                                                     \n";
 
-        const auto data = detail::parse_iers_data(str);
+        const auto data = detail::parse_eop_data_usno(str);
 
         REQUIRE(data.size() == 1u);
 
@@ -89,15 +89,9 @@ TEST_CASE("parse test")
               "                                                                                                        "
               "                                                                ";
 
-        const auto data = detail::parse_iers_data(str);
+        const auto data = detail::parse_eop_data_usno(str);
 
-        REQUIRE(data.size() == 2u);
-
-        REQUIRE(data[0].mjd == 61114);
-        REQUIRE(std::isnan(data[0].delta_ut1_utc));
-
-        REQUIRE(data[1].mjd == 61115);
-        REQUIRE(std::isnan(data[1].delta_ut1_utc));
+        REQUIRE(data.empty());
     }
 
     // Parse errors.
@@ -109,8 +103,8 @@ TEST_CASE("parse test")
               "0.383    0.375    -0.034    0.114                                                     \n ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid line detected in a finals2000A.all IERS data file: the expected number of "
+            detail::parse_eop_data_usno(str), std::invalid_argument,
+            Message("Invalid line detected in a USNO EOP data file: the expected number of "
                     "characters in the line is at least 185, but a line with 1 character(s) was detected instead"));
     }
 
@@ -121,8 +115,8 @@ TEST_CASE("parse test")
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid line detected in a finals2000A.all IERS data file: the expected number of "
+            detail::parse_eop_data_usno(str), std::invalid_argument,
+            Message("Invalid line detected in a USNO EOP data file: the expected number of "
                     "characters in the line is at least 185, but a line with 6 character(s) was detected instead"));
     }
 
@@ -134,8 +128,8 @@ TEST_CASE("parse test")
               "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_iers_data(str), std::invalid_argument,
-                               Message("Error parsing a finals2000A.all IERS data file: the string '4a684.00' could "
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the string '4a684.00' could "
                                        "not be parsed as a valid MJD"));
     }
     {
@@ -145,8 +139,8 @@ TEST_CASE("parse test")
               "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_iers_data(str), std::invalid_argument,
-                               Message("Error parsing a finals2000A.all IERS data file: the string '41684.0 ' could "
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the string '41684.0 ' could "
                                        "not be parsed as a valid MJD"));
     }
     {
@@ -156,8 +150,8 @@ TEST_CASE("parse test")
               "41684.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_iers_data(str), std::invalid_argument,
-                               Message("Invalid finals2000A.all IERS data file detected: the MJD value 41684 "
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the MJD value 41684 "
                                        "on line 0 is not less than the MJD value in the next line (41684)"));
     }
     {
@@ -167,8 +161,8 @@ TEST_CASE("parse test")
               "41683.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_iers_data(str), std::invalid_argument,
-                               Message("Invalid finals2000A.all IERS data file detected: the MJD value 41684 "
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the MJD value 41684 "
                                        "on line 0 is not less than the MJD value in the next line (41683)"));
     }
     {
@@ -178,9 +172,8 @@ TEST_CASE("parse test")
               "41683.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the MJD value inf on line 0 is not finite"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the MJD value inf on line 0 is not finite"));
     }
     {
         const std::string str
@@ -189,9 +182,8 @@ TEST_CASE("parse test")
               "     inf I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the MJD value inf on line 1 is not finite"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the MJD value inf on line 1 is not finite"));
     }
 
     // UT1-UTC
@@ -202,10 +194,9 @@ TEST_CASE("parse test")
               "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Error parsing a finals2000A.all IERS data file: the bulletin B string for the UT1-UTC "
-                    "difference '.80a5000' could not be parsed as a floating-point value"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the bulletin B string for the UT1-UTC "
+                                       "difference '.80a5000' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -214,10 +205,9 @@ TEST_CASE("parse test")
               "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Error parsing a finals2000A.all IERS data file: the bulletin B string for the UT1-UTC "
-                    "difference '.801500 ' could not be parsed as a floating-point value"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the bulletin B string for the UT1-UTC "
+                                       "difference '.801500 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -226,10 +216,9 @@ TEST_CASE("parse test")
               "I  0.097391 0.000008  0.309488 0.000011  I 0.0456841 0.0000132  0.4075 0.0064  I     0.391    0.319    "
               "-0.022    0.109                                                     ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Error parsing a finals2000A.all IERS data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.04a1909' could not be parsed as a floating-point value"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the bulletin A string for the UT1-UTC "
+                                       "difference '0.04a1909' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -238,10 +227,9 @@ TEST_CASE("parse test")
               "I  0.097391 0.000008  0.309488 0.000011  I 0.0456841 0.0000132  0.4075 0.0064  I     0.391    0.319    "
               "-0.022    0.109                                                     ";
 
-        REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Error parsing a finals2000A.all IERS data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.041190 ' could not be parsed as a floating-point value"));
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_usno(str), std::invalid_argument,
+                               Message("Error parsing a USNO EOP data file: the bulletin A string for the UT1-UTC "
+                                       "difference '0.041190 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -251,8 +239,8 @@ TEST_CASE("parse test")
               "-0.022    0.109                                                     ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 0 is an infinity"));
+            detail::parse_eop_data_usno(str), std::invalid_argument,
+            Message("Invalid EOP data table detected: the UT1-UTC value inf on line 0 is not finite"));
     }
     {
         const std::string str
@@ -262,29 +250,20 @@ TEST_CASE("parse test")
               "0.199    -0.701    0.300   .141000   .134000        inf   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_iers_data(str), std::invalid_argument,
-            Message("Invalid finals2000A.all IERS data file detected: the UT1-UTC value inf on line 1 is an infinity"));
+            detail::parse_eop_data_usno(str), std::invalid_argument,
+            Message("Invalid EOP data table detected: the UT1-UTC value inf on line 1 is not finite"));
     }
-}
 
-TEST_CASE("iers_row cmp")
-{
-    REQUIRE(iers_row{.mjd = 1} != iers_row{.mjd = 2});
-    REQUIRE(iers_row{.mjd = 1} == iers_row{.mjd = 1});
-
-    REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = 1.} == iers_row{.mjd = 1, .delta_ut1_utc = 1.});
-    REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = 2.} != iers_row{.mjd = 1, .delta_ut1_utc = 1.});
-    REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()}
-            != iers_row{.mjd = 1, .delta_ut1_utc = 1.});
-    REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = 1.}
-            != iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()}
-            == iers_row{.mjd = 1, .delta_ut1_utc = std::numeric_limits<double>::quiet_NaN()});
+    // A check for wrong filename for the download function.
+    REQUIRE_THROWS_MATCHES(eop_data::fetch_latest_usno("helloworld"), std::invalid_argument,
+                           Message("Invalid filename 'helloworld' specified for a USNO EOP data file: the valid names "
+                                   "are {\"finals2000A.all\", "
+                                   "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
 }
 
 TEST_CASE("s11n")
 {
-    iers_data idata;
+    eop_data idata;
 
     std::stringstream ss;
 
@@ -293,8 +272,10 @@ TEST_CASE("s11n")
         oa << idata;
     }
 
-    // Save the original table.
+    // Save the original table/timestamp/identifier.
     const auto otable = idata.get_table();
+    const auto otimestamep = idata.get_timestamp();
+    const auto oidentifier = idata.get_identifier();
 
     // Reset via move.
     auto idat2 = std::move(idata);
@@ -305,4 +286,6 @@ TEST_CASE("s11n")
     }
 
     REQUIRE(otable == idata.get_table());
+    REQUIRE(otimestamep == idata.get_timestamp());
+    REQUIRE(oidentifier == idata.get_identifier());
 }

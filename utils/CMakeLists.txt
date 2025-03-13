@@ -24,4 +24,4 @@ function(ADD_HEYOKA_UTIL arg1)
   add_test(${arg1} ${arg1})
 endfunction()
 
-ADD_HEYOKA_UTIL(iers_data_updater)
+ADD_HEYOKA_UTIL(eop_data_updater)

@@ -6,20 +6,20 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
-#define HEYOKA_DETAIL_IERS_BUILTIN_IERS_DATA_HPP
+#ifndef HEYOKA_DETAIL_EOP_DATA_BUILTIN_EOP_DATA_HPP
+#define HEYOKA_DETAIL_EOP_DATA_BUILTIN_EOP_DATA_HPP
 
 #include <heyoka/config.hpp>
-#include <heyoka/iers_data.hpp>
+#include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-extern const char *const builtin_iers_data_ts;
+extern const char *const builtin_eop_data_ts;
 
-extern const iers_row builtin_iers_data[19480];
+extern const eop_data_row builtin_eop_data[19430];
 
 } // namespace detail
 

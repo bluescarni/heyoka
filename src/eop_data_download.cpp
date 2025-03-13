@@ -29,7 +29,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/iers_data.hpp>
+#include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -40,16 +40,16 @@ namespace
 {
 
 // List of abbreviated month names.
-constexpr std::array<std::string_view, 12> iers_data_month_names
+constexpr std::array<std::string_view, 12> eop_data_month_names
     = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 // Map to associate abbreviated month names to [1, 12] indices.
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto iers_data_month_names_map = []() {
+const auto eop_data_month_names_map = []() {
     std::unordered_map<std::string_view, unsigned> retval;
 
     for (auto i = 0u; i < 12u; ++i) {
-        retval.emplace(iers_data_month_names[i], i + 1u);
+        retval.emplace(eop_data_month_names[i], i + 1u);
     }
 
     return retval;
@@ -60,13 +60,13 @@ const auto iers_data_month_names_map = []() {
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto iers_data_date_regexp = std::regex(
+const auto eop_data_date_regexp = std::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
-                fmt::join(iers_data_month_names, "|")));
+                fmt::join(eop_data_month_names, "|")));
 
 // Helper to extract from the "Last-Modified" field of an http response the timestamp in the format required
-// by the iers_data class.
-std::string iers_data_parse_last_modified(std::string_view lm_field)
+// by the eop_data class.
+std::string eop_data_parse_last_modified(std::string_view lm_field)
 {
     // Helper to parse an unsigned integral quantity from the range [begin, end). 'name'
     // is the name of the quantity, to be used only for error reporting.
@@ -84,7 +84,7 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
     };
 
     std::cmatch matches;
-    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, iers_data_date_regexp))
+    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, eop_data_date_regexp))
         [[likely]] {
         // Check if all groups matched.
         // NOTE: 7 + 1 because the first match is the entire string.
@@ -95,8 +95,8 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
             // Parse the month.
             const auto month_str = std::string_view(matches[3].first, matches[3].second);
             // NOTE: this must hold because the regex matched.
-            assert(iers_data_month_names_map.contains(month_str));
-            const auto month = iers_data_month_names_map.find(month_str)->second;
+            assert(eop_data_month_names_map.contains(month_str));
+            const auto month = eop_data_month_names_map.find(month_str)->second;
 
             // Parse the year.
             const auto year = uint_parse(matches[4].first, matches[4].second, "year");
@@ -125,7 +125,8 @@ std::string iers_data_parse_last_modified(std::string_view lm_field)
 
 } // namespace detail
 
-iers_data iers_data::fetch_latest()
+std::pair<std::string, std::string> eop_data::download(const std::string &host, unsigned port,
+                                                       const std::string &target)
 {
     try {
         // NOTE: code adapted from here:
@@ -135,12 +136,6 @@ iers_data iers_data::fetch_latest()
         using tcp = net::ip::tcp;
         namespace beast = boost::beast;
         namespace http = beast::http;
-
-        // Parameters for the connection.
-        constexpr auto host = "maia.usno.navy.mil";
-        constexpr auto port = "443";
-        constexpr auto target = "/ser7/finals2000A.all";
-        constexpr int version = 11;
 
         // The io_context is required for all I/O.
         net::io_context ioc;
@@ -162,7 +157,7 @@ iers_data iers_data::fetch_latest()
         stream.set_verify_callback(ssl::host_name_verification(host));
 
         // Look up the domain name.
-        auto const results = resolver.resolve(host, port);
+        auto const results = resolver.resolve(host, fmt::format("{}", port));
 
         // Make the connection on the IP address we get from a lookup.
         beast::get_lowest_layer(stream).connect(results);
@@ -171,7 +166,8 @@ iers_data iers_data::fetch_latest()
         stream.handshake(ssl::stream_base::client);
 
         // Set up an HTTP GET request message.
-        http::request<http::string_body> req{http::verb::get, target, version};
+        // NOTE: the 11 stands for HTTP 1.1.
+        http::request<http::string_body> req{http::verb::get, target, 11};
         req.set(http::field::host, host);
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
@@ -188,23 +184,23 @@ iers_data iers_data::fetch_latest()
         http::read(stream, buffer, res);
 
         // Parse the "last modified field" to construct the timestamp.
-        auto timestamp = detail::iers_data_parse_last_modified(res[http::field::last_modified]);
+        auto timestamp = detail::eop_data_parse_last_modified(res[http::field::last_modified]);
 
         // Fetch the message body as a string. See:
         // https://github.com/boostorg/beast/issues/819
-        const auto body = boost::beast::buffers_to_string(res.body().data());
+        auto body = boost::beast::buffers_to_string(res.body().data());
 
         // Gracefully close the stream.
         stream.shutdown();
 
         // Construct and return.
-        return iers_data{detail::parse_iers_data(body), std::move(timestamp)};
+        return std::make_pair(std::move(body), std::move(timestamp));
 
         // LCOV_EXCL_START
     } catch (const std::exception &ex) {
-        throw std::invalid_argument(fmt::format("Error while trying to download the latest IERS data: {}", ex.what()));
+        throw std::invalid_argument(fmt::format("Error while trying to download EOP data: {}", ex.what()));
     } catch (...) {
-        throw std::invalid_argument("Error while trying to download the latest IERS data");
+        throw std::invalid_argument("Error while trying to download EOP data");
     }
     // LCOV_EXCL_STOP
 }

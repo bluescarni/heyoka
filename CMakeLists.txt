@@ -206,8 +206,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lagrangian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/iers_data.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/iers_data_fetch_latest.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_download.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_usno.cpp"
     # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
@@ -269,8 +270,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
-    # IERS details.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iers/builtin_iers_data.cpp"
+    # EOP data details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_data/builtin_eop_data.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"

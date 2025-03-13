@@ -4,7 +4,7 @@ coverage:
   - "tutorial/.*"
   - "src/detail/vsop2013/.*"
   - "src/detail/elp2000/.*"
-  - "src/detail/iers/.*"
+  - "src/detail/eop_data/.*"
   - "include/heyoka/detail/tanuki*"
   - "include/heyoka/detail/mdspan*"
   - "src/detail/erfa/.*"

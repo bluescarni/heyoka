@@ -6,11 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_IERS_DATA_HPP
-#define HEYOKA_IERS_DATA_HPP
+#ifndef HEYOKA_EOP_DATA_HPP
+#define HEYOKA_EOP_DATA_HPP
 
+#include <compare>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -19,15 +21,15 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-// Single row in a IERS data table.
-struct HEYOKA_DLL_PUBLIC iers_row {
+// Single row in a EOP data table.
+struct HEYOKA_DLL_PUBLIC eop_data_row {
     // UTC modified Julian date.
     double mjd = 0;
     // UT1-UTC (seconds).
     double delta_ut1_utc = 0;
 
-    // Comparison operator.
-    bool operator==(const iers_row &) const noexcept;
+    // NOTE: used in testing.
+    auto operator<=>(const eop_data_row &) const = default;
 
 private:
     // Serialization.
@@ -37,11 +39,16 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
-// The IERS data table.
-using iers_table = std::vector<iers_row>;
+// The EOP data table.
+using eop_data_table = std::vector<eop_data_row>;
 
-// The IERS data class.
-class HEYOKA_DLL_PUBLIC iers_data
+// The EOP data class.
+//
+// This data class stores internally a table of EOP data. The default constructor
+// uses a builtin (probably outdated) copy of the finals2000A.all file from USNO.
+// Factory functions are available to download the latest datafiles from USNO
+// and other EOP data providers.
+class HEYOKA_DLL_PUBLIC eop_data
 {
     struct impl;
     std::shared_ptr<const impl> m_impl;
@@ -52,21 +59,29 @@ class HEYOKA_DLL_PUBLIC iers_data
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    explicit iers_data(iers_table, std::string);
+    // NOTE: private implementation-detail constructor.
+    explicit eop_data(eop_data_table, std::string, std::string);
 
 public:
-    iers_data();
+    eop_data();
 
-    [[nodiscard]] const iers_table &get_table() const noexcept;
+    [[nodiscard]] const eop_data_table &get_table() const noexcept;
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
+    [[nodiscard]] const std::string &get_identifier() const noexcept;
 
-    static iers_data fetch_latest();
+private:
+    static std::pair<std::string, std::string> download(const std::string &, unsigned, const std::string &);
+
+public:
+    static eop_data fetch_latest_usno(const std::string & = "finals2000A.all");
 };
 
 namespace detail
 {
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC iers_table parse_iers_data(const std::string &);
+HEYOKA_DLL_PUBLIC void validate_eop_data_table(const eop_data_table &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_usno(const std::string &);
 
 } // namespace detail
 
