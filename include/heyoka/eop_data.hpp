@@ -16,6 +16,8 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -83,6 +85,12 @@ void validate_eop_data_table(const eop_data_table &);
 
 // NOTE: public for testing.
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_usno(const std::string &);
+
+// NOTE: public for testing.
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
+                                                                                llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data,
+                                                                   llvm::Type *scal_t);
 
 } // namespace detail
 

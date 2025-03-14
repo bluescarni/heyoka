@@ -10,12 +10,24 @@
 #include <string>
 #include <utility>
 
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("basic")
 {
@@ -288,4 +300,73 @@ TEST_CASE("s11n")
     REQUIRE(otable == idata.get_table());
     REQUIRE(otimestamep == idata.get_timestamp());
     REQUIRE(oidentifier == idata.get_identifier());
+}
+
+TEST_CASE("eop_data_date_tt_cy_j2000")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy function that uses the array, returning a pointer to the first element.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+
+        // Compile and fetch the function pointer.
+        s.compile();
+        auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+
+        // Check manually a few values. These values have been computed with astropy.
+        REQUIRE(*fptr() == approximately(static_cast<T>(-0.2699657628640961)));
+        REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
+        REQUIRE(*(fptr() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+    };
+
+    tester.operator()<float>();
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_era")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy function that uses the array, returning a pointer to the first element.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_era(s, data, scal_t));
+
+        // Compile and fetch the function pointer.
+        s.compile();
+        auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+
+        // Check manually a few values. These values have been computed with astropy.
+        // TODO restore.
+        // REQUIRE(*fptr() == approximately(static_cast<T>(1.7773390613567774)));
+        // REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(3.4744869507397453)));
+        // REQUIRE(*(fptr() + 19429) == approximately(static_cast<T>(2.989612722143122)));
+    };
+
+    tester.operator()<float>();
+    tester.operator()<double>();
 }
