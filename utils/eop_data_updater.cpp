@@ -15,7 +15,7 @@
 int main()
 {
     // Download the latest eop data.
-    const auto idata = heyoka::eop_data::fetch_latest_usno();
+    const auto idata = heyoka::eop_data::fetch_latest_iers_rapid();
 
     // Create the header file first.
     std::ofstream oheader("builtin_eop_data.hpp");

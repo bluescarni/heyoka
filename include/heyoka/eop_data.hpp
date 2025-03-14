@@ -47,9 +47,8 @@ using eop_data_table = std::vector<eop_data_row>;
 // The EOP data class.
 //
 // This data class stores internally a table of EOP data. The default constructor
-// uses a builtin copy of the finals2000A.all file from USNO.
-// Factory functions are available to download the latest datafiles from USNO
-// and other EOP data providers.
+// uses a builtin copy of the finals2000A.all file from IERS. Factory functions are
+// available to download the latest datafiles from IERS and other EOP data providers.
 class HEYOKA_DLL_PUBLIC eop_data
 {
     struct impl;
@@ -75,7 +74,7 @@ private:
     static std::pair<std::string, std::string> download(const std::string &, unsigned, const std::string &);
 
 public:
-    static eop_data fetch_latest_usno(const std::string & = "finals2000A.all");
+    static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
 };
 
 namespace detail
@@ -84,7 +83,7 @@ namespace detail
 void validate_eop_data_table(const eop_data_table &);
 
 // NOTE: public for testing.
-[[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_usno(const std::string &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_rapid(const std::string &);
 
 // NOTE: public for testing.
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
