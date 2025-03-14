@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -366,10 +367,11 @@ TEST_CASE("eop_data_era")
         auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
 
         // Check manually a few values. These values have been computed with astropy.
-        // TODO restore.
-        // REQUIRE(*fptr() == approximately(static_cast<T>(1.7773390613567774)));
-        // REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(3.4744869507397453)));
-        // REQUIRE(*(fptr() + 19429) == approximately(static_cast<T>(2.989612722143122)));
+        // NOTE: these are only approximately true because apparently astropy is using a
+        // slightly different dataset by default.
+        REQUIRE(std::abs(*fptr() - 1.7773390613567774) < 1e-6);
+        REQUIRE(std::abs(*(fptr() + 6308) - 3.4744869507397453) < 1e-6);
+        REQUIRE(std::abs(*(fptr() + 19429) - 2.989612722143122) < 1e-6);
     };
 
     tester.operator()<float>();
