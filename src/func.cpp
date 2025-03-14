@@ -21,6 +21,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/container_hash/hash.hpp>
 
 #include <fmt/core.h>
@@ -764,15 +765,23 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
     return g(llvm_args, high_accuracy);
 }
 
-// NOTE: precondition on name: must be conforming to LLVM requirements for
-// function names, and must not contain "." (as we use it as a separator in
-// the mangling scheme).
 std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &c, llvm::Type *fp_t,
                                                                              const std::string &name,
                                                                              std::uint32_t batch_size,
                                                                              const std::vector<expression> &args)
 {
-    assert(std::ranges::find(name, '.') == name.end());
+    // LCOV_EXCL_START
+
+    // Check that 'name' does not contain periods ".". Periods are used
+    // to separate fields in the mangled name.
+    if (boost::contains(name, ".")) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot generate a mangled name for the compact mode evaluation of the mathematical "
+                        "function '{}': the function name cannot contain '.' symbols",
+                        name));
+    }
+
+    // LCOV_EXCL_STOP
 
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
