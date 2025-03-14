@@ -37,6 +37,7 @@ namespace detail
 {
 
 // Helper to validate a EOP data table.
+// NOTE: this must be called by every fetch_latest_*() function before passing the table to the eop_data constructor.
 void validate_eop_data_table(const eop_data_table &data)
 {
     const auto n_entries = data.size();
@@ -73,6 +74,11 @@ void validate_eop_data_table(const eop_data_table &data)
 
 struct eop_data::impl {
     eop_data_table m_data;
+    // NOTE: timestamp and identifier are meant to uniquely identify
+    // the data. The identifier indicates the data source, while the
+    // timestamp is used to identify the version of the data. The timestamp
+    // is always built from the "Last-Modified" property of the file on the
+    // remote server.
     std::string m_timestamp;
     std::string m_identifier;
 
@@ -105,7 +111,8 @@ eop_data::eop_data(eop_data_table data, std::string timestamp, std::string ident
 eop_data::eop_data()
     : m_impl(std::make_shared<const impl>(
           eop_data_table(std::ranges::begin(detail::builtin_eop_data), std::ranges::end(detail::builtin_eop_data)),
-          detail::builtin_eop_data_ts, "finals2000A.all"))
+          // NOTE: the builtin EOP data is from USNO's finals2000A.all file.
+          detail::builtin_eop_data_ts, "usno_finals2000A_all"))
 {
 }
 

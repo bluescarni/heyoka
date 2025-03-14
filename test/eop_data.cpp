@@ -23,7 +23,7 @@ TEST_CASE("basic")
 
     REQUIRE(!idata.get_table().empty());
     REQUIRE(!idata.get_timestamp().empty());
-    REQUIRE(idata.get_identifier() == "finals2000A.all");
+    REQUIRE(idata.get_identifier() == "usno_finals2000A_all");
 }
 
 TEST_CASE("parse_eop_data_usno test")

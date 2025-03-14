@@ -45,7 +45,7 @@ using eop_data_table = std::vector<eop_data_row>;
 // The EOP data class.
 //
 // This data class stores internally a table of EOP data. The default constructor
-// uses a builtin (probably outdated) copy of the finals2000A.all file from USNO.
+// uses a builtin copy of the finals2000A.all file from USNO.
 // Factory functions are available to download the latest datafiles from USNO
 // and other EOP data providers.
 class HEYOKA_DLL_PUBLIC eop_data

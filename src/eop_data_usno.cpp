@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cassert>
 #include <optional>
 #include <ranges>
@@ -184,8 +185,15 @@ eop_data eop_data::fetch_latest_usno(const std::string &filename)
     // Download it.
     auto [text, timestamp] = download("maia.usno.navy.mil", 443, fmt::format("/ser7/{}", filename));
 
+    // Build the identifier string.
+    auto identifier = fmt::format("usno_{}", filename);
+    // NOTE: we transform '.' into '_' so that we can use the identifier
+    // to construct the mangled name of compact-mode primitives (which
+    // use '.' as a separator).
+    std::ranges::replace(identifier, '.', '_');
+
     // Parse, validate and return.
-    return eop_data(detail::parse_eop_data_usno(text), std::move(timestamp), filename);
+    return eop_data(detail::parse_eop_data_usno(text), std::move(timestamp), std::move(identifier));
 }
 
 HEYOKA_END_NAMESPACE
