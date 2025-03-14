@@ -259,13 +259,10 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, llvm::Type *fp_t, const expre
                 // of the first-order derivative.
                 const auto u_idx = uname_to_index(v.name());
 
-                // Fetch from arr the derivative
-                // of order 'order - 1' of the u variable at u_idx. The index is:
-                // (order - 1) * n_uvars + u_idx.
+                // Fetch from arr the derivative of order 'order - 1' of the u variable at u_idx.
                 auto ret = taylor_fetch_diff(arr, u_idx, order - 1u, n_uvars);
 
-                // We have to divide the derivative by order
-                // to get the normalised derivative of the state variable.
+                // We have to divide the derivative by order to get the normalised derivative of the state variable.
                 return llvm_fdiv(
                     s, ret,
                     vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
