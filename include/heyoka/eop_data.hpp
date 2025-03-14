@@ -79,8 +79,9 @@ public:
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC void validate_eop_data_table(const eop_data_table &);
+void validate_eop_data_table(const eop_data_table &);
 
+// NOTE: public for testing.
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_usno(const std::string &);
 
 } // namespace detail
