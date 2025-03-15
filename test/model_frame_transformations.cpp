@@ -17,10 +17,10 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("fk5j2000_icrs")
+TEST_CASE("rot_fk5j2000_icrs")
 {
     const auto [x, y, z] = make_vars("x", "y", "z");
-    const auto [icrs_x, icrs_y, icrs_z] = model::fk5j2000_icrs({x, y, z});
+    const auto [icrs_x, icrs_y, icrs_z] = model::rot_fk5j2000_icrs({x, y, z});
     auto cf = cfunc<double>{{icrs_x, icrs_y, icrs_z}, {x, y, z}};
 
     {
@@ -33,10 +33,10 @@ TEST_CASE("fk5j2000_icrs")
     }
 }
 
-TEST_CASE("icrs_fk5j2000")
+TEST_CASE("rot_icrs_fk5j2000")
 {
     const auto [x, y, z] = make_vars("x", "y", "z");
-    const auto [icrs_x, icrs_y, icrs_z] = model::icrs_fk5j2000({x, y, z});
+    const auto [icrs_x, icrs_y, icrs_z] = model::rot_icrs_fk5j2000({x, y, z});
     auto cf = cfunc<double>{{icrs_x, icrs_y, icrs_z}, {x, y, z}};
 
     {

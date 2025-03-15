@@ -34,7 +34,7 @@ constexpr std::array fk5j2000_icrs_rot = {9.9999999999999278e-01,  1.11022337230
 // while with Layout == left we get the ICRS->FK5@J2000 rotation. I.e., changing the layout transposes
 // the rotation matrix.
 template <typename Layout>
-std::array<expression, 3> fk5j2000_icrs_impl(const std::array<expression, 3> &xyz)
+std::array<expression, 3> rot_fk5j2000_icrs_impl(const std::array<expression, 3> &xyz)
 {
     const mdspan<const double, extents<std::size_t, 3, 3>, Layout> rot(fk5j2000_icrs_rot.data());
 
@@ -60,15 +60,15 @@ std::array<expression, 3> fk5j2000_icrs_impl(const std::array<expression, 3> &xy
 // The rotation matrix has been created in astropy with code similar to this:
 //
 // https://github.com/astropy/astropy/blob/07b8873e0f78fbdb7787960eabf19fe48914218c/astropy/coordinates/builtin_frames/icrs_fk5_transforms.py
-std::array<expression, 3> fk5j2000_icrs(const std::array<expression, 3> &xyz)
+std::array<expression, 3> rot_fk5j2000_icrs(const std::array<expression, 3> &xyz)
 {
-    return detail::fk5j2000_icrs_impl<std::experimental::layout_right>(xyz);
+    return detail::rot_fk5j2000_icrs_impl<std::experimental::layout_right>(xyz);
 }
 
 // Inverse of fk5j2000_icrs().
-std::array<expression, 3> icrs_fk5j2000(const std::array<expression, 3> &xyz)
+std::array<expression, 3> rot_icrs_fk5j2000(const std::array<expression, 3> &xyz)
 {
-    return detail::fk5j2000_icrs_impl<std::experimental::layout_left>(xyz);
+    return detail::rot_fk5j2000_icrs_impl<std::experimental::layout_left>(xyz);
 }
 
 } // namespace model

@@ -20,8 +20,8 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> fk5j2000_icrs(const std::array<expression, 3> &);
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> icrs_fk5j2000(const std::array<expression, 3> &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> rot_fk5j2000_icrs(const std::array<expression, 3> &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> rot_icrs_fk5j2000(const std::array<expression, 3> &);
 
 } // namespace model
 
