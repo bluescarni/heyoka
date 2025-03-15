@@ -7,9 +7,13 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cmath>
+#include <initializer_list>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
+
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -340,6 +344,48 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
 
     tester.operator()<float>();
     tester.operator()<double>();
+
+    // A test with llvm multi state to check proper linkonce behaviour.
+    auto multi_tester = [&data]<typename T>() {
+        std::vector<llvm_state> vs;
+
+        for (auto i : {1, 2}) {
+            llvm_state s;
+
+            auto &bld = s.builder();
+            auto &ctx = s.context();
+            auto &md = s.module();
+
+            auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+            // Add dummy function that uses the array, returning a pointer to the first element.
+            auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fmt::format("test_{}", i), &md);
+            bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+            bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+
+            vs.push_back(std::move(s));
+        }
+
+        llvm_multi_state ms(std::move(vs));
+
+        // Compile and fetch the function pointer.
+        ms.compile();
+        auto *fptr1 = reinterpret_cast<const T *(*)()>(ms.jit_lookup("test_1"));
+        auto *fptr2 = reinterpret_cast<const T *(*)()>(ms.jit_lookup("test_2"));
+
+        // Check manually a few values. These values have been computed with astropy.
+        REQUIRE(*fptr1() == approximately(static_cast<T>(-0.2699657628640961)));
+        REQUIRE(*(fptr1() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
+        REQUIRE(*(fptr1() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+
+        REQUIRE(*fptr1() == *fptr2());
+        REQUIRE(*(fptr1() + 6308) == *(fptr2() + 6308));
+        REQUIRE(*(fptr1() + 19429) == *(fptr2() + 19429));
+    };
+
+    multi_tester.operator()<float>();
+    multi_tester.operator()<double>();
 }
 
 TEST_CASE("eop_data_era")
