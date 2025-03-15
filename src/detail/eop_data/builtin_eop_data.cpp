@@ -17,7 +17,7 @@ namespace detail
 
 const char *const builtin_eop_data_ts = "2025_03_13_17_43_46";
 
-constinit const eop_data_row builtin_eop_data[19437] = {
+const eop_data_row builtin_eop_data[19437] = {
     {.mjd = 41684, .delta_ut1_utc = 0.8075},     {.mjd = 41685, .delta_ut1_utc = 0.8044},
     {.mjd = 41686, .delta_ut1_utc = 0.8012},     {.mjd = 41687, .delta_ut1_utc = 0.7981},
     {.mjd = 41688, .delta_ut1_utc = 0.7949},     {.mjd = 41689, .delta_ut1_utc = 0.7918},

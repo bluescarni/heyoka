@@ -55,7 +55,7 @@ namespace detail
 
 const char *const builtin_eop_data_ts = "{}";
 
-constinit const eop_data_row builtin_eop_data[{}] = {{)",
+const eop_data_row builtin_eop_data[{}] = {{)",
                         idata.get_timestamp(), idata.get_table().size());
 
     for (const auto &[mjd, cur_delta_ut1_utc] : idata.get_table()) {
