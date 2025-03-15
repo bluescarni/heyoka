@@ -368,7 +368,8 @@ TEST_CASE("eop_data_era")
 
         // Check manually a few values. These values have been computed with astropy.
         // NOTE: these are only approximately true because apparently astropy is using a
-        // slightly different dataset by default.
+        // slightly different dataset by default. Perhaps we can make these checks more precise
+        // once we figure out exactly what astropy is using.
         REQUIRE(std::abs(*fptr() - 1.7773390613567774) < 1e-6);
         REQUIRE(std::abs(*(fptr() + 6308) - 3.4744869507397453) < 1e-6);
         REQUIRE(std::abs(*(fptr() + 19429) - 2.989612722143122) < 1e-6);
