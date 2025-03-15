@@ -35,6 +35,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/eop_data/builtin_eop_data.hpp>
+#include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -42,14 +43,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
-
-// erfa functions needed for time conversions.
-extern "C" {
-int eraUtctai(double, double, double *, double *);
-int eraTaitt(double, double, double *, double *);
-int eraUtcut1(double, double, double, double *, double *);
-double eraEra00(double, double);
-}
 
 // NOTE: GCC warns about use of mismatched new/delete
 // when creating global variables. I am not sure this is

@@ -42,6 +42,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -61,12 +62,6 @@
 #include <heyoka/model/sgp4.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
-
-// The erfa functions for conversion between UTC and TAI Julian dates.
-extern "C" {
-int eraUtctai(double, double, double *, double *);
-int eraTaiutc(double, double, double *, double *);
-}
 
 HEYOKA_BEGIN_NAMESPACE
 
