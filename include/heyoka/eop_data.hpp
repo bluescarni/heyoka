@@ -88,8 +88,7 @@ void validate_eop_data_table(const eop_data_table &);
 // NOTE: public for testing.
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
                                                                                 llvm::Type *);
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data,
-                                                                   llvm::Type *scal_t);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &, const eop_data &, llvm::Type *);
 
 } // namespace detail
 
