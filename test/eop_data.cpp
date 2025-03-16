@@ -332,6 +332,11 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
         bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
 
+        // Add a second function to test that we do not generate the data twice.
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+
         // Compile and fetch the function pointer.
         s.compile();
         auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
@@ -423,4 +428,12 @@ TEST_CASE("eop_data_era")
 
     tester.operator()<float>();
     tester.operator()<double>();
+}
+
+// Test to check the download code. We pick a small file for testing.
+TEST_CASE("download finals2000A.daily")
+{
+    const auto data = eop_data::fetch_latest_iers_rapid("finals2000A.daily");
+    REQUIRE(!data.get_table().empty());
+    REQUIRE(data.get_identifier() == "iers_rapid_finals2000A_daily");
 }
