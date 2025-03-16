@@ -53,7 +53,7 @@ const auto eop_data_month_names_map = []() {
     }
 
     return retval;
-}();
+}(); // LCOV_EXCL_LINE
 
 // Regular expression to parse a date in the RFC 7231 format:
 //
