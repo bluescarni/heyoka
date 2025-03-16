@@ -1254,11 +1254,20 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 #endif
 }
 
-// Gather a vector of type vec_tp from ptrs. If vec_tp is a vector type, then ptrs
-// must be a vector of pointers of the same size and the returned value is also a vector
-// of that size. Otherwise, ptrs must be a single scalar pointer and the returned value is a scalar.
+// Gather a vector of type vec_tp from ptrs.
+//
+// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values
+// of type vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
+//
+// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value
+// will be a vector of values gathered from the addresses specified in ptrs.
+//
+// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function
+// behaves like a scalar load from ptrs).
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
+    assert(ptrs->getType()->getScalarType()->isPointerTy());
+
     if (llvm::isa<llvm::FixedVectorType>(vec_tp)) {
         // LCOV_EXCL_START
         assert(llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
