@@ -511,6 +511,20 @@ llvm::Value *llvm_real_fcmp_uge(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateCall(f, {a, b});
 }
 
+// NOTE: fcmp ULE means that it must return true if either operand is nan, or if a <= b.
+llvm::Value *llvm_real_fcmp_ule(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "heyoka_mpfr_fcmp_ule", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
 // NOTE: fcmp OGE means that it will return true if neither operand is nan and a >= b.
 // This corresponds to the semantics of the mpfr_greaterequal_p() function.
 llvm::Value *llvm_real_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
@@ -824,6 +838,21 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t 
         return 1;
     } else {
         return ::mpfr_greaterequal_p(a, b);
+    }
+}
+
+// Wrapper to implement ULE comparison semantics for real types.
+extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a,
+                                                      const mppp::mpfr_struct_t *b) noexcept
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(mpfr_get_prec(a) == mpfr_get_prec(b));
+
+    if (mpfr_nan_p(a) != 0 || mpfr_nan_p(b) != 0) {
+        return 1;
+    } else {
+        return ::mpfr_lessequal_p(a, b);
     }
 }
 
