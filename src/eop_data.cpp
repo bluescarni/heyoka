@@ -564,22 +564,48 @@ llvm::Value *llvm_eop_data_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Va
 //
 // If either:
 //
+// - arr_size == 0, or
 // - date_value is less than the first value in the array, or
 // - date_value is greater than or equal to the last value in the array, or
 // - date_value is NaN,
 //
-// then arr_size will be returned.
-//
-// Both scalar and vector date_value inputs are supported.
-//
-// NOTE: this function assumes that internal data types are being used, and that the scalar array does not contain NaN
-// values.
+// then arr_size will be returned. date_value can be a scalar or a vector.
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-// llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_size, llvm::Value
-// *date_value)
-// {
-// }
+llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_size, llvm::Value *date_value)
+{
+    auto &bld = s.builder();
+
+    // As a first step, we look for the first date in the array which is *greater than* date_value.
+    auto *idx = llvm_eop_data_upper_bound(s, ptr, arr_size, date_value);
+
+    // The happy path requires the computation of idx - 1. The exceptions are:
+    //
+    // - idx == 0 -> this means that date_value is before any time interval,
+    // - idx == arr_size -> this means that data_value is after any time interval.
+    //
+    // In these two cases, we want to return arr_size, rather than idx - 1.
+
+    // Determine the batch size from date_value.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(date_value->getType())) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+        assert(batch_size != 0u);
+    }
+
+    // Splat the array size.
+    auto *arr_size_splat = vector_splat(bld, arr_size, batch_size);
+
+    // First step: ret = (idx == 0) ? arr_size : idx.
+    auto *idx_is_zero = bld.CreateICmpEQ(idx, llvm::ConstantInt::get(idx->getType(), 0));
+    auto *ret = bld.CreateSelect(idx_is_zero, arr_size_splat, idx);
+
+    // Second step: ret = (ret == arr_size) ? ret : (ret - 1).
+    auto *ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
+    ret = bld.CreateSelect(ret_eq_arr_size, ret, bld.CreateSub(ret, llvm::ConstantInt::get(ret->getType(), 1)));
+
+    return ret;
+}
 
 } // namespace detail
 
