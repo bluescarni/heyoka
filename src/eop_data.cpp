@@ -499,7 +499,7 @@ llvm::Value *llvm_eop_data_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Va
             // '!(v < *it)' to evaluate to true because we want to consider NaN greater than non-NaN. In order to do
             // this, we flip the comparison around to '*it <= v', and we implement it via the ULE predicate, which
             // returns true if either v is NaN or '*it <= v'.
-            auto *cmp = bld.CreateFCmpULE(cur_value, v);
+            auto *cmp = llvm_fcmp_ule(s, cur_value, v);
             if (batch_size != 1u) {
                 // NOTE: in vector mode, we must take care that cmp for the masked-out lanes evaluates to false.
                 assert(mask != nullptr);
