@@ -89,6 +89,10 @@ void validate_eop_data_table(const eop_data_table &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
                                                                                 llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_data_upper_bound(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                       llvm::Value *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_data_locate_date(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                       llvm::Value *);
 
 } // namespace detail
 
