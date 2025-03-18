@@ -515,7 +515,7 @@ TEST_CASE("eop_data upper_bound")
         }
 
         // Comprehensive randomised scalar testing.
-        for (const auto batch_size : {1u, 2u, 4u, 8u}) {
+        for (const auto batch_size : {1u, 2u, 4u, 5u, 8u}) {
             // Setup the compiled function.
             llvm_state s;
             add_test_func(s, batch_size);
@@ -656,7 +656,7 @@ TEST_CASE("eop_data locate_date")
         }
 
         // Comprehensive randomised scalar testing.
-        for (const auto batch_size : {1u, 2u, 4u, 8u}) {
+        for (const auto batch_size : {1u, 2u, 4u, 5u, 8u}) {
             // Setup the compiled function.
             llvm_state s;
             add_test_func(s, batch_size);
