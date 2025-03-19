@@ -76,7 +76,6 @@ private:
 public:
     static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
     static eop_data fetch_latest_iers_long_term();
-    static eop_data fetch_latest_iers_combined();
 };
 
 namespace detail
