@@ -75,6 +75,7 @@ private:
 
 public:
     static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
+    static eop_data fetch_latest_iers_long_term();
 };
 
 namespace detail
@@ -83,6 +84,7 @@ namespace detail
 void validate_eop_data_table(const eop_data_table &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_rapid(const std::string &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_long_term(const std::string &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
                                                                                 llvm::Type *);
