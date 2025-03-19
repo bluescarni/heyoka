@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 #include <boost/charconv.hpp>
 
@@ -135,18 +136,18 @@ eop_data_table parse_eop_data_iers_rapid(const std::string &str)
         }
 
         // Check the line length.
-        if (std::ranges::size(cur_line) < detail::eop_data_iers_rapid_expected_line_length) [[unlikely]] {
+        if (std::ranges::size(cur_line) < eop_data_iers_rapid_expected_line_length) [[unlikely]] {
             throw std::invalid_argument(fmt::format(
                 "Invalid line detected in a IERS rapid EOP data file: the expected number of "
                 "characters in the line is at least {}, but a line with {} character(s) was detected instead",
-                detail::eop_data_iers_rapid_expected_line_length, std::ranges::size(cur_line)));
+                eop_data_iers_rapid_expected_line_length, std::ranges::size(cur_line)));
         }
 
         // Parse the mjd.
-        const auto mjd = detail::parse_eop_data_iers_rapid_mjd(cur_line);
+        const auto mjd = parse_eop_data_iers_rapid_mjd(cur_line);
 
         // Parse the UT1-UTC difference.
-        const auto delta_ut1_utc = detail::parse_eop_data_iers_rapid_delta_ut1_utc(cur_line);
+        const auto delta_ut1_utc = parse_eop_data_iers_rapid_delta_ut1_utc(cur_line);
         if (!delta_ut1_utc) {
             // No data available on this line, break out.
             break;
@@ -157,7 +158,7 @@ eop_data_table parse_eop_data_iers_rapid(const std::string &str)
     }
 
     // Validate the output.
-    detail::validate_eop_data_table(retval);
+    validate_eop_data_table(retval);
 
     return retval;
 }
