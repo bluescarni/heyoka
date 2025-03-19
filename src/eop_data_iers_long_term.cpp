@@ -129,6 +129,8 @@ eop_data eop_data::fetch_latest_iers_long_term()
     // to construct the mangled name of compact-mode primitives (which
     // use '.' as a separator).
     std::ranges::replace(identifier, '.', '_');
+    // Replace also '-' with '_'.
+    std::ranges::replace(identifier, '-', '_');
 
     // Parse, validate and return.
     return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier));
