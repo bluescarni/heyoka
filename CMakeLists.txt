@@ -209,6 +209,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_combined.cpp"
     # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
