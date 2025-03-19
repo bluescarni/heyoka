@@ -210,7 +210,7 @@ std::pair<std::string, std::string> eop_data::download(const std::string &host, 
         // Beast returns the error beast::http::error::partial_message.
         // Therefore, if we see a short read here, it has occurred
         // after the message has been completed, so it is safe to ignore it.
-        if (ec != net::ssl::error::stream_truncated) [[unlikely]] {
+        if (ec != beast::error_code{} && ec != net::ssl::error::stream_truncated) [[unlikely]] {
             // LCOV_EXCL_START
             throw beast::system_error{ec};
             // LCOV_EXCL_STOP
