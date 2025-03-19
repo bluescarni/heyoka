@@ -291,6 +291,99 @@ TEST_CASE("parse_eop_data_iers_rapid test")
                 "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
 }
 
+TEST_CASE("parse_eop_data_iers_long_term test")
+{
+    using Catch::Matchers::Message;
+
+    // Successful parses.
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0.000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
+              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000";
+
+        const auto data = detail::parse_eop_data_iers_long_term(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 37665);
+        REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+
+        REQUIRE(data[1].mjd == 37666);
+        REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+    }
+
+    // NOTE: newline at the end.
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0.000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
+              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n";
+
+        const auto data = detail::parse_eop_data_iers_long_term(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 37665);
+        REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+
+        REQUIRE(data[1].mjd == 37666);
+        REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+    }
+
+    // Invalid mjd.
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\nhelloworld;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0."
+              "000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
+              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
+                               Message("Error parsing a IERS long term EOP data file: the string 'helloworld' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid ut1-utc value.
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0."
+              "000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;goofy;0.0020000;0.0016690;0."
+              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
+                               Message("Error parsing a IERS long term EOP data file: the string 'goofy' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid number of fields.
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0."
+              "000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01\n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
+                               Message("Error parsing a IERS long term EOP data file: at least 15 fields "
+                                       "were expected in a data row, but 3 were found instead"));
+    }
+}
+
 TEST_CASE("s11n")
 {
     eop_data idata;
