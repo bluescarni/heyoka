@@ -191,7 +191,30 @@ std::pair<std::string, std::string> eop_data::download(const std::string &host, 
         auto body = boost::beast::buffers_to_string(res.body().data());
 
         // Gracefully close the stream.
-        stream.shutdown();
+        beast::error_code ec;
+        stream.shutdown(ec);
+
+        // ssl::error::stream_truncated, also known as an SSL "short read",
+        // indicates the peer closed the connection without performing the
+        // required closing handshake (for example, Google does this to
+        // improve performance). Generally this can be a security issue,
+        // but if your communication protocol is self-terminated (as
+        // it is with both HTTP and WebSocket) then you may simply
+        // ignore the lack of close_notify.
+        //
+        // https://github.com/boostorg/beast/issues/38
+        //
+        // https://security.stackexchange.com/questions/91435/how-to-handle-a-malicious-ssl-tls-shutdown
+        //
+        // When a short read would cut off the end of an HTTP message,
+        // Beast returns the error beast::http::error::partial_message.
+        // Therefore, if we see a short read here, it has occurred
+        // after the message has been completed, so it is safe to ignore it.
+        if (ec != net::ssl::error::stream_truncated) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw beast::system_error{ec};
+            // LCOV_EXCL_STOP
+        }
 
         // Construct and return.
         return std::make_pair(std::move(body), std::move(timestamp));
