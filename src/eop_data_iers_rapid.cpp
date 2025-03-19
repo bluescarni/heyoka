@@ -37,9 +37,8 @@ namespace
 constexpr auto eop_data_iers_rapid_expected_line_length = 185u;
 
 // Helper to parse the MJD from a line in a IERS rapid EOP data file.
-double parse_eop_data_iers_rapid_mjd(auto cur_line)
+double parse_eop_data_iers_rapid_mjd(const std::ranges::contiguous_range auto &cur_line)
 {
-    static_assert(std::ranges::contiguous_range<decltype(cur_line)>);
     assert(std::ranges::size(cur_line) >= eop_data_iers_rapid_expected_line_length);
 
     // Fetch the range of mjd data.
@@ -63,9 +62,8 @@ double parse_eop_data_iers_rapid_mjd(auto cur_line)
 }
 
 // Helper to parse the UT1-UTC difference from a line in a IERS rapid EOP data file.
-std::optional<double> parse_eop_data_iers_rapid_delta_ut1_utc(auto cur_line)
+std::optional<double> parse_eop_data_iers_rapid_delta_ut1_utc(const std::ranges::contiguous_range auto &cur_line)
 {
-    static_assert(std::ranges::contiguous_range<decltype(cur_line)>);
     assert(std::ranges::size(cur_line) >= eop_data_iers_rapid_expected_line_length);
 
     // We first try to fetch the UT1-UTC from the bulletin B data.
