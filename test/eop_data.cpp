@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
 #include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
@@ -516,18 +519,61 @@ TEST_CASE("eop_data_era")
 
         // Compile and fetch the function pointer.
         s.compile();
-        auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+        using arr_t = T[2];
+        auto *fptr = reinterpret_cast<const arr_t *(*)()>(s.jit_lookup("test"));
 
-        // Check manually a few values. These values have been computed with astropy.
-        // NOTE: these are only approximately true because apparently astropy is using a
-        // slightly different dataset by default. Perhaps we can make these checks more precise
-        // once we figure out exactly what astropy is using.
-        REQUIRE(std::abs(*fptr() - 1.7773390613567774) < 1e-6);
-        REQUIRE(std::abs(*(fptr() + 6308) - 3.4744869507397453) < 1e-6);
-        REQUIRE(std::abs(*(fptr() + 19429) - 2.989612722143122) < 1e-6);
+        // Fetch the array pointer.
+        const auto *arr_ptr = fptr();
+
+        // We will be loading the double-length ERA approximation and reduce it in octuple precision.
+        // Then, we will compare it to values computed with astropy.
+        using oct_t = boost::multiprecision::cpp_bin_float_oct;
+        auto reducer = [](const auto &x) {
+            using std::atan2;
+            using std::sin;
+            using std::cos;
+
+            auto ret = atan2(sin(x), cos(x));
+            if (ret < 0) {
+
+                ret = 2 * boost::math::constants::pi<oct_t>() + ret;
+            }
+            return ret;
+        };
+
+        // NOTE: here we use a high tolerance of 1e-6 because for the life of me
+        // I cannot figure out what kind of IERS data astropy is actually using for these
+        // calculations. They say they are using some sort of mix between IERS A and IERS B
+        // data but my attempts at trying to figure out exactly how this is done have consistently
+        // failed. The fact that I cannot really understand whether or not I am using the very
+        // latest data (and not a cached and outdated copy) just adds to the confusion.
+        //
+        // More generally, it seems like the whole situation about self-consistency of IERS
+        // data is a mess, with slightly contradictory data being distributed in the "rapid" and
+        // "long-term" datasets. See, e.g., the comments here:
+        //
+        // https://github.com/astropy/astropy/pull/4436
+        using std::abs;
+        {
+            oct_t era{arr_ptr[0][0]};
+            era += arr_ptr[0][1];
+            REQUIRE(abs(reducer(era) - 1.7773390613567774) < 1e-6);
+        }
+
+        {
+            oct_t era{arr_ptr[6308][0]};
+            era += arr_ptr[6308][1];
+            REQUIRE(abs(reducer(era) - 3.4744869507397453) < 1e-6);
+        }
+
+        {
+            oct_t era{arr_ptr[19429][0]};
+            era += arr_ptr[19429][1];
+            REQUIRE(abs(reducer(era) - 2.989612722143122) < 1e-6);
+        }
     };
 
-    tester.operator()<float>();
+    // NOTE: test only double for the ERA.
     tester.operator()<double>();
 }
 

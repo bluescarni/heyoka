@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
@@ -178,23 +180,21 @@ namespace
 {
 
 // This is a helper that will construct into an LLVM module a global
-// array of scalars from the input eop data. A pointer to the beginning of
+// array of values from the input eop data. A pointer to the beginning of
 // the array will be returned. If the array already exists, a pointer
 // to the existing array will be returned instead.
 //
-// 'data' is the source of eop data. scal_t is the scalar floating-point type
-// to be used to codegen the data. arr_name is a name uniquely identifying
-// the array to be created. value_getter is the function object that will be used
-// to construct an array value from a row in the input eop data table.
+// 'data' is the source of eop data. value_t is the value type of the array. arr_name
+// is a name uniquely identifying the array to be created. value_getter is the function
+// object that will be used to construct an array value from a row in the input eop data table.
 //
 // NOTE: this function will ensure that the size of the global array is representable
 // as a 32-bit int.
-llvm::Value *llvm_get_eop_data(llvm_state &s, const eop_data &data, llvm::Type *scal_t,
+llvm::Value *llvm_get_eop_data(llvm_state &s, const eop_data &data, llvm::Type *value_t,
                                const std::string_view &arr_name,
-                               const std::function<double(const eop_data_row &)> &value_getter)
+                               const std::function<llvm::Constant *(const eop_data_row &)> &value_getter)
 {
-    assert(scal_t != nullptr);
-    assert(!llvm::isa<llvm::FixedVectorType>(scal_t));
+    assert(value_t != nullptr);
     assert(value_getter);
 
     auto &md = s.module();
@@ -207,9 +207,9 @@ llvm::Value *llvm_get_eop_data(llvm_state &s, const eop_data &data, llvm::Type *
     // - arr_name,
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
-    // - the scalar type used for the codegen.
+    // - the value type of the array.
     const auto name = fmt::format("heyoka.eop_data_{}.{}.{}_{}.{}", arr_name, table.size(), data.get_timestamp(),
-                                  data.get_identifier(), llvm_mangle_type(scal_t));
+                                  data.get_identifier(), llvm_mangle_type(value_t));
 
     // Helper to return a pointer to the first element of the array.
     const auto fetch_ptr = [&bld = s.builder()](llvm::GlobalVariable *g_arr) {
@@ -224,17 +224,18 @@ llvm::Value *llvm_get_eop_data(llvm_state &s, const eop_data &data, llvm::Type *
 
     // We need to create a new array. Begin with the array type.
     // NOTE: array size needs a 64-bit int, but we want to guarantee that the array size fits in a 32-bit int.
-    auto *arr_type = llvm::ArrayType::get(scal_t, boost::numeric_cast<std::uint32_t>(table.size()));
+    auto *arr_type = llvm::ArrayType::get(value_t, boost::numeric_cast<std::uint32_t>(table.size()));
 
     // Construct the vector of initialisers.
     std::vector<llvm::Constant *> data_init;
     data_init.reserve(table.size());
     for (const auto &row : table) {
         // Get the value from the row.
-        const auto value = value_getter(row);
+        auto *value = value_getter(row);
+        assert(value->getType() == value_t);
 
         // Add it to the vector of initialisers.
-        data_init.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{value})));
+        data_init.push_back(value);
     }
 
     // Create the array.
@@ -254,7 +255,7 @@ llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &s, const eop_data &d
 {
     auto *logger = get_logger();
 
-    const auto value_getter = [logger](const eop_data_row &r) {
+    const auto value_getter = [logger, &s, scal_t](const eop_data_row &r) {
         // Fetch the UTC mjd.
         const auto utc_mjd = r.mjd;
 
@@ -295,18 +296,29 @@ llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &s, const eop_data &d
                 utc_mjd, retval));
             // LCOV_EXCL_STOP
         }
-        return retval;
+        // NOTE: in principle the truncation of retval to lower-than-double precision could
+        // result in an infinity being produced. This is still ok, as the important thing for the
+        // dates array is the absence of NaNs. If infinities are generated, the bisection algorithm
+        // will still work (although we will likely generate NaNs once we start using the infinite
+        // date in calculations).
+        return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{retval}));
     };
 
     return llvm_get_eop_data(s, data, scal_t, "date_tt_cy_j2000", value_getter);
 }
 
 // eop data getter for the ERA.
+//
+// The ERA will be represented as a double-length floating-point, hence the value type of the
+// global array is itself a 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
     auto *logger = get_logger();
 
-    const auto value_getter = [logger](const eop_data_row &r) {
+    // Determine the value type.
+    auto *value_t = llvm::ArrayType::get(scal_t, 2);
+
+    const auto value_getter = [logger, &s, scal_t, value_t](const eop_data_row &r) {
         // Fetch the UTC mjd.
         const auto utc_mjd = r.mjd;
 
@@ -331,18 +343,50 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         }
         // LCOV_EXCL_STOP
 
-        // Compute the ERA and return.
-        const auto retval = eraEra00(ut1_jd1, ut1_jd2);
-        if (!std::isfinite(retval)) [[unlikely]] {
+        // Compute the ERA and return. See:
+        //
+        // https://en.wikipedia.org/wiki/Sidereal_time#ERA
+        //
+        // The approach we follow here is to first compute the ERA in multiprecision (without any reduction to the [0,
+        // 2pi] range), and then to truncate and store the result as a double-double number. This gives us the ERA with
+        // roughly 30 decimal digits of precision. Then, in the implementation of the era/erap functions in the
+        // expression system, we will perform double-double interpolation and reduction to the [0, 2pi] range, and
+        // finally we will truncate the result back to single-length representation.
+        //
+        // NOTE: at this time the ERA has an intrinsic accuracy no better than ~1e-10 rad, due to the ~1e-5s
+        // uncertainty in the measurement of the UT1-UTC difference. Thus it seems like there's no point
+        // in attempting to generalise this process to precisions higher than double.
+
+        // Use octuple precision as a safety margin.
+        using oct_t = boost::multiprecision::cpp_bin_float_oct;
+        const auto tU = oct_t{ut1_jd1} + ut1_jd2 - 2451545.0;
+        const auto twopi = 2 * boost::math::constants::pi<oct_t>();
+        const auto era = twopi * (0.7790572732640 + 1.00273781191135448 * tU);
+
+        // Compute the hi/lo components of the double-double era approximation.
+        auto era_hi = static_cast<double>(era);
+        auto era_lo = static_cast<double>(era - era_hi);
+
+        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision
+        // rounds correctly, but better safe than sorry.
+        std::tie(era_hi, era_lo) = eft_add_knuth(era_hi, era_lo);
+
+        if (!std::isfinite(era_hi) || !std::isfinite(era_lo)) [[unlikely]] {
             // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format(
-                "The computation of the ERA at the UTC MJD {} produced the non-finite value {}", utc_mjd, retval));
+                "The computation of the ERA at the UTC MJD {} produced the non-finite double-length value ({}, {})",
+                utc_mjd, era_hi, era_lo));
             // LCOV_EXCL_STOP
         }
+
+        // Pack the values into an array and return.
+        auto *retval
+            = llvm::ConstantArray::get(value_t, {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_hi})),
+                                                 llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_lo}))});
         return retval;
     };
 
-    return llvm_get_eop_data(s, data, scal_t, "era", value_getter);
+    return llvm_get_eop_data(s, data, value_t, "era", value_getter);
 }
 
 // Implementation of the std::upper_bound() algorithm for use in llvm_eop_data_locate_date().

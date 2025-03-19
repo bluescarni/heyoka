@@ -962,6 +962,9 @@ std::string llvm_mangle_type(llvm::Type *t)
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return fmt::format("{}_{}", llvm_type_name(v_t->getElementType()), v_t->getNumElements());
+    } else if (auto *arr_t = llvm::dyn_cast<llvm::ArrayType>(t)) {
+        // Similar idea if the type is an array.
+        return fmt::format("array_{}_{}", llvm_type_name(arr_t->getElementType()), arr_t->getNumElements());
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
