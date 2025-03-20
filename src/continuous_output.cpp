@@ -849,7 +849,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                                          builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx));
 
     // Compute the value of h = tm - start_tm.
-    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, start_tm_hi, start_tm_lo).first;
+    auto h = detail::llvm_dl_sub(m_llvm_state, tm, zero_vec_fp, start_tm_hi, start_tm_lo).first;
 
     // Compute the base pointers in the array of TC for the computation
     // of Horner's scheme.
