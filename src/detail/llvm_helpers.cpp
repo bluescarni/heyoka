@@ -3059,6 +3059,13 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     return {e, f};
 }
 
+// Subtraction.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_sub(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    return llvm_dl_add(state, x_hi, x_lo, llvm_fneg(state, y_hi), llvm_fneg(state, y_lo));
+}
+
 // Multiplication.
 // NOTE: this is procedure mul2() from here:
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
@@ -3214,7 +3221,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
     auto [prod_hi, prod_lo] = llvm_dl_mul(s, y_hi, y_lo, fl_hi, fl_lo);
 
-    return llvm_dl_add(s, x_hi, x_lo, llvm_fneg(s, prod_hi), llvm_fneg(s, prod_lo));
+    return llvm_dl_sub(s, x_hi, x_lo, prod_hi, prod_lo);
 }
 
 // Less-than.

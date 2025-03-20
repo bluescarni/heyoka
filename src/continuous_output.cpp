@@ -281,9 +281,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
         m_llvm_state, fp_t, builder.CreateInBoundsGEP(ext_fp_t, times_ptr_lo, tc_idx), 1);
 
     // Compute and store the value of h = tm - start_tm into tm_ptr.
-    auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, detail::llvm_constantfp(m_llvm_state, fp_t, 0.),
-                                            detail::llvm_fneg(m_llvm_state, start_tm_hi),
-                                            detail::llvm_fneg(m_llvm_state, start_tm_lo));
+    auto [h_hi, h_lo] = detail::llvm_dl_sub(m_llvm_state, tm, detail::llvm_constantfp(m_llvm_state, fp_t, 0.),
+                                            start_tm_hi, start_tm_lo);
     detail::ext_store_vector_to_memory(m_llvm_state, tm_ptr, h_hi);
 
     // Compute the index into the Taylor coefficients array.
@@ -850,9 +849,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                                          builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx));
 
     // Compute the value of h = tm - start_tm.
-    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, detail::llvm_fneg(m_llvm_state, start_tm_hi),
-                                 detail::llvm_fneg(m_llvm_state, start_tm_lo))
-                 .first;
+    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, start_tm_hi, start_tm_lo).first;
 
     // Compute the base pointers in the array of TC for the computation
     // of Horner's scheme.

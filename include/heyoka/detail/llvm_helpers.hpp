@@ -210,6 +210,10 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *,
                                                                       llvm::Value *, llvm::Value *);
 
+// Subtraction.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_sub(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+
 // Multiplication.
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &, llvm::Value *, llvm::Value *,
                                                                       llvm::Value *, llvm::Value *);
