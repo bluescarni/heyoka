@@ -326,7 +326,8 @@ era_impl::era_impl(expression time_expr, eop_data data)
 std::vector<expression> era_impl::gradient() const
 {
     era_erap_check_eop_data(m_eop_data);
-    return {erap(kw::time = args()[0], kw::eop_data = *m_eop_data)};
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return {erap(kw::time_expr = args()[0], kw::eop_data = *m_eop_data)};
 }
 
 namespace
@@ -355,6 +356,7 @@ llvm::Value *era_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
 {
     era_erap_check_eop_data(m_eop_data);
     return heyoka::detail::llvm_eval_helper(
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
             return llvm_era_eval_helper(s, args, fp_t, batch_size, data);
         },
@@ -367,6 +369,7 @@ llvm::Function *era_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std:
     era_erap_check_eop_data(m_eop_data);
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(),
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
             return llvm_era_eval_helper(s, args, fp_t, batch_size, data);
         },
