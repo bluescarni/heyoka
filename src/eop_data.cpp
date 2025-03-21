@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -314,6 +315,16 @@ llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &s, const eop_data &d
 llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
     auto *logger = get_logger();
+
+    // NOTE: for the ERA data specifically, we want to make sure that the array size x 2 is representable
+    // as a 32-bit int. The reason for this is that in the implementation of the era/erap functions,
+    // we will be reinterpreting the array of size-2 arrays as a 1D flattened array, into which we want
+    // to be able to index via 32-bit ints.
+    if (data.get_table().size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::overflow_error("Overflow detected while generating the LLVM ERA data");
+        // LCOV_EXCL_STOP
+    }
 
     // Determine the value type.
     auto *value_t = llvm::ArrayType::get(scal_t, 2);
