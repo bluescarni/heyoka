@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <random>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -25,8 +26,11 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
+#include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/model/era.hpp>
+#include <heyoka/s11n.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -190,4 +194,36 @@ TEST_CASE("get_era_erap_func")
     };
 
     tester.operator()<double>();
+}
+
+TEST_CASE("era s11n")
+{
+    std::stringstream ss;
+
+    auto x = make_vars("x");
+
+    auto ex = model::era(kw::time_expr = x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == model::era(kw::time_expr = x));
+}
+
+TEST_CASE("era diff")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(diff(model::era(kw::time_expr = 2. * x), x) == 2. * model::erap(kw::time_expr = 2. * x));
 }
