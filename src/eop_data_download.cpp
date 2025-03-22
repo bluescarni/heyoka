@@ -9,7 +9,10 @@
 #include <array>
 #include <cassert>
 #include <charconv>
+#include <chrono>
+#include <cstddef>
 #include <exception>
+#include <memory>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -18,9 +21,9 @@
 #include <unordered_map>
 #include <utility>
 
-#include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
+#include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
@@ -121,79 +124,134 @@ std::string eop_data_parse_last_modified(std::string_view lm_field)
     // LCOV_EXCL_STOP
 }
 
-} // namespace
+// NOTE: code adapted from here:
+//
+// https://github.com/boostorg/beast/blob/develop/example/http/client/async-ssl/http_client_async_ssl.cpp
+namespace net = boost::asio;
+namespace ssl = net::ssl;
+using tcp = net::ip::tcp;
+namespace beast = boost::beast;
+namespace http = beast::http;
 
-} // namespace detail
+// Timeout duration for network operations.
+constexpr auto timeout_duration = std::chrono::seconds(30);
 
-std::pair<std::string, std::string> eop_data::download(const std::string &host, unsigned port,
-                                                       const std::string &target)
+// Helper to check a beast error code and throw as needed.
+void check_error(beast::error_code ec, const char *id)
 {
-    try {
-        // NOTE: code adapted from here:
-        // https://github.com/boostorg/beast/blob/develop/example/http/client/sync-ssl/http_client_sync_ssl.cpp
-        namespace net = boost::asio;
-        namespace ssl = net::ssl;
-        using tcp = net::ip::tcp;
-        namespace beast = boost::beast;
-        namespace http = beast::http;
+    if (ec) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::runtime_error(
+            fmt::format("Error in the {} phase while trying to download a file: {}", id, ec.message()));
+        // LCOV_EXCL_STOP
+    }
+}
 
-        // The io_context is required for all I/O.
-        net::io_context ioc;
+class session : public std::enable_shared_from_this<session>
+{
+    tcp::resolver resolver_;
+    ssl::stream<beast::tcp_stream> stream_;
+    beast::flat_buffer buffer_; // (Must persist between reads)
+    http::request<http::empty_body> req_;
+    http::response<http::string_body> res_;
+    // This is the data we will extract from the http message.
+    std::string timestamp_;
+    std::string body_;
 
-        // The SSL context is required, and holds certificates.
-        ssl::context ctx(ssl::context::tlsv12_client);
+public:
+    explicit session(net::any_io_executor ex, ssl::context &ctx) : resolver_(ex), stream_(ex, ctx) {}
 
-        // Set default verification paths (uses system's certificate store).
-        ctx.set_default_verify_paths();
+    // Helper to move the data out after download is completed.
+    auto move_timestamp()
+    {
+        return std::move(timestamp_);
+    }
+    auto move_body()
+    {
+        return std::move(body_);
+    }
 
-        // Set verification mode.
-        ctx.set_verify_mode(ssl::verify_peer);
-
-        // These objects perform our I/O.
-        tcp::resolver resolver(ioc);
-        ssl::stream<beast::tcp_stream> stream(ioc, ctx);
-
+    // Start the asynchronous operation.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    void run(char const *host, char const *port, char const *target)
+    {
         // Set the expected hostname in the peer certificate for verification.
-        stream.set_verify_callback(ssl::host_name_verification(host));
-
-        // Look up the domain name.
-        auto const results = resolver.resolve(host, fmt::format("{}", port));
-
-        // Make the connection on the IP address we get from a lookup.
-        beast::get_lowest_layer(stream).connect(results);
-
-        // Perform the SSL handshake.
-        stream.handshake(ssl::stream_base::client);
+        stream_.set_verify_callback(ssl::host_name_verification(host));
 
         // Set up an HTTP GET request message.
-        // NOTE: the 11 stands for HTTP 1.1.
-        http::request<http::string_body> req{http::verb::get, target, 11};
-        req.set(http::field::host, host);
-        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        // NOTE: the '11' here means HTTP 1.1.
+        req_.version(11);
+        req_.method(http::verb::get);
+        req_.target(target);
+        req_.set(http::field::host, host);
+        req_.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+        // Look up the domain name.
+        resolver_.async_resolve(host, port, beast::bind_front_handler(&session::on_resolve, shared_from_this()));
+    }
+
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    void on_resolve(beast::error_code ec, tcp::resolver::results_type results)
+    {
+        check_error(ec, "resolve");
+
+        // Set a timeout on the operation.
+        beast::get_lowest_layer(stream_).expires_after(timeout_duration);
+
+        // Make the connection on the IP address we get from a lookup.
+        beast::get_lowest_layer(stream_).async_connect(
+            results, beast::bind_front_handler(&session::on_connect, shared_from_this()));
+    }
+
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type)
+    {
+        check_error(ec, "connect");
+
+        // Perform the SSL handshake.
+        stream_.async_handshake(ssl::stream_base::client,
+                                beast::bind_front_handler(&session::on_handshake, shared_from_this()));
+    }
+
+    void on_handshake(beast::error_code ec)
+    {
+        check_error(ec, "handshake");
+
+        // Set a timeout on the operation.
+        beast::get_lowest_layer(stream_).expires_after(timeout_duration);
 
         // Send the HTTP request to the remote host.
-        http::write(stream, req);
+        http::async_write(stream_, req_, beast::bind_front_handler(&session::on_write, shared_from_this()));
+    }
 
-        // This buffer is used for reading and must be persisted.
-        beast::flat_buffer buffer;
-
-        // Declare a container to hold the response.
-        http::response<http::dynamic_body> res;
+    void on_write(beast::error_code ec, std::size_t)
+    {
+        check_error(ec, "write");
 
         // Receive the HTTP response.
-        http::read(stream, buffer, res);
+        http::async_read(stream_, buffer_, res_, beast::bind_front_handler(&session::on_read, shared_from_this()));
+    }
+
+    void on_read(beast::error_code ec, std::size_t)
+    {
+        check_error(ec, "read");
 
         // Parse the "last modified field" to construct the timestamp.
-        auto timestamp = detail::eop_data_parse_last_modified(res[http::field::last_modified]);
+        timestamp_ = eop_data_parse_last_modified(res_[http::field::last_modified]);
 
-        // Fetch the message body as a string. See:
-        // https://github.com/boostorg/beast/issues/819
-        auto body = boost::beast::buffers_to_string(res.body().data());
+        // Fetch the message body.
+        body_ = res_.body();
+
+        // Set a timeout on the operation.
+        beast::get_lowest_layer(stream_).expires_after(timeout_duration);
 
         // Gracefully close the stream.
-        beast::error_code ec;
-        stream.shutdown(ec);
+        stream_.async_shutdown(beast::bind_front_handler(&session::on_shutdown, shared_from_this()));
+    }
 
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+    void on_shutdown(beast::error_code ec)
+    {
         // ssl::error::stream_truncated, also known as an SSL "short read",
         // indicates the peer closed the connection without performing the
         // required closing handshake (for example, Google does this to
@@ -210,14 +268,46 @@ std::pair<std::string, std::string> eop_data::download(const std::string &host, 
         // Beast returns the error beast::http::error::partial_message.
         // Therefore, if we see a short read here, it has occurred
         // after the message has been completed, so it is safe to ignore it.
-        if (ec != beast::error_code{} && ec != net::ssl::error::stream_truncated) [[unlikely]] {
-            // LCOV_EXCL_START
-            throw beast::system_error{ec};
-            // LCOV_EXCL_STOP
+        if (ec != net::ssl::error::stream_truncated) {
+            check_error(ec, "shutdown");
         }
+    }
+};
+
+} // namespace
+
+} // namespace detail
+
+std::pair<std::string, std::string> eop_data::download(const std::string &host, unsigned port,
+                                                       const std::string &target)
+{
+    try {
+        namespace net = boost::asio;
+        namespace ssl = net::ssl;
+
+        // The io_context is required for all I/O.
+        net::io_context ioc;
+
+        // The SSL context is required, and holds certificates.
+        ssl::context ctx(ssl::context::tlsv12_client);
+
+        // Set default verification paths (uses system's certificate store).
+        ctx.set_default_verify_paths();
+
+        // Set verification mode.
+        ctx.set_verify_mode(ssl::verify_peer);
+
+        // Launch the asynchronous operation. The session is constructed with a strand to
+        // ensure that handlers do not execute concurrently.
+        const auto port_str = fmt::format("{}", port);
+        auto sesh = std::make_shared<detail::session>(net::make_strand(ioc), ctx);
+        sesh->run(host.c_str(), port_str.c_str(), target.c_str());
+
+        // Run the I/O service. The call will return when the get operation is complete.
+        ioc.run();
 
         // Construct and return.
-        return std::make_pair(std::move(body), std::move(timestamp));
+        return std::make_pair(sesh->move_body(), sesh->move_timestamp());
 
         // LCOV_EXCL_START
     } catch (const std::exception &ex) {
