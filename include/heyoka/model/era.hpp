@@ -81,6 +81,11 @@ public:
     explicit erap_impl(expression, eop_data);
 
     [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 };
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,

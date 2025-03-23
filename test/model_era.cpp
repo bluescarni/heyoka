@@ -6,23 +6,41 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <limits>
 #include <random>
 #include <sstream>
+#include <tuple>
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
@@ -44,6 +62,25 @@ using namespace heyoka_test;
 static std::mt19937 rng;
 
 constexpr auto ntrials = 10000;
+
+const auto fp_types = std::tuple<float, double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR <= 17
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
 
 TEST_CASE("get_era_erap_func")
 {
@@ -226,4 +263,65 @@ TEST_CASE("era diff")
     auto x = make_vars("x");
 
     REQUIRE(diff(model::era(kw::time_expr = 2. * x), x) == 2. * model::erap(kw::time_expr = 2. * x));
+}
+
+// NOTE: the functional testing for the era/erap is done in the get_era_erap_func test. Here we
+// just basically checks that the cfunc compiles and that we get a non-nan value out of it.
+TEST_CASE("era erap cfunc")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool compact_mode) {
+        using std::isnan;
+
+        using fp_t = decltype(fp_x);
+
+        auto x = make_vars("x");
+
+        std::vector<fp_t> outs, ins, pars, tm;
+
+        for (auto batch_size : {1u}) {
+            if (batch_size != 1u && std::same_as<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
+            outs.resize(batch_size * 4u);
+            ins.resize(batch_size);
+            pars.resize(batch_size);
+            tm.resize(batch_size);
+
+            std::ranges::fill(ins, fp_t(0));
+            std::ranges::fill(pars, fp_t(0));
+            std::ranges::fill(tm, fp_t(0));
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<fp_t>(s, "cfunc",
+                            {model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
+                             model::erap(kw::time_expr = expression{fp_t(0.)}), model::erap()},
+                            {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.era_"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.erap_"));
+            }
+
+            s.compile();
+
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(!isnan(outs[i]));
+                REQUIRE(!isnan(outs[i + batch_size]));
+                REQUIRE(!isnan(outs[i + 2u * batch_size]));
+                REQUIRE(!isnan(outs[i + 3u * batch_size]));
+            }
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 0, cm); });
+        tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
+    }
 }

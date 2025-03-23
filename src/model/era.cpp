@@ -412,6 +412,52 @@ std::vector<expression> erap_impl::gradient() const
     return {0_dbl};
 }
 
+namespace
+{
+
+// Small wrapper for use in the implementation of the llvm evaluation of the erap.
+llvm::Value *llvm_erap_eval_helper(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *fp_t,
+                                   std::uint32_t batch_size, const eop_data &data)
+{
+    // Fetch/create the function for the computation of era/erap.
+    auto *era_erap_f = llvm_get_era_erap_func(s, fp_t, batch_size, data);
+
+    // Invoke it.
+    auto &bld = s.builder();
+    auto *era_erap = bld.CreateCall(era_erap_f, args[0]);
+
+    // Fetch the erap and return it.
+    return bld.CreateExtractValue(era_erap, 1);
+}
+
+} // namespace
+
+llvm::Value *erap_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
+                                  bool high_accuracy) const
+{
+    era_erap_check_eop_data(m_eop_data);
+    return heyoka::detail::llvm_eval_helper(
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
+            return llvm_erap_eval_helper(s, args, fp_t, batch_size, data);
+        },
+        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+}
+
+llvm::Function *erap_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                            bool high_accuracy) const
+{
+    era_erap_check_eop_data(m_eop_data);
+    return heyoka::detail::llvm_c_eval_func_helper(
+        get_name(),
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
+            return llvm_erap_eval_helper(s, args, fp_t, batch_size, data);
+        },
+        *this, s, fp_t, batch_size, high_accuracy);
+}
+
 expression era_func_impl(expression time_expr, eop_data data)
 {
     return expression{func{era_impl{std::move(time_expr), std::move(data)}}};
