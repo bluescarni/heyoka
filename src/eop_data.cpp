@@ -366,7 +366,8 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         //
         // NOTE: at this time the ERA has an intrinsic accuracy no better than ~1e-10 rad, due to the ~1e-5s
         // uncertainty in the measurement of the UT1-UTC difference. Thus it seems like there's no point
-        // in attempting to generalise this process to precisions higher than double.
+        // in attempting to generalise this process to precisions higher than double. We can always generalise this
+        // to higher precision in the future if needed.
 
         // Use octuple precision as a safety margin.
         using oct_t = boost::multiprecision::cpp_bin_float_oct;
@@ -391,10 +392,8 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         }
 
         // Pack the values into an array and return.
-        auto *retval
-            = llvm::ConstantArray::get(value_t, {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_hi})),
-                                                 llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_lo}))});
-        return retval;
+        return llvm::ConstantArray::get(value_t, {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_hi})),
+                                                  llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_lo}))});
     };
 
     return llvm_get_eop_data(s, data, value_t, "era", value_getter);

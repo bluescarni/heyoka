@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <concepts>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -23,18 +22,11 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
@@ -63,24 +55,10 @@ static std::mt19937 rng;
 
 constexpr auto ntrials = 10000;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR <= 17
-    std::numeric_limits<long double>::digits == 64
-#else
-    false
-#endif
-    ;
+// NOTE: no point here in testing with precision higher than double. Since the eop data accuracy
+// is in general nowhere near double precision, in several places we are at the moment hard-coding calculations
+// in double precision (e.g., the computation of the ERA in llvm_get_eop_data_era()).
+const auto fp_types = std::tuple<float, double>{};
 
 TEST_CASE("get_era_erap_func")
 {
@@ -230,6 +208,7 @@ TEST_CASE("get_era_erap_func")
         }
     };
 
+    tester.operator()<float>();
     tester.operator()<double>();
 }
 
@@ -279,10 +258,6 @@ TEST_CASE("era erap cfunc")
         std::vector<fp_t> outs, ins, pars, tm;
 
         for (auto batch_size : {1u}) {
-            if (batch_size != 1u && std::same_as<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size * 4u);
             ins.resize(batch_size);
             pars.resize(batch_size);
@@ -316,6 +291,9 @@ TEST_CASE("era erap cfunc")
                 REQUIRE(!isnan(outs[i + batch_size]));
                 REQUIRE(!isnan(outs[i + 2u * batch_size]));
                 REQUIRE(!isnan(outs[i + 3u * batch_size]));
+
+                REQUIRE(outs[i] == outs[i + batch_size]);
+                REQUIRE(outs[i + 2u * batch_size] == outs[i + 3u * batch_size]);
             }
         }
     };
@@ -325,3 +303,49 @@ TEST_CASE("era erap cfunc")
         tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// NOTE: the point of the multiprecision test is just to check we used the correct
+// llvm primitives in the implementation.
+TEST_CASE("era erap cfunc_mp")
+{
+    auto x = make_vars("x");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc",
+                                  {model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
+                                   model::erap(kw::time_expr = expression{0.}), model::erap()},
+                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{0, prec}};
+            const std::vector pars{mppp::real{0, prec}};
+            const std::vector tm{mppp::real{0, prec}};
+            std::vector<mppp::real> outs(4u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+
+            auto i = 0u;
+            REQUIRE(!isnan(outs[i]));
+            REQUIRE(!isnan(outs[i + 1u]));
+            REQUIRE(!isnan(outs[i + 2u]));
+            REQUIRE(!isnan(outs[i + 3u]));
+
+            REQUIRE(outs[i] == outs[i + 1u]);
+            REQUIRE(outs[i + 2u] == outs[i + 3u]);
+        }
+    }
+}
+
+#endif
