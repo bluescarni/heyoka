@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <limits>
 #include <random>
+#include <ranges>
+#include <regex>
 #include <sstream>
 #include <tuple>
 #include <utility>
@@ -258,7 +260,7 @@ TEST_CASE("era erap cfunc")
         std::vector<fp_t> outs, ins, pars, tm;
 
         for (auto batch_size : {1u}) {
-            outs.resize(batch_size * 4u);
+            outs.resize(batch_size * 5u);
             ins.resize(batch_size);
             pars.resize(batch_size);
             tm.resize(batch_size);
@@ -271,7 +273,8 @@ TEST_CASE("era erap cfunc")
 
             add_cfunc<fp_t>(s, "cfunc",
                             {model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
-                             model::erap(kw::time_expr = expression{fp_t(0.)}), model::erap()},
+                             model::erap(kw::time_expr = expression{fp_t(0.)}), model::erap(),
+                             model::erap(kw::time_expr = x)},
                             {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -280,6 +283,30 @@ TEST_CASE("era erap cfunc")
             }
 
             s.compile();
+
+            if (opt_level == 3u) {
+                // NOTE: in the compiled function, we are evaluating both era(x) and erap(x). The purpose
+                // of this check is to make sure that the computation of era/erap is done with a single call
+                // to the "get_era_erap()" function. That is, we want to make sure that LLVM understood it does not
+                // need to call the same function twice.
+                const auto get_era_erap_call_regex = std::regex(R"(.*call.*heyoka\.get_era_erap\..*)");
+                auto count = 0u;
+                const auto ir = s.get_ir();
+                for (const auto line : ir | std::ranges::views::split('\n')) {
+                    // NOTE: libstdc++ bug on large strings:
+                    // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
+                    if (std::ranges::size(line) > 200u) {
+                        continue;
+                    }
+
+                    std::cmatch matches;
+                    if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                         matches, get_era_erap_call_regex)) {
+                        ++count;
+                    }
+                }
+                REQUIRE(count == 4u);
+            }
 
             auto *cf_ptr
                 = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
@@ -291,9 +318,11 @@ TEST_CASE("era erap cfunc")
                 REQUIRE(!isnan(outs[i + batch_size]));
                 REQUIRE(!isnan(outs[i + 2u * batch_size]));
                 REQUIRE(!isnan(outs[i + 3u * batch_size]));
+                REQUIRE(!isnan(outs[i + 4u * batch_size]));
 
                 REQUIRE(outs[i] == outs[i + batch_size]);
                 REQUIRE(outs[i + 2u * batch_size] == outs[i + 3u * batch_size]);
+                REQUIRE(outs[i + 2u * batch_size] == outs[i + 4u * batch_size]);
             }
         }
     };
