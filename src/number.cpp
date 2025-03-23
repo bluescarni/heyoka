@@ -732,7 +732,7 @@ auto make_dl_twopi_dict()
 #endif
 
     return retval;
-};
+}
 
 // NOLINTNEXTLINE(cert-err58-cpp)
 const auto dl_twopi_dict = make_dl_twopi_dict();

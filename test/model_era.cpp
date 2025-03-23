@@ -41,6 +41,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/model/era.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -61,6 +62,17 @@ constexpr auto ntrials = 10000;
 // is in general nowhere near double precision, in several places we are at the moment hard-coding calculations
 // in double precision (e.g., the computation of the ERA in llvm_get_eop_data_era()).
 const auto fp_types = std::tuple<float, double>{};
+
+TEST_CASE("basics")
+{
+    REQUIRE(model::era() == model::era(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
+    REQUIRE(model::erap() == model::erap(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
+
+    auto x = make_vars("x");
+
+    REQUIRE(model::era() != model::era(kw::time_expr = x, kw::eop_data = eop_data{}));
+    REQUIRE(model::erap() != model::erap(kw::time_expr = x, kw::eop_data = eop_data{}));
+}
 
 TEST_CASE("get_era_erap_func")
 {
@@ -239,11 +251,43 @@ TEST_CASE("era s11n")
     REQUIRE(ex == model::era(kw::time_expr = x));
 }
 
+TEST_CASE("erap s11n")
+{
+    std::stringstream ss;
+
+    auto x = make_vars("x");
+
+    auto ex = model::erap(kw::time_expr = x, kw::eop_data = eop_data());
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == model::erap(kw::time_expr = x));
+}
+
 TEST_CASE("era diff")
 {
     auto x = make_vars("x");
 
     REQUIRE(diff(model::era(kw::time_expr = 2. * x), x) == 2. * model::erap(kw::time_expr = 2. * x));
+}
+
+TEST_CASE("erap diff")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(diff(model::erap(kw::time_expr = 2. * x), x) == 0_dbl);
 }
 
 // NOTE: the functional testing for the era/erap is done in the get_era_erap_func test. Here we

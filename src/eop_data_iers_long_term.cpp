@@ -100,7 +100,9 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
 
         // Check if we parsed everything we needed to.
         if (field_idx != last_field_idx) [[unlikely]] {
+            // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format("Error parsing a IERS long term EOP data file: at least {} fields "
+                                                    // LCOV_EXCL_STOP
                                                     "were expected in a data row, but {} were found instead",
                                                     last_field_idx + 1u, static_cast<unsigned>(field_idx)));
         }
@@ -116,6 +118,9 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
 }
 
 } // namespace detail
+
+// NOTE: we do not currently test this as the data file is a bit large.
+// LCOV_EXCL_START
 
 eop_data eop_data::fetch_latest_iers_long_term()
 {
@@ -135,5 +140,7 @@ eop_data eop_data::fetch_latest_iers_long_term()
     // Parse, validate and return.
     return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier));
 }
+
+// LCOV_EXCL_STOP
 
 HEYOKA_END_NAMESPACE
