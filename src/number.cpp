@@ -699,7 +699,7 @@ auto make_dl_twopi_dict()
         using type = decltype(twopi_hi);
         static_assert(std::is_same_v<type, decltype(twopi_lo)>);
 
-        assert(retval.find(typeid(type)) == retval.end());
+        assert(!retval.contains(typeid(type)));
 
         retval[typeid(type)] = std::make_pair(number{twopi_hi}, number{twopi_lo});
     };

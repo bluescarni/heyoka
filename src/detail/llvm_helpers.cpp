@@ -243,7 +243,12 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     // And the docs of the getDeclaration() function.
     assert(builder.GetInsertBlock() != nullptr);
     assert(builder.GetInsertBlock()->getModule() != nullptr);
-    auto *f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+    auto *f =
+#if LLVM_VERSION_MAJOR < 20
+        llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+#else
+        llvm::Intrinsic::getOrInsertDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+#endif
     assert(f != nullptr);
     // It does not make sense to have a definition of an intrinsic.
     assert(f->isDeclaration());

@@ -78,7 +78,7 @@ auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sle
                       std::uint32_t nargs = 1)
 {
     assert(sleef_tp == "d" || sleef_tp == "f");
-    assert(retval.find(scalar_name) == retval.end());
+    assert(!retval.contains(scalar_name));
     assert(nargs > 0u);
 
     auto make_sleef_vfinfo = [&](std::uint32_t width, const char *iset) {

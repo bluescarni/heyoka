@@ -532,7 +532,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     // Check that all variables in v_ex_vars appear in var_set.
     for (const auto &var : v_ex_vars) {
-        if (var_set.find(var) == var_set.end()) {
+        if (!var_set.contains(var)) [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Error in the decomposition of a function: the variable '{}' "
                             "appears in the function but not in the user-provided list of variables",
