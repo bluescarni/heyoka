@@ -434,8 +434,9 @@ TEST_CASE("taylor scalar era_erap")
     // NOTE: use as base time coordinate 6 hours after J2000.0.
     const auto tm_coord = 0.25 / 36525;
 
-    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y,
-                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = 5. * par[0]) * x};
+    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y
+                                 + era(kw::time_expr = number{tm_coord}),
+                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = par[0]) * x};
 
     auto scalar_tester = [&dyn, tm_coord, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
         using fp_t = decltype(fp_x);
@@ -443,15 +444,18 @@ TEST_CASE("taylor scalar era_erap")
         // Convert tm_coord to fp_t.
         const auto tm = static_cast<fp_t>(tm_coord);
 
-        // Create a compiled function for the evaluation of era/erap.
-        auto cf = cfunc<fp_t>{{era(kw::time_expr = x), erap(kw::time_expr = y)}, {x, y}};
+        // Create compiled function wrappers for the evaluation of era/erap.
+        auto era_wrapper = [cf = cfunc<fp_t>{{era(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
 
-        // Buffer for the output of cf.
-        // NOTE: size 4 because we need 2 evals for era and 2 evals for erap.
-        std::vector<fp_t> cf_in(4u), cf_out(4u);
-        typename cfunc<fp_t>::out_2d out_span(cf_out.data(), 2, 2);
-        typename cfunc<fp_t>::out_2d in_span(cf_in.data(), 2, 2);
-        typename cfunc<fp_t>::in_2d in_span_ro(cf_in.data(), 2, 2);
+        auto erap_wrapper = [cf = cfunc<fp_t>{{erap(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
 
         const std::vector<fp_t> pars = {tm};
 
@@ -465,35 +469,18 @@ TEST_CASE("taylor scalar era_erap")
         REQUIRE(jet[0] == tm);
         REQUIRE(jet[1] == -tm);
 
-        in_span(0, 0) = 2 * jet[1];
-        in_span(0, 1) = 4 * jet[0];
-        in_span(1, 0) = 3 * jet[1];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
+        REQUIRE(jet[2] == approximately(era_wrapper(2 * jet[1]) + erap_wrapper(3 * jet[1]) * jet[1] + era_wrapper(tm)));
+        REQUIRE(jet[3] == approximately(era_wrapper(4 * jet[0]) + erap_wrapper(pars[0]) * jet[0]));
 
-        REQUIRE(jet[2] == approximately(out_span(0, 0) + out_span(1, 0) * jet[1]));
-        REQUIRE(jet[3] == approximately(out_span(0, 1) + out_span(1, 1) * jet[0]));
+        REQUIRE(jet[4]
+                == approximately((erap_wrapper(2 * jet[1]) * 2 * jet[3] + erap_wrapper(3 * jet[1]) * jet[3]) / 2));
+        REQUIRE(jet[5] == approximately((erap_wrapper(4 * jet[0]) * 4 * jet[2] + erap_wrapper(pars[0]) * jet[2]) / 2));
 
-        // NOTE: at orders higher than 1 we have only erap evaluations.
-        in_span(1, 0) = 2 * jet[1];
-        in_span(1, 1) = 3 * jet[1];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[4] == approximately((out_span(1, 0) * 2 * jet[3] + out_span(1, 1) * jet[3]) / 2));
-
-        in_span(1, 0) = 4 * jet[0];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[5] == approximately((out_span(1, 0) * 4 * jet[2] + out_span(1, 1) * jet[2]) / 2));
-
-        in_span(1, 0) = 2 * jet[1];
-        in_span(1, 1) = 3 * jet[1];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[6] == approximately((out_span(1, 0) * 2 * 2 * jet[5] + out_span(1, 1) * 2 * jet[5]) / 6));
-
-        in_span(1, 0) = 4 * jet[0];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[7] == approximately((out_span(1, 0) * 4 * 2 * jet[4] + out_span(1, 1) * 2 * jet[4]) / 6));
+        REQUIRE(
+            jet[6]
+            == approximately((erap_wrapper(2 * jet[1]) * 2 * 2 * jet[5] + erap_wrapper(3 * jet[1]) * 2 * jet[5]) / 6));
+        REQUIRE(jet[7]
+                == approximately((erap_wrapper(4 * jet[0]) * 4 * 2 * jet[4] + erap_wrapper(pars[0]) * 2 * jet[4]) / 6));
     };
 
     for (auto cm : {false, true}) {
@@ -512,8 +499,9 @@ TEST_CASE("taylor batch era_erap")
     // NOTE: use as base time coordinate 6 hours after J2000.0.
     const auto tm_coord = 0.25 / 36525;
 
-    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y,
-                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = 5. * par[0]) * x};
+    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y
+                                 + era(kw::time_expr = number{tm_coord}),
+                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = par[0]) * x};
 
     auto batch_tester = [&dyn, tm_coord, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
         using fp_t = decltype(fp_x);
@@ -521,15 +509,18 @@ TEST_CASE("taylor batch era_erap")
         // Convert tm_coord to fp_t.
         const auto tm = static_cast<fp_t>(tm_coord);
 
-        // Create a compiled function for the evaluation of era/erap.
-        auto cf = cfunc<fp_t>{{era(kw::time_expr = x), erap(kw::time_expr = y)}, {x, y}};
+        // Create compiled function wrappers for the evaluation of era/erap.
+        auto era_wrapper = [cf = cfunc<fp_t>{{era(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
 
-        // Buffer for the output of cf.
-        // NOTE: size 4 because we need 2 evals for era and 2 evals for erap.
-        std::vector<fp_t> cf_in(4u), cf_out(4u);
-        typename cfunc<fp_t>::out_2d out_span(cf_out.data(), 2, 2);
-        typename cfunc<fp_t>::out_2d in_span(cf_in.data(), 2, 2);
-        typename cfunc<fp_t>::in_2d in_span_ro(cf_in.data(), 2, 2);
+        auto erap_wrapper = [cf = cfunc<fp_t>{{erap(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
 
         const std::vector<fp_t> pars = {tm, tm, tm};
 
@@ -552,47 +543,41 @@ TEST_CASE("taylor batch era_erap")
         REQUIRE(jet[4] == -tm);
         REQUIRE(jet[5] == -tm);
 
-        in_span(0, 0) = 2 * jet[3];
-        in_span(0, 1) = 4 * jet[0];
-        in_span(1, 0) = 3 * jet[3];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
+        REQUIRE(jet[6] == approximately(era_wrapper(2 * jet[3]) + erap_wrapper(3 * jet[3]) * jet[3] + era_wrapper(tm)));
+        REQUIRE(jet[7] == approximately(era_wrapper(2 * jet[3]) + erap_wrapper(3 * jet[3]) * jet[3] + era_wrapper(tm)));
+        REQUIRE(jet[8] == approximately(era_wrapper(2 * jet[3]) + erap_wrapper(3 * jet[3]) * jet[3] + era_wrapper(tm)));
+        REQUIRE(jet[9] == approximately(era_wrapper(4 * jet[0]) + erap_wrapper(pars[0]) * jet[0]));
+        REQUIRE(jet[10] == approximately(era_wrapper(4 * jet[0]) + erap_wrapper(pars[0]) * jet[0]));
+        REQUIRE(jet[11] == approximately(era_wrapper(4 * jet[0]) + erap_wrapper(pars[0]) * jet[0]));
 
-        REQUIRE(jet[6] == approximately(out_span(0, 0) + out_span(1, 0) * jet[3]));
-        REQUIRE(jet[7] == approximately(out_span(0, 0) + out_span(1, 0) * jet[3]));
-        REQUIRE(jet[8] == approximately(out_span(0, 0) + out_span(1, 0) * jet[3]));
-        REQUIRE(jet[9] == approximately(out_span(0, 1) + out_span(1, 1) * jet[0]));
-        REQUIRE(jet[10] == approximately(out_span(0, 1) + out_span(1, 1) * jet[0]));
-        REQUIRE(jet[11] == approximately(out_span(0, 1) + out_span(1, 1) * jet[0]));
+        REQUIRE(jet[12]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * jet[9] + erap_wrapper(3 * jet[3]) * jet[9]) / 2));
+        REQUIRE(jet[13]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * jet[9] + erap_wrapper(3 * jet[3]) * jet[9]) / 2));
+        REQUIRE(jet[14]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * jet[9] + erap_wrapper(3 * jet[3]) * jet[9]) / 2));
+        REQUIRE(jet[15] == approximately((erap_wrapper(4 * jet[0]) * 4 * jet[6] + erap_wrapper(pars[0]) * jet[6]) / 2));
+        REQUIRE(jet[16] == approximately((erap_wrapper(4 * jet[0]) * 4 * jet[6] + erap_wrapper(pars[0]) * jet[6]) / 2));
+        REQUIRE(jet[17] == approximately((erap_wrapper(4 * jet[0]) * 4 * jet[6] + erap_wrapper(pars[0]) * jet[6]) / 2));
 
-        // NOTE: at orders higher than 1 we have only erap evaluations.
-        in_span(1, 0) = 2 * jet[3];
-        in_span(1, 1) = 3 * jet[3];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[12] == approximately((out_span(1, 0) * 2 * jet[9] + out_span(1, 1) * jet[9]) / 2));
-        REQUIRE(jet[13] == approximately((out_span(1, 0) * 2 * jet[9] + out_span(1, 1) * jet[9]) / 2));
-        REQUIRE(jet[14] == approximately((out_span(1, 0) * 2 * jet[9] + out_span(1, 1) * jet[9]) / 2));
-
-        in_span(1, 0) = 4 * jet[0];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[15] == approximately((out_span(1, 0) * 4 * jet[6] + out_span(1, 1) * jet[6]) / 2));
-        REQUIRE(jet[16] == approximately((out_span(1, 0) * 4 * jet[6] + out_span(1, 1) * jet[6]) / 2));
-        REQUIRE(jet[17] == approximately((out_span(1, 0) * 4 * jet[6] + out_span(1, 1) * jet[6]) / 2));
-
-        in_span(1, 0) = 2 * jet[3];
-        in_span(1, 1) = 3 * jet[3];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[18] == approximately((out_span(1, 0) * 2 * 2 * jet[15] + out_span(1, 1) * 2 * jet[15]) / 6));
-        REQUIRE(jet[19] == approximately((out_span(1, 0) * 2 * 2 * jet[15] + out_span(1, 1) * 2 * jet[15]) / 6));
-        REQUIRE(jet[20] == approximately((out_span(1, 0) * 2 * 2 * jet[15] + out_span(1, 1) * 2 * jet[15]) / 6));
-
-        in_span(1, 0) = 4 * jet[0];
-        in_span(1, 1) = 5 * pars[0];
-        cf(out_span, in_span_ro);
-        REQUIRE(jet[21] == approximately((out_span(1, 0) * 4 * 2 * jet[12] + out_span(1, 1) * 2 * jet[12]) / 6));
-        REQUIRE(jet[22] == approximately((out_span(1, 0) * 4 * 2 * jet[12] + out_span(1, 1) * 2 * jet[12]) / 6));
-        REQUIRE(jet[23] == approximately((out_span(1, 0) * 4 * 2 * jet[12] + out_span(1, 1) * 2 * jet[12]) / 6));
+        REQUIRE(jet[18]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * 2 * jet[15] + erap_wrapper(3 * jet[3]) * 2 * jet[15])
+                                 / 6));
+        REQUIRE(jet[19]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * 2 * jet[15] + erap_wrapper(3 * jet[3]) * 2 * jet[15])
+                                 / 6));
+        REQUIRE(jet[20]
+                == approximately((erap_wrapper(2 * jet[3]) * 2 * 2 * jet[15] + erap_wrapper(3 * jet[3]) * 2 * jet[15])
+                                 / 6));
+        REQUIRE(
+            jet[21]
+            == approximately((erap_wrapper(4 * jet[0]) * 4 * 2 * jet[12] + erap_wrapper(pars[0]) * 2 * jet[12]) / 6));
+        REQUIRE(
+            jet[22]
+            == approximately((erap_wrapper(4 * jet[0]) * 4 * 2 * jet[12] + erap_wrapper(pars[0]) * 2 * jet[12]) / 6));
+        REQUIRE(
+            jet[23]
+            == approximately((erap_wrapper(4 * jet[0]) * 4 * 2 * jet[12] + erap_wrapper(pars[0]) * 2 * jet[12]) / 6));
     };
 
     for (auto cm : {false, true}) {
@@ -600,6 +585,94 @@ TEST_CASE("taylor batch era_erap")
         tuple_for_each(fp_types, [&batch_tester, cm](auto x) { batch_tester(x, 3, cm); });
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// NOTE: the point of the multiprecision test is just to check we used the correct
+// llvm primitives in the implementation.
+TEST_CASE("taylor mp era_erap")
+{
+    using model::era;
+    using model::erap;
+
+    auto x = "x"_var, y = "y"_var;
+
+    // NOTE: use as base time coordinate 6 hours after J2000.0.
+    const auto tm_coord = 0.25 / 36525;
+
+    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y
+                                 + era(kw::time_expr = number{tm_coord}),
+                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = par[0]) * x};
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto prec : {30, 123}) {
+                // Convert tm_coord to real.
+                const auto tm = mppp::real(tm_coord, prec);
+
+                // Create compiled function wrappers for the evaluation of era/erap.
+                auto era_wrapper = [prec, cf = cfunc<mppp::real>{{era(kw::time_expr = x)}, {x}, kw::prec = prec}](
+                                       const mppp::real &v) mutable {
+                    mppp::real retval{0, prec};
+                    cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+                    return retval;
+                };
+
+                auto erap_wrapper = [prec, cf = cfunc<mppp::real>{{erap(kw::time_expr = x)}, {x}, kw::prec = prec}](
+                                        const mppp::real &v) mutable {
+                    mppp::real retval{0, prec};
+                    cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+                    return retval;
+                };
+
+                const std::vector pars = {tm};
+
+                auto ta = taylor_adaptive<mppp::real>{dyn,
+                                                      {tm, -tm},
+                                                      kw::tol = .1,
+                                                      kw::compact_mode = cm,
+                                                      kw::opt_level = opt_level,
+                                                      kw::pars = pars,
+                                                      kw::prec = prec};
+
+                ta.step(true);
+
+                const auto jet = tc_to_jet(ta);
+
+                REQUIRE(jet[0] == tm);
+                REQUIRE(jet[1] == -tm);
+
+                REQUIRE(jet[2]
+                        == approximately(era_wrapper(mppp::real{2, prec} * jet[1])
+                                         + erap_wrapper(mppp::real{3, prec} * jet[1]) * jet[1] + era_wrapper(tm)));
+                REQUIRE(jet[3]
+                        == approximately(era_wrapper(mppp::real{4, prec} * jet[0]) + erap_wrapper(pars[0]) * jet[0]));
+
+                REQUIRE(jet[4]
+                        == approximately((erap_wrapper(mppp::real{2, prec} * jet[1]) * mppp::real{2, prec} * jet[3]
+                                          + erap_wrapper(mppp::real{3, prec} * jet[1]) * jet[3])
+                                         / mppp::real{2, prec}));
+                REQUIRE(jet[5]
+                        == approximately((erap_wrapper(mppp::real{4, prec} * jet[0]) * mppp::real{4, prec} * jet[2]
+                                          + erap_wrapper(pars[0]) * jet[2])
+                                         / mppp::real{2, prec}));
+
+                REQUIRE(jet[6]
+                        == approximately((erap_wrapper(mppp::real{2, prec} * jet[1]) * mppp::real{2, prec}
+                                              * mppp::real{2, prec} * jet[5]
+                                          + erap_wrapper(mppp::real{3, prec} * jet[1]) * mppp::real{2, prec} * jet[5])
+                                         / mppp::real{6, prec}));
+                REQUIRE(jet[7]
+                        == approximately((erap_wrapper(mppp::real{4, prec} * jet[0]) * mppp::real{4, prec}
+                                              * mppp::real{2, prec} * jet[4]
+                                          + erap_wrapper(pars[0]) * mppp::real{2, prec} * jet[4])
+                                         / mppp::real{6, prec}));
+            }
+        }
+    }
+}
+
+#endif
 
 // Test expression simplification with era/erap.
 TEST_CASE("taylor era_erap cse")
