@@ -44,6 +44,7 @@
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/era.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -422,3 +423,89 @@ TEST_CASE("era erap cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("taylor era_erap")
+{
+    using model::era;
+    using model::erap;
+
+    auto x = "x"_var, y = "y"_var;
+
+    // NOTE: use as base time coordinate 6 hours after J2000.0.
+    const auto tm_coord = 0.25 / 36525;
+
+    const auto dyn = {prime(x) = era(kw::time_expr = 2. * par[0]) + erap(kw::time_expr = 3. * y),
+                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = 5. * par[0])};
+
+    auto scalar_tester = [&dyn, tm_coord, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        // Convert tm_coord to fp_t.
+        const auto tm = static_cast<fp_t>(tm_coord);
+
+        // Create a compiled function for the evaluation of era/erap.
+        auto cf = cfunc<fp_t>{{era(kw::time_expr = x), erap(kw::time_expr = y)}, {x, y}};
+
+        // Buffer for the output of cf.
+        // NOTE: size 4 because we need 2 evals for era and 2 evals for erap.
+        std::vector<fp_t> cf_in(4u), cf_out(4u);
+        typename cfunc<fp_t>::out_2d out_span(cf_out.data(), 2, 2);
+        typename cfunc<fp_t>::out_2d in_span(cf_in.data(), 2, 2);
+        typename cfunc<fp_t>::in_2d in_span_ro(cf_in.data(), 2, 2);
+
+        const std::vector<fp_t> pars = {tm};
+
+        auto ta = taylor_adaptive<fp_t>{
+            dyn, {tm, -tm}, kw::tol = .1, kw::compact_mode = compact_mode, kw::opt_level = opt_level, kw::pars = pars};
+
+        ta.step(true);
+
+        const auto jet = tc_to_jet(ta);
+
+        REQUIRE(jet[0] == tm);
+        REQUIRE(jet[1] == -tm);
+
+        in_span(0, 0) = 2 * pars[0];
+        in_span(0, 1) = 4 * tm;
+        in_span(1, 0) = -3 * tm;
+        in_span(1, 1) = 5 * pars[0];
+        cf(out_span, in_span_ro);
+
+        REQUIRE(jet[2] == out_span(0, 0) + out_span(1, 0));
+        REQUIRE(jet[3] == out_span(0, 1) + out_span(1, 1));
+
+        // NOTE: only 1 evaluation needed at order 2.
+        in_span(1, 0) = 4 * jet[0];
+        cf(out_span, in_span_ro);
+
+        REQUIRE(jet[4] == 0);
+        REQUIRE(jet[5] == approximately((out_span(1, 0) * 4 * jet[2]) / 2));
+
+        REQUIRE(jet[6] == 0);
+        REQUIRE(jet[7] == 0);
+    };
+
+    for (auto cm : {false, true}) {
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 0, cm); });
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
+    }
+}
+
+// Test expression simplification with era/erap.
+TEST_CASE("taylor era_erap cse")
+{
+    using model::era;
+    using model::erap;
+
+    auto x = "x"_var, y = "y"_var;
+
+    auto ta = taylor_adaptive<double>{{prime(x) = (era(kw::time_expr = x) + erap(kw::time_expr = y))
+                                                  + (era(kw::time_expr = y) + erap(kw::time_expr = x)),
+                                       prime(y) = (era(kw::time_expr = x) + erap(kw::time_expr = y))
+                                                  + (era(kw::time_expr = y) + erap(kw::time_expr = x))},
+                                      {2., 3.},
+                                      kw::opt_level = 0,
+                                      kw::tol = 1.};
+
+    REQUIRE(ta.get_decomposition().size() == 11u);
+}

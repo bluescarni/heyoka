@@ -65,6 +65,15 @@ public:
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+
+    [[nodiscard]] taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+
+    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
+                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool) const;
 };
 
 class HEYOKA_DLL_PUBLIC erap_impl : public func_base
@@ -86,6 +95,13 @@ public:
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
+                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool) const;
 };
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,

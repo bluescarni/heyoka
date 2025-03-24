@@ -6,11 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cassert>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -34,6 +36,8 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
@@ -42,6 +46,8 @@
 #include <heyoka/model/era.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -326,6 +332,7 @@ era_impl::era_impl(expression time_expr, eop_data data)
 std::vector<expression> era_impl::gradient() const
 {
     era_erap_check_eop_data(m_eop_data);
+
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return {erap(kw::time_expr = args()[0], kw::eop_data = *m_eop_data)};
 }
@@ -334,15 +341,15 @@ namespace
 {
 
 // Small wrapper for use in the implementation of the llvm evaluation of the era.
-llvm::Value *llvm_era_eval_helper(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *fp_t,
-                                  std::uint32_t batch_size, const eop_data &data)
+llvm::Value *llvm_era_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *fp_t, std::uint32_t batch_size,
+                                  const eop_data &data)
 {
     // Fetch/create the function for the computation of era/erap.
     auto *era_erap_f = llvm_get_era_erap_func(s, fp_t, batch_size, data);
 
     // Invoke it.
     auto &bld = s.builder();
-    auto *era_erap = bld.CreateCall(era_erap_f, args[0]);
+    auto *era_erap = bld.CreateCall(era_erap_f, arg);
 
     // Fetch the era and return it.
     return bld.CreateExtractValue(era_erap, 0);
@@ -355,10 +362,11 @@ llvm::Value *era_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
                                  bool high_accuracy) const
 {
     era_erap_check_eop_data(m_eop_data);
+
     return heyoka::detail::llvm_eval_helper(
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_era_eval_helper(s, args, fp_t, batch_size, data);
+            return llvm_era_eval_helper(s, args[0], fp_t, batch_size, data);
         },
         *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
@@ -367,13 +375,259 @@ llvm::Function *era_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std:
                                            bool high_accuracy) const
 {
     era_erap_check_eop_data(m_eop_data);
+
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(),
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_era_eval_helper(s, args, fp_t, batch_size, data);
+            return llvm_era_eval_helper(s, args[0], fp_t, batch_size, data);
         },
         *this, s, fp_t, batch_size, high_accuracy);
+}
+
+// NOTE: here we implement a custom decomposition for era() which injects erap() into the decomposition. We do this
+// because the Taylor derivatives of the era use the value of erap, thus by inserting it into the decomposition we
+// can compute it once at the beginning and then re-use it afterwards.
+taylor_dc_t::size_type era_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
+{
+    assert(args().size() == 1u);
+
+    era_erap_check_eop_data(m_eop_data);
+
+    // Append the erap decomposition.
+    u_vars_defs.emplace_back(erap(kw::time_expr = args()[0], kw::eop_data = *m_eop_data), std::vector<std::uint32_t>{});
+
+    // Append the era decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+
+    // Setup the hidden dep for the era (the erap does not have hidden deps).
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+
+    // Compute the return value (pointing to the decomposed era).
+    return u_vars_defs.size() - 1u;
+}
+
+namespace
+{
+
+// Derivative of era(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Value *taylor_diff_era_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &, const U &num,
+                                  const std::vector<llvm::Value *> &,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t batch_size,
+                                  const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    if (order == 0u) {
+        return llvm_era_eval_helper(s, hd::taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), fp_t, batch_size,
+                                    data);
+    } else {
+        return hd::vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
+    }
+}
+
+// Derivative of era(variable).
+//
+// NOTE: era is defined as:
+//
+// era(b(t)) = c_0(b(t)) + c_1(b(t))*b(t),
+//
+// where c0 and c1 are step functions (hence with null derivatives). Taking the first order derivative wrt t:
+//
+// era'(b(t)) = c_1(b(t))*b'(t),
+//
+// and, generalising,
+//
+// era^[n] = c_1 * b^[n],
+//
+// where c_1 is erap(b(t)).
+llvm::Value *taylor_diff_era_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                  const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                  const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    // Fetch the index of the variable.
+    const auto b_idx = hd::uname_to_index(var.name());
+
+    // Load b^[n].
+    auto *bn = hd::taylor_fetch_diff(arr, b_idx, order, n_uvars);
+
+    if (order == 0u) {
+        // Evaluate the era and return it.
+        return llvm_era_eval_helper(s, bn, fp_t, batch_size, data);
+    } else {
+        // Fetch the value of erap from the hidden dep.
+        auto *erap_val = hd::taylor_fetch_diff(arr, deps[0], 0, n_uvars);
+
+        // Return erap*b^[n].
+        return hd::llvm_fmul(s, erap_val, bn);
+    }
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Value *taylor_diff_era_impl(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &, const U &,
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, const eop_data &)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of an era()");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Value *era_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                   bool) const
+{
+    assert(args().size() == 1u);
+    assert(deps.size() == 1u);
+
+    era_erap_check_eop_data(m_eop_data);
+
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_era_impl(s, fp_t, deps, v, arr, par_ptr, n_uvars, order, batch_size, *m_eop_data);
+        },
+        args()[0].value());
+}
+
+namespace
+{
+
+// Derivative of era(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Function *taylor_c_diff_func_era_impl(llvm_state &s, llvm::Type *fp_t, const era_impl &fn, const U &num,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size, const eop_data &data)
+{
+    return heyoka::detail::taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, fn.get_name(), 1,
+        [&s, fp_t, batch_size, &data](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_era_eval_helper(s, args[0], fp_t, batch_size, data);
+        },
+        num);
+}
+
+// Derivative of era(variable).
+llvm::Function *taylor_c_diff_func_era_impl(llvm_state &s, llvm::Type *fp_t, const era_impl &fn, const variable &var,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size, const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = hd::make_vector_type(fp_t, batch_size);
+
+    const auto na_pair = hd::taylor_c_diff_func_name_args(ctx, fp_t, fn.get_name(), n_uvars, batch_size, {var}, 1);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+    if (f != nullptr) {
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *diff_ptr = f->args().begin() + 2;
+    auto *b_idx = f->args().begin() + 5;
+    auto *dep_idx = f->args().begin() + 6;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Create the return value.
+    auto *retval = bld.CreateAlloca(val_t);
+
+    // Load b^[n].
+    auto *bn = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx);
+
+    hd::llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // For order 0, invoke the era on the order 0 of b_idx.
+            auto *era_val = llvm_era_eval_helper(s, bn, fp_t, batch_size, data);
+
+            // Store the result.
+            bld.CreateStore(era_val, retval);
+        },
+        [&]() {
+            // For order > 0, we must compute erap*b^[n].
+
+            // Load the value of erap.
+            auto *erap = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), dep_idx);
+
+            // Compute and store erap*b^[n].
+            bld.CreateStore(hd::llvm_fmul(s, erap, bn), retval);
+        });
+
+    // Return the result.
+    bld.CreateRet(bld.CreateLoad(val_t, retval));
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Function *taylor_c_diff_func_era_impl(llvm_state &, llvm::Type *, const era_impl &, const U &, std::uint32_t,
+                                            std::uint32_t, const eop_data &)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of an era() in compact mode");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Function *era_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 1u);
+
+    era_erap_check_eop_data(m_eop_data);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_era_impl(s, fp_t, *this, v, n_uvars, batch_size, *m_eop_data); },
+        args()[0].value());
 }
 
 void erap_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
@@ -416,15 +670,15 @@ namespace
 {
 
 // Small wrapper for use in the implementation of the llvm evaluation of the erap.
-llvm::Value *llvm_erap_eval_helper(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *fp_t,
-                                   std::uint32_t batch_size, const eop_data &data)
+llvm::Value *llvm_erap_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *fp_t, std::uint32_t batch_size,
+                                   const eop_data &data)
 {
     // Fetch/create the function for the computation of era/erap.
     auto *era_erap_f = llvm_get_era_erap_func(s, fp_t, batch_size, data);
 
     // Invoke it.
     auto &bld = s.builder();
-    auto *era_erap = bld.CreateCall(era_erap_f, args[0]);
+    auto *era_erap = bld.CreateCall(era_erap_f, arg);
 
     // Fetch the erap and return it.
     return bld.CreateExtractValue(era_erap, 1);
@@ -437,10 +691,11 @@ llvm::Value *erap_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::ve
                                   bool high_accuracy) const
 {
     era_erap_check_eop_data(m_eop_data);
+
     return heyoka::detail::llvm_eval_helper(
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_erap_eval_helper(s, args, fp_t, batch_size, data);
+            return llvm_erap_eval_helper(s, args[0], fp_t, batch_size, data);
         },
         *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
@@ -449,13 +704,217 @@ llvm::Function *erap_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
                                             bool high_accuracy) const
 {
     era_erap_check_eop_data(m_eop_data);
+
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(),
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         [&s, fp_t, batch_size, &data = *m_eop_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_erap_eval_helper(s, args, fp_t, batch_size, data);
+            return llvm_erap_eval_helper(s, args[0], fp_t, batch_size, data);
         },
         *this, s, fp_t, batch_size, high_accuracy);
+}
+
+namespace
+{
+
+// Derivative of erap(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Value *taylor_diff_erap_impl(llvm_state &s, llvm::Type *fp_t, const U &num, const std::vector<llvm::Value *> &,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t batch_size,
+                                   const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    if (order == 0u) {
+        return llvm_erap_eval_helper(s, hd::taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), fp_t,
+                                     batch_size, data);
+    } else {
+        return hd::vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
+    }
+}
+
+// Derivative of erap(variable).
+//
+// NOTE: the derivatives of erap() are all zero (except of course for the order-0 derivative).
+llvm::Value *taylor_diff_erap_impl(llvm_state &s, llvm::Type *fp_t, const variable &var,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                   const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    if (order == 0u) {
+        // Fetch the index of the variable.
+        const auto b_idx = hd::uname_to_index(var.name());
+
+        // Load b^[0].
+        auto *b0 = hd::taylor_fetch_diff(arr, b_idx, 0, n_uvars);
+
+        // Evaluate the erap and return it.
+        return llvm_erap_eval_helper(s, b0, fp_t, batch_size, data);
+    } else {
+        // Return zero.
+        return hd::vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
+    }
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Value *taylor_diff_erap_impl(llvm_state &, llvm::Type *, const U &, const std::vector<llvm::Value *> &,
+                                   llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, const eop_data &)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of an erap()");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Value *erap_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                    bool) const
+{
+    assert(args().size() == 1u);
+
+    era_erap_check_eop_data(m_eop_data);
+
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_erap_impl(s, fp_t, v, arr, par_ptr, n_uvars, order, batch_size, *m_eop_data);
+        },
+        args()[0].value());
+}
+
+namespace
+{
+
+// Derivative of erap(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Function *taylor_c_diff_func_erap_impl(llvm_state &s, llvm::Type *fp_t, const erap_impl &fn, const U &num,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size, const eop_data &data)
+{
+    return heyoka::detail::taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, fn.get_name(), 0,
+        [&s, fp_t, batch_size, &data](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_erap_eval_helper(s, args[0], fp_t, batch_size, data);
+        },
+        num);
+}
+
+// Derivative of erap(variable).
+llvm::Function *taylor_c_diff_func_erap_impl(llvm_state &s, llvm::Type *fp_t, const erap_impl &fn, const variable &var,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size, const eop_data &data)
+{
+    namespace hd = heyoka::detail;
+
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = hd::make_vector_type(fp_t, batch_size);
+
+    const auto na_pair = hd::taylor_c_diff_func_name_args(ctx, fp_t, fn.get_name(), n_uvars, batch_size, {var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+    if (f != nullptr) {
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *diff_ptr = f->args().begin() + 2;
+    auto *b_idx = f->args().begin() + 5;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Create the return value.
+    auto *retval = bld.CreateAlloca(val_t);
+
+    hd::llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // For order 0, invoke the erap on the order 0 of b_idx.
+
+            // Load b^[0].
+            auto *b0 = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), b_idx);
+
+            // Compute the erap.
+            auto *erap_val = llvm_erap_eval_helper(s, b0, fp_t, batch_size, data);
+
+            // Store the result.
+            bld.CreateStore(erap_val, retval);
+        },
+        [&]() {
+            // For order > 0, we return 0.
+            bld.CreateStore(llvm_codegen(s, val_t, number{0.}), retval);
+        });
+
+    // Return the result.
+    bld.CreateRet(bld.CreateLoad(val_t, retval));
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Function *taylor_c_diff_func_erap_impl(llvm_state &, llvm::Type *, const erap_impl &, const U &, std::uint32_t,
+                                             std::uint32_t, const eop_data &)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of an erap() in compact mode");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Function *erap_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 1u);
+
+    era_erap_check_eop_data(m_eop_data);
+
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_c_diff_func_erap_impl(s, fp_t, *this, v, n_uvars, batch_size, *m_eop_data);
+        },
+        args()[0].value());
 }
 
 expression era_func_impl(expression time_expr, eop_data data)
