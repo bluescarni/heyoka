@@ -434,8 +434,8 @@ TEST_CASE("taylor era_erap")
     // NOTE: use as base time coordinate 6 hours after J2000.0.
     const auto tm_coord = 0.25 / 36525;
 
-    const auto dyn = {prime(x) = era(kw::time_expr = 2. * par[0]) + erap(kw::time_expr = 3. * y),
-                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = 5. * par[0])};
+    const auto dyn = {prime(x) = era(kw::time_expr = 2. * y) + erap(kw::time_expr = 3. * y) * y,
+                      prime(y) = era(kw::time_expr = 4. * x) + erap(kw::time_expr = 5. * par[0]) * x};
 
     auto scalar_tester = [&dyn, tm_coord, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
         using fp_t = decltype(fp_x);
@@ -465,24 +465,35 @@ TEST_CASE("taylor era_erap")
         REQUIRE(jet[0] == tm);
         REQUIRE(jet[1] == -tm);
 
-        in_span(0, 0) = 2 * pars[0];
-        in_span(0, 1) = 4 * tm;
-        in_span(1, 0) = -3 * tm;
+        in_span(0, 0) = 2 * jet[1];
+        in_span(0, 1) = 4 * jet[0];
+        in_span(1, 0) = 3 * jet[1];
         in_span(1, 1) = 5 * pars[0];
         cf(out_span, in_span_ro);
 
-        REQUIRE(jet[2] == out_span(0, 0) + out_span(1, 0));
-        REQUIRE(jet[3] == out_span(0, 1) + out_span(1, 1));
+        REQUIRE(jet[2] == approximately(out_span(0, 0) + out_span(1, 0) * jet[1]));
+        REQUIRE(jet[3] == approximately(out_span(0, 1) + out_span(1, 1) * jet[0]));
 
-        // NOTE: only 1 evaluation needed at order 2.
-        in_span(1, 0) = 4 * jet[0];
+        // NOTE: at orders higher than 1 we have only erap evaluations.
+        in_span(1, 0) = 2 * jet[1];
+        in_span(1, 1) = 3 * jet[1];
         cf(out_span, in_span_ro);
+        REQUIRE(jet[4] == approximately((out_span(1, 0) * 2 * jet[3] + out_span(1, 1) * jet[3]) / 2));
 
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately((out_span(1, 0) * 4 * jet[2]) / 2));
+        in_span(1, 0) = 4 * jet[0];
+        in_span(1, 1) = 5 * pars[0];
+        cf(out_span, in_span_ro);
+        REQUIRE(jet[5] == approximately((out_span(1, 0) * 4 * jet[2] + out_span(1, 1) * jet[2]) / 2));
 
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
+        in_span(1, 0) = 2 * jet[1];
+        in_span(1, 1) = 3 * jet[1];
+        cf(out_span, in_span_ro);
+        REQUIRE(jet[6] == approximately((out_span(1, 0) * 2 * 2 * jet[5] + out_span(1, 1) * 2 * jet[5]) / 6));
+
+        in_span(1, 0) = 4 * jet[0];
+        in_span(1, 1) = 5 * pars[0];
+        cf(out_span, in_span_ro);
+        REQUIRE(jet[7] == approximately((out_span(1, 0) * 4 * 2 * jet[4] + out_span(1, 1) * 2 * jet[4]) / 6));
     };
 
     for (auto cm : {false, true}) {
