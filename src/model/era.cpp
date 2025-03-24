@@ -395,6 +395,7 @@ taylor_dc_t::size_type era_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     era_erap_check_eop_data(m_eop_data);
 
     // Append the erap decomposition.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     u_vars_defs.emplace_back(erap(kw::time_expr = args()[0], kw::eop_data = *m_eop_data), std::vector<std::uint32_t>{});
 
     // Append the era decomposition.
