@@ -68,13 +68,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # NOTE: this is needed by codecov
-          # apparently:
-          # https://github.com/codecov/codecov-action/issues/190
-          fetch-depth: 2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
+      - uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./build/coverage.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   conda_ubsan:
     runs-on: ubuntu-latest
     steps:
