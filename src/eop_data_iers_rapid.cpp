@@ -172,6 +172,10 @@ const std::set<std::string> eop_data_iers_rapid_filenames
 
 } // namespace detail
 
+// NOTE: if we want to provide mirrors for the datafiles in the future, we must be really careful about adding
+// further mangling to the identifiers. Even if the mirrors contain the same files, the timestamps will be in general
+// different, which could lead to confusion about which data is exactly being used. Probably it's best to treat
+// mirrors of the same data as different data altogether.
 eop_data eop_data::fetch_latest_iers_rapid(const std::string &filename)
 {
     // Check the provided filename.
