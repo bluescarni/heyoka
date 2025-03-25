@@ -681,7 +681,7 @@ void diff_tensors_forward_impl(
 
         for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
             const auto &cur_in = dc[i];
-            assert(retval.count(cur_in) == 0u);
+            assert(!retval.contains(cur_in));
             retval[cur_in] = i;
         }
 

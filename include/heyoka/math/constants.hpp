@@ -59,6 +59,13 @@ public:
 
 } // namespace detail
 
+// NOTE: the main intent of this class is the implementation of constants
+// which do not have exact representations as floating-point numbers. This
+// includes both irrational numbers but also fractions which cannot be
+// represented exactly in base 2 (e.g., 0.1). By implementing them as nullary
+// functions (rather than numbers), the constants will be instantiated with
+// the desired precision at JIT compilation time.
+//
 // NOTE: like for user-defined functions, here we are relying
 // on the user to remember to give different names to different
 // constants in order for the comparison/hashing/etc. primitives

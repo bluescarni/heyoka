@@ -22,24 +22,28 @@
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <typeindex>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -660,6 +664,148 @@ number number_like(llvm_state &s, llvm::Type *tp, double val)
 
     throw std::invalid_argument(
         fmt::format("Unable to create a number of type '{}' from the input value {}", llvm_type_name(tp), val));
+}
+
+namespace
+{
+
+// clang-format off
+//
+// Helper function to construct a dictionary of double-length approximations of 2*pi
+// for floating-point types.
+//
+// The hi/lo parts of the 2*pi approximation can be computed via the following Python
+// code (using heyoka.py's multiprecision class hy.real):
+//
+// >>> import heyoka as hy
+// >>> # Set the desired precision in bits (e.g., 24 for single-precision).
+// >>> prec = 24
+// >>> # Decimal 2*pi approximation with many more digits than necessary (here
+// >>> # corresponding to 4 times quadruple-precision, i.e., 113 * 4 bits).
+// >>> twopi_str = '6.28318530717958647692528676655900576839433879875021164194988918461563281257241799725606965068423413596429617302656461329418768921910116447'
+// >>> dl_twopi = hy.real(twopi_str, prec*2)
+// >>> twopi_hi = hy.real(dl_twopi, prec)
+// >>> twopi_lo = hy.real(dl_twopi - twopi_hi, prec)
+// >>> assert(twopi_hi + twopi_lo == twopi_hi)
+// >>> assert(hy.real(twopi_hi, prec*2) + hy.real(twopi_lo, prec*2) == dl_twopi)
+// >>> print((twopi_hi, twopi_lo))
+//
+// clang-format on
+auto make_dl_twopi_dict()
+{
+    std::unordered_map<std::type_index, std::pair<number, number>> retval;
+
+    auto impl = [&retval](auto twopi_hi, auto twopi_lo) {
+        using type = decltype(twopi_hi);
+        static_assert(std::is_same_v<type, decltype(twopi_lo)>);
+
+        assert(!retval.contains(typeid(type)));
+
+        retval[typeid(type)] = std::make_pair(number{twopi_hi}, number{twopi_lo});
+    };
+
+    // Handle float.
+    if (is_ieee754_binary32<float>) {
+        impl(6.28318548f, -1.74845553e-7f);
+    }
+
+    // Handle double.
+    if (is_ieee754_binary64<double>) {
+        impl(6.2831853071795862, 2.4492935982947059e-16);
+    }
+
+    // Handle long double.
+    if (is_ieee754_binary64<long double>) {
+        impl(6.2831853071795862l, 2.4492935982947059e-16l);
+    } else if (is_x86_fp80<long double>) {
+        impl(6.28318530717958647703l, -1.00331152253366640475e-19l);
+    } else if (is_ieee754_binary128<long double>) {
+        impl(6.28318530717958647692528676655900559l, 1.73436202602475620495940880520867045e-34l);
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // Handle real128.
+    impl(mppp::real128{"6.28318530717958647692528676655900559"},
+         mppp::real128{"1.73436202602475620495940880520867045e-34"});
+
+#endif
+
+    return retval;
+} // LCOV_EXCL_LINE
+
+// NOLINTNEXTLINE(cert-err58-cpp)
+const auto dl_twopi_dict = make_dl_twopi_dict();
+
+} // namespace
+
+// Helper to create a pair of number instances containing the double-length approximation
+// of 2pi for an input LLVM floating-point scalar type.
+std::pair<number, number> dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
+{
+    if (fp_t->isFloatingPointTy() && fp_t->isIEEE()) {
+#if !defined(NDEBUG)
+        // Sanity check.
+        const auto &sem = fp_t->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
+
+        assert(prec <= 113u);
+#endif
+
+        auto impl = [](auto val) {
+            using type = decltype(val);
+            const auto it = dl_twopi_dict.find(typeid(type));
+
+            // LCOV_EXCL_START
+            if (it == dl_twopi_dict.end()) {
+                throw std::invalid_argument(
+                    fmt::format("Cannot generate a double-length 2*pi approximation for the C++ type '{}'",
+                                boost::core::demangle(typeid(type).name())));
+            }
+            // LCOV_EXCL_STOP
+
+            return it->second;
+        };
+
+        auto &context = s.context();
+
+        if (fp_t == to_external_llvm_type<float>(context, false)) {
+            return impl(0.f);
+        } else if (fp_t == to_external_llvm_type<double>(context, false)) {
+            return impl(0.);
+        } else if (fp_t == to_external_llvm_type<long double>(context, false)) {
+            return impl(0.l);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if (fp_t == to_external_llvm_type<mppp::real128>(context, false)) {
+            return impl(mppp::real128(0));
+#endif
+        }
+
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format(
+            "Cannot generate a double-length 2*pi approximation for the LLVM type '{}'", detail::llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto prec = llvm_is_real(fp_t)) {
+        // Generate the 2*pi constant with prec * 4 precision.
+        auto twopi = mppp::real_pi(boost::safe_numerics::safe<::mpfr_prec_t>(prec) * 4);
+        mppp::mul_2ui(twopi, twopi, 1ul);
+
+        // Fetch the hi/lo components in precision prec.
+        auto twopi_hi = mppp::real{twopi, prec};
+        auto twopi_lo = mppp::real{std::move(twopi) - twopi_hi, prec};
+
+        assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+        return std::make_pair(number(std::move(twopi_hi)), number(std::move(twopi_lo)));
+#endif
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
+                                                detail::llvm_type_name(fp_t)));
+    }
+    // LCOV_EXCL_STOP
 }
 
 } // namespace detail

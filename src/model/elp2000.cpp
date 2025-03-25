@@ -161,8 +161,8 @@ std::array<expression, 2> ccpow(const expression &ex, trig_eval_dict_t &td, std:
 
     auto &pd = it->second;
 
-    assert(pd.find(1) != pd.end());
-    assert(pd.find(-1) != pd.end());
+    assert(pd.contains(1));
+    assert(pd.contains(-1));
 
     const auto pow1 = pd[1];
     const auto powm1 = pd[-1];

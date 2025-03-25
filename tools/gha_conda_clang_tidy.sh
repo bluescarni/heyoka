@@ -14,8 +14,9 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -p $deps_dir cmake c-compiler cxx-compiler clang clangxx \
-    clang-tools llvmdev tbb-devel tbb libboost-devel mppp sleef fmt spdlog ninja
+# NOTE: the clang pins are hopefully temporary.
+conda create -y -p $deps_dir cmake c-compiler cxx-compiler 'clang=19.*' 'clangxx=19.*' openssl \
+    'clang-tools==19.*' 'llvmdev=19.*' tbb-devel tbb libboost-devel mppp sleef fmt spdlog ninja
 source activate $deps_dir
 
 # Create the build dir and cd into it.

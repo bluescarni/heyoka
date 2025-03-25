@@ -39,7 +39,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          conda install -y cmake llvmdev tbb-devel tbb libboost-devel xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib mppp
+          conda install -y cmake llvmdev tbb-devel tbb libboost-devel xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib mppp openssl
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 17 2022" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DHEYOKA_WITH_SLEEF=yes
@@ -68,13 +68,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # NOTE: this is needed by codecov
-          # apparently:
-          # https://github.com/codecov/codecov-action/issues/190
-          fetch-depth: 2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
+      - uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./build/coverage.info
+          token: ${{ secrets.CODECOV_TOKEN }}
   conda_ubsan:
     runs-on: ubuntu-latest
     steps:

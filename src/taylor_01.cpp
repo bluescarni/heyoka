@@ -83,6 +83,7 @@ namespace detail
 // for the function implementing the Taylor derivative in compact mode of the mathematical function
 // called "name". The mangled name is assembled from "name", the types of the arguments args, the number
 // of uvars and the scalar or vector floating-point type in use (which depends on fp_t and batch_size).
+//
 // NOTE: the values in args are inconsequential, only the types matter.
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const std::string &name,
@@ -91,15 +92,14 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
                              const std::vector<std::variant<variable, number, param>> &args,
                              std::uint32_t n_hidden_deps)
 {
-    assert(std::ranges::find(name, '.') == name.end());
     assert(fp_t != nullptr);
     assert(n_uvars > 0u);
 
     // LCOV_EXCL_START
 
-    // Check that name does not contain periods ".". Periods are used
+    // Check that 'name' does not contain periods ".". Periods are used
     // to separate fields in the mangled name.
-    if (boost::contains(name, ".")) {
+    if (boost::contains(name, ".")) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Cannot generate a mangled name for the compact mode Taylor derivative of the mathematical "
                         "function '{}': the function name cannot contain '.' symbols",

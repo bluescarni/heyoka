@@ -243,7 +243,12 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     // And the docs of the getDeclaration() function.
     assert(builder.GetInsertBlock() != nullptr);
     assert(builder.GetInsertBlock()->getModule() != nullptr);
-    auto *f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+    auto *f =
+#if LLVM_VERSION_MAJOR < 20
+        llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+#else
+        llvm::Intrinsic::getOrInsertDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+#endif
     assert(f != nullptr);
     // It does not make sense to have a definition of an intrinsic.
     assert(f->isDeclaration());
@@ -962,6 +967,9 @@ std::string llvm_mangle_type(llvm::Type *t)
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return fmt::format("{}_{}", llvm_type_name(v_t->getElementType()), v_t->getNumElements());
+    } else if (auto *arr_t = llvm::dyn_cast<llvm::ArrayType>(t)) {
+        // Similar idea if the type is an array.
+        return fmt::format("array_{}_{}", llvm_type_name(arr_t->getElementType()), arr_t->getNumElements());
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
@@ -1254,11 +1262,20 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 #endif
 }
 
-// Gather a vector of type vec_tp from ptrs. If vec_tp is a vector type, then ptrs
-// must be a vector of pointers of the same size and the returned value is also a vector
-// of that size. Otherwise, ptrs must be a single scalar pointer and the returned value is a scalar.
+// Gather a vector of type vec_tp from ptrs.
+//
+// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values
+// of type vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
+//
+// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value
+// will be a vector of values gathered from the addresses specified in ptrs.
+//
+// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function
+// behaves like a scalar load from ptrs).
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
+    assert(ptrs->getType()->getScalarType()->isPointerTy());
+
     if (llvm::isa<llvm::FixedVectorType>(vec_tp)) {
         // LCOV_EXCL_START
         assert(llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
@@ -2070,6 +2087,31 @@ llvm::Value *llvm_fcmp_uge(llvm_state &s, llvm::Value *a, llvm::Value *b)
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_uge values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
+llvm::Value *llvm_fcmp_ule(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpULE(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ule(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ule values of type '{}'", llvm_type_name(fp_t)));
         // LCOV_EXCL_STOP
     }
 }
@@ -3022,6 +3064,13 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     return {e, f};
 }
 
+// Subtraction.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_sub(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    return llvm_dl_add(state, x_hi, x_lo, llvm_fneg(state, y_hi), llvm_fneg(state, y_lo));
+}
+
 // Multiplication.
 // NOTE: this is procedure mul2() from here:
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
@@ -3177,7 +3226,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
     auto [prod_hi, prod_lo] = llvm_dl_mul(s, y_hi, y_lo, fl_hi, fl_lo);
 
-    return llvm_dl_add(s, x_hi, x_lo, llvm_fneg(s, prod_hi), llvm_fneg(s, prod_lo));
+    return llvm_dl_sub(s, x_hi, x_lo, prod_hi, prod_lo);
 }
 
 // Less-than.

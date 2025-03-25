@@ -6,24 +6,20 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_FAST_UNORDERED_HPP
-#define HEYOKA_DETAIL_FAST_UNORDERED_HPP
+#ifndef HEYOKA_DETAIL_EOP_DATA_BUILTIN_EOP_DATA_HPP
+#define HEYOKA_DETAIL_EOP_DATA_BUILTIN_EOP_DATA_HPP
 
 #include <heyoka/config.hpp>
-
-#include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-template <typename... Args>
-using fast_uset = boost::unordered_flat_set<Args...>;
+extern const char *const builtin_eop_data_ts;
 
-template <typename... Args>
-using fast_umap = boost::unordered_flat_map<Args...>;
+extern const eop_data_row builtin_eop_data[19437];
 
 } // namespace detail
 

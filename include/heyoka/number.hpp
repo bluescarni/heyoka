@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <functional>
 #include <ostream>
+#include <utility>
 #include <variant>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -120,6 +121,8 @@ namespace detail
 {
 
 HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
+
+std::pair<number, number> dl_twopi_like(llvm_state &, llvm::Type *);
 
 } // namespace detail
 

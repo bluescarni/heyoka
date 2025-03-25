@@ -1,6 +1,31 @@
 Changelog
 =========
 
+7.3.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Add support for LLVM 20
+  (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
+- Introduce class to represent, manage and update EOP data
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+- New models: time conversions, frame transformations, Earth
+  rotation angle
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now requires LLVM >= 16
+  (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
+- heyoka now requires Boost >= 1.85
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+- heyoka now depends on OpenSSL
+  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+
+
 7.2.1 (2025-01-07)
 ------------------
 

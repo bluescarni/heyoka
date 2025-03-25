@@ -12,8 +12,10 @@
 #include <heyoka/model/cart2geo.hpp>
 #include <heyoka/model/cr3bp.hpp>
 #include <heyoka/model/elp2000.hpp>
+#include <heyoka/model/era.hpp>
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>
+#include <heyoka/model/frame_transformations.hpp>
 #include <heyoka/model/jb08_tn.hpp>
 #include <heyoka/model/mascon.hpp>
 #include <heyoka/model/nbody.hpp>
@@ -21,6 +23,7 @@
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/model/rotating.hpp>
 #include <heyoka/model/sgp4.hpp>
+#include <heyoka/model/time_conversions.hpp>
 #include <heyoka/model/vsop2013.hpp>
 
 #endif
