@@ -72,9 +72,17 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 41684);
         REQUIRE(data[0].delta_ut1_utc == .8075000);
+        REQUIRE(data[0].pm_x == .143000);
+        REQUIRE(data[0].pm_y == .137000);
+        REQUIRE(data[0].dX == -18.637);
+        REQUIRE(data[0].dY == -3.667);
 
         REQUIRE(data[1].mjd == 41685);
         REQUIRE(data[1].delta_ut1_utc == .8044000);
+        REQUIRE(data[1].pm_x == .141000);
+        REQUIRE(data[1].pm_y == .134000);
+        REQUIRE(data[1].dX == -18.636);
+        REQUIRE(data[1].dY == -3.571);
     }
 
     {
@@ -90,9 +98,17 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 60709);
         REQUIRE(data[0].delta_ut1_utc == 0.0461909);
+        REQUIRE(data[0].pm_x == 0.099700);
+        REQUIRE(data[0].pm_y == 0.309126);
+        REQUIRE(data[0].dX == 0.383);
+        REQUIRE(data[0].dY == -0.034);
 
         REQUIRE(data[1].mjd == 60710);
         REQUIRE(data[1].delta_ut1_utc == 0.0456841);
+        REQUIRE(data[1].pm_x == 0.097391);
+        REQUIRE(data[1].pm_y == 0.309488);
+        REQUIRE(data[1].dX == 0.391);
+        REQUIRE(data[1].dY == -0.022);
     }
 
     // NOTE: newline at the end.
@@ -107,6 +123,10 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 60709);
         REQUIRE(data[0].delta_ut1_utc == 0.0461909);
+        REQUIRE(data[0].pm_x == 0.099700);
+        REQUIRE(data[0].pm_y == 0.309126);
+        REQUIRE(data[0].dX == 0.383);
+        REQUIRE(data[0].dY == -0.034);
     }
 
     // NOTE: missing both bulletin A and bulletin B data.
@@ -120,6 +140,19 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         const auto data = detail::parse_eop_data_iers_rapid(str);
 
         REQUIRE(data.empty());
+    }
+
+    // NOTE: this is a case in which on the second line there's no bulletin A/B data for dX/dY.
+    {
+        const std::string str
+            = "25 6 2 60828.00 P  0.122981 0.007056  0.425970 0.010837  P 0.0350338 0.0072179                 P    "
+              "-0.045    0.128     0.070    0.160                                                     \n"
+              "25 6 3 60829.00 P  0.124395 0.007110  0.426240 0.010942  P 0.0351650 0.0072970                          "
+              "                                                                                   ";
+
+        const auto data = detail::parse_eop_data_iers_rapid(str);
+
+        REQUIRE(data.size() == 1u);
     }
 
     // Parse errors.
@@ -225,7 +258,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin B string for the UT1-UTC "
-                    "difference '.80a5000' could not be parsed as a floating-point value"));
+                    "difference field '.80a5000' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -237,7 +270,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin B string for the UT1-UTC "
-                    "difference '.801500 ' could not be parsed as a floating-point value"));
+                    "difference field '.801500 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -249,7 +282,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.04a1909' could not be parsed as a floating-point value"));
+                    "difference field '0.04a1909' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -261,7 +294,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.041190 ' could not be parsed as a floating-point value"));
+                    "difference field '0.041190 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -284,6 +317,42 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Invalid EOP data table detected: the UT1-UTC value inf on line 1 is not finite"));
+    }
+
+    // Invalid PM x/y values.
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300       inf   .137000   .8015000   -18.637    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the pm_x value inf on line 0 is not finite"));
+    }
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000       nan   .8015000   -18.637    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the pm_y value nan on line 0 is not finite"));
+    }
+
+    // Invalid dX/dY values.
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000       inf    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the dX value inf on line 0 is not finite"));
+    }
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000   -18.637       nan  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
     }
 
     // A check for wrong filename for the download function.

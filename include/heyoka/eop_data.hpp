@@ -29,8 +29,14 @@ struct HEYOKA_DLL_PUBLIC eop_data_row {
     double mjd = 0;
     // UT1-UTC (seconds).
     double delta_ut1_utc = 0;
+    // Polar motion x_p/y_p.
+    double pm_x = 0;
+    double pm_y = 0;
+    // Free-core nutation and time-dependent effects.
+    double dX = 0;
+    double dY = 0;
 
-    // NOTE: used in testing.
+    // NOTE: used for testing.
     auto operator<=>(const eop_data_row &) const = default;
 
 private:
@@ -89,6 +95,11 @@ void validate_eop_data_table(const eop_data_table &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &, const eop_data &,
                                                                                 llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_pm_x(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_pm_y(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dX(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dY(llvm_state &, const eop_data &, llvm::Type *);
+
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_data_upper_bound(llvm_state &, llvm::Value *, llvm::Value *,
                                                                        llvm::Value *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_data_locate_date(llvm_state &, llvm::Value *, llvm::Value *,

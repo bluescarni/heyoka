@@ -68,12 +68,20 @@ void eop_data_row::save(boost::archive::binary_oarchive &oa, unsigned) const
 {
     oa << mjd;
     oa << delta_ut1_utc;
+    oa << pm_x;
+    oa << pm_y;
+    oa << dX;
+    oa << dY;
 }
 
 void eop_data_row::load(boost::archive::binary_iarchive &ia, unsigned)
 {
     ia >> mjd;
     ia >> delta_ut1_utc;
+    ia >> pm_x;
+    ia >> pm_y;
+    ia >> dX;
+    ia >> dY;
 }
 
 namespace detail
@@ -109,6 +117,30 @@ void validate_eop_data_table(const eop_data_table &data)
             throw std::invalid_argument(
                 fmt::format("Invalid EOP data table detected: the UT1-UTC value {} on line {} is not finite",
                             cur_delta_ut1_utc, i));
+        }
+
+        // PM values must be finite.
+        const auto pm_x = data[i].pm_x;
+        if (!std::isfinite(pm_x)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the pm_x value {} on line {} is not finite", pm_x, i));
+        }
+        const auto pm_y = data[i].pm_y;
+        if (!std::isfinite(pm_y)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the pm_y value {} on line {} is not finite", pm_y, i));
+        }
+
+        // dX/dY values must be finite.
+        const auto dX = data[i].dX;
+        if (!std::isfinite(dX)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the dX value {} on line {} is not finite", dX, i));
+        }
+        const auto dY = data[i].dY;
+        if (!std::isfinite(dY)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the dY value {} on line {} is not finite", dY, i));
         }
     }
 }
@@ -398,6 +430,24 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
 
     return llvm_get_eop_data(s, data, value_t, "era", value_getter);
 }
+
+// Getters for the polar motion and dX/dY data.
+// NOTE: these are all the same, use a macro (yuck) to avoid repetition.
+#define HEYOKA_LLVM_GET_EOP_DATA_IMPL(name)                                                                            \
+    llvm::Value *llvm_get_eop_data_##name(llvm_state &s, const eop_data &data, llvm::Type *scal_t)                     \
+    {                                                                                                                  \
+        return llvm_get_eop_data(s, data, scal_t, #name, [&s, scal_t](const eop_data_row &r) {                         \
+            const auto val = r.name;                                                                                   \
+            return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{val}));                                   \
+        });                                                                                                            \
+    }
+
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_x);
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_y);
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dX);
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dY);
+
+#undef HEYOKA_LLVM_GET_EOP_DATA_IMPL
 
 // Implementation of the std::upper_bound() algorithm for use in llvm_eop_data_locate_date().
 //
