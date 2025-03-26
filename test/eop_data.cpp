@@ -373,9 +373,9 @@ TEST_CASE("parse_eop_data_iers_long_term test")
             = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
               "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
               "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0.000000;;0."
-              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;-2.000000;0.004774;4.000000;0.002000\n37666;1962;01;02;;-0."
               "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
-              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000";
+              "0014000;;;;;;1.000000;0.004774;2.000000;0.002000";
 
         const auto data = detail::parse_eop_data_iers_long_term(str);
 
@@ -383,9 +383,17 @@ TEST_CASE("parse_eop_data_iers_long_term test")
 
         REQUIRE(data[0].mjd == 37665);
         REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+        REQUIRE(data[0].pm_x == -0.012700);
+        REQUIRE(data[0].pm_y == 0.213000);
+        REQUIRE(data[0].dX == -2);
+        REQUIRE(data[0].dY == 4);
 
         REQUIRE(data[1].mjd == 37666);
         REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+        REQUIRE(data[1].pm_x == -0.015900);
+        REQUIRE(data[1].pm_y == 0.214100);
+        REQUIRE(data[1].dX == 1);
+        REQUIRE(data[1].dY == 2);
     }
 
     // NOTE: newline at the end.
@@ -404,9 +412,17 @@ TEST_CASE("parse_eop_data_iers_long_term test")
 
         REQUIRE(data[0].mjd == 37665);
         REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+        REQUIRE(data[0].pm_x == -0.012700);
+        REQUIRE(data[0].pm_y == 0.213000);
+        REQUIRE(data[0].dX == 0);
+        REQUIRE(data[0].dY == 0);
 
         REQUIRE(data[1].mjd == 37666);
         REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+        REQUIRE(data[1].pm_x == -0.015900);
+        REQUIRE(data[1].pm_y == 0.214100);
+        REQUIRE(data[1].dX == 0);
+        REQUIRE(data[1].dY == 0);
     }
 
     // Invalid mjd.
@@ -451,7 +467,7 @@ TEST_CASE("parse_eop_data_iers_long_term test")
               "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01\n";
 
         REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
-                               Message("Error parsing a IERS long term EOP data file: at least 15 fields "
+                               Message("Error parsing a IERS long term EOP data file: at least 26 fields "
                                        "were expected in a data row, but 3 were found instead"));
     }
 }
