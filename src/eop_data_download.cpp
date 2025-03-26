@@ -134,7 +134,7 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 
 // Timeout duration for network operations.
-constexpr auto timeout_duration = std::chrono::seconds(30);
+constexpr auto timeout_duration = std::chrono::seconds(60);
 
 // Helper to check a beast error code and throw as needed.
 void check_error(beast::error_code ec, const char *id)
