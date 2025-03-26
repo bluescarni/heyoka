@@ -662,6 +662,90 @@ TEST_CASE("eop_data_era")
     tester.operator()<double>();
 }
 
+TEST_CASE("eop_data_pm_x_pm_y")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy functions that use the arrays, returning pointers to the first elements.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_pm_x(s, data, scal_t));
+
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_pm_y(s, data, scal_t));
+
+        // Compile and fetch the function pointers.
+        s.compile();
+        auto *fptr1 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+        auto *fptr2 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test2"));
+
+        // Fetch the array pointers.
+        const auto *arr_ptr1 = fptr1();
+        const auto *arr_ptr2 = fptr2();
+
+        // Just check the first values.
+        REQUIRE(arr_ptr1[0] == static_cast<T>(0.143));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(0.137));
+    };
+
+    tester.operator()<float>();
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_dX_dY")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy functions that use the arrays, returning pointers to the first elements.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_dX(s, data, scal_t));
+
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_dY(s, data, scal_t));
+
+        // Compile and fetch the function pointers.
+        s.compile();
+        auto *fptr1 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+        auto *fptr2 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test2"));
+
+        // Fetch the array pointers.
+        const auto *arr_ptr1 = fptr1();
+        const auto *arr_ptr2 = fptr2();
+
+        // Just check the first values.
+        REQUIRE(arr_ptr1[0] == static_cast<T>(-18.637));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(-3.667));
+    };
+
+    tester.operator()<float>();
+    tester.operator()<double>();
+}
+
 // Test to check the download code. We pick a small file for testing.
 TEST_CASE("download finals2000A.daily")
 {
