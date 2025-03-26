@@ -533,7 +533,7 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         // Check manually a few values. These values have been computed with astropy.
         REQUIRE(*fptr() == approximately(static_cast<T>(-0.2699657628640961)));
         REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+        REQUIRE(*(fptr() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
     };
 
     tester.operator()<float>();
@@ -571,11 +571,11 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         // Check manually a few values. These values have been computed with astropy.
         REQUIRE(*fptr1() == approximately(static_cast<T>(-0.2699657628640961)));
         REQUIRE(*(fptr1() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr1() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+        REQUIRE(*(fptr1() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
 
         REQUIRE(*fptr1() == *fptr2());
         REQUIRE(*(fptr1() + 6308) == *(fptr2() + 6308));
-        REQUIRE(*(fptr1() + 19429) == *(fptr2() + 19429));
+        REQUIRE(*(fptr1() + 19128) == *(fptr2() + 19128));
     };
 
     multi_tester.operator()<float>();
@@ -652,9 +652,9 @@ TEST_CASE("eop_data_era")
         }
 
         {
-            oct_t era{arr_ptr[19429][0]};
-            era += arr_ptr[19429][1];
-            REQUIRE(abs(reducer(era) - 2.989612722143122) < 1e-6);
+            oct_t era{arr_ptr[19128][0]};
+            era += arr_ptr[19128][1];
+            REQUIRE(abs(reducer(era) - 4.094937357962103) < 1e-6);
         }
     };
 
