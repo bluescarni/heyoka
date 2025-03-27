@@ -25,11 +25,15 @@
 
 #include <fmt/core.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -40,6 +44,7 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/eop_data/builtin_eop_data.hpp>
 #include <heyoka/detail/erfa_decls.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -678,10 +683,69 @@ llvm::Value *llvm_eop_data_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Va
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_size, llvm::Value *date_value)
 {
+    assert(ptr != nullptr);
+    assert(ptr->getType()->isPointerTy());
+
     auto &bld = s.builder();
+    auto &md = s.module();
+    auto &ctx = s.context();
+
+    assert(arr_size != nullptr);
+    assert(arr_size->getType() == bld.getInt32Ty());
+
+    // NOTE: we want to define a function to perform the computation in order to help LLVM elide redundant computations.
+    // For instance, if we are computing both era/erap and pm_x/pm_xp for the *same* input date,
+    // we would like LLVM to locate that date only once for the two calls.
+
+    // Create the mangled name of the function. The mangled name will be based on the type of date_value,
+    // which encodes both the value type of the array and the batch size.
+    auto *val_t = date_value->getType();
+    const auto fname = fmt::format("heyoka.eop_data_locate_date.{}", llvm_mangle_type(val_t));
+
+    // Check if we already created the function.
+    if (auto *fptr = md.getFunction(fname)) {
+        // The function was created already. Call it and return the result.
+        return bld.CreateCall(fptr, {ptr, arr_size, date_value});
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // Determine the batch size from date_value.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+        assert(batch_size != 0u);
+    }
+
+    // Determine the return type: either a single 32-bit int or a vector thereof.
+    auto *ret_t = make_vector_type(bld.getInt32Ty(), batch_size);
+
+    // Build the function prototype.
+    auto *ft = llvm::FunctionType::get(ret_t, {bld.getPtrTy(), bld.getInt32Ty(), val_t}, false);
+
+    // Create the function
+    auto *f = llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    f->addFnAttr(llvm::Attribute::NoRecurse);
+    f->addFnAttr(llvm::Attribute::NoUnwind);
+    f->addFnAttr(llvm::Attribute::Speculatable);
+    f->addFnAttr(llvm::Attribute::WillReturn);
+
+    // Fetch the arguments.
+    auto *ptr_arg = f->getArg(0);
+    auto *arr_size_arg = f->getArg(1);
+    auto *date_value_arg = f->getArg(2);
+
+    // The pointer argument is read-only.
+    ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // As a first step, we look for the first date in the array which is *greater than* date_value.
-    auto *idx = llvm_eop_data_upper_bound(s, ptr, arr_size, date_value);
+    auto *idx = llvm_eop_data_upper_bound(s, ptr_arg, arr_size_arg, date_value_arg);
 
     // The happy path requires the computation of idx - 1. The exceptions are:
     //
@@ -690,15 +754,8 @@ llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Va
     //
     // In these two cases, we want to return arr_size, rather than idx - 1.
 
-    // Determine the batch size from date_value.
-    std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(date_value->getType())) {
-        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-        assert(batch_size != 0u);
-    }
-
     // Splat the array size.
-    auto *arr_size_splat = vector_splat(bld, arr_size, batch_size);
+    auto *arr_size_splat = vector_splat(bld, arr_size_arg, batch_size);
 
     // First step: ret = (idx == 0) ? arr_size : idx.
     auto *idx_is_zero = bld.CreateICmpEQ(idx, llvm::ConstantInt::get(idx->getType(), 0));
@@ -708,7 +765,14 @@ llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Va
     auto *ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
     ret = bld.CreateSelect(ret_eq_arr_size, ret, bld.CreateSub(ret, llvm::ConstantInt::get(ret->getType(), 1)));
 
-    return ret;
+    // Create the return value.
+    bld.CreateRet(ret);
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    // Invoke the function and return the result.
+    return bld.CreateCall(f, {ptr, arr_size, date_value});
 }
 
 } // namespace detail
