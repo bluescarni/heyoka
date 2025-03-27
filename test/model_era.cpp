@@ -43,7 +43,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/model/era.hpp>
+#include <heyoka/model/eop.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
