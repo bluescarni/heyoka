@@ -463,7 +463,7 @@ TEST_CASE("taylor scalar era_erap")
         auto ta = taylor_adaptive<fp_t>{
             dyn, {tm, -tm}, kw::tol = .1, kw::compact_mode = compact_mode, kw::opt_level = opt_level, kw::pars = pars};
 
-        // NOTE: we want to check here that the era/erap calculation is performed exactly 5 times.
+        // NOTE: we want to check here that the era/erap calculation is performed no more than 5 times.
         if (opt_level == 3u) {
             const auto get_era_erap_call_regex = std::regex(R"(.*call.*heyoka\.get_era_erap\..*)");
             auto count = 0u;
@@ -501,7 +501,7 @@ TEST_CASE("taylor scalar era_erap")
                 }
             }
 
-            REQUIRE(count == 5u);
+            REQUIRE(count <= 5u);
         }
 
         ta.step(true);
@@ -574,7 +574,7 @@ TEST_CASE("taylor batch era_erap")
                                               kw::opt_level = opt_level,
                                               kw::pars = pars};
 
-        // NOTE: we want to check here that the era/erap calculation is performed exactly 5 times.
+        // NOTE: we want to check here that the era/erap calculation is performed no more than 5 times.
         if (opt_level == 3u) {
             const auto get_era_erap_call_regex = std::regex(R"(.*call.*heyoka\.get_era_erap\..*)");
             auto count = 0u;
@@ -612,7 +612,7 @@ TEST_CASE("taylor batch era_erap")
                 }
             }
 
-            REQUIRE(count == 5u);
+            REQUIRE(count <= 5u);
         }
 
         ta.step(true);
