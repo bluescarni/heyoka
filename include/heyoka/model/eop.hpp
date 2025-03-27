@@ -26,12 +26,11 @@
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
 
-// NOTE: for the representation of the Earth rotation angle (ERA) as a function of time,
-// we adopt a piecewise linear approximation where the switch points are given by the
-// dates in the eop data. Within each time interval, the ERA is approximated as
-// ERA(t) = c0 + c1*t (where the values of the c0 and c1 constants change from interval
-// to interval). In the expression system, we implement two unary functions, era and erap,
-// which return respectively the ERA and its first-order derivative at the given input time.
+// NOTE: for the representation of EOP data, we adopt a piecewise linear approximation where the switch points are given
+// by the dates in the eop dataset. Within each time interval, an EOP quantity is approximated as EOP(t) = c0 + c1*t
+// (where the values of the c0 and c1 constants change from interval to interval). In the expression system, we
+// implement, for each EOP quantity, two unary functions which return respectively the EOP quantity and its first-order
+// derivative at the given input time.
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -111,7 +110,7 @@ public:
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
 
 template <typename... KwArgs>
-auto era_erap_common_opts(const KwArgs &...kw_args)
+auto eop_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -141,11 +140,11 @@ auto era_erap_common_opts(const KwArgs &...kw_args)
 } // namespace detail
 
 inline constexpr auto era = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::era_func_impl, detail::era_erap_common_opts(kw_args...));
+    return std::apply(detail::era_func_impl, detail::eop_common_opts(kw_args...));
 };
 
 inline constexpr auto erap = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::erap_func_impl, detail::era_erap_common_opts(kw_args...));
+    return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...));
 };
 
 } // namespace model
