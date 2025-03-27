@@ -167,7 +167,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
                 auto *era_0 = bld.CreateLoad(era_t, bld.CreateInBoundsGEP(era_t, era_ptr, {idx}));
                 auto *era_1 = bld.CreateLoad(era_t, bld.CreateInBoundsGEP(era_t, era_ptr, {idxp1}));
 
-                // Decompose into hi/lo parte.
+                // Decompose into hi/lo parts.
                 bld.CreateStore(bld.CreateExtractValue(era_0, {0}), era0_hi_alloc);
                 bld.CreateStore(bld.CreateExtractValue(era_0, {1}), era0_lo_alloc);
                 bld.CreateStore(bld.CreateExtractValue(era_1, {0}), era1_hi_alloc);
