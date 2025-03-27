@@ -285,14 +285,14 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
 namespace
 {
 
-// Small wrapper to check that we have eop data to work with in the era/erap
+// Small wrapper to check that we have eop data to work with in the eop
 // implementations. It should never happen that we end up throwing here while
 // using the public API, but better safe than sorry.
-void era_erap_check_eop_data(const std::optional<eop_data> &odata)
+void eop_check_eop_data(const std::optional<eop_data> &odata)
 {
     if (!odata) [[unlikely]] {
         // LCOV_EXCL_START
-        throw std::invalid_argument("Cannot use the era/erap functions without eop data");
+        throw std::invalid_argument("Error: missing EOP data");
         // LCOV_EXCL_STOP
     }
 }
@@ -331,7 +331,7 @@ era_impl::era_impl(expression time_expr, eop_data data)
 
 std::vector<expression> era_impl::gradient() const
 {
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return {erap(kw::time_expr = args()[0], kw::eop_data = *m_eop_data)};
@@ -361,7 +361,7 @@ llvm::Value *era_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return heyoka::detail::llvm_eval_helper(
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
@@ -374,7 +374,7 @@ llvm::Value *era_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
 llvm::Function *era_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                            bool high_accuracy) const
 {
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(),
@@ -392,7 +392,7 @@ taylor_dc_t::size_type era_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     // Append the erap decomposition.
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
@@ -496,7 +496,7 @@ llvm::Value *era_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::v
     assert(args().size() == 1u);
     assert(deps.size() == 1u);
 
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return std::visit(
         [&](const auto &v) {
@@ -629,7 +629,7 @@ llvm::Function *era_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 {
     assert(args().size() == 1u);
 
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return std::visit(
         [&](const auto &v) { return taylor_c_diff_func_era_impl(s, fp_t, *this, v, n_uvars, batch_size, *m_eop_data); },
@@ -696,7 +696,7 @@ llvm::Value *erap_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::ve
                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const
 {
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return heyoka::detail::llvm_eval_helper(
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
@@ -709,7 +709,7 @@ llvm::Value *erap_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::ve
 llvm::Function *erap_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                             bool high_accuracy) const
 {
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(),
@@ -790,7 +790,7 @@ llvm::Value *erap_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::
 {
     assert(args().size() == 1u);
 
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return std::visit(
         [&](const auto &v) {
@@ -914,7 +914,7 @@ llvm::Function *erap_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 {
     assert(args().size() == 1u);
 
-    era_erap_check_eop_data(m_eop_data);
+    eop_check_eop_data(m_eop_data);
 
     return std::visit(
         [&](const auto &v) {
