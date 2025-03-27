@@ -573,20 +573,25 @@ llvm::Function *taylor_c_diff_func_era_impl(llvm_state &s, llvm::Type *fp_t, con
     // Create the return value.
     auto *retval = bld.CreateAlloca(val_t);
 
-    // Load b^[n].
-    auto *bn = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx);
-
     hd::llvm_if_then_else(
         s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
         [&]() {
             // For order 0, invoke the era on the order 0 of b_idx.
-            auto *era_val = llvm_era_eval_helper(s, bn, fp_t, batch_size, data);
+
+            // Load b^[0].
+            auto *b0 = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), b_idx);
+
+            // Evaluate.
+            auto *era_val = llvm_era_eval_helper(s, b0, fp_t, batch_size, data);
 
             // Store the result.
             bld.CreateStore(era_val, retval);
         },
         [&]() {
             // For order > 0, we must compute erap*b^[n].
+
+            // Load b^[n].
+            auto *bn = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx);
 
             // Load the value of erap.
             auto *erap = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), dep_idx);
