@@ -696,8 +696,8 @@ TEST_CASE("eop_data_pm_x_pm_y")
         const auto *arr_ptr2 = fptr2();
 
         // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(0.143));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(0.137));
+        REQUIRE(arr_ptr1[0] == static_cast<T>(0.143 * boost::math::constants::pi<double>() / (180. * 3600)));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(0.137 * boost::math::constants::pi<double>() / (180. * 3600)));
     };
 
     tester.operator()<float>();
@@ -738,8 +738,8 @@ TEST_CASE("eop_data_dX_dY")
         const auto *arr_ptr2 = fptr2();
 
         // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(-18.637));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(-3.667));
+        REQUIRE(arr_ptr1[0] == static_cast<T>(-18.637 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(-3.667 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
     };
 
     tester.operator()<float>();

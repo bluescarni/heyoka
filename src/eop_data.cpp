@@ -437,20 +437,23 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
 }
 
 // Getters for the polar motion and dX/dY data.
-// NOTE: these are all the same, use a macro (yuck) to avoid repetition.
-#define HEYOKA_LLVM_GET_EOP_DATA_IMPL(name)                                                                            \
+// NOTE: these are all similar, use a macro (yuck) to avoid repetition.
+// NOTE: like with the ERA, perform the computations in double-precision.
+#define HEYOKA_LLVM_GET_EOP_DATA_IMPL(name, conv_factor)                                                               \
     llvm::Value *llvm_get_eop_data_##name(llvm_state &s, const eop_data &data, llvm::Type *scal_t)                     \
     {                                                                                                                  \
         return llvm_get_eop_data(s, data, scal_t, #name, [&s, scal_t](const eop_data_row &r) {                         \
-            const auto val = r.name;                                                                                   \
+            /* Fetch the value and convert. */                                                                         \
+            const auto val = r.name * (conv_factor);                                                                   \
             return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{val}));                                   \
         });                                                                                                            \
     }
 
-HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_x);
-HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_y);
-HEYOKA_LLVM_GET_EOP_DATA_IMPL(dX);
-HEYOKA_LLVM_GET_EOP_DATA_IMPL(dY);
+// NOTE: PM data is in arcsec, dX/dY data in milliarcsec.
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_x, boost::math::constants::pi<double>() / (180. * 3600));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_y, boost::math::constants::pi<double>() / (180. * 3600));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dX, boost::math::constants::pi<double>() / (180. * 3600 * 1000));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dY, boost::math::constants::pi<double>() / (180. * 3600 * 1000));
 
 #undef HEYOKA_LLVM_GET_EOP_DATA_IMPL
 
