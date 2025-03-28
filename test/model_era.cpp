@@ -40,6 +40,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
@@ -69,6 +70,9 @@ TEST_CASE("basics")
 {
     REQUIRE(model::era() == model::era(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
     REQUIRE(model::erap() == model::erap(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
+
+    REQUIRE(std::get<func>(model::era().value()).get_name().starts_with("eop_era_"));
+    REQUIRE(std::get<func>(model::erap().value()).get_name().starts_with("eop_erap_"));
 
     auto x = make_vars("x");
 
