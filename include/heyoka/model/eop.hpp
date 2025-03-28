@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -40,8 +41,9 @@ namespace model
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC era_impl : public func_base
+class HEYOKA_DLL_PUBLIC eop_impl : public func_base
 {
+    std::string m_eop_name;
     // NOTE: we wrap the eop data into an optional because
     // we do not want to pay the cost of storing the full eop data
     // for a default-constructed object, which is anyway only used
@@ -55,8 +57,8 @@ class HEYOKA_DLL_PUBLIC era_impl : public func_base
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
-    era_impl();
-    explicit era_impl(expression, eop_data);
+    eop_impl();
+    explicit eop_impl(std::string, expression, eop_data);
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
@@ -75,8 +77,9 @@ public:
                                                      bool) const;
 };
 
-class HEYOKA_DLL_PUBLIC erap_impl : public func_base
+class HEYOKA_DLL_PUBLIC eopp_impl : public func_base
 {
+    std::string m_eop_name;
     std::optional<eop_data> m_eop_data;
 
     friend class boost::serialization::access;
@@ -85,8 +88,8 @@ class HEYOKA_DLL_PUBLIC erap_impl : public func_base
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
-    erap_impl();
-    explicit erap_impl(expression, eop_data);
+    eopp_impl();
+    explicit eopp_impl(std::string, expression, eop_data);
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
@@ -105,6 +108,10 @@ public:
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                        const eop_data &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, const char *,
+                  llvm::Value *(*)(llvm_state &, const eop_data &, llvm::Type *));
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression era_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
@@ -151,7 +158,7 @@ inline constexpr auto erap = [](const auto &...kw_args) -> expression {
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::era_impl)
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::erap_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eop_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eopp_impl)
 
 #endif

@@ -324,8 +324,8 @@ TEST_CASE("era erap cfunc")
                             {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.era_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.erap_"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_era_"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_erap_"));
             }
 
             s.compile();
