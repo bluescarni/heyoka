@@ -356,7 +356,8 @@ TEST_CASE("era erap cfunc")
                         ++count;
                     }
                 }
-                REQUIRE(count == 4u);
+                // NOTE: check <= since inlining could remove function calls altogether.
+                REQUIRE(count <= 4u);
             }
 
             auto *cf_ptr
