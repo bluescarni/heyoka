@@ -494,11 +494,39 @@ struct eop_impl_funcs {
 };
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::unordered_map<std::string, eop_impl_funcs> eop_impl_funcs_map
-    = {{"era",
-        {.grad
-         = [](const expression &arg, const eop_data &data) { return erap(kw::time_expr = arg, kw::eop_data = data); },
-         .llvm_eval = &llvm_get_era_erap_func}}};
+const std::unordered_map<std::string, eop_impl_funcs> eop_impl_funcs_map = {
+    {"era",
+     {.grad
+      = [](const expression &arg, const eop_data &data) { return erap(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval = &llvm_get_era_erap_func}},
+    {"pm_x",
+     {.grad
+      = [](const expression &arg, const eop_data &data) { return pm_xp(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval =
+          [](llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data) {
+              return llvm_get_eop_func(s, fp_t, batch_size, data, "pm_x", &heyoka::detail::llvm_get_eop_data_pm_x);
+          }}},
+    {"pm_y",
+     {.grad
+      = [](const expression &arg, const eop_data &data) { return pm_yp(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval =
+          [](llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data) {
+              return llvm_get_eop_func(s, fp_t, batch_size, data, "pm_y", &heyoka::detail::llvm_get_eop_data_pm_y);
+          }}},
+    {"dX",
+     {.grad = [](const expression &arg, const eop_data &data) { return dXp(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval =
+          [](llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data) {
+              return llvm_get_eop_func(s, fp_t, batch_size, data, "dX", &heyoka::detail::llvm_get_eop_data_dX);
+          }}},
+    {"dY",
+     {.grad = [](const expression &arg, const eop_data &data) { return dYp(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval =
+          [](llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data) {
+              return llvm_get_eop_func(s, fp_t, batch_size, data, "dY", &heyoka::detail::llvm_get_eop_data_dY);
+          }}}
+
+};
 
 } // namespace
 
@@ -1148,6 +1176,46 @@ expression era_func_impl(expression time_expr, eop_data data)
 expression erap_func_impl(expression time_expr, eop_data data)
 {
     return expression{func{eopp_impl{"era", std::move(time_expr), std::move(data)}}};
+}
+
+expression pm_x_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"pm_x", std::move(time_expr), std::move(data)}}};
+}
+
+expression pm_xp_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"pm_x", std::move(time_expr), std::move(data)}}};
+}
+
+expression pm_y_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"pm_y", std::move(time_expr), std::move(data)}}};
+}
+
+expression pm_yp_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"pm_y", std::move(time_expr), std::move(data)}}};
+}
+
+expression dX_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"dX", std::move(time_expr), std::move(data)}}};
+}
+
+expression dXp_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"dX", std::move(time_expr), std::move(data)}}};
+}
+
+expression dY_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"dY", std::move(time_expr), std::move(data)}}};
+}
+
+expression dYp_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"dY", std::move(time_expr), std::move(data)}}};
 }
 
 } // namespace model::detail

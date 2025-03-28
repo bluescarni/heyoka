@@ -116,6 +116,18 @@ llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, c
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression era_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_x_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_xp_func_impl(expression, eop_data);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_y_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_yp_func_impl(expression, eop_data);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression dX_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression dXp_func_impl(expression, eop_data);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression dY_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression dYp_func_impl(expression, eop_data);
+
 template <typename... KwArgs>
 auto eop_common_opts(const KwArgs &...kw_args)
 {
@@ -152,6 +164,38 @@ inline constexpr auto era = [](const auto &...kw_args) -> expression {
 
 inline constexpr auto erap = [](const auto &...kw_args) -> expression {
     return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto pm_x = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::pm_x_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto pm_xp = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::pm_xp_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto pm_y = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::pm_y_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto pm_yp = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::pm_yp_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto dX = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::dX_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto dXp = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::dXp_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto dY = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::dY_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto dYp = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::dYp_func_impl, detail::eop_common_opts(kw_args...));
 };
 
 } // namespace model
