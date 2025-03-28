@@ -72,9 +72,17 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 41684);
         REQUIRE(data[0].delta_ut1_utc == .8075000);
+        REQUIRE(data[0].pm_x == .143000);
+        REQUIRE(data[0].pm_y == .137000);
+        REQUIRE(data[0].dX == -18.637);
+        REQUIRE(data[0].dY == -3.667);
 
         REQUIRE(data[1].mjd == 41685);
         REQUIRE(data[1].delta_ut1_utc == .8044000);
+        REQUIRE(data[1].pm_x == .141000);
+        REQUIRE(data[1].pm_y == .134000);
+        REQUIRE(data[1].dX == -18.636);
+        REQUIRE(data[1].dY == -3.571);
     }
 
     {
@@ -90,9 +98,17 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 60709);
         REQUIRE(data[0].delta_ut1_utc == 0.0461909);
+        REQUIRE(data[0].pm_x == 0.099700);
+        REQUIRE(data[0].pm_y == 0.309126);
+        REQUIRE(data[0].dX == 0.383);
+        REQUIRE(data[0].dY == -0.034);
 
         REQUIRE(data[1].mjd == 60710);
         REQUIRE(data[1].delta_ut1_utc == 0.0456841);
+        REQUIRE(data[1].pm_x == 0.097391);
+        REQUIRE(data[1].pm_y == 0.309488);
+        REQUIRE(data[1].dX == 0.391);
+        REQUIRE(data[1].dY == -0.022);
     }
 
     // NOTE: newline at the end.
@@ -107,6 +123,10 @@ TEST_CASE("parse_eop_data_iers_rapid test")
 
         REQUIRE(data[0].mjd == 60709);
         REQUIRE(data[0].delta_ut1_utc == 0.0461909);
+        REQUIRE(data[0].pm_x == 0.099700);
+        REQUIRE(data[0].pm_y == 0.309126);
+        REQUIRE(data[0].dX == 0.383);
+        REQUIRE(data[0].dY == -0.034);
     }
 
     // NOTE: missing both bulletin A and bulletin B data.
@@ -120,6 +140,19 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         const auto data = detail::parse_eop_data_iers_rapid(str);
 
         REQUIRE(data.empty());
+    }
+
+    // NOTE: this is a case in which on the second line there's no bulletin A/B data for dX/dY.
+    {
+        const std::string str
+            = "25 6 2 60828.00 P  0.122981 0.007056  0.425970 0.010837  P 0.0350338 0.0072179                 P    "
+              "-0.045    0.128     0.070    0.160                                                     \n"
+              "25 6 3 60829.00 P  0.124395 0.007110  0.426240 0.010942  P 0.0351650 0.0072970                          "
+              "                                                                                   ";
+
+        const auto data = detail::parse_eop_data_iers_rapid(str);
+
+        REQUIRE(data.size() == 1u);
     }
 
     // Parse errors.
@@ -225,7 +258,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin B string for the UT1-UTC "
-                    "difference '.80a5000' could not be parsed as a floating-point value"));
+                    "difference field '.80a5000' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -237,7 +270,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin B string for the UT1-UTC "
-                    "difference '.801500 ' could not be parsed as a floating-point value"));
+                    "difference field '.801500 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -249,7 +282,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.04a1909' could not be parsed as a floating-point value"));
+                    "difference field '0.04a1909' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -261,7 +294,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(
             detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
             Message("Error parsing a IERS rapid EOP data file: the bulletin A string for the UT1-UTC "
-                    "difference '0.041190 ' could not be parsed as a floating-point value"));
+                    "difference field '0.041190 ' could not be parsed as a floating-point value"));
     }
     {
         const std::string str
@@ -286,6 +319,42 @@ TEST_CASE("parse_eop_data_iers_rapid test")
             Message("Invalid EOP data table detected: the UT1-UTC value inf on line 1 is not finite"));
     }
 
+    // Invalid PM x/y values.
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300       inf   .137000   .8015000   -18.637    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the pm_x value inf on line 0 is not finite"));
+    }
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000       nan   .8015000   -18.637    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the pm_y value nan on line 0 is not finite"));
+    }
+
+    // Invalid dX/dY values.
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000       inf    -3.667  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the dX value inf on line 0 is not finite"));
+    }
+    {
+        const std::string str
+            = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000   -18.637       nan  \n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+                               Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
+    }
+
     // A check for wrong filename for the download function.
     REQUIRE_THROWS_MATCHES(
         eop_data::fetch_latest_iers_rapid("helloworld"), std::invalid_argument,
@@ -304,9 +373,9 @@ TEST_CASE("parse_eop_data_iers_long_term test")
             = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
               "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
               "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0.000000;;0."
-              "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01;02;;-0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;-2.000000;0.004774;4.000000;0.002000\n37666;1962;01;02;;-0."
               "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
-              "0014000;;;;;;0.000000;0.004774;0.000000;0.002000";
+              "0014000;;;;;;1.000000;0.004774;2.000000;0.002000";
 
         const auto data = detail::parse_eop_data_iers_long_term(str);
 
@@ -314,9 +383,17 @@ TEST_CASE("parse_eop_data_iers_long_term test")
 
         REQUIRE(data[0].mjd == 37665);
         REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+        REQUIRE(data[0].pm_x == -0.012700);
+        REQUIRE(data[0].pm_y == 0.213000);
+        REQUIRE(data[0].dX == -2);
+        REQUIRE(data[0].dY == 4);
 
         REQUIRE(data[1].mjd == 37666);
         REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+        REQUIRE(data[1].pm_x == -0.015900);
+        REQUIRE(data[1].pm_y == 0.214100);
+        REQUIRE(data[1].dX == 1);
+        REQUIRE(data[1].dY == 2);
     }
 
     // NOTE: newline at the end.
@@ -335,9 +412,17 @@ TEST_CASE("parse_eop_data_iers_long_term test")
 
         REQUIRE(data[0].mjd == 37665);
         REQUIRE(data[0].delta_ut1_utc == 0.0326338);
+        REQUIRE(data[0].pm_x == -0.012700);
+        REQUIRE(data[0].pm_y == 0.213000);
+        REQUIRE(data[0].dX == 0);
+        REQUIRE(data[0].dY == 0);
 
         REQUIRE(data[1].mjd == 37666);
         REQUIRE(data[1].delta_ut1_utc == 0.0320547);
+        REQUIRE(data[1].pm_x == -0.015900);
+        REQUIRE(data[1].pm_y == 0.214100);
+        REQUIRE(data[1].dX == 0);
+        REQUIRE(data[1].dY == 0);
     }
 
     // Invalid mjd.
@@ -382,7 +467,7 @@ TEST_CASE("parse_eop_data_iers_long_term test")
               "0326338;0.0020000;0.0017230;0.0014000;;;;;;0.000000;0.004774;0.000000;0.002000\n37666;1962;01\n";
 
         REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
-                               Message("Error parsing a IERS long term EOP data file: at least 15 fields "
+                               Message("Error parsing a IERS long term EOP data file: at least 26 fields "
                                        "were expected in a data row, but 3 were found instead"));
     }
 }
@@ -448,7 +533,7 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         // Check manually a few values. These values have been computed with astropy.
         REQUIRE(*fptr() == approximately(static_cast<T>(-0.2699657628640961)));
         REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+        REQUIRE(*(fptr() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
     };
 
     tester.operator()<float>();
@@ -486,11 +571,11 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         // Check manually a few values. These values have been computed with astropy.
         REQUIRE(*fptr1() == approximately(static_cast<T>(-0.2699657628640961)));
         REQUIRE(*(fptr1() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr1() + 19429) == approximately(static_cast<T>(0.26197127448982177)));
+        REQUIRE(*(fptr1() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
 
         REQUIRE(*fptr1() == *fptr2());
         REQUIRE(*(fptr1() + 6308) == *(fptr2() + 6308));
-        REQUIRE(*(fptr1() + 19429) == *(fptr2() + 19429));
+        REQUIRE(*(fptr1() + 19128) == *(fptr2() + 19128));
     };
 
     multi_tester.operator()<float>();
@@ -567,13 +652,97 @@ TEST_CASE("eop_data_era")
         }
 
         {
-            oct_t era{arr_ptr[19429][0]};
-            era += arr_ptr[19429][1];
-            REQUIRE(abs(reducer(era) - 2.989612722143122) < 1e-6);
+            oct_t era{arr_ptr[19128][0]};
+            era += arr_ptr[19128][1];
+            REQUIRE(abs(reducer(era) - 4.094937357962103) < 1e-6);
         }
     };
 
     // NOTE: test only double for the ERA.
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_pm_x_pm_y")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy functions that use the arrays, returning pointers to the first elements.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_pm_x(s, data, scal_t));
+
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_pm_y(s, data, scal_t));
+
+        // Compile and fetch the function pointers.
+        s.compile();
+        auto *fptr1 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+        auto *fptr2 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test2"));
+
+        // Fetch the array pointers.
+        const auto *arr_ptr1 = fptr1();
+        const auto *arr_ptr2 = fptr2();
+
+        // Just check the first values.
+        REQUIRE(arr_ptr1[0] == static_cast<T>(0.143 * boost::math::constants::pi<double>() / (180. * 3600)));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(0.137 * boost::math::constants::pi<double>() / (180. * 3600)));
+    };
+
+    tester.operator()<float>();
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_dX_dY")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy functions that use the arrays, returning pointers to the first elements.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_dX(s, data, scal_t));
+
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_dY(s, data, scal_t));
+
+        // Compile and fetch the function pointers.
+        s.compile();
+        auto *fptr1 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
+        auto *fptr2 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test2"));
+
+        // Fetch the array pointers.
+        const auto *arr_ptr1 = fptr1();
+        const auto *arr_ptr2 = fptr2();
+
+        // Just check the first values.
+        REQUIRE(arr_ptr1[0] == static_cast<T>(-18.637 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(-3.667 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
+    };
+
+    tester.operator()<float>();
     tester.operator()<double>();
 }
 

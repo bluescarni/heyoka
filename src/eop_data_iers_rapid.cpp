@@ -61,16 +61,23 @@ double parse_eop_data_iers_rapid_mjd(const std::ranges::contiguous_range auto &c
     return mjd;
 }
 
-// Helper to parse the UT1-UTC difference from a line in a IERS rapid EOP data file.
-std::optional<double> parse_eop_data_iers_rapid_delta_ut1_utc(const std::ranges::contiguous_range auto &cur_line)
+// Helper to parse a field from a line in a IERS rapid EOP data file.
+//
+// In the rapid datasets, there may be both bulletin A and bulletin B data available. We first try to parse
+// the B data as it is supposed to be more accurate, and we fall back to A data if B data is not available.
+// If neither A nor B data is available, we will return an empty optional.
+//
+// The beginA/B and sizeA/B indicate the [begin, begin + size) column range for the bulletin A/B data.
+std::optional<double> parse_eop_data_iers_rapid_field(const std::ranges::contiguous_range auto &cur_line,
+                                                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                      int beginB, int sizeB, int beginA, int sizeA, const char *name)
 {
     assert(std::ranges::size(cur_line) >= eop_data_iers_rapid_expected_line_length);
 
-    // We first try to fetch the UT1-UTC from the bulletin B data.
-    // This is the post-processed most accurate data, usually lagging
+    // We first try to fetch the bulletin B data. This is the post-processed most accurate data, usually lagging
     // behind the present time.
-    const auto *begin = std::ranges::data(cur_line) + 154;
-    const auto *end = begin + 11;
+    const auto *begin = std::ranges::data(cur_line) + beginB;
+    const auto *end = begin + sizeB;
 
     // Ignore leading whitespaces.
     for (; begin != end && *begin == ' '; ++begin) {
@@ -80,21 +87,21 @@ std::optional<double> parse_eop_data_iers_rapid_delta_ut1_utc(const std::ranges:
     // Try to parse, but only if the bulletin B data is not empty: if empty, it means
     // it is not available yet.
     if (begin != end) {
-        double delta_ut1_utc{};
-        const auto parse_res = boost::charconv::from_chars(begin, end, delta_ut1_utc);
+        double retval{};
+        const auto parse_res = boost::charconv::from_chars(begin, end, retval);
         if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
             throw std::invalid_argument(
-                fmt::format("Error parsing a IERS rapid EOP data file: the bulletin B string for the UT1-UTC "
-                            "difference '{}' could not be parsed as a floating-point value",
-                            bullB_sv));
+                fmt::format("Error parsing a IERS rapid EOP data file: the bulletin B string for the {} field '{}' "
+                            "could not be parsed as a floating-point value",
+                            name, bullB_sv));
         }
 
-        return delta_ut1_utc;
+        return retval;
     }
 
     // Try the bulletin A data.
-    begin = std::ranges::data(cur_line) + 58;
-    end = begin + 10;
+    begin = std::ranges::data(cur_line) + beginA;
+    end = begin + sizeA;
 
     // Ignore leading whitespaces.
     for (; begin != end && *begin == ' '; ++begin) {
@@ -106,16 +113,15 @@ std::optional<double> parse_eop_data_iers_rapid_delta_ut1_utc(const std::ranges:
     if (begin == end) {
         return {};
     }
-    double delta_ut1_utc{};
-    const auto parse_res = boost::charconv::from_chars(begin, end, delta_ut1_utc);
+    double retval{};
+    const auto parse_res = boost::charconv::from_chars(begin, end, retval);
     if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("Error parsing a IERS rapid EOP data file: the bulletin A string for the UT1-UTC "
-                        "difference '{}' could not be parsed as a floating-point value",
-                        bullA_sv));
+        throw std::invalid_argument(fmt::format("Error parsing a IERS rapid EOP data file: the bulletin A string for "
+                                                "the {} field '{}' could not be parsed as a floating-point value",
+                                                name, bullA_sv));
     }
 
-    return delta_ut1_utc;
+    return retval;
 }
 
 } // namespace
@@ -145,14 +151,39 @@ eop_data_table parse_eop_data_iers_rapid(const std::string &str)
         const auto mjd = parse_eop_data_iers_rapid_mjd(cur_line);
 
         // Parse the UT1-UTC difference.
-        const auto delta_ut1_utc = parse_eop_data_iers_rapid_delta_ut1_utc(cur_line);
+        const auto delta_ut1_utc = parse_eop_data_iers_rapid_field(cur_line, 154, 11, 58, 10, "UT1-UTC difference");
         if (!delta_ut1_utc) {
             // No data available on this line, break out.
             break;
         }
 
+        // Parse the PM x/y values.
+        const auto pm_x = parse_eop_data_iers_rapid_field(cur_line, 134, 10, 18, 9, "pm_x");
+        if (!pm_x) {
+            // No data available on this line, break out.
+            break;
+        }
+        const auto pm_y = parse_eop_data_iers_rapid_field(cur_line, 144, 10, 37, 9, "pm_y");
+        if (!pm_y) {
+            // No data available on this line, break out.
+            break;
+        }
+
+        // Parse the dX/dY values.
+        const auto dX = parse_eop_data_iers_rapid_field(cur_line, 165, 10, 97, 9, "dX");
+        if (!dX) {
+            // No data available on this line, break out.
+            break;
+        }
+        const auto dY = parse_eop_data_iers_rapid_field(cur_line, 175, 10, 116, 9, "dY");
+        if (!dY) {
+            // No data available on this line, break out.
+            break;
+        }
+
         // Add the line to retval.
-        retval.push_back({.mjd = mjd, .delta_ut1_utc = *delta_ut1_utc});
+        retval.push_back(
+            {.mjd = mjd, .delta_ut1_utc = *delta_ut1_utc, .pm_x = *pm_x, .pm_y = *pm_y, .dX = *dX, .dY = *dY});
     }
 
     // Validate the output.

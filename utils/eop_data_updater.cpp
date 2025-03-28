@@ -58,8 +58,9 @@ const char *const builtin_eop_data_ts = "{}";
 const eop_data_row builtin_eop_data[{}] = {{)",
                         idata.get_timestamp(), idata.get_table().size());
 
-    for (const auto &[mjd, cur_delta_ut1_utc] : idata.get_table()) {
-        ocpp << fmt::format("{{.mjd={}, .delta_ut1_utc={}}},\n", mjd, cur_delta_ut1_utc);
+    for (const auto &[mjd, cur_delta_ut1_utc, pm_x, pm_y, dX, dY] : idata.get_table()) {
+        ocpp << fmt::format("{{.mjd={}, .delta_ut1_utc={}, .pm_x={}, .pm_y={}, .dX={}, .dY={}}},\n", mjd,
+                            cur_delta_ut1_utc, pm_x, pm_y, dX, dY);
     }
 
     ocpp << R"(};

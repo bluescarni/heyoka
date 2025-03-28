@@ -73,10 +73,10 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         }
 
         // Init the EOP values.
-        double mjd{}, delta_ut1_utc{};
+        double mjd{}, delta_ut1_utc{}, pm_x{}, pm_y{}, dX{}, dY{};
 
         // This is the index of the last field we will be reading from.
-        constexpr auto last_field_idx = 14u;
+        constexpr auto last_field_idx = 25u;
 
         // Within an individual line, we split on the CSV separator ';'.
         auto field_range = cur_line | std::views::split(';');
@@ -84,12 +84,32 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         boost::safe_numerics::safe<unsigned> field_idx = 0;
         for (auto field_it = std::ranges::begin(field_range); field_it != std::ranges::end(field_range);
              ++field_it, ++field_idx) {
-            if (field_idx == 0u) {
-                // Parse the mjd.
-                mjd = parse_eop_data_iers_long_term_double(*field_it);
-            } else if (field_idx == 14u) {
-                // Parse the UT1-UTC value.
-                delta_ut1_utc = parse_eop_data_iers_long_term_double(*field_it);
+            switch (static_cast<unsigned>(field_idx)) {
+                case 0u:
+                    // Parse the mjd.
+                    mjd = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                case 5u:
+                    // Parse pm_x.
+                    pm_x = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                case 7u:
+                    // Parse pm_y.
+                    pm_y = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                case 14u:
+                    // Parse the UT1-UTC value.
+                    delta_ut1_utc = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                case 23u:
+                    // Parse the dX value.
+                    dX = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                case 25u:
+                    // Parse the dY value.
+                    dY = parse_eop_data_iers_long_term_double(*field_it);
+                    break;
+                default:;
             }
 
             // Break out if we parsed the last field.
@@ -108,7 +128,7 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         }
 
         // Add the line to retval.
-        retval.push_back({.mjd = mjd, .delta_ut1_utc = delta_ut1_utc});
+        retval.push_back({.mjd = mjd, .delta_ut1_utc = delta_ut1_utc, .pm_x = pm_x, .pm_y = pm_y, .dX = dX, .dY = dY});
     }
 
     // Validate the output.

@@ -25,11 +25,15 @@
 
 #include <fmt/core.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -40,6 +44,7 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/eop_data/builtin_eop_data.hpp>
 #include <heyoka/detail/erfa_decls.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -68,12 +73,20 @@ void eop_data_row::save(boost::archive::binary_oarchive &oa, unsigned) const
 {
     oa << mjd;
     oa << delta_ut1_utc;
+    oa << pm_x;
+    oa << pm_y;
+    oa << dX;
+    oa << dY;
 }
 
 void eop_data_row::load(boost::archive::binary_iarchive &ia, unsigned)
 {
     ia >> mjd;
     ia >> delta_ut1_utc;
+    ia >> pm_x;
+    ia >> pm_y;
+    ia >> dX;
+    ia >> dY;
 }
 
 namespace detail
@@ -109,6 +122,30 @@ void validate_eop_data_table(const eop_data_table &data)
             throw std::invalid_argument(
                 fmt::format("Invalid EOP data table detected: the UT1-UTC value {} on line {} is not finite",
                             cur_delta_ut1_utc, i));
+        }
+
+        // PM values must be finite.
+        const auto pm_x = data[i].pm_x;
+        if (!std::isfinite(pm_x)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the pm_x value {} on line {} is not finite", pm_x, i));
+        }
+        const auto pm_y = data[i].pm_y;
+        if (!std::isfinite(pm_y)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the pm_y value {} on line {} is not finite", pm_y, i));
+        }
+
+        // dX/dY values must be finite.
+        const auto dX = data[i].dX;
+        if (!std::isfinite(dX)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the dX value {} on line {} is not finite", dX, i));
+        }
+        const auto dY = data[i].dY;
+        if (!std::isfinite(dY)) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid EOP data table detected: the dY value {} on line {} is not finite", dY, i));
         }
     }
 }
@@ -399,6 +436,27 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
     return llvm_get_eop_data(s, data, value_t, "era", value_getter);
 }
 
+// Getters for the polar motion and dX/dY data.
+// NOTE: these are all similar, use a macro (yuck) to avoid repetition.
+// NOTE: like with the ERA, perform the computations in double-precision.
+#define HEYOKA_LLVM_GET_EOP_DATA_IMPL(name, conv_factor)                                                               \
+    llvm::Value *llvm_get_eop_data_##name(llvm_state &s, const eop_data &data, llvm::Type *scal_t)                     \
+    {                                                                                                                  \
+        return llvm_get_eop_data(s, data, scal_t, #name, [&s, scal_t](const eop_data_row &r) {                         \
+            /* Fetch the value and convert. */                                                                         \
+            const auto val = r.name * (conv_factor);                                                                   \
+            return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{val}));                                   \
+        });                                                                                                            \
+    }
+
+// NOTE: PM data is in arcsec, dX/dY data in milliarcsec.
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_x, boost::math::constants::pi<double>() / (180. * 3600));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(pm_y, boost::math::constants::pi<double>() / (180. * 3600));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dX, boost::math::constants::pi<double>() / (180. * 3600 * 1000));
+HEYOKA_LLVM_GET_EOP_DATA_IMPL(dY, boost::math::constants::pi<double>() / (180. * 3600 * 1000));
+
+#undef HEYOKA_LLVM_GET_EOP_DATA_IMPL
+
 // Implementation of the std::upper_bound() algorithm for use in llvm_eop_data_locate_date().
 //
 // Given an array of sorted scalar values beginning at ptr and of size arr_size (a 32-bit int), this function
@@ -628,10 +686,69 @@ llvm::Value *llvm_eop_data_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Va
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_size, llvm::Value *date_value)
 {
+    assert(ptr != nullptr);
+    assert(ptr->getType()->isPointerTy());
+
     auto &bld = s.builder();
+    auto &md = s.module();
+    auto &ctx = s.context();
+
+    assert(arr_size != nullptr);
+    assert(arr_size->getType() == bld.getInt32Ty());
+
+    // NOTE: we want to define a function to perform the computation in order to help LLVM elide redundant computations.
+    // For instance, if we are computing both era/erap and pm_x/pm_xp for the *same* input date,
+    // we would like LLVM to locate that date only once for the two calls.
+
+    // Create the mangled name of the function. The mangled name will be based on the type of date_value,
+    // which encodes both the value type of the array and the batch size.
+    auto *val_t = date_value->getType();
+    const auto fname = fmt::format("heyoka.eop_data_locate_date.{}", llvm_mangle_type(val_t));
+
+    // Check if we already created the function.
+    if (auto *fptr = md.getFunction(fname)) {
+        // The function was created already. Call it and return the result.
+        return bld.CreateCall(fptr, {ptr, arr_size, date_value});
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // Determine the batch size from date_value.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+        assert(batch_size != 0u);
+    }
+
+    // Determine the return type: either a single 32-bit int or a vector thereof.
+    auto *ret_t = make_vector_type(bld.getInt32Ty(), batch_size);
+
+    // Build the function prototype.
+    auto *ft = llvm::FunctionType::get(ret_t, {bld.getPtrTy(), bld.getInt32Ty(), val_t}, false);
+
+    // Create the function
+    auto *f = llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    f->addFnAttr(llvm::Attribute::NoRecurse);
+    f->addFnAttr(llvm::Attribute::NoUnwind);
+    f->addFnAttr(llvm::Attribute::Speculatable);
+    f->addFnAttr(llvm::Attribute::WillReturn);
+
+    // Fetch the arguments.
+    auto *ptr_arg = f->getArg(0);
+    auto *arr_size_arg = f->getArg(1);
+    auto *date_value_arg = f->getArg(2);
+
+    // The pointer argument is read-only.
+    ptr_arg->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // As a first step, we look for the first date in the array which is *greater than* date_value.
-    auto *idx = llvm_eop_data_upper_bound(s, ptr, arr_size, date_value);
+    auto *idx = llvm_eop_data_upper_bound(s, ptr_arg, arr_size_arg, date_value_arg);
 
     // The happy path requires the computation of idx - 1. The exceptions are:
     //
@@ -640,15 +757,8 @@ llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Va
     //
     // In these two cases, we want to return arr_size, rather than idx - 1.
 
-    // Determine the batch size from date_value.
-    std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(date_value->getType())) {
-        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-        assert(batch_size != 0u);
-    }
-
     // Splat the array size.
-    auto *arr_size_splat = vector_splat(bld, arr_size, batch_size);
+    auto *arr_size_splat = vector_splat(bld, arr_size_arg, batch_size);
 
     // First step: ret = (idx == 0) ? arr_size : idx.
     auto *idx_is_zero = bld.CreateICmpEQ(idx, llvm::ConstantInt::get(idx->getType(), 0));
@@ -658,7 +768,14 @@ llvm::Value *llvm_eop_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm::Va
     auto *ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
     ret = bld.CreateSelect(ret_eq_arr_size, ret, bld.CreateSub(ret, llvm::ConstantInt::get(ret->getType(), 1)));
 
-    return ret;
+    // Create the return value.
+    bld.CreateRet(ret);
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    // Invoke the function and return the result.
+    return bld.CreateCall(f, {ptr, arr_size, date_value});
 }
 
 } // namespace detail

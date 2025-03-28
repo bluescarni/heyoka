@@ -12,7 +12,7 @@
 #include <heyoka/model/cart2geo.hpp>
 #include <heyoka/model/cr3bp.hpp>
 #include <heyoka/model/elp2000.hpp>
-#include <heyoka/model/era.hpp>
+#include <heyoka/model/eop.hpp>
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/frame_transformations.hpp>
