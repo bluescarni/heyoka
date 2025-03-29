@@ -517,3 +517,113 @@ TEST_CASE("eop cfunc")
         tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
     }
 }
+
+TEST_CASE("taylor scalar")
+{
+    using model::dX;
+    using model::dXp;
+    using model::dY;
+    using model::dYp;
+    using model::pm_x;
+    using model::pm_xp;
+    using model::pm_y;
+    using model::pm_yp;
+
+    auto x = "x"_var, y = "y"_var;
+
+    // NOTE: use as base time coordinate 6 hours after J2000.0.
+    const auto tm_coord = 0.25 / 36525;
+
+    const auto dyn = {prime(x) = pm_x(kw::time_expr = 2. * y) + pm_xp(kw::time_expr = 3. * y) * y
+                                 + pm_y(kw::time_expr = number{tm_coord}) + pm_yp(kw::time_expr = -3. * y),
+                      prime(y) = dX(kw::time_expr = 4. * x) + dXp(kw::time_expr = par[0]) * x
+                                 + dY(kw::time_expr = -4. * x) + dYp(kw::time_expr = -5. * x)};
+
+    auto scalar_tester = [&dyn, tm_coord, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        // Convert tm_coord to fp_t.
+        const auto tm = static_cast<fp_t>(tm_coord);
+
+        // Create compiled function wrappers for the evaluation of eop/eopp.
+        auto dX_wrapper = [cf = cfunc<fp_t>{{dX(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto dXp_wrapper = [cf = cfunc<fp_t>{{dXp(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto dY_wrapper = [cf = cfunc<fp_t>{{dY(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto dYp_wrapper = [cf = cfunc<fp_t>{{dYp(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto pm_x_wrapper = [cf = cfunc<fp_t>{{pm_x(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto pm_xp_wrapper = [cf = cfunc<fp_t>{{pm_xp(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto pm_y_wrapper = [cf = cfunc<fp_t>{{pm_y(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+        auto pm_yp_wrapper = [cf = cfunc<fp_t>{{pm_yp(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+
+        const std::vector<fp_t> pars = {tm};
+
+        auto ta = taylor_adaptive<fp_t>{
+            dyn, {tm, -tm}, kw::tol = .1, kw::compact_mode = compact_mode, kw::opt_level = opt_level, kw::pars = pars};
+
+        ta.step(true);
+
+        const auto jet = tc_to_jet(ta);
+
+        REQUIRE(jet[0] == tm);
+        REQUIRE(jet[1] == -tm);
+
+        REQUIRE(jet[2]
+                == approximately(pm_x_wrapper(2 * jet[1]) + pm_xp_wrapper(3 * jet[1]) * jet[1] + pm_y_wrapper(tm)
+                                 + pm_yp_wrapper(-3 * jet[1])));
+        REQUIRE(jet[3]
+                == approximately(dX_wrapper(4 * jet[0]) + dXp_wrapper(pars[0]) * jet[0] + dY_wrapper(-4 * jet[0])
+                                 + dYp_wrapper(-5 * jet[0])));
+
+        REQUIRE(jet[4]
+                == approximately((pm_xp_wrapper(2 * jet[1]) * 2 * jet[3] + pm_xp_wrapper(3 * jet[1]) * jet[3]) / 2));
+        REQUIRE(jet[5]
+                == approximately((dXp_wrapper(4 * jet[0]) * 4 * jet[2] + dXp_wrapper(pars[0]) * jet[2]
+                                  + dYp_wrapper(-4 * jet[0]) * -4 * jet[2])
+                                 / 2));
+
+        REQUIRE(jet[6]
+                == approximately((pm_xp_wrapper(2 * jet[1]) * 2 * 2 * jet[5] + pm_xp_wrapper(3 * jet[1]) * 2 * jet[5])
+                                 / 6));
+        REQUIRE(jet[7]
+                == approximately((dXp_wrapper(4 * jet[0]) * 4 * 2 * jet[4] + dXp_wrapper(pars[0]) * 2 * jet[4]
+                                  + dYp_wrapper(-4 * jet[0]) * 2 * -4 * jet[4])
+                                 / 6));
+    };
+
+    for (auto cm : {false, true}) {
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 0, cm); });
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
+    }
+}
