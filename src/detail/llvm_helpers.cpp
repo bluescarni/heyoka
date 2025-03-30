@@ -1642,6 +1642,7 @@ std::string llvm_type_name(llvm::Type *t)
 }
 
 // Create an LLVM if statement in the form:
+//
 // if (cond) {
 //   then_f();
 // } else {

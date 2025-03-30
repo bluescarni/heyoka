@@ -18,6 +18,7 @@
 #include <sstream>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -29,6 +30,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
 #if defined(HEYOKA_HAVE_REAL)
 
@@ -39,10 +41,11 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/model/era.hpp>
+#include <heyoka/model/eop.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -68,6 +71,9 @@ TEST_CASE("basics")
 {
     REQUIRE(model::era() == model::era(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
     REQUIRE(model::erap() == model::erap(kw::time_expr = heyoka::time, kw::eop_data = eop_data{}));
+
+    REQUIRE(std::get<func>(model::era().value()).get_name().starts_with("eop_era_"));
+    REQUIRE(std::get<func>(model::erap().value()).get_name().starts_with("eop_erap_"));
 
     auto x = make_vars("x");
 
@@ -323,8 +329,8 @@ TEST_CASE("era erap cfunc")
                             {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.era_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.erap_"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_era_"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_erap_"));
             }
 
             s.compile();
@@ -350,7 +356,8 @@ TEST_CASE("era erap cfunc")
                         ++count;
                     }
                 }
-                REQUIRE(count == 4u);
+                // NOTE: check <= since inlining could remove function calls altogether.
+                REQUIRE(count <= 4u);
             }
 
             auto *cf_ptr
@@ -462,6 +469,47 @@ TEST_CASE("taylor scalar era_erap")
         auto ta = taylor_adaptive<fp_t>{
             dyn, {tm, -tm}, kw::tol = .1, kw::compact_mode = compact_mode, kw::opt_level = opt_level, kw::pars = pars};
 
+        // NOTE: we want to check here that the era/erap calculation is performed no more than 5 times.
+        if (opt_level == 3u) {
+            const auto get_era_erap_call_regex = std::regex(R"(.*call.*heyoka\.get_era_erap\..*)");
+            auto count = 0u;
+
+            if (compact_mode) {
+                for (const auto &ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+                    for (const auto line : ir | std::ranges::views::split('\n')) {
+                        // NOTE: libstdc++ bug on large strings:
+                        // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
+                        if (std::ranges::size(line) > 200u) {
+                            continue;
+                        }
+
+                        std::cmatch matches;
+                        if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                             matches, get_era_erap_call_regex)) {
+                            ++count;
+                        }
+                    }
+                }
+            } else {
+                const auto ir = std::get<0>(ta.get_llvm_state()).get_ir();
+                for (const auto line : ir | std::ranges::views::split('\n')) {
+                    // NOTE: libstdc++ bug on large strings:
+                    // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
+                    if (std::ranges::size(line) > 200u) {
+                        continue;
+                    }
+
+                    std::cmatch matches;
+                    if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                         matches, get_era_erap_call_regex)) {
+                        ++count;
+                    }
+                }
+            }
+
+            REQUIRE(count <= 5u);
+        }
+
         ta.step(true);
 
         const auto jet = tc_to_jet(ta);
@@ -531,6 +579,47 @@ TEST_CASE("taylor batch era_erap")
                                               kw::compact_mode = compact_mode,
                                               kw::opt_level = opt_level,
                                               kw::pars = pars};
+
+        // NOTE: we want to check here that the era/erap calculation is performed no more than 5 times.
+        if (opt_level == 3u) {
+            const auto get_era_erap_call_regex = std::regex(R"(.*call.*heyoka\.get_era_erap\..*)");
+            auto count = 0u;
+
+            if (compact_mode) {
+                for (const auto &ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+                    for (const auto line : ir | std::ranges::views::split('\n')) {
+                        // NOTE: libstdc++ bug on large strings:
+                        // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
+                        if (std::ranges::size(line) > 200u) {
+                            continue;
+                        }
+
+                        std::cmatch matches;
+                        if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                             matches, get_era_erap_call_regex)) {
+                            ++count;
+                        }
+                    }
+                }
+            } else {
+                const auto ir = std::get<0>(ta.get_llvm_state()).get_ir();
+                for (const auto line : ir | std::ranges::views::split('\n')) {
+                    // NOTE: libstdc++ bug on large strings:
+                    // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
+                    if (std::ranges::size(line) > 200u) {
+                        continue;
+                    }
+
+                    std::cmatch matches;
+                    if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                         matches, get_era_erap_call_regex)) {
+                        ++count;
+                    }
+                }
+            }
+
+            REQUIRE(count <= 5u);
+        }
 
         ta.step(true);
 

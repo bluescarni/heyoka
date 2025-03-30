@@ -11,9 +11,10 @@ New
   (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
 - Introduce class to represent, manage and update EOP data
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
-- New models: time conversions, frame transformations, Earth
-  rotation angle
-  (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+- New models: time conversions, frame transformations, Earth orientation
+  parameters (including ERA, polar motion, etc.)
+  (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__,
+  `#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 
 Changes
 ~~~~~~~
