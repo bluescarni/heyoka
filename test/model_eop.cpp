@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -25,6 +27,12 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
@@ -517,6 +525,51 @@ TEST_CASE("eop cfunc")
         tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// NOTE: the point of the multiprecision test is just to check we used the correct
+// llvm primitives in the implementation.
+TEST_CASE("eop eopp cfunc_mp")
+{
+    auto x = make_vars("x");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc",
+                                  {model::pm_x(kw::time_expr = x), model::pm_x(kw::time_expr = par[0]),
+                                   model::dX(kw::time_expr = expression{0.}), model::dYp()},
+                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{0, prec}};
+            const std::vector pars{mppp::real{0, prec}};
+            const std::vector tm{mppp::real{0, prec}};
+            std::vector<mppp::real> outs(4u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+
+            auto i = 0u;
+            REQUIRE(!isnan(outs[i]));
+            REQUIRE(!isnan(outs[i + 1u]));
+            REQUIRE(!isnan(outs[i + 2u]));
+            REQUIRE(!isnan(outs[i + 3u]));
+
+            REQUIRE(outs[i] == outs[i + 1u]);
+        }
+    }
+}
+
+#endif
 
 TEST_CASE("taylor scalar")
 {
