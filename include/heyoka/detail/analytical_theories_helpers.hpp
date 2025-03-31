@@ -19,8 +19,8 @@
 #include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/expression.hpp>
 
-// NOTE: this header contains complex arithmetic utilities useful
-// in the implementation of analytical theories.
+// NOTE: this header contains utilities for the implementation of analytical theories
+// of celestial mechanics.
 
 HEYOKA_BEGIN_NAMESPACE
 
