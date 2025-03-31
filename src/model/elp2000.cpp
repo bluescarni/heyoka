@@ -9,10 +9,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
-#include <cstdint>
-#include <functional>
 #include <iterator>
-#include <limits>
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
@@ -22,6 +19,7 @@
 #include <oneapi/tbb/parallel_invoke.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/analytical_theories_helpers.hpp>
 #include <heyoka/detail/elp2000/elp2000_10_15.hpp>
 #include <heyoka/detail/elp2000/elp2000_16_21.hpp>
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
@@ -87,122 +85,6 @@ constexpr std::array N = {5.3118862867834666, 3.8133035637584562};
 // the planetary perturbations.
 constexpr std::array T = {1.753470343150658, 628.30758496215537};
 
-// Create the expression for the evaluation of the polynomial with coefficients
-// stored in dense form in cfs according to Horner's scheme.
-template <typename T, std::size_t N>
-expression horner_eval(const std::array<T, N> &cfs, const expression &x)
-{
-    static_assert(N > 0u);
-
-    auto ret = expression(cfs[N - 1u]);
-
-    for (std::size_t i = 1; i < N; ++i) {
-        ret = cfs[N - i - 1u] + ret * x;
-    }
-
-    return ret;
-} // LCOV_EXCL_LINE
-
-// Complex multiplication.
-std::array<expression, 2> ex_cmul(const std::array<expression, 2> &c1, const std::array<expression, 2> &c2)
-{
-    const auto &[a, b] = c1;
-    const auto &[c, d] = c2;
-
-    return {a * c - b * d, b * c + a * d};
-}
-
-// Complex inversion.
-std::array<expression, 2> ex_cinv(const std::array<expression, 2> &c)
-{
-    const auto &[a, b] = c;
-
-    const auto den = pow(a, 2_dbl) + pow(b, 2_dbl);
-
-    return {a / den, -b / den};
-}
-
-// Dictionary to map an integral exponent to the corresponding integral power of a complex expression.
-using pow_dict_t = heyoka::detail::fast_umap<std::int8_t, std::array<expression, 2>>;
-
-// Dictionary to map an expression "ex" to a a dictionary of integral powers of
-// cos(ex) + im * sin(ex).
-using trig_eval_dict_t = heyoka::detail::fast_umap<expression, pow_dict_t, std::hash<expression>>;
-
-// NOLINTNEXTLINE(misc-no-recursion)
-std::array<expression, 2> ccpow_impl(pow_dict_t &pd, const std::array<expression, 2> &pow1,
-                                     const std::array<expression, 2> &powm1, std::int8_t n)
-{
-    auto it = pd.find(n);
-
-    if (it != pd.end()) {
-        return it->second;
-    }
-
-    std::array<expression, 2> ret;
-    if (n >= 0) {
-        ret = ex_cmul(pow1, ccpow_impl(pd, pow1, powm1, static_cast<std::int8_t>(n - 1)));
-    } else {
-        ret = ex_cmul(powm1, ccpow_impl(pd, pow1, powm1, static_cast<std::int8_t>(n + 1)));
-    }
-
-    [[maybe_unused]] auto [_, flag] = pd.try_emplace(n, ret);
-    assert(flag);
-
-    return ret;
-}
-
-// Implementation of complex integral exponentiation of cos(ex) + im * sin(ex)
-// supported by a cache.
-std::array<expression, 2> ccpow(const expression &ex, trig_eval_dict_t &td, std::int8_t n)
-{
-    auto it = td.find(ex);
-    assert(it != td.end());
-
-    auto &pd = it->second;
-
-    assert(pd.contains(1));
-    assert(pd.contains(-1));
-
-    const auto pow1 = pd[1];
-    const auto powm1 = pd[-1];
-
-    return ccpow_impl(pd, pow1, powm1, n);
-}
-
-// Pairwise complex product.
-std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &terms)
-{
-    if (terms.empty()) {
-        return {1_dbl, 0_dbl};
-    }
-
-    // LCOV_EXCL_START
-    if (terms.size() == std::numeric_limits<decltype(terms.size())>::max()) {
-        throw std::overflow_error("Overflow detected in pairwise_cmul()");
-    }
-    // LCOV_EXCL_STOP
-
-    while (terms.size() != 1u) {
-        std::vector<std::array<expression, 2>> new_terms;
-
-        for (decltype(terms.size()) i = 0; i < terms.size(); i += 2u) {
-            if (i + 1u == terms.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing value.
-                new_terms.push_back(terms[i]);
-            } else {
-                new_terms.push_back(ex_cmul(terms[i], terms[i + 1u]));
-            }
-        }
-
-        new_terms.swap(terms);
-    }
-
-    return terms[0];
-}
-
 } // namespace
 
 // NOTE: don't check for coverage here as in order to hit all branches
@@ -214,13 +96,18 @@ std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &
 // NOLINTNEXTLINE(readability-function-size,hicpp-function-size,google-readability-function-size)
 std::vector<expression> elp2000_spherical_impl(const expression &tm, double thresh)
 {
+    using heyoka::detail::ccpow;
+    using heyoka::detail::ex_cinv;
+    using heyoka::detail::horner_eval;
+    using heyoka::detail::pairwise_cmul;
+    using heyoka::detail::trig_eval_dict_t;
+    using heyoka::detail::uncvref_t;
+
     if (!std::isfinite(thresh) || thresh < 0.) {
         throw std::invalid_argument(fmt::format("Invalid threshold value passed to elp2000_spherical(): "
                                                 "the value must be finite and non-negative, but it is {} instead",
                                                 thresh));
     }
-
-    using heyoka::detail::uncvref_t;
 
     // Evaluate the arguments.
     const auto W1_eval = horner_eval(W1, tm);
@@ -1426,6 +1313,8 @@ constexpr std::array LQ = {0., -0.113469002e-3, 0.12372674e-6, 0.12654170e-8, -0
 // Cartesian coordinates, inertial mean ecliptic and equinox of J2000.
 std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, double thresh)
 {
+    namespace hd = heyoka::detail;
+
     const auto cart = elp2000_cartesian_impl(tm, thresh);
 
     const auto &x = cart[0];
@@ -1433,8 +1322,8 @@ std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, doubl
     const auto &z = cart[2];
 
     // Evaluate Laskar's series.
-    const auto P = horner_eval(LP, tm);
-    const auto Q = horner_eval(LQ, tm);
+    const auto P = hd::horner_eval(LP, tm);
+    const auto Q = hd::horner_eval(LQ, tm);
 
     const auto P2 = pow(P, 2_dbl);
     const auto Q2 = pow(Q, 2_dbl);
