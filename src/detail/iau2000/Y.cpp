@@ -901,6 +901,7 @@ const double iau2000_Y_args_cfs_data_4[2ul] = {
 
 } // namespace
 
+// NOLINTBEGIN(cert-err58-cpp)
 const mdspan<const std::int8_t, extents<std::size_t, 962, 14>> iau2000_Y_args_idxs_0(iau2000_Y_args_idxs_data_0);
 const mdspan<const double, extents<std::size_t, 962, 2>> iau2000_Y_cfs_0(iau2000_Y_args_cfs_data_0);
 
@@ -915,6 +916,7 @@ const mdspan<const double, extents<std::size_t, 5, 2>> iau2000_Y_cfs_3(iau2000_Y
 
 const mdspan<const std::int8_t, extents<std::size_t, 1, 14>> iau2000_Y_args_idxs_4(iau2000_Y_args_idxs_data_4);
 const mdspan<const double, extents<std::size_t, 1, 2>> iau2000_Y_cfs_4(iau2000_Y_args_cfs_data_4);
+// NOLINTEND(cert-err58-cpp)
 
 } // namespace model::detail
 
