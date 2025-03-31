@@ -271,6 +271,10 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
+    # IAU2000 details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/X.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/Y.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/s.cpp"
     # EOP data details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_data/builtin_eop_data.cpp"
     # Models.
