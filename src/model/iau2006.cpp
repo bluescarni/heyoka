@@ -19,9 +19,9 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/analytical_theories_helpers.hpp>
-#include <heyoka/detail/iau2000/X.hpp>
-#include <heyoka/detail/iau2000/Y.hpp>
-#include <heyoka/detail/iau2000/s.hpp>
+#include <heyoka/detail/iau2006/X.hpp>
+#include <heyoka/detail/iau2006/Y.hpp>
+#include <heyoka/detail/iau2006/s.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -80,7 +80,7 @@ constexpr std::array poly_s = {94.0, 3808.65, -122.68, -72574.11, 27.98, 15.62};
 
 } // namespace
 
-std::vector<expression> iau2000_impl(const expression &tm, double thresh)
+std::vector<expression> iau2006_impl(const expression &tm, double thresh)
 {
     using heyoka::detail::ccpow;
     using heyoka::detail::ex_cinv;
@@ -89,7 +89,7 @@ std::vector<expression> iau2000_impl(const expression &tm, double thresh)
     using heyoka::detail::trig_eval_dict_t;
 
     if (!std::isfinite(thresh) || thresh < 0.) {
-        throw std::invalid_argument(fmt::format("Invalid threshold value passed to iau2000(): the value must be finite "
+        throw std::invalid_argument(fmt::format("Invalid threshold value passed to iau2006(): the value must be finite "
                                                 "and non-negative, but it is {} instead",
                                                 thresh));
     }
@@ -143,9 +143,9 @@ std::vector<expression> iau2000_impl(const expression &tm, double thresh)
     // Temporary accumulation list for complex products.
     std::vector<std::array<expression, 2>> tmp_cprod;
 
-    // Helper to construct a trigonometric series from the coefficients and indices of the iau2000 solution.
+    // Helper to construct a trigonometric series from the coefficients and indices of the iau2006 solution.
     //
-    // The iau2000 solution for X, Y and s is built from trigonometric series in which terms have the form
+    // The iau2006 solution for X, Y and s is built from trigonometric series in which terms have the form
     //
     // C_s * sin(arg) + C_c * cos(arg),
     //
@@ -202,27 +202,27 @@ std::vector<expression> iau2000_impl(const expression &tm, double thresh)
 
     // Build the Poisson series for X.
     std::vector<expression> X_terms_0, X_terms_1, X_terms_2, X_terms_3, X_terms_4;
-    trig_builder(X_terms_0, iau2000_X_cfs_0, iau2000_X_args_idxs_0);
-    trig_builder(X_terms_1, iau2000_X_cfs_1, iau2000_X_args_idxs_1);
-    trig_builder(X_terms_2, iau2000_X_cfs_2, iau2000_X_args_idxs_2);
-    trig_builder(X_terms_3, iau2000_X_cfs_3, iau2000_X_args_idxs_3);
-    trig_builder(X_terms_4, iau2000_X_cfs_4, iau2000_X_args_idxs_4);
+    trig_builder(X_terms_0, iau2006_X_cfs_0, iau2006_X_args_idxs_0);
+    trig_builder(X_terms_1, iau2006_X_cfs_1, iau2006_X_args_idxs_1);
+    trig_builder(X_terms_2, iau2006_X_cfs_2, iau2006_X_args_idxs_2);
+    trig_builder(X_terms_3, iau2006_X_cfs_3, iau2006_X_args_idxs_3);
+    trig_builder(X_terms_4, iau2006_X_cfs_4, iau2006_X_args_idxs_4);
 
     // Build the Poisson series for Y.
     std::vector<expression> Y_terms_0, Y_terms_1, Y_terms_2, Y_terms_3, Y_terms_4;
-    trig_builder(Y_terms_0, iau2000_Y_cfs_0, iau2000_Y_args_idxs_0);
-    trig_builder(Y_terms_1, iau2000_Y_cfs_1, iau2000_Y_args_idxs_1);
-    trig_builder(Y_terms_2, iau2000_Y_cfs_2, iau2000_Y_args_idxs_2);
-    trig_builder(Y_terms_3, iau2000_Y_cfs_3, iau2000_Y_args_idxs_3);
-    trig_builder(Y_terms_4, iau2000_Y_cfs_4, iau2000_Y_args_idxs_4);
+    trig_builder(Y_terms_0, iau2006_Y_cfs_0, iau2006_Y_args_idxs_0);
+    trig_builder(Y_terms_1, iau2006_Y_cfs_1, iau2006_Y_args_idxs_1);
+    trig_builder(Y_terms_2, iau2006_Y_cfs_2, iau2006_Y_args_idxs_2);
+    trig_builder(Y_terms_3, iau2006_Y_cfs_3, iau2006_Y_args_idxs_3);
+    trig_builder(Y_terms_4, iau2006_Y_cfs_4, iau2006_Y_args_idxs_4);
 
     // Build the Poisson series for s.
     std::vector<expression> s_terms_0, s_terms_1, s_terms_2, s_terms_3, s_terms_4;
-    trig_builder(s_terms_0, iau2000_s_cfs_0, iau2000_s_args_idxs_0);
-    trig_builder(s_terms_1, iau2000_s_cfs_1, iau2000_s_args_idxs_1);
-    trig_builder(s_terms_2, iau2000_s_cfs_2, iau2000_s_args_idxs_2);
-    trig_builder(s_terms_3, iau2000_s_cfs_3, iau2000_s_args_idxs_3);
-    trig_builder(s_terms_4, iau2000_s_cfs_4, iau2000_s_args_idxs_4);
+    trig_builder(s_terms_0, iau2006_s_cfs_0, iau2006_s_args_idxs_0);
+    trig_builder(s_terms_1, iau2006_s_cfs_1, iau2006_s_args_idxs_1);
+    trig_builder(s_terms_2, iau2006_s_cfs_2, iau2006_s_args_idxs_2);
+    trig_builder(s_terms_3, iau2006_s_cfs_3, iau2006_s_args_idxs_3);
+    trig_builder(s_terms_4, iau2006_s_cfs_4, iau2006_s_args_idxs_4);
 
     // Sum the Poisson series, multiply them by powers of the time and sum again.
     const auto X_trig

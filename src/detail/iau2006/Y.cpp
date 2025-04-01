@@ -10,7 +10,7 @@
 #include <cstdint>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/iau2000/Y.hpp>
+#include <heyoka/detail/iau2006/Y.hpp>
 #include <heyoka/mdspan.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -21,7 +21,7 @@ namespace model::detail
 namespace
 {
 
-const std::int8_t iau2000_Y_args_idxs_data_0[13468ul] = {
+const std::int8_t iau2006_Y_args_idxs_data_0[13468ul] = {
     0, 0,  0,  0,  1,  0,  0,   0,   0,   0,  0,  0,  0, 0,  0, 0,  2,  -2, 2,  0, 0,   0,   0,   0,  0,  0, 0, 0,
     0, 0,  2,  0,  2,  0,  0,   0,   0,   0,  0,  0,  0, 0,  0, 0,  0,  0,  2,  0, 0,   0,   0,   0,  0,  0, 0, 0,
     0, 1,  2,  -2, 2,  0,  0,   0,   0,   0,  0,  0,  0, 0,  0, 0,  2,  0,  1,  0, 0,   0,   0,   0,  0,  0, 0, 0,
@@ -505,7 +505,7 @@ const std::int8_t iau2000_Y_args_idxs_data_0[13468ul] = {
     2, 0,  -2, -2, -2, 0,  0,   -2,  0,   2,  0,  0,  0, 0,  1, 2,  2,  -4, 1,  0, 0,   0,   0,   0,  0,  0, 0, 0,
 };
 
-const double iau2000_Y_args_cfs_data_0[1924ul] = {
+const double iau2006_Y_args_cfs_data_0[1924ul] = {
     1538.18, 9205236.26, -458.66, 573033.42, 137.41,  97846.69, -29.05, -89618.24, -17.40, 22438.42, 31.80,  20069.50,
     36.70,   12902.66,   -13.20,  -9592.72,  -192.40, 7387.02,  3.92,   -6918.22,  0.40,   -5331.13, -0.90,  -3323.89,
     7.50,    3143.98,    7.80,    2636.13,   -6.60,   2554.51,  -2.00,  -2423.59,  6.80,   1645.01,  0.00,   -1387.00,
@@ -669,7 +669,7 @@ const double iau2000_Y_args_cfs_data_0[1924ul] = {
     0.00,    0.10,       0.00,    0.10,
 };
 
-const std::int8_t iau2000_Y_args_idxs_data_1[3878ul] = {
+const std::int8_t iau2006_Y_args_idxs_data_1[3878ul] = {
     0, 0,  0,  0,  1,  0, 0,   0,   0,  0,  0,  0, 0, 0,  0, 0,  2,  -2, 2,  0, 0,   0,   0,   0,  0,  0, 0, 0,
     0, 0,  2,  0,  2,  0, 0,   0,   0,  0,  0,  0, 0, 0,  0, 0,  0,  0,  2,  0, 0,   0,   0,   0,  0,  0, 0, 0,
     0, 1,  0,  0,  0,  0, 0,   0,   0,  0,  0,  0, 0, 0,  1, 0,  0,  0,  0,  0, 0,   0,   0,   0,  0,  0, 0, 0,
@@ -811,7 +811,7 @@ const std::int8_t iau2000_Y_args_idxs_data_1[3878ul] = {
     0, 0,  0,  0,  0,  0, 1,   -3,  0,  0,  0,  0, 0, -2,
 };
 
-const double iau2000_Y_args_cfs_data_1[554ul] = {
+const double iau2006_Y_args_cfs_data_1[554ul] = {
     153041.79, 853.32, 11714.49, -290.91, 2024.68, -51.26, -1837.32, 48.00,  -1312.21, -28.93,  -632.54, 0.78,   459.68,
     -67.30,    344.50, 1.41,     268.14,  -7.06,   192.06, 29.83,    139.64, 0.15,     -113.94, -1.04,   109.81, 3.20,
     -56.37,    0.13,   -56.17,   -0.01,   -53.05,  -1.24,  -51.60,   0.16,   45.91,    -0.12,   -42.45,  0.02,   40.82,
@@ -857,7 +857,7 @@ const double iau2000_Y_args_cfs_data_1[554ul] = {
     -0.10,     0.00,   0.10,     0.00,    -0.10,   0.00,   0.10,     0.00,
 };
 
-const std::int8_t iau2000_Y_args_idxs_data_2[420ul] = {
+const std::int8_t iau2006_Y_args_idxs_data_2[420ul] = {
     0,  0, 0,  0, 1,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 2, -2, 2,  0,  0,  0,  0,  0,  0,  0, 0,  0,  0, 0,
     2,  0, 2,  0, 0,  0,  0, 0, 0,  0,  0,  0,  0,  0, 0,  0, 2, 0,  0,  0,  0,  0,  0,  0,  0,  0, 0,  1,  2, -2,
     2,  0, 0,  0, 0,  0,  0, 0, 0,  0,  0,  1,  0,  0, 0,  0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0, 2,  0,  1, 0,
@@ -874,27 +874,27 @@ const std::int8_t iau2000_Y_args_idxs_data_2[420ul] = {
     0,  0, 0,  0, 1,  -1, 1, 0, 0,  -1, 0,  -2, 5,  0, 0,  0, 0, 1,  2,  0,  2,  0,  0,  0,  0,  0, 0,  0,  0, 0,
 };
 
-const double iau2000_Y_args_cfs_data_2[60ul] = {
+const double iau2006_Y_args_cfs_data_2[60ul] = {
     120.56, -2301.27, -1.03, -143.27, -0.28, -24.46, 0.24,  22.41, -1.19, -5.61, 3.57,  -1.83, 0.24,  -5.02, -0.04,
     -3.23,  -0.48,    2.40,  -0.10,   1.73,  -0.02,  1.33,  -0.04, 0.83,  -0.05, -0.79, 0.03,  -0.66, 0.00,  -0.64,
     0.04,   0.61,     -0.01, -0.41,   -0.01, 0.35,   -0.01, -0.33, 0.01,  0.31,  0.01,  0.27,  -0.07, -0.17, 0.07,
     0.17,   0.02,     -0.21, 0.01,    0.20,  0.01,   -0.17, 0.01,  -0.16, 0.00,  -0.13, -0.07, -0.04, 0.02,  0.08,
 };
 
-const std::int8_t iau2000_Y_args_idxs_data_3[70ul] = {
+const std::int8_t iau2006_Y_args_idxs_data_3[70ul] = {
     0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, -2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-const double iau2000_Y_args_cfs_data_3[10ul] = {
+const double iau2006_Y_args_cfs_data_3[10ul] = {
     -15.22, -1.61, -1.16, -0.01, -0.20, 0.00, 0.18, 0.00, 0.13, 0.00,
 };
 
-const std::int8_t iau2000_Y_args_idxs_data_4[14ul] = {
+const std::int8_t iau2006_Y_args_idxs_data_4[14ul] = {
     0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-const double iau2000_Y_args_cfs_data_4[2ul] = {
+const double iau2006_Y_args_cfs_data_4[2ul] = {
     -0.02,
     0.11,
 };
@@ -902,20 +902,20 @@ const double iau2000_Y_args_cfs_data_4[2ul] = {
 } // namespace
 
 // NOLINTBEGIN(cert-err58-cpp)
-const mdspan<const std::int8_t, extents<std::size_t, 962, 14>> iau2000_Y_args_idxs_0(iau2000_Y_args_idxs_data_0);
-const mdspan<const double, extents<std::size_t, 962, 2>> iau2000_Y_cfs_0(iau2000_Y_args_cfs_data_0);
+const mdspan<const std::int8_t, extents<std::size_t, 962, 14>> iau2006_Y_args_idxs_0(iau2006_Y_args_idxs_data_0);
+const mdspan<const double, extents<std::size_t, 962, 2>> iau2006_Y_cfs_0(iau2006_Y_args_cfs_data_0);
 
-const mdspan<const std::int8_t, extents<std::size_t, 277, 14>> iau2000_Y_args_idxs_1(iau2000_Y_args_idxs_data_1);
-const mdspan<const double, extents<std::size_t, 277, 2>> iau2000_Y_cfs_1(iau2000_Y_args_cfs_data_1);
+const mdspan<const std::int8_t, extents<std::size_t, 277, 14>> iau2006_Y_args_idxs_1(iau2006_Y_args_idxs_data_1);
+const mdspan<const double, extents<std::size_t, 277, 2>> iau2006_Y_cfs_1(iau2006_Y_args_cfs_data_1);
 
-const mdspan<const std::int8_t, extents<std::size_t, 30, 14>> iau2000_Y_args_idxs_2(iau2000_Y_args_idxs_data_2);
-const mdspan<const double, extents<std::size_t, 30, 2>> iau2000_Y_cfs_2(iau2000_Y_args_cfs_data_2);
+const mdspan<const std::int8_t, extents<std::size_t, 30, 14>> iau2006_Y_args_idxs_2(iau2006_Y_args_idxs_data_2);
+const mdspan<const double, extents<std::size_t, 30, 2>> iau2006_Y_cfs_2(iau2006_Y_args_cfs_data_2);
 
-const mdspan<const std::int8_t, extents<std::size_t, 5, 14>> iau2000_Y_args_idxs_3(iau2000_Y_args_idxs_data_3);
-const mdspan<const double, extents<std::size_t, 5, 2>> iau2000_Y_cfs_3(iau2000_Y_args_cfs_data_3);
+const mdspan<const std::int8_t, extents<std::size_t, 5, 14>> iau2006_Y_args_idxs_3(iau2006_Y_args_idxs_data_3);
+const mdspan<const double, extents<std::size_t, 5, 2>> iau2006_Y_cfs_3(iau2006_Y_args_cfs_data_3);
 
-const mdspan<const std::int8_t, extents<std::size_t, 1, 14>> iau2000_Y_args_idxs_4(iau2000_Y_args_idxs_data_4);
-const mdspan<const double, extents<std::size_t, 1, 2>> iau2000_Y_cfs_4(iau2000_Y_args_cfs_data_4);
+const mdspan<const std::int8_t, extents<std::size_t, 1, 14>> iau2006_Y_args_idxs_4(iau2006_Y_args_idxs_data_4);
+const mdspan<const double, extents<std::size_t, 1, 2>> iau2006_Y_cfs_4(iau2006_Y_args_cfs_data_4);
 // NOLINTEND(cert-err58-cpp)
 
 } // namespace model::detail

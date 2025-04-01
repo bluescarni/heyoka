@@ -272,10 +272,10 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
-    # IAU2000 details.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/X.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/Y.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2000/s.cpp"
+    # IAU2006 details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/X.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/Y.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/s.cpp"
     # EOP data details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_data/builtin_eop_data.cpp"
     # Models.
@@ -295,7 +295,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eop.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2000.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2006.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
