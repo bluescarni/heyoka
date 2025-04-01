@@ -16,8 +16,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/kw.hpp>
-#include <heyoka/math/time.hpp>
 #include <heyoka/model/vsop2013.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
