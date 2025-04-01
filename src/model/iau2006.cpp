@@ -26,6 +26,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/model/iau2006.hpp>
 
 // NOTE: this is an implementation of the IAU-2006/2000 analytical precession/nutation
 // theory. The formulation is explained in detail in Vallado, 3.7.1, and in chapter 5 of the
