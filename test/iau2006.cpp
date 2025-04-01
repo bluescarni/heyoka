@@ -68,3 +68,35 @@ TEST_CASE("basic")
         REQUIRE(std::abs((output[2] - s) / s) <= 1e-10);
     }
 }
+
+// A test for the threshold.
+TEST_CASE("thresh")
+{
+    using Catch::Matchers::Message;
+
+    heyoka::detail::edb_disabler ed;
+
+    const auto sol = iau2006();
+    cfunc<double> cf(sol, {}, kw::compact_mode = true);
+
+    // Evaluate at several time coordinates around J2000 and validate against erfa.
+    std::vector<double> input, output = {0., 0., 0.};
+    std::uniform_real_distribution<double> dist(-50 * 365.25, 50 * 365.25);
+    for (auto i = 0; i < ntrials; ++i) {
+        // Generate a random number of days since J2000.
+        const auto delta_days = dist(rng);
+
+        // heyoka.
+        cf(output, input, kw::time = delta_days / 36525);
+
+        // erfa.
+        double x{}, y{};
+        eraXy06(2451545.0, delta_days, &x, &y);
+        const auto s = eraS06(2451545.0, delta_days, x, y);
+
+        // Compare.
+        REQUIRE(std::abs((output[0] - x) / x) <= 1e-8);
+        REQUIRE(std::abs((output[1] - y) / y) <= 1e-8);
+        REQUIRE(std::abs((output[2] - s) / s) <= 1e-8);
+    }
+}
