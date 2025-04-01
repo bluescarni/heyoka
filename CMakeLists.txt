@@ -295,6 +295,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eop.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2000.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
