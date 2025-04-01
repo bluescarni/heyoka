@@ -32,6 +32,15 @@
 // (where the values of the c0 and c1 constants change from interval to interval). In the expression system, we
 // implement, for each EOP quantity, two unary functions which return respectively the EOP quantity and its first-order
 // derivative at the given input time.
+//
+// NOTE: the linear interpolation approach should be adequate for astrodynamical applications. In principle, however,
+// for both the polar motion and the UT1-UTC difference, there are short-term (diurnal and semi-diurnal) variations
+// due to ocean tides and high-frequency nutation terms that should be accounted for. For this purpose, IERS provides
+// a routine (interp.f) that accounts for these short-term variations while at the same time interpolating at higher
+// orders. In principle, we could think in the future about implementing this code in the expression system. For more
+// information see:
+//
+// https://hpiers.obspm.fr/iers/bul/bulb/explanatory.html
 
 HEYOKA_BEGIN_NAMESPACE
 
