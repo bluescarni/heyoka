@@ -166,13 +166,13 @@ std::vector<expression> iau2006_impl(const expression &tm, double thresh)
     // In this function, out is the vector that will contain all the terms of the trigonometric series. cfs is the
     // dataset of sin/cos coefficients. idxs is the dataset of integral indices.
     const auto trig_builder
-        = [&tmp_cprod, uas2rad, thresh, &args, &trig_eval](auto &out, const auto &cfs, const auto &idxs) {
+        = [&tmp_cprod, arcsec2rad, thresh, &args, &trig_eval](auto &out, const auto &cfs, const auto &idxs) {
               assert(out.empty());
 
               for (std::size_t i = 0; i < cfs.extent(0); ++i) {
-                  // Fetch the sin/cos coefficients.
-                  auto sin_cf = cfs(i, 0);
-                  auto cos_cf = cfs(i, 1);
+                  // Fetch the sin/cos coefficients and convert them to arcseconds.
+                  auto sin_cf = cfs(i, 0) / 1e6;
+                  auto cos_cf = cfs(i, 1) / 1e6;
 
                   // Check if the term is too small.
                   if (std::sqrt((sin_cf * sin_cf) + (cos_cf * cos_cf)) < thresh) {
@@ -180,8 +180,8 @@ std::vector<expression> iau2006_impl(const expression &tm, double thresh)
                   }
 
                   // Convert the coefficients to rad.
-                  sin_cf *= uas2rad;
-                  cos_cf *= uas2rad;
+                  sin_cf *= arcsec2rad;
+                  cos_cf *= arcsec2rad;
 
                   // Compute the complex powers of the arguments.
                   tmp_cprod.clear();

@@ -76,7 +76,7 @@ TEST_CASE("thresh")
 
     heyoka::detail::edb_disabler ed;
 
-    const auto sol = iau2006();
+    const auto sol = iau2006(kw::thresh = 1e-5);
     cfunc<double> cf(sol, {}, kw::compact_mode = true);
 
     // Evaluate at several time coordinates around J2000 and validate against erfa.
@@ -95,8 +95,8 @@ TEST_CASE("thresh")
         const auto s = eraS06(2451545.0, delta_days, x, y);
 
         // Compare.
-        REQUIRE(std::abs((output[0] - x) / x) <= 1e-8);
-        REQUIRE(std::abs((output[1] - y) / y) <= 1e-8);
-        REQUIRE(std::abs((output[2] - s) / s) <= 1e-8);
+        REQUIRE(std::abs(output[0] - x) <= 1e-9);
+        REQUIRE(std::abs(output[1] - y) <= 1e-9);
+        REQUIRE(std::abs(output[2] - s) <= 1e-9);
     }
 }
