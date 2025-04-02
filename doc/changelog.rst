@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add an implementation of the IAU2000/2006 precession/nutation theory
+  (`#479 <https://github.com/bluescarni/heyoka/pull/479>`__).
 - Add support for LLVM 20
   (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
 - Introduce class to represent, manage and update EOP data

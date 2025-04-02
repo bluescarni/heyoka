@@ -186,3 +186,7 @@ if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(taylor_kepF_mp)
   ADD_HEYOKA_TESTCASE(taylor_relu_mp)
 endif()
+
+ADD_HEYOKA_TESTCASE(iau2006)
+# NOTE: we use the erfa routines to validate our implementation.
+target_link_libraries(iau2006 PRIVATE heyoka_erfa)
