@@ -27,12 +27,15 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC std::vector<expression> iau2006_impl(const expression &, double);
 
+// Default truncation threshold for the IAU2006 theory.
+inline constexpr double iau2006_default_thresh = 1e-6;
+
 } // namespace detail
 
 template <typename... KwArgs>
 std::vector<expression> iau2006(const KwArgs &...kw_args)
 {
-    return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
+    return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(detail::iau2006_default_thresh, kw_args...));
 }
 
 } // namespace model
