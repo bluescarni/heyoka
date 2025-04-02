@@ -154,7 +154,7 @@ auto eop_common_opts(const KwArgs &...kw_args)
     }();
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() {
+    auto data = [&p]() -> eop_data {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {
