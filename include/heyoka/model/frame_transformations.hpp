@@ -76,8 +76,9 @@ auto itrs_icrs_common_opts(const KwArgs &...kw_args)
 
 inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const KwArgs &...kw_args) {
-    return std::apply(detail::rot_itrs_icrs_impl, detail::itrs_icrs_common_opts(kw_args...));
+(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    return std::apply(detail::rot_itrs_icrs_impl,
+                      std::tuple_cat(std::make_tuple(xyz), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
 } // namespace model

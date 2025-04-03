@@ -212,7 +212,7 @@ std::array<expression, 3> rot_itrs_icrs_impl(const std::array<expression, 3> &xy
     const auto xyz_cirs = rot_tirs_cirs(xyz_tirs, time_expr, data);
 
     // Step 3: precession-nutation.
-    return rot_cirs_icrs(xyz_tirs, time_expr, thresh, data);
+    return rot_cirs_icrs(xyz_cirs, time_expr, thresh, data);
 }
 
 } // namespace detail
