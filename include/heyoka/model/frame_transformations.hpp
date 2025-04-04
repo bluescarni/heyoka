@@ -22,6 +22,18 @@
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/iau2006.hpp>
 
+// NOTE: for the future, we may be interested in implementing more frame rotations. The TEME,
+// for instance, can be implemented as a rotation of the PEF, which itself is a couple of rotations
+// away from the ITRF and very close to the TIRS (see the diagram on the Vallado book).
+//
+// We need however a way to progressively construct complex rotations by stacking together elementary
+// rotations, similarly to what AstroPy and GODOT do, because otherwise we have a combinatorial
+// explosion of possibilities. The general idea would be to implement step-by-step rotations (e.g.,
+// by re-using the intermediate frame rotations we already have in the detail namespace) and then either allow
+// the user to define a sequence of rotations manually, or perhaps even introduce a class to represent
+// a "graph of rotations", which would allow to, e.g., select the "quickest" way (i.e., lowest number
+// of elementary rotations) to go from one frame to another. Not clear yet on how this is to be implemented...
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace model

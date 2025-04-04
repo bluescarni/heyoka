@@ -1751,7 +1751,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
-    // NOTE: parallel compilation before LLVM 20 seems quite buggy, hence we disable it.
+    // NOTE: parallel compilation before LLVM 20 is buggy, hence we disable it unconditionally.
 #if LLVM_VERSION_MAJOR >= 20
 
     if (m_parjit) {
