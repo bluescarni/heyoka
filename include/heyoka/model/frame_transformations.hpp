@@ -36,6 +36,9 @@ namespace detail
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3>
 rot_itrs_icrs_impl(const std::array<expression, 3> &, const expression &, double, const eop_data &);
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3>
+rot_icrs_itrs_impl(const std::array<expression, 3> &, const expression &, double, const eop_data &);
+
 // Common options for the itrs/icrs rotations.
 template <typename... KwArgs>
 auto itrs_icrs_common_opts(const KwArgs &...kw_args)
@@ -78,6 +81,13 @@ inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
 (const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
     return std::apply(detail::rot_itrs_icrs_impl,
+                      std::tuple_cat(std::make_tuple(xyz), detail::itrs_icrs_common_opts(kw_args...)));
+};
+
+inline constexpr auto rot_icrs_itrs = []<typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    return std::apply(detail::rot_icrs_itrs_impl,
                       std::tuple_cat(std::make_tuple(xyz), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
