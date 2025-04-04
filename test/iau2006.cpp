@@ -45,7 +45,7 @@ TEST_CASE("basic")
 
     // Create a compiled function containing the full solution.
     const auto sol = iau2006(kw::thresh = 0.);
-    cfunc<double> cf(sol, {}, kw::compact_mode = true);
+    cfunc<double> cf({sol[0], sol[1], sol[2]}, {}, kw::compact_mode = true);
 
     // Evaluate at several time coordinates around J2000 and validate against erfa.
     std::vector<double> input, output = {0., 0., 0.};
@@ -77,7 +77,7 @@ TEST_CASE("thresh")
     heyoka::detail::edb_disabler ed;
 
     const auto sol = iau2006(kw::thresh = 1e-5);
-    cfunc<double> cf(sol, {}, kw::compact_mode = true);
+    cfunc<double> cf({sol[0], sol[1], sol[2]}, {}, kw::compact_mode = true);
 
     // Evaluate at several time coordinates around J2000 and validate against erfa.
     std::vector<double> input, output = {0., 0., 0.};

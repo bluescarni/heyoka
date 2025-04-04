@@ -139,9 +139,6 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
 
 } // namespace detail
 
-// NOTE: we do not currently test this as the data file is a bit large.
-// LCOV_EXCL_START
-
 eop_data eop_data::fetch_latest_iers_long_term()
 {
     // Download the file.
@@ -160,7 +157,5 @@ eop_data eop_data::fetch_latest_iers_long_term()
     // Parse, validate and return.
     return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier));
 }
-
-// LCOV_EXCL_STOP
 
 HEYOKA_END_NAMESPACE

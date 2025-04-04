@@ -9,8 +9,8 @@
 #ifndef HEYOKA_MODEL_IAU2006_HPP
 #define HEYOKA_MODEL_IAU2006_HPP
 
+#include <array>
 #include <tuple>
-#include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -25,14 +25,17 @@ namespace model
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC std::vector<expression> iau2006_impl(const expression &, double);
+HEYOKA_DLL_PUBLIC std::array<expression, 3> iau2006_impl(const expression &, double);
+
+// Default truncation threshold for the IAU2006 theory.
+inline constexpr double iau2006_default_thresh = 1e-6;
 
 } // namespace detail
 
 template <typename... KwArgs>
-std::vector<expression> iau2006(const KwArgs &...kw_args)
+std::array<expression, 3> iau2006(const KwArgs &...kw_args)
 {
-    return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
+    return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(detail::iau2006_default_thresh, kw_args...));
 }
 
 } // namespace model
