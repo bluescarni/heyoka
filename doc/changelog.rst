@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Parallel JIT compilation is now enabled on LLVM>=20
+  (`#481 <https://github.com/bluescarni/heyoka/pull/481>`__).
 - Add an implementation of the IAU2000/2006 precession/nutation theory
   (`#479 <https://github.com/bluescarni/heyoka/pull/479>`__).
 - Add support for LLVM 20
