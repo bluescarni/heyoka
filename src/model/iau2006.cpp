@@ -81,7 +81,7 @@ constexpr std::array poly_s = {94.0, 3808.65, -122.68, -72574.11, 27.98, 15.62};
 
 } // namespace
 
-std::vector<expression> iau2006_impl(const expression &tm, double thresh)
+std::array<expression, 3> iau2006_impl(const expression &tm, double thresh)
 {
     using heyoka::detail::ccpow;
     using heyoka::detail::ex_cinv;

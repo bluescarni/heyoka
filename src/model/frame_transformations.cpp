@@ -152,10 +152,7 @@ std::array<expression, 3> rot_tirs_cirs(const std::array<expression, 3> &xyz, co
 auto build_cirs_icrs_pn(const expression &time_expr, double thresh, const eop_data &data)
 {
     // Construct the IAU2006 theory.
-    const auto pn_res = iau2006(kw::time_expr = time_expr, kw::thresh = thresh);
-    const auto &X_pn = pn_res[0];
-    const auto &Y_pn = pn_res[1];
-    const auto &s_pn = pn_res[2];
+    const auto [X_pn, Y_pn, s_pn] = iau2006(kw::time_expr = time_expr, kw::thresh = thresh);
 
     // Correct X, Y and s with the eop data.
     const auto DX = dX(kw::time_expr = time_expr, kw::eop_data = data);
