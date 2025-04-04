@@ -15,7 +15,8 @@ New
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 - New models: time conversions, frame transformations, Earth orientation
   parameters (including ERA, polar motion, etc.)
-  (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__,
+  (`#480 <https://github.com/bluescarni/heyoka/pull/480>`__,
+  `#477 <https://github.com/bluescarni/heyoka/pull/477>`__,
   `#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 
 Changes
