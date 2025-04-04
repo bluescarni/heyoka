@@ -276,6 +276,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/X.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/Y.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/iau2006/s.cpp"
+    # EGM2008 details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/egm2008.cpp"
     # EOP data details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_data/builtin_eop_data.cpp"
     # Models.
