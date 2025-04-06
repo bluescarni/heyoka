@@ -13,6 +13,7 @@
 #include <tuple>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/model/vsop2013.hpp>
@@ -32,11 +33,11 @@ inline constexpr double iau2006_default_thresh = 1e-6;
 
 } // namespace detail
 
-template <typename... KwArgs>
-std::array<expression, 3> iau2006(const KwArgs &...kw_args)
-{
+inline constexpr auto iau2006 = []<typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+(const KwArgs &...kw_args) {
     return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(detail::iau2006_default_thresh, kw_args...));
-}
+};
 
 } // namespace model
 
