@@ -9,12 +9,16 @@
 #ifndef HEYOKA_DETAIL_EGM2008_HPP
 #define HEYOKA_DETAIL_EGM2008_HPP
 
+#include <cstdint>
+
 #include <heyoka/config.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace model::detail
 {
+
+inline constexpr std::uint32_t egm2008_max_degree = 80;
 
 extern const double egm2008_CS[3318][2];
 
