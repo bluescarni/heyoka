@@ -80,9 +80,13 @@ auto egm2008_kdelta(std::uint32_t n, std::uint32_t m)
 // geopotential up to V_nn and W_nn. The terms are generated via the recursive algorithm
 // explained in Montenbruck, 3.2.4, with one important deviation: since the EGM2008 model
 // provides the *normalised* C/S coefficients, we have to adapt the recursive algorithm
-// to produced the normalised counterparts of the V/W terms. See the notebook in the tools/
+// to produce the normalised counterparts of the V/W terms. See the notebook in the tools/
 // directory for a derivation (but it is just a matter of adapting certain numerical factors
 // in the recursion).
+//
+// NOTE: apart from the renormalisation bits, there is nothing in this algorithm which
+// is specific to the EGM2008 model. That is, this should be usable with small modifications
+// in the implementation of other geopotential models.
 auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const expression &ya_r2,
                           const expression &za_r2, const expression &a2_r2)
 {
@@ -97,8 +101,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
         for (std::uint32_t n = m + 1u; n <= max_n; ++n) {
             // Compute the quantities for the first part of the recursion formula.
             assert(n >= 1u);
-            assert(rec_map.contains({n - 1u, m}));
-            const auto &[V_nm1_m, W_nm1_m] = rec_map.find({n - 1u, m})->second;
+            const auto &[V_nm1_m, W_nm1_m] = rec_map.at({n - 1u, m});
             const auto F1 = std::sqrt(((2. * n) + 1) * ((2. * n) - 1)
                                       / ((static_cast<double>(n) - m) * (static_cast<double>(n) + m)));
 
@@ -112,8 +115,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
             if (n != m + 1u) {
                 // Compute the quantities for the second part of the recursion formula.
                 assert(n >= 2u);
-                assert(rec_map.contains({n - 2u, m}));
-                const auto &[V_nm2_m, W_nm2_m] = rec_map.find({n - 2u, m})->second;
+                const auto &[V_nm2_m, W_nm2_m] = rec_map.at({n - 2u, m});
                 const auto F2
                     = std::sqrt(((2. * n) + 1) * (static_cast<double>(n) - m - 1) * (static_cast<double>(n) + m - 1)
                                 / ((static_cast<double>(n) - m) * (static_cast<double>(n) + m) * (2. * n - 3)));
@@ -129,8 +131,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
         }
 
         // Seed the starting terms for the next iteration of m. These are V_(m+1,m+1)/W_(m+1,m+1).
-        assert(rec_map.contains({m, m}));
-        const auto &[V_mm, W_mm] = rec_map.find({m, m})->second;
+        const auto &[V_mm, W_mm] = rec_map.at({m, m});
         const auto mp1 = m + 1u;
         const auto F
             = std::sqrt((2. - egm2008_kdelta(0, mp1)) * (2. * mp1 + 1) / (2. * mp1 * (2. - egm2008_kdelta(0, m))));
@@ -149,7 +150,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
             assert(rec_map.contains({n, m}));
 
             if (m == 0u) {
-                assert(rec_map.find({n, m})->second[1] == 0_dbl);
+                assert(rec_map.at({n, m})[1] == 0_dbl);
             }
 
             ++n_found;
@@ -191,9 +192,8 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
         // j in the [0, i] range here. However, we allow to stop the iteration
         // at a order m < i, hence the iteration range here is [0, min(m, i)].
         for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
-            assert(rec_map.contains({i, j}));
             const auto [C, S] = get_egm2008_sc(i, j);
-            const auto &[V, W] = rec_map.find({i, j})->second;
+            const auto &[V, W] = rec_map.at({i, j});
 
             terms.push_back(C * V + S * W);
         }
