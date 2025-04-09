@@ -10,6 +10,7 @@
 #define HEYOKA_MODEL_FRAME_TRANSFORMATIONS_HPP
 
 #include <array>
+#include <functional>
 #include <tuple>
 #include <utility>
 
@@ -93,14 +94,14 @@ inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
 (const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
     return std::apply(detail::rot_itrs_icrs_impl,
-                      std::tuple_cat(std::make_tuple(xyz), detail::itrs_icrs_common_opts(kw_args...)));
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
 inline constexpr auto rot_icrs_itrs = []<typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
 (const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
     return std::apply(detail::rot_icrs_itrs_impl,
-                      std::tuple_cat(std::make_tuple(xyz), detail::itrs_icrs_common_opts(kw_args...)));
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
 } // namespace model

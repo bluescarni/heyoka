@@ -6,6 +6,7 @@ coverage:
   - "src/detail/elp2000/.*"
   - "src/detail/eop_data/.*"
   - "src/detail/iau2006/.*"
+  - "src/detail/egm2008.cpp"
   - "include/heyoka/detail/tanuki*"
   - "include/heyoka/detail/mdspan*"
   - "src/detail/erfa/.*"
