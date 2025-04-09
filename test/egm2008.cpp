@@ -1218,6 +1218,8 @@ constexpr double test_accelerations[500][3]
        {3.4576619024588456e-01, -2.7083978549820529e+00, 3.8936298732516660e-02},
        {1.2509940704857794e+00, 3.5386134910931779e+00, 5.1336921169810601e-01}};
 
+// NOTE: for the acceleration test, we compare to accelerations computed via pyshtools
+// up to degree/order 30.
 TEST_CASE("acceleration")
 {
     using std::cos;

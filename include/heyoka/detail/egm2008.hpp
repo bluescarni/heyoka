@@ -18,9 +18,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model::detail
 {
 
-inline constexpr std::uint32_t egm2008_max_degree = 80;
+inline constexpr std::uint32_t egm2008_max_degree = 150;
 
-extern const double egm2008_CS[3318][2];
+extern const double egm2008_CS[11473][2];
 
 } // namespace model::detail
 
