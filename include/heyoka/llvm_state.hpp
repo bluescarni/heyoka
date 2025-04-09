@@ -341,7 +341,7 @@ namespace detail
 struct llvm_mc_value {
     std::vector<std::string> opt_bc, opt_ir, obj;
 
-    std::size_t total_size() const;
+    [[nodiscard]] std::size_t total_size() const;
 };
 
 // Cache lookup and insertion.
@@ -350,17 +350,9 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc
 
 // The default setting for the parjit flag for llvm_multi_state.
 //
-// At this time, it seems like parallel compilation in lljit is buggy:
-//
-// - on Unix platforms, parallel compilation occasionally results in
-//   multiply-defined symbols for external C functions, which leads to
-//   compilation failures;
-// - on Windows, it seems like parallel compilation outright results in
-//   segmentation faults under heavy load.
-//
-// The root of the problem seems to be a concurrency issue. Thus, for the time
-// being, let us just disable parallel compilation by default.
-inline constexpr bool default_parjit = false;
+// NOTE: we set this unconditionally to true, even if parallel jit compilation
+// is hard-disabled before llvm 20.
+inline constexpr bool default_parjit = true;
 
 } // namespace detail
 
