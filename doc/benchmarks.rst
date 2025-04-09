@@ -216,7 +216,7 @@ We can see how in this test heyoka is about 20 times faster than ``Feagin14``.
 
 We can move to even higher precisions with the help of
 `arbitrary-precision arithmetic <https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic>`__.
-heyoka uses the `MPFR library <https://www.mpfr.org/>`__ for multiprecision floating-point
+heyoka uses the `MPFR library <https://en.wikipedia.org/wiki/GNU_MPFR>`__ for multiprecision floating-point
 computations under the hood. DifferentialEquations.jl can also use MPFR (via the
 `BigFloat <https://docs.julialang.org/en/v1/manual/integers-and-floating-point-numbers/#Arbitrary-Precision-Arithmetic>`__
 type) or, alternatively the `Arb <https://arblib.org/>`__ library (via the
