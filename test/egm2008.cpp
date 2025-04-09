@@ -50,6 +50,17 @@ TEST_CASE("error handling")
                         model::detail::egm2008_max_degree, model::detail::egm2008_max_degree - 1u)));
 }
 
+// A test to check that custom mu/a are correctly forwarded.
+TEST_CASE("custom params")
+{
+    const auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::mu = "mu"_var));
+    REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::a = "a"_var));
+    REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::mu = 1.2_dbl));
+    REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::a = 1.1_dbl));
+}
+
 TEST_CASE("potential")
 {
     using std::cos;
