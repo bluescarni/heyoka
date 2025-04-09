@@ -76,6 +76,13 @@ inline constexpr auto egm2008_pot = []<typename... KwArgs>
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
 };
 
+inline constexpr auto egm2008_acc = []<typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, const KwArgs &...kw_args) {
+    return std::apply(detail::egm2008_acc_impl,
+                      std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
+};
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE

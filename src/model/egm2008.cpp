@@ -39,9 +39,16 @@ namespace
 // degree and order.
 std::array<double, 2> get_egm2008_sc(std::uint32_t n, std::uint32_t m)
 {
-    // NOTE: the coefficients in the dataset begin from n=2.
-    assert(n >= 2u);
     assert(m <= n);
+
+    // NOTE: the coefficients in the dataset begin from n=2.
+    if (n == 0u) {
+        return {1, 0};
+    }
+
+    if (n == 1u) {
+        return {0, 0};
+    }
 
     const auto start_n_idx = ((n * (n + 1u)) / 2u) - 3u;
     const auto idx = start_n_idx + m;
@@ -77,7 +84,8 @@ auto egm2008_kdelta(std::uint32_t n, std::uint32_t m)
 }
 
 // This helper will generate all the V/W terms necessary for the computation of the
-// geopotential up to V_nn and W_nn. The terms are generated via the recursive algorithm
+// geopotential up to V_nn and W_nn as a function of the geocentric Cartesian coordinates.
+// The terms are generated via the recursive algorithm
 // explained in Montenbruck, 3.2.4, with one important deviation: since the EGM2008 model
 // provides the *normalised* C/S coefficients, we have to adapt the recursive algorithm
 // to produce the normalised counterparts of the V/W terms. See the notebook in the tools/
@@ -88,11 +96,12 @@ auto egm2008_kdelta(std::uint32_t n, std::uint32_t m)
 // is specific to the EGM2008 model. That is, this should be usable with small modifications
 // in the implementation of other geopotential models.
 auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const expression &ya_r2,
-                          const expression &za_r2, const expression &a2_r2)
+                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                          const expression &za_r2, const expression &a2_r2, const expression &a_r)
 {
     // Seed the recursion map with the V00/W00 term.
     boost::unordered_flat_map<std::array<std::uint32_t, 2>, std::array<expression, 2>> rec_map;
-    rec_map.try_emplace({0, 0}, std::array{1_dbl, 0_dbl});
+    rec_map.try_emplace({0, 0}, std::array{a_r, 0_dbl});
 
     // Run the recursion.
     // NOTE: we use '<' to stop the iteration because at the last iteration we only need the seeding to generate
@@ -176,18 +185,20 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
     // Pre-compute several quantities.
     const auto &[x, y, z] = xyz;
     const auto r2 = sum({pow(x, 2.), pow(y, 2.), pow(z, 2.)});
-    const auto xa_r2 = x * a / r2;
-    const auto ya_r2 = y * a / r2;
-    const auto za_r2 = z * a / r2;
-    const auto a2_r2 = pow(a, 2.) / r2;
-    const auto mu_r = mu / sqrt(r2);
+    const auto a_r2 = a / r2;
+    const auto xa_r2 = x * a_r2;
+    const auto ya_r2 = y * a_r2;
+    const auto za_r2 = z * a_r2;
+    const auto a2_r2 = a * a_r2;
+    const auto a_r = a / sqrt(r2);
+    const auto mu_a = mu / a;
 
     // Generate the recursion for the V/W terms.
-    const auto rec_map = egm2008_make_rec_map(n, xa_r2, ya_r2, za_r2, a2_r2);
+    const auto rec_map = egm2008_make_rec_map(n, xa_r2, ya_r2, za_r2, a2_r2, a_r);
 
     // Assemble the terms of the summation.
     std::vector<expression> terms;
-    for (std::uint32_t i = 2; i <= n; ++i) {
+    for (std::uint32_t i = 0; i <= n; ++i) {
         // NOTE: in order to generate the full potential, we would iterate
         // j in the [0, i] range here. However, we allow to stop the iteration
         // at a order m < i, hence the iteration range here is [0, min(m, i)].
@@ -199,7 +210,86 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
         }
     }
 
-    return mu_r * (1. + sum(std::move(terms)));
+    return mu_a * sum(std::move(terms));
+}
+
+// NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with the
+// modifications to the formulae due to the use of normalised coefficients in EGM2008.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m,
+                                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                           const expression &mu, const expression &a)
+{
+    // Check degree/order.
+    egm2008_common_checks(n, m);
+
+    // NOTE: in the Cunningham recursion formulae for the acceleration, we need V/W terms
+    // up to degree/order n+1.
+    if (n == egm2008_max_degree) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid degree specified for the computation of the acceleration in "
+                        "the EGM2008 geopotential model: a degree of {} is too high, the maximum allowed value is {}",
+                        n, egm2008_max_degree - 1u));
+    }
+
+    // Pre-compute several quantities.
+    const auto &[x, y, z] = xyz;
+    const auto r2 = sum({pow(x, 2.), pow(y, 2.), pow(z, 2.)});
+    const auto a_r2 = a / r2;
+    const auto xa_r2 = x * a_r2;
+    const auto ya_r2 = y * a_r2;
+    const auto za_r2 = z * a_r2;
+    const auto a2_r2 = a * a_r2;
+    const auto a_r = a / sqrt(r2);
+    const auto mu_a2 = mu / pow(a, 2.);
+
+    // Generate the recursion for the V/W terms.
+    const auto rec_map = egm2008_make_rec_map(n + 1u, xa_r2, ya_r2, za_r2, a2_r2, a_r);
+
+    // Initialise the vectors storing the summation terms for the accelerations.
+    std::vector<expression> x_terms, y_terms, z_terms;
+
+    // Assemble the terms of the summation.
+    std::vector<expression> terms;
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        // NOTE: in order to generate the full accelerations, we would iterate
+        // j in the [0, i] range here. However, we allow to stop the iteration
+        // at a order m < i, hence the iteration range here is [0, min(m, i)].
+        for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
+            const auto [C, S] = get_egm2008_sc(i, j);
+
+            // Compute the numerical coefficients.
+            // NOTE: these differ from the original formulae due to the use normalised geopotential coefficients.
+            auto cxy_0 = std::sqrt((2. - egm2008_kdelta(0, j)) * (2. * i + 1) * (2. + i + j) * (1. + i + j)
+                                   / ((2. - egm2008_kdelta(0, j + 1u)) * (2. * i + 3)));
+            const auto cz = (1. + i - j) * std::sqrt((1. + i + j) * (2. * i + 1) / ((2. * i + 3) * (1. + i - j)));
+
+            // NOTE: the x and y terms have special-casing for m == 0.
+            if (j == 0u) {
+                const auto &[V, W] = rec_map.at({i + 1u, 1});
+
+                x_terms.push_back(-C * cxy_0 * V);
+                y_terms.push_back(-C * cxy_0 * W);
+            } else {
+                cxy_0 *= 0.5;
+                const auto cxy_1
+                    = 0.5 * (2. + i - j) * (1. + i - j)
+                      * std::sqrt((2. - egm2008_kdelta(0, j)) * (2. * i + 1)
+                                  / ((2. - egm2008_kdelta(0, j - 1u)) * (2. * i + 3) * (2. + i - j) * (1. + i - j)));
+
+                const auto &[Vp1, Wp1] = rec_map.at({i + 1u, j + 1u});
+                const auto &[Vm1, Wm1] = rec_map.at({i + 1u, j - 1u});
+
+                x_terms.insert(x_terms.end(), {-C * cxy_0 * Vp1, -S * cxy_0 * Wp1, C * cxy_1 * Vm1, S * cxy_1 * Wm1});
+                y_terms.insert(y_terms.end(), {-C * cxy_0 * Wp1, S * cxy_0 * Vp1, -C * cxy_1 * Wm1, S * cxy_1 * Vm1});
+            }
+
+            const auto &[V, W] = rec_map.at({i + 1u, j});
+            z_terms.insert(z_terms.end(), {-C * cz * V, -S * cz * W});
+        }
+    }
+
+    return {mu_a2 * sum(std::move(x_terms)), mu_a2 * sum(std::move(y_terms)), mu_a2 * sum(std::move(z_terms))};
 }
 
 } // namespace model::detail
