@@ -213,8 +213,8 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
     return mu_a * sum(std::move(terms));
 }
 
-// NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with the
-// modifications to the formulae due to the use of normalised coefficients in EGM2008.
+// NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with
+// modifications due to the use of normalised coefficients in EGM2008.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m,
                                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -260,7 +260,7 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
             const auto [C, S] = get_egm2008_sc(i, j);
 
             // Compute the numerical coefficients.
-            // NOTE: these differ from the original formulae due to the use normalised geopotential coefficients.
+            // NOTE: these differ from the original formulae due to the use of normalised geopotential coefficients.
             auto cxy_0 = std::sqrt((2. - egm2008_kdelta(0, j)) * (2. * i + 1) * (2. + i + j) * (1. + i + j)
                                    / ((2. - egm2008_kdelta(0, j + 1u)) * (2. * i + 3)));
             const auto cz = (1. + i - j) * std::sqrt((1. + i + j) * (2. * i + 1) / ((2. * i + 3) * (1. + i - j)));
