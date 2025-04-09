@@ -59,6 +59,11 @@ TEST_CASE("custom params")
     REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::a = "a"_var));
     REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::mu = 1.2_dbl));
     REQUIRE(model::egm2008_pot({x, y, z}, 0, 0) != model::egm2008_pot({x, y, z}, 0, 0, kw::a = 1.1_dbl));
+
+    REQUIRE(model::egm2008_acc({x, y, z}, 0, 0) != model::egm2008_acc({x, y, z}, 0, 0, kw::mu = "mu"_var));
+    REQUIRE(model::egm2008_acc({x, y, z}, 0, 0) != model::egm2008_acc({x, y, z}, 0, 0, kw::a = "a"_var));
+    REQUIRE(model::egm2008_acc({x, y, z}, 0, 0) != model::egm2008_acc({x, y, z}, 0, 0, kw::mu = 1.2_dbl));
+    REQUIRE(model::egm2008_acc({x, y, z}, 0, 0) != model::egm2008_acc({x, y, z}, 0, 0, kw::a = 1.1_dbl));
 }
 
 TEST_CASE("potential")
