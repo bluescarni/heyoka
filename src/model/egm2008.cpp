@@ -252,7 +252,6 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     std::vector<expression> x_terms, y_terms, z_terms;
 
     // Assemble the terms of the summation.
-    std::vector<expression> terms;
     for (std::uint32_t i = 0; i <= n; ++i) {
         // NOTE: in order to generate the full accelerations, we would iterate
         // j in the [0, i] range here. However, we allow to stop the iteration
