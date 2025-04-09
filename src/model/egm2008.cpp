@@ -170,7 +170,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
 #endif
 
     return rec_map;
-}
+} // LCOV_EXCL_LINE
 
 } // namespace
 
@@ -227,8 +227,10 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     // up to degree/order n+1.
     if (n == egm2008_max_degree) [[unlikely]] {
         throw std::invalid_argument(
+            // LCOV_EXCL_START
             fmt::format("Invalid degree specified for the computation of the acceleration in "
                         "the EGM2008 geopotential model: a degree of {} is too high, the maximum allowed value is {}",
+                        // LCOV_EXCL_STOP
                         n, egm2008_max_degree - 1u));
     }
 
