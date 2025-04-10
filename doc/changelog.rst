@@ -7,9 +7,6 @@ Changelog
 New
 ~~~
 
-- Parallel JIT compilation is now enabled by default on LLVM>=20
-  (`#483 <https://github.com/bluescarni/heyoka/pull/483>`__,
-  `#481 <https://github.com/bluescarni/heyoka/pull/481>`__).
 - Add an implementation of the EGM2008 geopotential model
   (`#482 <https://github.com/bluescarni/heyoka/pull/482>`__).
 - Add an implementation of the IAU2000/2006 precession/nutation theory

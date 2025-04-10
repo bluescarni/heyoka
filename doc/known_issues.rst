@@ -18,15 +18,10 @@ Unsolved
 
   The root cause is most likely a code-generation/optimisation problem in LLVM.
   This issue is currently under investigation.
-* The parallel compilation feature (added in heyoka 6.0.0) is currently turned
-  off by default on all platforms and completely disabled on Windows.
+* The parallel compilation feature (initially added in heyoka 6.0.0) is currently disabled.
   The reason is a likely thread scheduling bug in LLVM's parallel compilation facilities
   which, on Unix systems, rarely results in a multiply-defined symbol, ultimately leading to a compilation
-  failure. On Windows, parallel compilation under heavy loads results in segmentation faults.
-  The issue is currently under investigation by the LLVM developers. In the
-  meantime, you can explicitly turn on parallel compilation on Unix systems via the ``kw::parjit``
-  :ref:`keyword argument <kwargs>` when constructing an integrator or a compiled
-  function.
+  failure. The issue is currently under investigation by the LLVM developers.
 * The option for selecting the code used model for JIT compilation
   (added in heyoka 6.0.0) is currently disabled on Windows due to what
   looks like an LLVM bug. The issue is currently under investigation.
