@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add function to convert from geodetic to Cartesian coordinates
+  (`#484 <https://github.com/bluescarni/heyoka/pull/484>`__).
 - Add an implementation of the EGM2008 geopotential model
   (`#482 <https://github.com/bluescarni/heyoka/pull/482>`__).
 - Add an implementation of the IAU2000/2006 precession/nutation theory
@@ -24,6 +26,9 @@ New
 Changes
 ~~~~~~~
 
+- The size of the compiled library has been drastically reduced thanks
+  to optimisations in the storage of the datafiles of the VSOP2013 theory
+  (`#484 <https://github.com/bluescarni/heyoka/pull/484>`__).
 - heyoka now requires LLVM >= 16
   (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
 - heyoka now requires Boost >= 1.85
