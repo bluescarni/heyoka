@@ -26,91 +26,86 @@ TEST_CASE("impl")
 
     const double a_earth = 6378137.0;
     const double b_earth = 6356752.314245;
-    const double ecc2 = 1. - b_earth * b_earth / a_earth / a_earth;
+    const double ecc2 = 1. - (b_earth * b_earth / a_earth / a_earth);
     // First, we test malformed cases and their throws.
-    // 1 - Size of the Cartesian state is wrong
+    // 1 - Negative eccentricity
     REQUIRE_THROWS_AS(
-        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y")}, ecc2, a_earth, 4u),
+        model::detail::cart2geo_impl({expression("x"), expression("y"), expression("z")}, -2.3, a_earth, 4u),
         std::invalid_argument);
-    // 2 - Negative eccentricity
+    // 2 - Negative planet equatorial radius
     REQUIRE_THROWS_AS(
-        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y"), expression("z")}, -2.3,
-                                     a_earth, 4u),
+        model::detail::cart2geo_impl({expression("x"), expression("y"), expression("z")}, ecc2, -23233234.3423, 4u),
         std::invalid_argument);
-    // 3 - Negative planet equatorial radius
-    REQUIRE_THROWS_AS(
-        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y"), expression("z")}, ecc2,
-                                     -23233234.3423, 4u),
-        std::invalid_argument);
+    // 3 - Zero planet equatorial radius
+    REQUIRE_THROWS_AS(model::detail::cart2geo_impl({expression("x"), expression("y"), expression("z")}, ecc2, 0., 4u),
+                      std::invalid_argument);
     // 4 - No iterations
     REQUIRE_THROWS_AS(
-        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y"), expression("z")}, ecc2,
-                                     a_earth, 0u),
+        model::detail::cart2geo_impl({expression("x"), expression("y"), expression("z")}, ecc2, a_earth, 0u),
         std::invalid_argument);
 
     // Then we test that for a few cases the numerical values are correct (approximately)
     // Init the symbolic variables.
-    auto [x, y, z] = make_vars("x", "y", "z");
+    auto [x, y, z, h, phi, lon] = make_vars("x", "y", "z", "h", "phi", "lon");
     auto geodetic_lph = model::cart2geo({x, y, z});
-    cfunc<double> h_cf{{geodetic_lph[0]}, {x, y, z}};
-    cfunc<double> phi_cf{{geodetic_lph[1]}, {x, y, z}};
-    cfunc<double> lon_cf{{geodetic_lph[2]}, {x, y, z}};
+    auto cart_lph = model::geo2cart({h, phi, lon});
+    cfunc<double> geo_cf{geodetic_lph, std::vector{x, y, z}};
+    cfunc<double> cart_cf{cart_lph, std::vector{h, phi, lon}};
+
+    // Prepare the input-output buffers.
+    std::array<double, 3> in{};
+    std::array<double, 3> out{};
+    std::array<double, 3> out_cart{};
+
     // Case 1
     {
-        // Prepare the input-output buffers.
-        std::array<double, 3> in{6000000, 6000000, 6000000};
-        std::array<double, 1> out{};
-        h_cf(out, in);
+        in = {6000000, 6000000, 6000000};
+        geo_cf(out, in);
         REQUIRE(out[0] == approximately(4021307.660867557));
-        phi_cf(out, in);
-        REQUIRE(out[0] == approximately(0.6174213396277664));
-        lon_cf(out, in);
-        REQUIRE(out[0] == approximately(0.7853981633974483));
+        REQUIRE(out[1] == approximately(0.6174213396277664));
+        REQUIRE(out[2] == approximately(0.7853981633974483));
+        cart_cf(out_cart, out);
+        REQUIRE(out_cart[0] == approximately(in[0], 100000.));
+        REQUIRE(out_cart[1] == approximately(in[1], 100000.));
+        REQUIRE(out_cart[2] == approximately(in[2], 100000.));
     }
     // Case 2
     {
-        // Prepare the input-output buffers.
-        std::array<double, 3> in{-2100.13123213, -1000.3764235678, 7324555.1224};
-        std::array<double, 1> out{};
-        h_cf(out, in);
+
+        in = {-2100.13123213, -1000.3764235678, 7324555.1224};
+        geo_cf(out, in);
         REQUIRE(out[0] == approximately(967803.1740983669));
-        phi_cf(out, in);
-        REQUIRE(out[0] == approximately(1.5704805814766054));
-        lon_cf(out, in);
-        REQUIRE(out[0] == approximately(-2.6970515993420663));
+        REQUIRE(out[1] == approximately(1.5704805814766054));
+        REQUIRE(out[2] == approximately(-2.6970515993420663));
+        cart_cf(out_cart, out);
+        REQUIRE(out_cart[0] == approximately(in[0], 1000000.));
+        REQUIRE(out_cart[1] == approximately(in[1], 1000000.));
+        REQUIRE(out_cart[2] == approximately(in[2], 1000000.));
     }
+
     // And we repeat checking the n_iter and ecc2 values being not default
+    geodetic_lph = model::cart2geo({x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 1);
+    geo_cf = cfunc<double>{geodetic_lph, std::vector{x, y, z}};
+
     // Case 1
     {
-        geodetic_lph = model::cart2geo({x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 1);
-        h_cf = cfunc<double>{{geodetic_lph[0]}, {x, y, z}};
-        phi_cf = cfunc<double>{{geodetic_lph[1]}, {x, y, z}};
-        lon_cf = cfunc<double>{{geodetic_lph[2]}, {x, y, z}};
-        // Prepare the input-output buffers.
-        std::array<double, 3> in{1., -1., 1.};
-        std::array<double, 1> out{};
-        h_cf(out, in);
+        in = {1., -1., 1.};
+        geo_cf(out, in);
         REQUIRE(out[0] == approximately(-59.791916138446254));
-        phi_cf(out, in);
-        REQUIRE(out[0] == approximately(-0.2053312550471871));
-        lon_cf(out, in);
-        REQUIRE(out[0] == approximately(-0.7853981633974483));
+        REQUIRE(out[1] == approximately(-0.2053312550471871));
+        REQUIRE(out[2] == approximately(-0.7853981633974483));
     }
+
+    geodetic_lph = model::cart2geo({x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 3);
+    geo_cf = cfunc<double>{geodetic_lph, std::vector{x, y, z}};
+
     // Case 2
     {
-        geodetic_lph = model::cart2geo(std::vector{x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 3);
-        h_cf = cfunc<double>{{geodetic_lph[0]}, {x, y, z}};
-        phi_cf = cfunc<double>{{geodetic_lph[1]}, {x, y, z}};
-        lon_cf = cfunc<double>{{geodetic_lph[2]}, {x, y, z}};
-        // Prepare the input-output buffers.
-        std::array<double, 3> in{1., -1., 1.};
-        std::array<double, 1> out{};
-        h_cf(out, in);
+        in = {1., -1., 1.};
+        geo_cf(out, in);
         REQUIRE(out[0] == approximately(-58.66556686050428));
-        phi_cf(out, in);
-        REQUIRE(out[0] == approximately(-0.15741313107202423));
-        lon_cf(out, in);
-        REQUIRE(out[0] == approximately(-0.7853981633974483));
+        REQUIRE(out[1] == approximately(-0.15741313107202423));
+        REQUIRE(out[2] == approximately(-0.7853981633974483));
     }
 }
 
