@@ -9,12 +9,10 @@
 #ifndef HEYOKA_MODEL_CART2GEO_HPP
 #define HEYOKA_MODEL_CART2GEO_HPP
 
+#include <array>
 #include <concepts>
-#include <initializer_list>
-#include <ranges>
 #include <tuple>
 #include <type_traits>
-#include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -36,7 +34,7 @@ namespace detail
 inline constexpr auto a_earth = 6378137.0;
 inline constexpr auto b_earth = 6356752.314245;
 
-template <typename... KwArgs>
+template <bool WithNIters, typename... KwArgs>
 auto cart2geo_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
@@ -67,50 +65,47 @@ auto cart2geo_common_opts(const KwArgs &...kw_args)
         }
     }
 
-    // Number of iterations. Optional. Defaults to 4 (guarantees an error below the cm level on the Earth).
-    unsigned n_iters = 4u;
-    if constexpr (p.has(kw::n_iters)) {
-        if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::n_iters))>>) {
-            n_iters = boost::numeric_cast<unsigned>(p(kw::n_iters));
-        } else {
-            static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                          "The 'n_iters' argument to cart2geo() is of the wrong type (it must be of integral type).");
+    if constexpr (WithNIters) {
+        // Number of iterations. Optional. Defaults to 4 (guarantees an error below the cm level on the Earth).
+        unsigned n_iters = 4u;
+        if constexpr (p.has(kw::n_iters)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::n_iters))>>) {
+                n_iters = boost::numeric_cast<unsigned>(p(kw::n_iters));
+            } else {
+                static_assert(
+                    heyoka::detail::always_false_v<KwArgs...>,
+                    "The 'n_iters' argument to cart2geo() is of the wrong type (it must be of integral type).");
+            }
         }
-    }
 
-    return std::tuple{ecc2, R_eq, n_iters};
+        return std::tuple{ecc2, R_eq, n_iters};
+    } else {
+        return std::tuple{ecc2, R_eq};
+    }
 }
 
 // This c++ function returns the symbolic expressions of the geodetic coordinates (h,lat,lon) as a function of the
 // Cartesian coordinates in the ECEF (Earth-Centered Earth-Fixed reference Frame).
-HEYOKA_DLL_PUBLIC std::vector<expression> cart2geo_impl(const std::vector<expression> &, double, double, unsigned);
+HEYOKA_DLL_PUBLIC std::array<expression, 3> cart2geo_impl(const std::array<expression, 3> &, double, double, unsigned);
 
-// Implementation of the cart2geo function object.
-// Annoyingly, we need two overloads to accept also std::initializer_list in input.
-struct cart2geo_functor {
-    template <typename R, typename... KwArgs>
-        requires std::ranges::input_range<R> && std::constructible_from<expression, std::ranges::range_reference_t<R>>
-    auto operator()(R &&r, const KwArgs &...kw_args) const
-    {
-        std::vector<expression> xyz;
-        xyz.reserve(3);
-        for (auto &&val : r) {
-            xyz.emplace_back(std::forward<decltype(val)>(val));
-        }
-
-        return std::apply(cart2geo_impl, std::tuple_cat(std::tuple{std::move(xyz)}, cart2geo_common_opts(kw_args...)));
-    }
-    template <typename T, typename... KwArgs>
-        requires std::constructible_from<expression, const T &>
-    auto operator()(std::initializer_list<T> r, const KwArgs &...kw_args) const
-    {
-        return operator()(std::ranges::subrange(r.begin(), r.end()), kw_args...);
-    }
-};
+// Inverse of cart2geo_impl().
+HEYOKA_DLL_PUBLIC std::array<expression, 3> geo2cart_impl(const std::array<expression, 3> &, double, double);
 
 } // namespace detail
 
-inline constexpr auto cart2geo = detail::cart2geo_functor{};
+inline constexpr auto cart2geo = []<typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    return std::apply(detail::cart2geo_impl,
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::cart2geo_common_opts<true>(kw_args...)));
+};
+
+inline constexpr auto geo2cart = []<typename... KwArgs>
+    requires(!igor::has_unnamed_arguments<KwArgs...>())
+(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    return std::apply(detail::geo2cart_impl,
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::cart2geo_common_opts<false>(kw_args...)));
+};
 
 } // namespace model
 
