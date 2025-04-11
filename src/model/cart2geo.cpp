@@ -46,7 +46,7 @@ std::vector<expression> cart2geo_impl(const std::vector<expression> &xyz, double
     const expression p = sqrt(pow(xyz[0], 2.) + pow(xyz[1], 2.));
     expression phi = atan(xyz[2] / (p * (1. - ecc2)));
     expression h, N;
-    // we iterate to improve the solution
+    // we iterate to improve the solution.
     for (auto i = 0u; i < n_iters; ++i) {
         N = R_eq * pow(1. - ecc2 * pow(sin(phi), 2.), -.5);
         h = p / cos(phi) - N;
