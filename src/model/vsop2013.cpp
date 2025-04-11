@@ -168,6 +168,12 @@ auto build_vsop2103_data()
 
 // Implementation of the function constructing the VSOP2013 elliptic series as heyoka expressions. The elements
 // are referred to the Dynamical Frame J2000.
+//
+// NOTE: as a future development, we could consider implementing the same trig caching scheme adopted for ELP2000
+// and IAU2006. The problem here is that certain trigonometric arguments (in particular the one from Pluto) have
+// very large indices values, in the order of tens of thousands. Other arguments, such as the lunar ones, have indices
+// values in the order of ~100. In these cases we would probably not want to adopt the trig caching approach as
+// it would just slow things down. Also, we would need to re-engineer the implementation to avoid parallelisation.
 expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, expression t_expr, double thresh)
 {
     // Check the input values.
@@ -248,6 +254,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                         continue;
                     }
 
+                    // Assemble the linear combination of trigonometric arguments.
                     // a1-a9.
                     for (std::size_t j = 0; j < 9u; ++j) {
                         // Compute lambda_l for the current element
