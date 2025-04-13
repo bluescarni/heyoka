@@ -334,47 +334,44 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
         const auto [cur_ex, visited] = stack.back();
         stack.pop_back();
 
-        std::visit(
-            [&func_set, &stack, cur_ex, visited, &s_set]<typename T>(const T &arg) {
-                if constexpr (std::same_as<func, T>) {
-                    // Function (i.e., internal) node.
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                    // Fetch the function id.
-                    const auto f_id = arg.get_ptr();
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                    if (auto it = func_set.find(f_id); it != func_set.end()) {
-                        // We already got the list of variables for the current function,
-                        // no need to do anything else.
-                        return;
-                    }
+            if (auto it = func_set.find(f_id); it != func_set.end()) {
+                // We already got the list of variables for the current function,
+                // no need to do anything else.
+                continue;
+            }
 
-                    if (visited) {
-                        // We have now visited all the children of the function node and determined
-                        // the list of variables. We just have to add f_id to the cache so that we
-                        // won't repeat the same computation again.
-                        assert(!func_set.contains(f_id));
-                        func_set.emplace(f_id);
-                    } else {
-                        // It is the first time we visit this function. Re-add it to the stack
-                        // with visited=true, and add all of its arguments to the stack as well.
-                        stack.emplace_back(cur_ex, true);
+            if (visited) {
+                // We have now visited all the children of the function node and determined
+                // the list of variables. We just have to add f_id to the cache so that we
+                // won't repeat the same computation again.
+                assert(!func_set.contains(f_id));
+                func_set.emplace(f_id);
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
 
-                        // NOTE: iterate in reverse in order to simulate recursion-based traversal
-                        // (i.e., we visit the children left-to-right).
-                        for (const auto &ex : arg.args() | std::views::reverse) {
-                            stack.emplace_back(&ex, false);
-                        }
-                    }
-                } else {
-                    // Non-function (i.e., leaf) node.
-                    assert(!visited);
-
-                    if constexpr (std::same_as<variable, T>) {
-                        s_set.emplace(arg.name());
-                    }
+                // NOTE: iterate in reverse in order to simulate recursion-based traversal
+                // (i.e., we visit the children left-to-right).
+                for (const auto &ex : f.args() | std::views::reverse) {
+                    stack.emplace_back(&ex, false);
                 }
-            },
-            cur_ex->value());
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
+                s_set.emplace(var_ptr->name());
+            }
+        }
     }
 }
 
@@ -655,74 +652,71 @@ std::size_t get_n_nodes(const expression &e)
             const auto [cur_ex, visited] = stack.back();
             stack.pop_back();
 
-            retval += std::visit(
-                [&func_map, &stack, cur_ex, visited]<typename T>(const T &arg) -> std::size_t {
-                    if constexpr (std::same_as<func, T>) {
-                        // Function (i.e., internal) node.
+            if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+                // Function (i.e., internal) node.
+                const auto &f = *f_ptr;
 
-                        // Fetch the function id.
-                        const auto f_id = arg.get_ptr();
+                // Fetch the function id.
+                const auto *f_id = f.get_ptr();
 
-                        if (auto it = func_map.find(f_id); it != func_map.end()) {
-                            // We already computed the number of nodes for the current
-                            // function, return it.
-                            return it->second;
-                        }
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the number of nodes for the current
+                    // function, add it to retval.
+                    retval += it->second;
+                    continue;
+                }
 
-                        if (visited) {
-                            // This is the second time we visit the function. We can now
-                            // compute its number of nodes.
+                if (visited) {
+                    // This is the second time we visit the function. We can now
+                    // compute its number of nodes.
 
-                            // Count the function node itself.
-                            boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+                    // Count the function node itself.
+                    boost::safe_numerics::safe<std::size_t> n_nodes = 1;
 
-                            // Count the number of nodes in the arguments.
-                            for (const auto &ex : arg.args()) {
-                                if (const auto *fptr = std::get_if<func>(&ex.value())) {
-                                    // The argument is a function. Its number of nodes was already
-                                    // computed and it must be available in the cache.
-                                    assert(func_map.contains(fptr->get_ptr()));
-                                    n_nodes += func_map.find(fptr->get_ptr())->second;
-                                } else {
-                                    // The argument is a non-function (i.e., a leaf node). Increase
-                                    // the count by one.
-                                    ++n_nodes;
-                                }
-                            }
-
-                            // Store the number of nodes for the current function
-                            // in the cache.
-                            assert(!func_map.contains(f_id));
-                            func_map.emplace(f_id, n_nodes);
-
-                            // NOTE: in returning 1 here we are accounting only for the function node
-                            // itself. It is not necessary to account for the total number of nodes n_nodes
-                            // because all the children nodes were already counted during visitation
-                            // of the current function.
-                            return 1;
+                    // Count the number of nodes in the arguments.
+                    for (const auto &ex : f.args()) {
+                        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                            // The argument is a function. Its number of nodes was already
+                            // computed and it must be available in the cache.
+                            assert(func_map.contains(fptr->get_ptr()));
+                            n_nodes += func_map.find(fptr->get_ptr())->second;
                         } else {
-                            // It is the first time we visit this function. Re-add it to the stack
-                            // with visited=true, and add all of its arguments to the stack as well.
-                            stack.emplace_back(cur_ex, true);
-
-                            // NOTE: iterate in reverse in order to simulate recursion-based traversal
-                            // (i.e., we visit the children left-to-right).
-                            for (const auto &ex : arg.args() | std::views::reverse) {
-                                stack.emplace_back(&ex, false);
-                            }
-
-                            // NOTE: we do not know at this stage what the total number of nodes
-                            // for the current function is. This will be available the next time we
-                            // pop the function from the stack. In the meantime return 0.
-                            return 0;
+                            // The argument is a non-function (i.e., a leaf node). Increase
+                            // the count by one.
+                            ++n_nodes;
                         }
-                    } else {
-                        // Non-function (i.e., leaf) node.
-                        assert(!visited);
-                        return 1;
                     }
-                },
-                cur_ex->value());
+
+                    // Store the number of nodes for the current function
+                    // in the cache.
+                    assert(!func_map.contains(f_id));
+                    func_map.emplace(f_id, n_nodes);
+
+                    // NOTE: by incrementing by 1 here we are accounting only for the function node
+                    // itself. It is not necessary to account for the total number of nodes n_nodes
+                    // because all the children nodes were already counted during visitation
+                    // of the current function.
+                    ++retval;
+                } else {
+                    // It is the first time we visit this function. Re-add it to the stack
+                    // with visited=true, and add all of its arguments to the stack as well.
+                    stack.emplace_back(cur_ex, true);
+
+                    // NOTE: iterate in reverse in order to simulate recursion-based traversal
+                    // (i.e., we visit the children left-to-right).
+                    for (const auto &ex : f.args() | std::views::reverse) {
+                        stack.emplace_back(&ex, false);
+                    }
+
+                    // NOTE: we do not know at this stage what the total number of nodes
+                    // for the current function is. This will be available the next time we
+                    // pop the function from the stack. In the meantime do **not** increment retval.
+                }
+            } else {
+                // Non-function (i.e., leaf) node.
+                assert(!visited);
+                ++retval;
+            }
         }
 
         return retval;
