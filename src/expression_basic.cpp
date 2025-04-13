@@ -18,9 +18,11 @@
 #include <iterator>
 #include <map>
 #include <ostream>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -49,6 +51,7 @@
 
 #endif
 
+#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -321,38 +324,58 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
+void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expression &e)
 {
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_set, &s_set](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    assert(stack.empty());
+    stack.emplace_back(&e, false);
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
+    while (!stack.empty()) {
+        // Pop the stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                if (func_set.find(f_id) != func_set.end()) {
-                    // We already determined the list of variables for the
-                    // current function, exit.
-                    return;
+        std::visit(
+            [&func_set, &stack, cur_ex, visited, &s_set]<typename T>(const T &arg) {
+                if constexpr (std::same_as<func, T>) {
+                    // Function (i.e., internal) node.
+
+                    // Fetch the function id.
+                    const auto f_id = arg.get_ptr();
+
+                    if (auto it = func_set.find(f_id); it != func_set.end()) {
+                        // We already got the list of variables for the current function,
+                        // no need to do anything else.
+                        return;
+                    }
+
+                    if (visited) {
+                        // We have now visited all the children of the function node and determined
+                        // the list of variables. We just have to add f_id to the cache so that we
+                        // won't repeat the same computation again.
+                        assert(!func_set.contains(f_id));
+                        func_set.emplace(f_id);
+                    } else {
+                        // It is the first time we visit this function. Re-add it to the stack
+                        // with visited=true, and add all of its arguments to the stack as well.
+                        stack.emplace_back(cur_ex, true);
+
+                        // NOTE: iterate in reverse in order to simulate recursion-based traversal
+                        // (i.e., we visit the children left-to-right).
+                        for (const auto &ex : arg.args() | std::views::reverse) {
+                            stack.emplace_back(&ex, false);
+                        }
+                    }
+                } else {
+                    // Non-function (i.e., leaf) node.
+                    assert(!visited);
+
+                    if constexpr (std::same_as<variable, T>) {
+                        s_set.emplace(arg.name());
+                    }
                 }
-
-                // Determine the list of variables for each
-                // function argument.
-                for (const auto &farg : arg.args()) {
-                    get_variables(func_set, s_set, farg);
-                }
-
-                // Add the id of f to the set.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            } else if constexpr (std::is_same_v<type, variable>) {
-                s_set.insert(arg.name());
-            }
-        },
-        e.value());
+            },
+            cur_ex->value());
+    }
 }
 
 } // namespace
@@ -362,10 +385,10 @@ void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set
 std::vector<std::string> get_variables(const expression &e)
 {
     detail::funcptr_set func_set;
+    detail::fast_uset<std::string> s_set;
+    std::vector<std::pair<const expression *, bool>> stack;
 
-    std::unordered_set<std::string> s_set;
-
-    detail::get_variables(func_set, s_set, e);
+    detail::get_variables_impl(func_set, stack, s_set, e);
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
@@ -377,11 +400,11 @@ std::vector<std::string> get_variables(const expression &e)
 std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
     detail::funcptr_set func_set;
-
-    std::unordered_set<std::string> s_set;
+    detail::fast_uset<std::string> s_set;
+    std::vector<std::pair<const expression *, bool>> stack;
 
     for (const auto &ex : v_ex) {
-        detail::get_variables(func_set, s_set, ex);
+        detail::get_variables_impl(func_set, stack, s_set, ex);
     }
 
     // Turn the set into an ordered vector.
@@ -617,70 +640,106 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
     return os << oss.str();
 }
 
-namespace detail
-{
-
-namespace
-{
-
-// Exception to signal that the computation
-// of the number of nodes resulted in overflow.
-struct too_many_nodes : std::exception {
-};
-
-// NOLINTNEXTLINE(misc-no-recursion)
-std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &arg) -> std::size_t {
-            if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the number of nodes for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                boost::safe_numerics::safe<std::size_t> retval = 1;
-
-                for (const auto &ex : arg.args()) {
-                    try {
-                        retval += get_n_nodes(func_map, ex);
-                    } catch (...) {
-                        throw too_many_nodes{};
-                    }
-                }
-
-                // Store the number of nodes for the current function
-                // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return 1;
-            }
-        },
-        e.value());
-}
-
-} // namespace
-
-} // namespace detail
-
 // NOTE: this always returns a number > 0, unless an overflow
 // occurs due to the expression being too large. In such case,
 // zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
     detail::funcptr_map<std::size_t> func_map;
+    std::vector<std::pair<const expression *, bool>> stack{{&e, false}};
+    boost::safe_numerics::safe<std::size_t> retval = 0;
 
     try {
-        return detail::get_n_nodes(func_map, e);
-    } catch (const detail::too_many_nodes &) {
+        while (!stack.empty()) {
+            // Pop the stack.
+            const auto [cur_ex, visited] = stack.back();
+            stack.pop_back();
+
+            retval += std::visit(
+                [&func_map, &stack, cur_ex, visited]<typename T>(const T &arg) -> std::size_t {
+                    if constexpr (std::same_as<func, T>) {
+                        // Function (i.e., internal) node.
+
+                        // Fetch the function id.
+                        const auto f_id = arg.get_ptr();
+
+                        if (auto it = func_map.find(f_id); it != func_map.end()) {
+                            // We already computed the number of nodes for the current
+                            // function, return it.
+                            return it->second;
+                        }
+
+                        if (visited) {
+                            // This is the second time we visit the function. We can now
+                            // compute its number of nodes.
+
+                            // Count the function node itself.
+                            boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+
+                            // Count the number of nodes in the arguments.
+                            for (const auto &ex : arg.args()) {
+                                if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                                    // The argument is a function. Its number of nodes was already
+                                    // computed and it must be available in the cache.
+                                    assert(func_map.contains(fptr->get_ptr()));
+                                    n_nodes += func_map.find(fptr->get_ptr())->second;
+                                } else {
+                                    // The argument is a non-function (i.e., a leaf node). Increase
+                                    // the count by one.
+                                    ++n_nodes;
+                                }
+                            }
+
+                            // Store the number of nodes for the current function
+                            // in the cache.
+                            assert(!func_map.contains(f_id));
+                            func_map.emplace(f_id, n_nodes);
+
+                            // NOTE: in returning 1 here we are accounting only for the function node
+                            // itself. It is not necessary to account for the total number of nodes n_nodes
+                            // because all the children nodes were already counted during visitation
+                            // of the current function.
+                            return 1;
+                        } else {
+                            // It is the first time we visit this function. Re-add it to the stack
+                            // with visited=true, and add all of its arguments to the stack as well.
+                            stack.emplace_back(cur_ex, true);
+
+                            // NOTE: iterate in reverse in order to simulate recursion-based traversal
+                            // (i.e., we visit the children left-to-right).
+                            for (const auto &ex : arg.args() | std::views::reverse) {
+                                stack.emplace_back(&ex, false);
+                            }
+
+                            // NOTE: we do not know at this stage what the total number of nodes
+                            // for the current function is. This will be available the next time we
+                            // pop the function from the stack. In the meantime return 0.
+                            return 0;
+                        }
+                    } else {
+                        // Non-function (i.e., leaf) node.
+                        assert(!visited);
+                        return 1;
+                    }
+                },
+                cur_ex->value());
+        }
+
+        return retval;
+    } catch (const std::system_error &) {
+        // NOTE: this is not ideal, as in principle system_error may be thrown
+        // by something other than overflow errors in boost::safe_numerics. However, as much
+        // as I tried, I could not find out a way to detect if the thrown system_error
+        // is coming out of boost::safe_numerics. It should be just a matter of comparing
+        // the error code in the exception to the predefined error codes in boost::safe_numerics,
+        // but for some reason this does not work. I suspect it has something to do with
+        // the error category comparison failing because the error category of the code
+        // in the exception is not the same object (same address) of the error category
+        // in the predefined error codes. I don't understand why this has to be so complicated
+        // but don't have the time to investigate now :(
+        //
+        // https://en.cppreference.com/w/cpp/error/error_code/operator_cmp
+
         return 0;
     }
 }
