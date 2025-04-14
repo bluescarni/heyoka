@@ -18,7 +18,6 @@
 #include <iterator>
 #include <map>
 #include <ostream>
-#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -159,51 +158,101 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
+// NOTE: the idea here is to have two stacks: the usual stack ('stack') for depth-first traversal, and a stack of copies
+// of the expression nodes ('copy_stack'). As we traverse the expression, we keep on pusing to copy_stack copies of the
+// nodes.
+//
+// When we encounter a function node, we initially add an empty optional in copy_stack, since we cannot copy it yet as
+// we need to copy its arguments first. As we proceed with the traversal, the second time we encounter the function
+// node we are sure that all its arguments have been copied. The copies of the arguments are at the tail end of
+// copy_stack. We can then proceed to pop them to construct the copy of the function node.
+expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expression &e)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto f_id = v.get_ptr();
+    assert(stack.empty());
+    assert(copy_stack.empty());
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already copied the current function, fetch the copy
-                    // from the cache.
-                    return it->second;
-                }
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
-                // Create the new args vector by making a deep copy
-                // of the original function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    // NOTE: the argument needs to be copied via a recursive
-                    // call to copy_impl() only if it is a func. Otherwise, a normal
-                    // copy will suffice.
-                    if (std::holds_alternative<func>(orig_arg.value())) {
-                        new_args.push_back(copy_impl(func_map, orig_arg));
-                    } else {
-                        new_args.push_back(orig_arg);
-                    }
-                }
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                // Create a copy of v with the new arguments.
-                auto f_copy = v.copy(std::move(new_args));
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                // Construct the return value and put it into the cache.
-                auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                return ex;
-            } else {
-                return expression{v};
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already copied the current function. Fetch the copy from the cache
+                // and add it to the copy stack.
+                assert(!visited);
+                copy_stack.emplace_back(it->second);
+                continue;
             }
-        },
-        e.value());
+
+            if (visited) {
+                // We have now visited and copied all the children of the function node
+                // (i.e., the function arguments). The copies are at the tail end of
+                // copy_stack. We will be popping the copies from copy_stack and use them
+                // to initialise a new copy of the function.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the copy stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!copy_stack.empty());
+                    assert(copy_stack.back());
+
+                    new_args.push_back(std::move(*copy_stack.back()));
+                    copy_stack.pop_back();
+                }
+
+                // Create the new copy of the function.
+                auto ex_copy = expression{f.copy(std::move(new_args))};
+
+                // Add it to the cache.
+                assert(!func_map.contains(f_id));
+                func_map.emplace(f_id, ex_copy);
+
+                // Add it to copy_stack.
+                // NOTE: the copy stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty function we
+                // pushed the first time we visited).
+                assert(!copy_stack.empty());
+                assert(!copy_stack.back());
+                copy_stack.back().emplace(std::move(ex_copy));
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty copy of the function to copy_stack. We will perform
+                // the actual copy once we have copied all arguments.
+                copy_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+            copy_stack.emplace_back(*cur_ex);
+        }
+    }
+
+    assert(copy_stack.size() == 1u);
+    assert(copy_stack.back());
+
+    auto ret = std::move(*copy_stack.back());
+    copy_stack.pop_back();
+
+    return ret;
 }
 
 } // namespace
@@ -213,19 +262,23 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 expression copy(const expression &e)
 {
     detail::funcptr_map<expression> func_map;
+    std::vector<std::pair<const expression *, bool>> stack;
+    std::vector<std::optional<expression>> copy_stack;
 
-    return detail::copy_impl(func_map, e);
+    return detail::copy_impl(func_map, stack, copy_stack, e);
 }
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
     detail::funcptr_map<expression> func_map;
+    std::vector<std::pair<const expression *, bool>> stack;
+    std::vector<std::optional<expression>> copy_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        ret.push_back(detail::copy_impl(func_map, ex));
+        ret.push_back(detail::copy_impl(func_map, stack, copy_stack, ex));
     }
 
     return ret;
@@ -327,6 +380,8 @@ namespace
 void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expression &e)
 {
     assert(stack.empty());
+
+    // Seed the stack.
     stack.emplace_back(&e, false);
 
     while (!stack.empty()) {
@@ -344,6 +399,7 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
             if (auto it = func_set.find(f_id); it != func_set.end()) {
                 // We already got the list of variables for the current function,
                 // no need to do anything else.
+                assert(!visited);
                 continue;
             }
 
@@ -358,9 +414,7 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
                 // with visited=true, and add all of its arguments to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
-                // NOTE: iterate in reverse in order to simulate recursion-based traversal
-                // (i.e., we visit the children left-to-right).
-                for (const auto &ex : f.args() | std::views::reverse) {
+                for (const auto &ex : f.args()) {
                     stack.emplace_back(&ex, false);
                 }
             }
@@ -662,6 +716,7 @@ std::size_t get_n_nodes(const expression &e)
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already computed the number of nodes for the current
                     // function, add it to retval.
+                    assert(!visited);
                     retval += it->second;
                     continue;
                 }
@@ -702,9 +757,7 @@ std::size_t get_n_nodes(const expression &e)
                     // with visited=true, and add all of its arguments to the stack as well.
                     stack.emplace_back(cur_ex, true);
 
-                    // NOTE: iterate in reverse in order to simulate recursion-based traversal
-                    // (i.e., we visit the children left-to-right).
-                    for (const auto &ex : f.args() | std::views::reverse) {
+                    for (const auto &ex : f.args()) {
                         stack.emplace_back(&ex, false);
                     }
 
