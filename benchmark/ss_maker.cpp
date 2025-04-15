@@ -24,10 +24,10 @@
 
 #include <boost/program_options.hpp>
 
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xio.hpp>
-#include <xtensor/xmath.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/core/xmath.hpp>
+#include <xtensor/io/xio.hpp>
+#include <xtensor/views/xview.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -30,10 +30,10 @@
 #include <fmt/format.h>
 
 #include <xtensor-blas/xlinalg.hpp>
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xfixed.hpp>
-#include <xtensor/xio.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/containers/xfixed.hpp>
+#include <xtensor/io/xio.hpp>
+#include <xtensor/views/xview.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

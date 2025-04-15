@@ -34,7 +34,7 @@ Additionally, heyoka has the following **optional** dependencies:
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
-  libraries (used in the tests and benchmarks).
+  libraries (used in the tests and benchmarks, xtensor>=0.26 is required).
 
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.18).
