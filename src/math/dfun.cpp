@@ -24,7 +24,6 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
