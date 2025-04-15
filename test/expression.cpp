@@ -582,12 +582,47 @@ TEST_CASE("copy")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    auto bar_copy = copy(bar);
+        auto bar_copy = copy(bar);
 
-    // Copy created a new object.
-    REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
+        // Check that copy created a new object.
+        REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
+
+        // Check equality.
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = foo + foo;
+
+        auto bar_copy = copy(bar);
+
+        // Check that the two foos in bar_copy point to the same underlying object.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
+
+        // Check equality.
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        // Test with a vector function.
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        std::vector bar{foo + foo, foo * foo};
+
+        auto bar_copy = copy(bar);
+
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[1].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[1].value()).args()[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[1].value()).args()[1].value()).get_ptr());
+
+        REQUIRE(bar_copy == bar);
+    }
 }
 
 TEST_CASE("subs str")
