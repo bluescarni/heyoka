@@ -208,6 +208,7 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
                     assert(!copy_stack.empty());
                     assert(copy_stack.back());
 
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
                     new_args.push_back(std::move(*copy_stack.back()));
                     copy_stack.pop_back();
                 }
@@ -249,6 +250,7 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
     assert(copy_stack.size() == 1u);
     assert(copy_stack.back());
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto ret = std::move(*copy_stack.back());
     copy_stack.pop_back();
 
