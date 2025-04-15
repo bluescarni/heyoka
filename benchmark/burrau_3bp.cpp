@@ -17,8 +17,8 @@
 
 #include <boost/program_options.hpp>
 
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/views/xview.hpp>
 
 #include <heyoka/kw.hpp>
 #include <heyoka/model/nbody.hpp>
