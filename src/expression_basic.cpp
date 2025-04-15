@@ -29,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
@@ -158,6 +159,16 @@ namespace detail
 namespace
 {
 
+// NOTE: here we define a couple of stack data structures to be used when traversing
+// the nodes of an expression. We use boost::small_vector in order to avoid paying for
+// heap allocations on small expressions.
+constexpr std::size_t static_stack_size = 20;
+
+using traverse_stack = boost::container::small_vector<std::pair<const expression *, bool>, static_stack_size>;
+
+template <typename T>
+using return_stack = boost::container::small_vector<std::optional<T>, static_stack_size>;
+
 // NOTE: the idea here is to have two stacks: the usual stack ('stack') for depth-first traversal, and a stack of copies
 // of the expression nodes ('copy_stack'). As we traverse the expression, we keep on pusing to copy_stack copies of the
 // nodes.
@@ -264,8 +275,8 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
 expression copy(const expression &e)
 {
     detail::funcptr_map<expression> func_map;
-    std::vector<std::pair<const expression *, bool>> stack;
-    std::vector<std::optional<expression>> copy_stack;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> copy_stack;
 
     return detail::copy_impl(func_map, stack, copy_stack, e);
 }
@@ -273,8 +284,8 @@ expression copy(const expression &e)
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
     detail::funcptr_map<expression> func_map;
-    std::vector<std::pair<const expression *, bool>> stack;
-    std::vector<std::optional<expression>> copy_stack;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> copy_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
@@ -439,7 +450,7 @@ std::vector<std::string> get_variables(const expression &e)
 {
     detail::funcptr_set func_set;
     detail::fast_uset<std::string> s_set;
-    std::vector<std::pair<const expression *, bool>> stack;
+    detail::traverse_stack stack;
 
     detail::get_variables_impl(func_set, stack, s_set, e);
 
@@ -454,7 +465,7 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
     detail::funcptr_set func_set;
     detail::fast_uset<std::string> s_set;
-    std::vector<std::pair<const expression *, bool>> stack;
+    detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
         detail::get_variables_impl(func_set, stack, s_set, ex);
@@ -699,7 +710,7 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
 std::size_t get_n_nodes(const expression &e)
 {
     detail::funcptr_map<std::size_t> func_map;
-    std::vector<std::pair<const expression *, bool>> stack{{&e, false}};
+    detail::traverse_stack stack{{&e, false}};
     boost::safe_numerics::safe<std::size_t> retval = 0;
 
     try {
