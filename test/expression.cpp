@@ -1781,9 +1781,7 @@ TEST_CASE("cfunc sum_to_sub")
     }
 }
 
-// Test to check that the optimisation for hashing non-recursive
-// expressions is correct.
-TEST_CASE("hash opt")
+TEST_CASE("hash")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 

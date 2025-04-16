@@ -185,8 +185,6 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 namespace detail
 {
 
-std::size_t hash(funcptr_map<std::size_t> &, const expression &) noexcept;
-
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &) noexcept;
 
 void stream_expression(std::ostringstream &, const expression &);

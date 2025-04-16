@@ -621,98 +621,118 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 namespace detail
 {
 
+// NOTE: at this time there is no apparent need for a vectorised version of this.
+// In case we ever need one, remember to adapt the end of the function to pop
+// the return value from hash_stack. The simple function optimisation would also need
+// to be reconsidered.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexcept
-{
-    return std::visit(
-        [&func_map](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the hash for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                // Compute the hash of the current function.
-                auto retval = v.hash(func_map);
-
-                // Add it to the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return std::hash<type>{}(v);
-            }
-        },
-        ex.value());
-}
-
-// NOLINTNEXTLINE(bugprone-exception-escape,misc-no-recursion)
 std::size_t hash(const expression &ex) noexcept
 {
-    // NOTE: we implement an optimisation here: if either the expression is **not** a function,
-    // or if it is a function and none of its arguments are functions (i.e., it is a non-recursive
-    // expression), then we do not recurse into detail::hash() and we do not create/update the
-    // funcptr_map cache. This allows us to avoid memory allocations, in an effort to optimise the
-    // computation of hashes in decompositions, where the elementary subexpressions are
-    // non-recursive by definition.
-    // NOTE: we must be very careful with this optimisation: we need to make sure the hash computation
-    // result is the same whether the optimisation is enabled or not. That is, the hash
-    // **must** be the same regardless of whether a non-recursive expression is standalone
-    // or it is part of a larger expression.
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&ex](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+    detail::funcptr_map<std::size_t> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<std::size_t> hash_stack;
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto no_func_args = std::none_of(v.args().begin(), v.args().end(), [](const auto &x) {
-                    return std::holds_alternative<func>(x.value());
-                });
+    // Seed the stack.
+    stack.emplace_back(&ex, false);
 
-                if (no_func_args) {
-                    // NOTE: it is very important that here we replicate *exactly* the logic
-                    // of func::hash(), so that we produce the same hash value that would
-                    // be produced if ex were part of a larger expression.
-                    std::size_t seed = std::hash<std::string>{}(v.get_name());
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                    for (const auto &arg : v.args()) {
-                        // NOTE: for non-function arguments, calling hash(arg)
-                        // is identical to calling detail::hash(func_map, arg)
-                        // (as we do in func::hash()):
-                        // both ultimately end up using directly the std::hash
-                        // specialisation on the arg.
-                        boost::hash_combine(seed, hash(arg));
-                    }
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                    return seed;
-                } else {
-                    // The regular, non-optimised path.
-                    detail::funcptr_map<std::size_t> func_map;
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                    return hash(func_map, ex);
-                }
-            } else {
-                // ex is not a function, compute its hash directly
-                // via a std::hash specialisation.
-                // NOTE: this is the same logic implemented in detail::hash(),
-                // except we avoid the unnecessary creation of a funcptr_map.
-                return std::hash<type>{}(v);
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already computed the hash of the current function. Fetch it from the cache
+                // and add it to the hash stack.
+                assert(!visited);
+                hash_stack.emplace_back(it->second);
+                continue;
             }
-        },
-        ex.value());
+
+            if (visited) {
+                // We have now visited and computed the hash of all the children of the function node
+                // (i.e., the function arguments). The hashes are at the tail end of
+                // hash_stack. We will be popping and combining them in order to compute the hash
+                // of the function.
+
+                // NOTE: the hash of a function is obtained by combining the function
+                // name with the hashes of the function arguments.
+                auto seed = std::hash<std::string>{}(f.get_name());
+                const auto n_args = f.args().size();
+                for (decltype(f.args().size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the hash stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!hash_stack.empty());
+                    assert(hash_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    boost::hash_combine(seed, *hash_stack.back());
+                    hash_stack.pop_back();
+                }
+
+                // Add the hash to the cache.
+                // NOTE: here we apply an optimisation: if the stack is empty,
+                // we are at the end of the while loop and we won't need the cached
+                // value in the future. Like this, we avoid an unnecessary heap allocation
+                // if the expression we are hashing is a simple non-recursive function.
+                assert(!func_map.contains(f_id));
+                if (!stack.empty()) {
+                    func_map.emplace(f_id, seed);
+                }
+
+                // Add it to hash_stack.
+                // NOTE: the hash stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty hash we
+                // pushed the first time we visited).
+                assert(!hash_stack.empty());
+                assert(!hash_stack.back());
+                hash_stack.back().emplace(seed);
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty hash to hash_stack. We will add the real hash
+                // later once we have hashed all arguments.
+                hash_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            hash_stack.emplace_back(std::visit(
+                []<typename T>(const T &arg) -> std::size_t {
+                    if constexpr (std::same_as<func, T>) {
+                        assert(false);
+                        return 0;
+                    } else {
+                        return std::hash<T>{}(arg);
+                    }
+                },
+                cur_ex->value()));
+        }
+    }
+
+    assert(hash_stack.size() == 1u);
+    assert(hash_stack.back());
+
+    // NOTE: usually we pop back the only element of hash_stack here, but because
+    // we do not have a vectorised counterpart of hashing we can omit this step
+    // (which is needed in order to prepare hash_stack for the next expression in
+    // the vector).
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return *hash_stack.back();
 }
-
-} // namespace detail
-
-namespace detail
-{
 
 namespace
 {
