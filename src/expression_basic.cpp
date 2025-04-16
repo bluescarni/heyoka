@@ -698,8 +698,8 @@ std::size_t hash(const expression &ex) noexcept
                 // with visited=true, and add all of its arguments to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
-                for (const auto &ex : f.args()) {
-                    stack.emplace_back(&ex, false);
+                for (const auto &arg : f.args()) {
+                    stack.emplace_back(&arg, false);
                 }
 
                 // Add an empty hash to hash_stack. We will add the real hash
