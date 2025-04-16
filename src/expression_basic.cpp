@@ -484,54 +484,108 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
-                            const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables_impl(auto &func_map, auto &stack, auto &rename_stack, const expression &e,
+                                 const std::unordered_map<std::string, std::string> &repl_map)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &repl_map](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    assert(stack.empty());
+    assert(rename_stack.empty());
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already renamed variables for the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                // Prepare the new args vector by renaming variables
-                // for all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(rename_variables(func_map, orig_arg, repl_map));
-                }
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(std::move(new_args));
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                // Put the return value in the cache.
-                auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
-                    return expression{it->second};
-                }
-
-                // NOTE: fall through to the default case of returning a copy
-                // of the original variable if no renaming took place.
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already renamed the current function. Fetch the renamed copy from the cache
+                // and add it to the rename stack.
+                assert(!visited);
+                rename_stack.emplace_back(it->second);
+                continue;
             }
 
-            return expression{arg};
-        },
-        e.value());
+            if (visited) {
+                // We have now visited and renamed all the children of the function node
+                // (i.e., the function arguments). The renamed children are at the tail end of
+                // rename_stack. We will be popping the copies from rename_stack and use them
+                // to initialise a new copy of the function.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the rename stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!rename_stack.empty());
+                    assert(rename_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    new_args.push_back(std::move(*rename_stack.back()));
+                    rename_stack.pop_back();
+                }
+
+                // Create the new copy of the function.
+                auto ex_copy = expression{f.copy(std::move(new_args))};
+
+                // Add it to the cache.
+                assert(!func_map.contains(f_id));
+                func_map.emplace(f_id, ex_copy);
+
+                // Add it to rename_stack.
+                // NOTE: the rename stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty function we
+                // pushed the first time we visited).
+                assert(!rename_stack.empty());
+                assert(!rename_stack.back());
+                rename_stack.back().emplace(std::move(ex_copy));
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty copy of the function to rename_stack. We will perform
+                // the actual rename once we have renamed all arguments.
+                rename_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Check if the current expression is a variable whose name shows up
+            // in repl_map. If it is not, we will fall through and push a copy
+            // of cur_ex into the rename stack.
+            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
+                const auto it = repl_map.find(var_ptr->name());
+                if (it != repl_map.end()) {
+                    rename_stack.emplace_back(it->second);
+                    continue;
+                }
+            }
+
+            rename_stack.emplace_back(*cur_ex);
+        }
+    }
+
+    assert(rename_stack.size() == 1u);
+    assert(rename_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    auto ret = std::move(*rename_stack.back());
+    rename_stack.pop_back();
+
+    return ret;
 }
 
 } // namespace
@@ -541,20 +595,24 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
 expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> rename_stack;
 
-    return detail::rename_variables(func_map, e, repl_map);
+    return detail::rename_variables_impl(func_map, stack, rename_stack, e, repl_map);
 }
 
 std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
                                          const std::unordered_map<std::string, std::string> &repl_map)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> rename_stack;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(detail::rename_variables(func_map, ex, repl_map));
+        retval.push_back(detail::rename_variables_impl(func_map, stack, rename_stack, ex, repl_map));
     }
 
     return retval;
