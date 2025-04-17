@@ -22,7 +22,6 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/container_hash/hash.hpp>
 
 #include <fmt/core.h>
 
@@ -602,23 +601,6 @@ void swap(func &a, func &b) noexcept
 {
     using std::swap;
     swap(a.m_func, b.m_func);
-}
-
-// NOTE: it is very important that the implementation here is kept exactly in sync
-// with the implementation of expression hashing for non-recursive expressions. If one
-// changes, the other must as well.
-std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
-{
-    // NOTE: the hash value is computed by combining the hash values of:
-    // - the function name,
-    // - the arguments' hashes.
-    std::size_t seed = std::hash<std::string>{}(get_name());
-
-    for (const auto &arg : args()) {
-        boost::hash_combine(seed, detail::hash(func_map, arg));
-    }
-
-    return seed;
 }
 
 bool operator==(const func &a, const func &b) noexcept

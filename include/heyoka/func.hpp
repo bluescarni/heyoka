@@ -10,7 +10,6 @@
 #define HEYOKA_FUNC_HPP
 
 #include <concepts>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -393,8 +392,6 @@ public:
     [[nodiscard]] std::type_index get_type_index() const;
 
     void to_stream(std::ostringstream &) const;
-
-    [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
     [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const std::string &) const;

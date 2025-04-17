@@ -31,7 +31,6 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sub.hpp>

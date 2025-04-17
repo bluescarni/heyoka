@@ -25,9 +25,9 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xarray.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/containers/xarray.hpp>
+#include <xtensor/views/xview.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

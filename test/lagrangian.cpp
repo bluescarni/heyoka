@@ -14,9 +14,9 @@
 
 #include <boost/math/constants/constants.hpp>
 
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xslice.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/views/xslice.hpp>
+#include <xtensor/views/xview.hpp>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>

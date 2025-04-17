@@ -31,7 +31,6 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/div.hpp>
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>

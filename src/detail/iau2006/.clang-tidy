@@ -1,0 +1,5 @@
+# Disable all checks in this folder.
+# NOTE: the 'llvm-twine-local' is sort of a dummy check because
+# clang-tidy does not allow to have all checks disabled. See:
+# https://gitlab.kitware.com/cmake/cmake/-/merge_requests/777/diffs
+Checks: '-*,llvm-twine-local'

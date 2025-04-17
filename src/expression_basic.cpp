@@ -21,6 +21,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
@@ -49,6 +51,7 @@
 
 #endif
 
+#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -156,51 +159,113 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
+// NOTE: here we define a couple of stack data structures to be used when traversing
+// the nodes of an expression. We use boost::small_vector in order to avoid paying for
+// heap allocations on small expressions.
+constexpr std::size_t static_stack_size = 20;
+
+using traverse_stack = boost::container::small_vector<std::pair<const expression *, bool>, static_stack_size>;
+
+template <typename T>
+using return_stack = boost::container::small_vector<std::optional<T>, static_stack_size>;
+
+// NOTE: the idea here is to have two stacks: the usual stack ('stack') for depth-first traversal, and a stack of copies
+// of the expression nodes ('copy_stack'). As we traverse the expression, we keep on pusing to copy_stack copies of the
+// nodes.
+//
+// When we encounter a function node, we initially add an empty optional in copy_stack, since we cannot copy it yet as
+// we need to copy its arguments first. As we proceed with the traversal, the second time we encounter the function
+// node we are sure that all its arguments have been copied. The copies of the arguments are at the tail end of
+// copy_stack. We can then proceed to pop them to construct the copy of the function node.
+expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expression &e)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto f_id = v.get_ptr();
+    assert(stack.empty());
+    assert(copy_stack.empty());
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already copied the current function, fetch the copy
-                    // from the cache.
-                    return it->second;
-                }
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
-                // Create the new args vector by making a deep copy
-                // of the original function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    // NOTE: the argument needs to be copied via a recursive
-                    // call to copy_impl() only if it is a func. Otherwise, a normal
-                    // copy will suffice.
-                    if (std::holds_alternative<func>(orig_arg.value())) {
-                        new_args.push_back(copy_impl(func_map, orig_arg));
-                    } else {
-                        new_args.push_back(orig_arg);
-                    }
-                }
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                // Create a copy of v with the new arguments.
-                auto f_copy = v.copy(std::move(new_args));
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                // Construct the return value and put it into the cache.
-                auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                return ex;
-            } else {
-                return expression{v};
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already copied the current function. Fetch the copy from the cache
+                // and add it to the copy stack.
+                assert(!visited);
+                copy_stack.emplace_back(it->second);
+                continue;
             }
-        },
-        e.value());
+
+            if (visited) {
+                // We have now visited and copied all the children of the function node
+                // (i.e., the function arguments). The copies are at the tail end of
+                // copy_stack. We will be popping the copies from copy_stack and use them
+                // to initialise a new copy of the function.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the copy stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!copy_stack.empty());
+                    assert(copy_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    new_args.push_back(std::move(*copy_stack.back()));
+                    copy_stack.pop_back();
+                }
+
+                // Create the new copy of the function.
+                auto ex_copy = expression{f.copy(std::move(new_args))};
+
+                // Add it to the cache.
+                assert(!func_map.contains(f_id));
+                func_map.emplace(f_id, ex_copy);
+
+                // Add it to copy_stack.
+                // NOTE: the copy stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty function we
+                // pushed the first time we visited).
+                assert(!copy_stack.empty());
+                assert(!copy_stack.back());
+                copy_stack.back().emplace(std::move(ex_copy));
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty copy of the function to copy_stack. We will perform
+                // the actual copy once we have copied all arguments.
+                copy_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+            copy_stack.emplace_back(*cur_ex);
+        }
+    }
+
+    assert(copy_stack.size() == 1u);
+    assert(copy_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    auto ret = std::move(*copy_stack.back());
+    copy_stack.pop_back();
+
+    return ret;
 }
 
 } // namespace
@@ -210,19 +275,23 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 expression copy(const expression &e)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> copy_stack;
 
-    return detail::copy_impl(func_map, e);
+    return detail::copy_impl(func_map, stack, copy_stack, e);
 }
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> copy_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        ret.push_back(detail::copy_impl(func_map, ex));
+        ret.push_back(detail::copy_impl(func_map, stack, copy_stack, ex));
     }
 
     return ret;
@@ -321,38 +390,56 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
+void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expression &e)
 {
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_set, &s_set](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    assert(stack.empty());
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
-                if (func_set.find(f_id) != func_set.end()) {
-                    // We already determined the list of variables for the
-                    // current function, exit.
-                    return;
-                }
+    while (!stack.empty()) {
+        // Pop the stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                // Determine the list of variables for each
-                // function argument.
-                for (const auto &farg : arg.args()) {
-                    get_variables(func_set, s_set, farg);
-                }
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                // Add the id of f to the set.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            } else if constexpr (std::is_same_v<type, variable>) {
-                s_set.insert(arg.name());
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (auto it = func_set.find(f_id); it != func_set.end()) {
+                // We already got the list of variables for the current function,
+                // no need to do anything else.
+                assert(!visited);
+                continue;
             }
-        },
-        e.value());
+
+            if (visited) {
+                // We have now visited all the children of the function node and determined
+                // the list of variables. We just have to add f_id to the cache so that we
+                // won't repeat the same computation again.
+                assert(!func_set.contains(f_id));
+                func_set.emplace(f_id);
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
+                s_set.emplace(var_ptr->name());
+            }
+        }
+    }
 }
 
 } // namespace
@@ -362,10 +449,10 @@ void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set
 std::vector<std::string> get_variables(const expression &e)
 {
     detail::funcptr_set func_set;
+    detail::fast_uset<std::string> s_set;
+    detail::traverse_stack stack;
 
-    std::unordered_set<std::string> s_set;
-
-    detail::get_variables(func_set, s_set, e);
+    detail::get_variables_impl(func_set, stack, s_set, e);
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
@@ -377,11 +464,11 @@ std::vector<std::string> get_variables(const expression &e)
 std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
     detail::funcptr_set func_set;
-
-    std::unordered_set<std::string> s_set;
+    detail::fast_uset<std::string> s_set;
+    detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
-        detail::get_variables(func_set, s_set, ex);
+        detail::get_variables_impl(func_set, stack, s_set, ex);
     }
 
     // Turn the set into an ordered vector.
@@ -397,54 +484,108 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
-                            const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables_impl(auto &func_map, auto &stack, auto &rename_stack, const expression &e,
+                                 const std::unordered_map<std::string, std::string> &repl_map)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &repl_map](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    assert(stack.empty());
+    assert(rename_stack.empty());
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already renamed variables for the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                // Prepare the new args vector by renaming variables
-                // for all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(rename_variables(func_map, orig_arg, repl_map));
-                }
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(std::move(new_args));
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                // Put the return value in the cache.
-                auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
-                    return expression{it->second};
-                }
-
-                // NOTE: fall through to the default case of returning a copy
-                // of the original variable if no renaming took place.
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already renamed the current function. Fetch the renamed copy from the cache
+                // and add it to the rename stack.
+                assert(!visited);
+                rename_stack.emplace_back(it->second);
+                continue;
             }
 
-            return expression{arg};
-        },
-        e.value());
+            if (visited) {
+                // We have now visited and renamed all the children of the function node
+                // (i.e., the function arguments). The renamed children are at the tail end of
+                // rename_stack. We will be popping the copies from rename_stack and use them
+                // to initialise a new copy of the function.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the rename stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!rename_stack.empty());
+                    assert(rename_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    new_args.push_back(std::move(*rename_stack.back()));
+                    rename_stack.pop_back();
+                }
+
+                // Create the new copy of the function.
+                auto ex_copy = expression{f.copy(std::move(new_args))};
+
+                // Add it to the cache.
+                assert(!func_map.contains(f_id));
+                func_map.emplace(f_id, ex_copy);
+
+                // Add it to rename_stack.
+                // NOTE: the rename stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty function we
+                // pushed the first time we visited).
+                assert(!rename_stack.empty());
+                assert(!rename_stack.back());
+                rename_stack.back().emplace(std::move(ex_copy));
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty copy of the function to rename_stack. We will perform
+                // the actual rename once we have renamed all arguments.
+                rename_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Check if the current expression is a variable whose name shows up
+            // in repl_map. If it is not, we will fall through and push a copy
+            // of cur_ex into the rename stack.
+            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
+                const auto it = repl_map.find(var_ptr->name());
+                if (it != repl_map.end()) {
+                    rename_stack.emplace_back(it->second);
+                    continue;
+                }
+            }
+
+            rename_stack.emplace_back(*cur_ex);
+        }
+    }
+
+    assert(rename_stack.size() == 1u);
+    assert(rename_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    auto ret = std::move(*rename_stack.back());
+    rename_stack.pop_back();
+
+    return ret;
 }
 
 } // namespace
@@ -454,20 +595,24 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
 expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> rename_stack;
 
-    return detail::rename_variables(func_map, e, repl_map);
+    return detail::rename_variables_impl(func_map, stack, rename_stack, e, repl_map);
 }
 
 std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
                                          const std::unordered_map<std::string, std::string> &repl_map)
 {
     detail::funcptr_map<expression> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> rename_stack;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(detail::rename_variables(func_map, ex, repl_map));
+        retval.push_back(detail::rename_variables_impl(func_map, stack, rename_stack, ex, repl_map));
     }
 
     return retval;
@@ -476,98 +621,120 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 namespace detail
 {
 
+// NOTE: at this time there is no apparent need for a vectorised version of this.
+// In case we ever need one, remember to adapt the end of the function to pop
+// the return value from hash_stack. The simple function optimisation would also need
+// to be reconsidered.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexcept
-{
-    return std::visit(
-        [&func_map](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the hash for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                // Compute the hash of the current function.
-                auto retval = v.hash(func_map);
-
-                // Add it to the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return std::hash<type>{}(v);
-            }
-        },
-        ex.value());
-}
-
-// NOLINTNEXTLINE(bugprone-exception-escape,misc-no-recursion)
 std::size_t hash(const expression &ex) noexcept
 {
-    // NOTE: we implement an optimisation here: if either the expression is **not** a function,
-    // or if it is a function and none of its arguments are functions (i.e., it is a non-recursive
-    // expression), then we do not recurse into detail::hash() and we do not create/update the
-    // funcptr_map cache. This allows us to avoid memory allocations, in an effort to optimise the
-    // computation of hashes in decompositions, where the elementary subexpressions are
-    // non-recursive by definition.
-    // NOTE: we must be very careful with this optimisation: we need to make sure the hash computation
-    // result is the same whether the optimisation is enabled or not. That is, the hash
-    // **must** be the same regardless of whether a non-recursive expression is standalone
-    // or it is part of a larger expression.
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&ex](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+    detail::funcptr_map<std::size_t> func_map;
+    detail::traverse_stack stack;
+    detail::return_stack<std::size_t> hash_stack;
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto no_func_args = std::none_of(v.args().begin(), v.args().end(), [](const auto &x) {
-                    return std::holds_alternative<func>(x.value());
-                });
+    // Seed the stack.
+    stack.emplace_back(&ex, false);
 
-                if (no_func_args) {
-                    // NOTE: it is very important that here we replicate *exactly* the logic
-                    // of func::hash(), so that we produce the same hash value that would
-                    // be produced if ex were part of a larger expression.
-                    std::size_t seed = std::hash<std::string>{}(v.get_name());
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                    for (const auto &arg : v.args()) {
-                        // NOTE: for non-function arguments, calling hash(arg)
-                        // is identical to calling detail::hash(func_map, arg)
-                        // (as we do in func::hash()):
-                        // both ultimately end up using directly the std::hash
-                        // specialisation on the arg.
-                        boost::hash_combine(seed, hash(arg));
-                    }
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
 
-                    return seed;
-                } else {
-                    // The regular, non-optimised path.
-                    detail::funcptr_map<std::size_t> func_map;
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
 
-                    return hash(func_map, ex);
-                }
-            } else {
-                // ex is not a function, compute its hash directly
-                // via a std::hash specialisation.
-                // NOTE: this is the same logic implemented in detail::hash(),
-                // except we avoid the unnecessary creation of a funcptr_map.
-                return std::hash<type>{}(v);
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already computed the hash of the current function. Fetch it from the cache
+                // and add it to the hash stack.
+                assert(!visited);
+                hash_stack.emplace_back(it->second);
+                continue;
             }
-        },
-        ex.value());
+
+            if (visited) {
+                // We have now visited and computed the hash of all the children of the function node
+                // (i.e., the function arguments). The hashes are at the tail end of
+                // hash_stack. We will be popping and combining them in order to compute the hash
+                // of the function.
+
+                // NOTE: the hash of a function is obtained by combining the function
+                // name with the hashes of the function arguments.
+                auto seed = std::hash<std::string>{}(f.get_name());
+                const auto n_args = f.args().size();
+                for (decltype(f.args().size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the hash stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!hash_stack.empty());
+                    assert(hash_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    boost::hash_combine(seed, *hash_stack.back());
+                    hash_stack.pop_back();
+                }
+
+                // Add the hash to the cache.
+                // NOTE: here we apply an optimisation: if the stack is empty,
+                // we are at the end of the while loop and we won't need the cached
+                // value in the future. Like this, we avoid an unnecessary heap allocation
+                // if the expression we are hashing is a simple non-recursive function.
+                assert(!func_map.contains(f_id));
+                if (!stack.empty()) {
+                    func_map.emplace(f_id, seed);
+                }
+
+                // Add it to hash_stack.
+                // NOTE: the hash stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty hash we
+                // pushed the first time we visited).
+                assert(!hash_stack.empty());
+                assert(!hash_stack.back());
+                hash_stack.back().emplace(seed);
+            } else {
+                // It is the first time we visit this function. Re-add it to the stack
+                // with visited=true, and add all of its arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &arg : f.args()) {
+                    stack.emplace_back(&arg, false);
+                }
+
+                // Add an empty hash to hash_stack. We will add the real hash
+                // later once we have hashed all arguments.
+                hash_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            hash_stack.emplace_back(std::visit(
+                []<typename T>(const T &arg) -> std::size_t {
+                    if constexpr (std::same_as<func, T>) {
+                        // LCOV_EXCL_START
+                        assert(false);
+                        return 0;
+                        // LCOV_EXCL_STOP
+                    } else {
+                        return std::hash<T>{}(arg);
+                    }
+                },
+                cur_ex->value()));
+        }
+    }
+
+    assert(hash_stack.size() == 1u);
+    assert(hash_stack.back());
+
+    // NOTE: usually we pop back the only element of hash_stack here, but because
+    // we do not have a vectorised counterpart of hashing we can omit this step
+    // (which is needed in order to prepare hash_stack for the next expression in
+    // the vector).
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return *hash_stack.back();
 }
-
-} // namespace detail
-
-namespace detail
-{
 
 namespace
 {
@@ -617,70 +784,102 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
     return os << oss.str();
 }
 
-namespace detail
-{
-
-namespace
-{
-
-// Exception to signal that the computation
-// of the number of nodes resulted in overflow.
-struct too_many_nodes : std::exception {
-};
-
-// NOLINTNEXTLINE(misc-no-recursion)
-std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &arg) -> std::size_t {
-            if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the number of nodes for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                boost::safe_numerics::safe<std::size_t> retval = 1;
-
-                for (const auto &ex : arg.args()) {
-                    try {
-                        retval += get_n_nodes(func_map, ex);
-                    } catch (...) {
-                        throw too_many_nodes{};
-                    }
-                }
-
-                // Store the number of nodes for the current function
-                // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return 1;
-            }
-        },
-        e.value());
-}
-
-} // namespace
-
-} // namespace detail
-
 // NOTE: this always returns a number > 0, unless an overflow
 // occurs due to the expression being too large. In such case,
 // zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
     detail::funcptr_map<std::size_t> func_map;
+    detail::traverse_stack stack{{&e, false}};
+    boost::safe_numerics::safe<std::size_t> retval = 0;
 
     try {
-        return detail::get_n_nodes(func_map, e);
-    } catch (const detail::too_many_nodes &) {
+        while (!stack.empty()) {
+            // Pop the stack.
+            const auto [cur_ex, visited] = stack.back();
+            stack.pop_back();
+
+            if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+                // Function (i.e., internal) node.
+                const auto &f = *f_ptr;
+
+                // Fetch the function id.
+                const auto *f_id = f.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the number of nodes for the current
+                    // function, add it to retval.
+                    assert(!visited);
+                    retval += it->second;
+                    continue;
+                }
+
+                if (visited) {
+                    // This is the second time we visit the function. We can now
+                    // compute its number of nodes.
+
+                    // Count the function node itself.
+                    boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+
+                    // Count the number of nodes in the arguments.
+                    for (const auto &ex : f.args()) {
+                        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                            // The argument is a function. Its number of nodes was already
+                            // computed and it must be available in the cache.
+                            assert(func_map.contains(fptr->get_ptr()));
+                            n_nodes += func_map.find(fptr->get_ptr())->second;
+                        } else {
+                            // The argument is a non-function (i.e., a leaf node). Increase
+                            // the count by one.
+                            ++n_nodes;
+                        }
+                    }
+
+                    // Store the number of nodes for the current function
+                    // in the cache.
+                    assert(!func_map.contains(f_id));
+                    func_map.emplace(f_id, n_nodes);
+
+                    // NOTE: by incrementing by 1 here we are accounting only for the function node
+                    // itself. It is not necessary to account for the total number of nodes n_nodes
+                    // because all the children nodes were already counted during visitation
+                    // of the current function.
+                    ++retval;
+                } else {
+                    // It is the first time we visit this function. Re-add it to the stack
+                    // with visited=true, and add all of its arguments to the stack as well.
+                    stack.emplace_back(cur_ex, true);
+
+                    for (const auto &ex : f.args()) {
+                        stack.emplace_back(&ex, false);
+                    }
+
+                    // NOTE: we do not know at this stage what the total number of nodes
+                    // for the current function is. This will be available the next time we
+                    // pop the function from the stack. In the meantime do **not** increment retval.
+                }
+            } else {
+                // Non-function (i.e., leaf) node.
+                assert(!visited);
+                ++retval;
+            }
+        }
+
+        return retval;
+    } catch (const std::system_error &) {
+        // NOTE: this is not ideal, as in principle system_error may be thrown
+        // by something other than overflow errors in boost::safe_numerics. However, as much
+        // as I tried, I could not find out a way to detect if the thrown system_error
+        // is coming out of boost::safe_numerics. It should be just a matter of comparing
+        // the error code in the exception to the predefined error codes in boost::safe_numerics,
+        // but for some reason this does not work. I suspect it has something to do with
+        // the error category comparison failing because the error category of the code
+        // in the exception is not the same object (same address) of the error category
+        // in the predefined error codes. I don't understand why this has to be so complicated
+        // but don't have the time to investigate now :(
+        //
+        // https://en.cppreference.com/w/cpp/error/error_code/operator_cmp
+
         return 0;
     }
 }
