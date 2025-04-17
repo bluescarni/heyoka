@@ -61,6 +61,7 @@ std::optional<T> parse_sw_data_celestrak_value(const std::ranges::contiguous_ran
 }
 
 // Helper to parse a UTC date from a celestrak SW datafile as a UTC mjd.
+// NOTE: we assume that the date is always present.
 double parse_sw_data_celestrak_mjd(const std::ranges::contiguous_range auto &cur_field)
 {
     // Fetch the range of data.
