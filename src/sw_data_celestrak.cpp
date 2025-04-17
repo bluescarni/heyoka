@@ -35,7 +35,7 @@ namespace detail
 namespace
 {
 
-// Helper to parse a value from a field in a row of a celestrak SW data.
+// Helper to parse a value from a field in a row of a celestrak SW data file.
 template <typename T>
 std::optional<T> parse_sw_data_celestrak_value(const std::ranges::contiguous_range auto &cur_field)
 {
@@ -60,7 +60,7 @@ std::optional<T> parse_sw_data_celestrak_value(const std::ranges::contiguous_ran
     return retval;
 }
 
-// Helper to parse a UTC date from a celestrak SW datafile as a UTC mjd.
+// Helper to parse a UTC calendar date from a celestrak SW datafile as a UTC mjd.
 // NOTE: we assume that the date is always present.
 double parse_sw_data_celestrak_mjd(const std::ranges::contiguous_range auto &cur_field)
 {
@@ -106,9 +106,11 @@ double parse_sw_data_celestrak_mjd(const std::ranges::contiguous_range auto &cur
     double djm0{}, djm{};
     const auto ret = ::eraCal2jd(year, month, day, &djm0, &djm);
     if (ret != 0) [[unlikely]] {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Error parsing a celestrak SW data file: the conversion of the ISO "
                                                 "8601 date string '{}' to a Julian date produced the error code {}",
                                                 std::string_view(begin, end), ret));
+        // LCOV_EXCL_STOP
     }
 
     // NOTE: the eraCal2jd() function returns directly the mjd as djm.
