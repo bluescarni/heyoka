@@ -51,8 +51,10 @@ void validate_sw_data_table(const sw_data_table &data)
         // All mjd values must be finite and ordered in strictly ascending order.
         const auto cur_mjd = data[i].mjd;
         if (!std::isfinite(cur_mjd)) [[unlikely]] {
+            // LCOV_EXCL_START
             throw std::invalid_argument(
                 fmt::format("Invalid SW data table detected: the MJD value {} on line {} is not finite", cur_mjd, i));
+            // LCOV_EXCL_STOP
         }
         // NOTE: if data[i + 1u].mjd is NaN, then cur_mjd >= data[i + 1u].mjd evaluates
         // to false and we will throw on the next iteration when we detect a non-finite

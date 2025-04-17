@@ -9,6 +9,7 @@
 #ifndef HEYOKA_SW_DATA_HPP
 #define HEYOKA_SW_DATA_HPP
 
+#include <compare>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -30,6 +31,9 @@ struct HEYOKA_DLL_PUBLIC sw_data_row {
     double f107 = 0;
     // 81-day arithmetic average of observed F10.7 centred on the date.
     double f107a_center81 = 0;
+
+    // NOTE: used for testing.
+    auto operator<=>(const sw_data_row &) const = default;
 
 private:
     // Serialization.
