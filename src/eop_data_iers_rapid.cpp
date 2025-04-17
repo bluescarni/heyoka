@@ -23,7 +23,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/https_download.hpp>
+#include <heyoka/detail/http_download.hpp>
 #include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE

@@ -32,7 +32,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/https_download.hpp>
+#include <heyoka/detail/http_download.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -43,16 +43,16 @@ namespace
 {
 
 // List of abbreviated month names.
-constexpr std::array<std::string_view, 12> https_download_month_names
+constexpr std::array<std::string_view, 12> http_download_month_names
     = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 // Map to associate abbreviated month names to [1, 12] indices.
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto https_download_month_names_map = []() {
+const auto http_download_month_names_map = []() {
     std::unordered_map<std::string_view, unsigned> retval;
 
     for (auto i = 0u; i < 12u; ++i) {
-        retval.emplace(https_download_month_names[i], i + 1u);
+        retval.emplace(http_download_month_names[i], i + 1u);
     }
 
     return retval;
@@ -63,12 +63,12 @@ const auto https_download_month_names_map = []() {
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto https_download_date_regexp = std::regex(
+const auto http_download_date_regexp = std::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
-                fmt::join(https_download_month_names, "|")));
+                fmt::join(http_download_month_names, "|")));
 
 // Helper to extract from the "Last-Modified" field of an http response the timestamp.
-std::string https_download_parse_last_modified(std::string_view lm_field)
+std::string http_download_parse_last_modified(std::string_view lm_field)
 {
     // Helper to parse an unsigned integral quantity from the range [begin, end). 'name'
     // is the name of the quantity, to be used only for error reporting.
@@ -86,7 +86,7 @@ std::string https_download_parse_last_modified(std::string_view lm_field)
     };
 
     std::cmatch matches;
-    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, https_download_date_regexp))
+    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, http_download_date_regexp))
         [[likely]] {
         // Check if all groups matched.
         // NOTE: 7 + 1 because the first match is the entire string.
@@ -97,8 +97,8 @@ std::string https_download_parse_last_modified(std::string_view lm_field)
             // Parse the month.
             const auto month_str = std::string_view(matches[3].first, matches[3].second);
             // NOTE: this must hold because the regex matched.
-            assert(https_download_month_names_map.contains(month_str));
-            const auto month = https_download_month_names_map.find(month_str)->second;
+            assert(http_download_month_names_map.contains(month_str));
+            const auto month = http_download_month_names_map.find(month_str)->second;
 
             // Parse the year.
             const auto year = uint_parse(matches[4].first, matches[4].second, "year");
@@ -126,6 +126,7 @@ std::string https_download_parse_last_modified(std::string_view lm_field)
 // NOTE: code adapted from here:
 //
 // https://github.com/boostorg/beast/blob/develop/example/http/client/async-ssl/http_client_async_ssl.cpp
+// https://github.com/boostorg/beast/blob/develop/example/http/client/async/http_client_async.cpp
 namespace net = boost::asio;
 namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
@@ -146,7 +147,7 @@ void check_error(beast::error_code ec, const char *id)
     }
 }
 
-class session : public std::enable_shared_from_this<session>
+class https_session : public std::enable_shared_from_this<https_session>
 {
     tcp::resolver resolver_;
     ssl::stream<beast::tcp_stream> stream_;
@@ -158,9 +159,9 @@ class session : public std::enable_shared_from_this<session>
     std::string body_;
 
 public:
-    explicit session(net::any_io_executor ex, ssl::context &ctx) : resolver_(ex), stream_(ex, ctx) {}
+    explicit https_session(net::any_io_executor ex, ssl::context &ctx) : resolver_(ex), stream_(ex, ctx) {}
 
-    // Helper to move the data out after download is completed.
+    // Helpers to move the data out after download is completed.
     auto move_timestamp()
     {
         return std::move(timestamp_);
@@ -186,7 +187,7 @@ public:
         req_.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
         // Look up the domain name.
-        resolver_.async_resolve(host, port, beast::bind_front_handler(&session::on_resolve, shared_from_this()));
+        resolver_.async_resolve(host, port, beast::bind_front_handler(&https_session::on_resolve, shared_from_this()));
     }
 
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
@@ -199,7 +200,7 @@ public:
 
         // Make the connection on the IP address we get from a lookup.
         beast::get_lowest_layer(stream_).async_connect(
-            results, beast::bind_front_handler(&session::on_connect, shared_from_this()));
+            results, beast::bind_front_handler(&https_session::on_connect, shared_from_this()));
     }
 
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
@@ -209,7 +210,7 @@ public:
 
         // Perform the SSL handshake.
         stream_.async_handshake(ssl::stream_base::client,
-                                beast::bind_front_handler(&session::on_handshake, shared_from_this()));
+                                beast::bind_front_handler(&https_session::on_handshake, shared_from_this()));
     }
 
     void on_handshake(beast::error_code ec)
@@ -220,7 +221,7 @@ public:
         beast::get_lowest_layer(stream_).expires_after(timeout_duration);
 
         // Send the HTTP request to the remote host.
-        http::async_write(stream_, req_, beast::bind_front_handler(&session::on_write, shared_from_this()));
+        http::async_write(stream_, req_, beast::bind_front_handler(&https_session::on_write, shared_from_this()));
     }
 
     void on_write(beast::error_code ec, std::size_t)
@@ -228,7 +229,8 @@ public:
         check_error(ec, "write");
 
         // Receive the HTTP response.
-        http::async_read(stream_, buffer_, res_, beast::bind_front_handler(&session::on_read, shared_from_this()));
+        http::async_read(stream_, buffer_, res_,
+                         beast::bind_front_handler(&https_session::on_read, shared_from_this()));
     }
 
     void on_read(beast::error_code ec, std::size_t)
@@ -236,7 +238,7 @@ public:
         check_error(ec, "read");
 
         // Parse the "last modified field" to construct the timestamp.
-        timestamp_ = https_download_parse_last_modified(res_[http::field::last_modified]);
+        timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
 
         // Fetch the message body.
         body_ = res_.body();
@@ -245,7 +247,7 @@ public:
         beast::get_lowest_layer(stream_).expires_after(timeout_duration);
 
         // Gracefully close the stream.
-        stream_.async_shutdown(beast::bind_front_handler(&session::on_shutdown, shared_from_this()));
+        stream_.async_shutdown(beast::bind_front_handler(&https_session::on_shutdown, shared_from_this()));
     }
 
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -270,6 +272,100 @@ public:
         if (ec != net::ssl::error::stream_truncated) {
             check_error(ec, "shutdown");
         }
+    }
+};
+
+class http_session : public std::enable_shared_from_this<http_session>
+{
+    tcp::resolver resolver_;
+    beast::tcp_stream stream_;
+    beast::flat_buffer buffer_; // (Must persist between reads)
+    http::request<http::empty_body> req_;
+    http::response<http::string_body> res_;
+    // This is the data we will extract from the http message.
+    std::string timestamp_;
+    std::string body_;
+
+public:
+    explicit http_session(net::io_context &ioc) : resolver_(net::make_strand(ioc)), stream_(net::make_strand(ioc)) {}
+
+    // Helpers to move the data out after download is completed.
+    auto move_timestamp()
+    {
+        return std::move(timestamp_);
+    }
+    auto move_body()
+    {
+        return std::move(body_);
+    }
+
+    // Start the asynchronous operation.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    void run(char const *host, char const *port, char const *target)
+    {
+        // Set up an HTTP GET request message.
+        // NOTE: the '11' here means HTTP 1.1.
+        req_.version(11);
+        req_.method(http::verb::get);
+        req_.target(target);
+        req_.set(http::field::host, host);
+        req_.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+        // Look up the domain name.
+        resolver_.async_resolve(host, port, beast::bind_front_handler(&http_session::on_resolve, shared_from_this()));
+    }
+
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    void on_resolve(beast::error_code ec, tcp::resolver::results_type results)
+    {
+        check_error(ec, "resolve");
+
+        // Set a timeout on the operation.
+        stream_.expires_after(timeout_duration);
+
+        // Make the connection on the IP address we get from a lookup.
+        stream_.async_connect(results, beast::bind_front_handler(&http_session::on_connect, shared_from_this()));
+    }
+
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type)
+    {
+        check_error(ec, "connect");
+
+        // Set a timeout on the operation.
+        stream_.expires_after(timeout_duration);
+
+        // Send the HTTP request to the remote host.
+        http::async_write(stream_, req_, beast::bind_front_handler(&http_session::on_write, shared_from_this()));
+    }
+
+    void on_write(beast::error_code ec, std::size_t)
+    {
+        check_error(ec, "write");
+
+        // Receive the HTTP response.
+        http::async_read(stream_, buffer_, res_, beast::bind_front_handler(&http_session::on_read, shared_from_this()));
+    }
+
+    void on_read(beast::error_code ec, std::size_t)
+    {
+        check_error(ec, "read");
+
+        // Parse the "last modified field" to construct the timestamp.
+        timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
+
+        // Fetch the message body.
+        body_ = res_.body();
+
+        // Gracefully close the socket.
+        stream_.socket().shutdown(tcp::socket::shutdown_both, ec);
+
+        // not_connected happens sometimes so don't bother reporting it.
+        if (ec != beast::errc::not_connected) {
+            check_error(ec, "shutdown");
+        }
+
+        // If we get here then the connection is closed gracefully.
     }
 };
 
@@ -298,7 +394,7 @@ std::pair<std::string, std::string> https_download(const std::string &host, unsi
         // Launch the asynchronous operation. The session is constructed with a strand to
         // ensure that handlers do not execute concurrently.
         const auto port_str = fmt::format("{}", port);
-        auto sesh = std::make_shared<detail::session>(net::make_strand(ioc), ctx);
+        auto sesh = std::make_shared<detail::https_session>(net::make_strand(ioc), ctx);
         sesh->run(host.c_str(), port_str.c_str(), target.c_str());
 
         // Run the I/O service. The call will return when the get operation is complete.
@@ -312,6 +408,36 @@ std::pair<std::string, std::string> https_download(const std::string &host, unsi
         throw std::invalid_argument(fmt::format("Error invoking https_download(): {}", ex.what()));
     } catch (...) {
         throw std::invalid_argument("Error invoking https_download()");
+    }
+    // LCOV_EXCL_STOP
+}
+
+// NOTE: this is a function to download a file from a remote server via http. In addition to the file,
+// its timestamp on the remote server will also be returned in the format year_month_day_hour_minute_second.
+std::pair<std::string, std::string> http_download(const std::string &host, unsigned port, const std::string &target)
+{
+    try {
+        namespace net = boost::asio;
+
+        // The io_context is required for all I/O.
+        net::io_context ioc;
+
+        // Launch the asynchronous operation.
+        const auto port_str = fmt::format("{}", port);
+        auto sesh = std::make_shared<detail::http_session>(ioc);
+        sesh->run(host.c_str(), port_str.c_str(), target.c_str());
+
+        // Run the I/O service. The call will return when the get operation is complete.
+        ioc.run();
+
+        // Construct and return.
+        return std::make_pair(sesh->move_body(), sesh->move_timestamp());
+
+        // LCOV_EXCL_START
+    } catch (const std::exception &ex) {
+        throw std::invalid_argument(fmt::format("Error invoking http_download(): {}", ex.what()));
+    } catch (...) {
+        throw std::invalid_argument("Error invoking http_download()");
     }
     // LCOV_EXCL_STOP
 }
