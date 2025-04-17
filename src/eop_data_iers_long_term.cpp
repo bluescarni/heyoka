@@ -83,8 +83,11 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         auto field_range = cur_line | std::views::split(';');
         // NOTE: keep track of the field index.
         boost::safe_numerics::safe<unsigned> field_idx = 0;
-        for (auto field_it = std::ranges::begin(field_range); field_it != std::ranges::end(field_range);
-             ++field_it, ++field_idx) {
+        for (auto field_it = std::ranges::begin(field_range);
+             // NOTE: here we check with <= in order to make sure we read the last field.
+             // This means that, on a correct parse, field_idx will have a value of
+             // last_field_idx + 1 when exiting the loop.
+             field_idx <= last_field_idx && field_it != std::ranges::end(field_range); ++field_it, ++field_idx) {
             switch (static_cast<unsigned>(field_idx)) {
                 case 0u:
                     // Parse the mjd.
@@ -112,15 +115,10 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
                     break;
                 default:;
             }
-
-            // Break out if we parsed the last field.
-            if (field_idx == last_field_idx) {
-                break;
-            }
         }
 
         // Check if we parsed everything we needed to.
-        if (field_idx != last_field_idx) [[unlikely]] {
+        if (field_idx != last_field_idx + 1u) [[unlikely]] {
             // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format("Error parsing a IERS long term EOP data file: at least {} fields "
                                                     // LCOV_EXCL_STOP
