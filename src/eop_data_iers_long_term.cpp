@@ -21,6 +21,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/https_download.hpp>
 #include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -143,7 +144,7 @@ eop_data eop_data::fetch_latest_iers_long_term()
 {
     // Download the file.
     constexpr auto filename = "eopc04_20.1962-now.csv";
-    auto [text, timestamp] = download("datacenter.iers.org", 443, fmt::format("/data/csv/{}", filename));
+    auto [text, timestamp] = detail::https_download("datacenter.iers.org", 443, fmt::format("/data/csv/{}", filename));
 
     // Build the identifier string.
     auto identifier = fmt::format("iers_long_term_{}", filename);

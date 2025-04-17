@@ -12,7 +12,6 @@
 #include <compare>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -76,10 +75,6 @@ public:
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
     [[nodiscard]] const std::string &get_identifier() const noexcept;
 
-private:
-    static std::pair<std::string, std::string> download(const std::string &, unsigned, const std::string &);
-
-public:
     static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
     static eop_data fetch_latest_iers_long_term();
 };

@@ -32,7 +32,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/eop_data.hpp>
+#include <heyoka/detail/https_download.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -43,16 +43,16 @@ namespace
 {
 
 // List of abbreviated month names.
-constexpr std::array<std::string_view, 12> eop_data_month_names
+constexpr std::array<std::string_view, 12> https_download_month_names
     = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 // Map to associate abbreviated month names to [1, 12] indices.
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto eop_data_month_names_map = []() {
+const auto https_download_month_names_map = []() {
     std::unordered_map<std::string_view, unsigned> retval;
 
     for (auto i = 0u; i < 12u; ++i) {
-        retval.emplace(eop_data_month_names[i], i + 1u);
+        retval.emplace(https_download_month_names[i], i + 1u);
     }
 
     return retval;
@@ -63,13 +63,12 @@ const auto eop_data_month_names_map = []() {
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto eop_data_date_regexp = std::regex(
+const auto https_download_date_regexp = std::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
-                fmt::join(eop_data_month_names, "|")));
+                fmt::join(https_download_month_names, "|")));
 
-// Helper to extract from the "Last-Modified" field of an http response the timestamp in the format required
-// by the eop_data class.
-std::string eop_data_parse_last_modified(std::string_view lm_field)
+// Helper to extract from the "Last-Modified" field of an http response the timestamp.
+std::string https_download_parse_last_modified(std::string_view lm_field)
 {
     // Helper to parse an unsigned integral quantity from the range [begin, end). 'name'
     // is the name of the quantity, to be used only for error reporting.
@@ -87,7 +86,7 @@ std::string eop_data_parse_last_modified(std::string_view lm_field)
     };
 
     std::cmatch matches;
-    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, eop_data_date_regexp))
+    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, https_download_date_regexp))
         [[likely]] {
         // Check if all groups matched.
         // NOTE: 7 + 1 because the first match is the entire string.
@@ -98,8 +97,8 @@ std::string eop_data_parse_last_modified(std::string_view lm_field)
             // Parse the month.
             const auto month_str = std::string_view(matches[3].first, matches[3].second);
             // NOTE: this must hold because the regex matched.
-            assert(eop_data_month_names_map.contains(month_str));
-            const auto month = eop_data_month_names_map.find(month_str)->second;
+            assert(https_download_month_names_map.contains(month_str));
+            const auto month = https_download_month_names_map.find(month_str)->second;
 
             // Parse the year.
             const auto year = uint_parse(matches[4].first, matches[4].second, "year");
@@ -237,7 +236,7 @@ public:
         check_error(ec, "read");
 
         // Parse the "last modified field" to construct the timestamp.
-        timestamp_ = eop_data_parse_last_modified(res_[http::field::last_modified]);
+        timestamp_ = https_download_parse_last_modified(res_[http::field::last_modified]);
 
         // Fetch the message body.
         body_ = res_.body();
@@ -276,10 +275,9 @@ public:
 
 } // namespace
 
-} // namespace detail
-
-std::pair<std::string, std::string> eop_data::download(const std::string &host, unsigned port,
-                                                       const std::string &target)
+// NOTE: this is a function to download a file from a remote server via https. In addition to the file,
+// its timestamp on the remote server will also be returned in the format year_month_day_hour_minute_second.
+std::pair<std::string, std::string> https_download(const std::string &host, unsigned port, const std::string &target)
 {
     try {
         namespace net = boost::asio;
@@ -311,11 +309,13 @@ std::pair<std::string, std::string> eop_data::download(const std::string &host, 
 
         // LCOV_EXCL_START
     } catch (const std::exception &ex) {
-        throw std::invalid_argument(fmt::format("Error while trying to download EOP data: {}", ex.what()));
+        throw std::invalid_argument(fmt::format("Error invoking https_download(): {}", ex.what()));
     } catch (...) {
-        throw std::invalid_argument("Error while trying to download EOP data");
+        throw std::invalid_argument("Error invoking https_download()");
     }
     // LCOV_EXCL_STOP
 }
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE

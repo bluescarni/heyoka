@@ -190,6 +190,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/https_download.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -208,7 +209,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
     # VSOP2013 details.
