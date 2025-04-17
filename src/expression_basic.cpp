@@ -713,8 +713,10 @@ std::size_t hash(const expression &ex) noexcept
             hash_stack.emplace_back(std::visit(
                 []<typename T>(const T &arg) -> std::size_t {
                     if constexpr (std::same_as<func, T>) {
+                        // LCOV_EXCL_START
                         assert(false);
                         return 0;
+                        // LCOV_EXCL_STOP
                     } else {
                         return std::hash<T>{}(arg);
                     }
