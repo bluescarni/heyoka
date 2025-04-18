@@ -939,7 +939,7 @@ TEST_CASE("eop_data locate_date")
             auto *date = detail::ext_load_vector_from_memory(s, scal_t, date_ptr, batch_size);
 
             // Run the binary search.
-            auto *ret = detail::llvm_eop_data_locate_date(s, arr_ptr, arr_size, date);
+            auto *ret = detail::llvm_eop_sw_data_locate_date(s, arr_ptr, arr_size, date);
 
             // Write the result to out_ptr.
             detail::ext_store_vector_to_memory(s, out_ptr, ret);

@@ -124,7 +124,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     auto *arr_size_splat = hd::vector_splat(bld, arr_size, batch_size);
 
     // Locate the index in date_ptr of the time interval containing tm_val.
-    auto *idx = hd::llvm_eop_data_locate_date(s, date_ptr, arr_size, tm_val);
+    auto *idx = hd::llvm_eop_sw_data_locate_date(s, date_ptr, arr_size, tm_val);
 
     // Codegen nan for use later.
     auto *nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});
@@ -357,7 +357,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     auto *arr_size_splat = hd::vector_splat(bld, arr_size, batch_size);
 
     // Locate the index in date_ptr of the time interval containing tm_val.
-    auto *idx = hd::llvm_eop_data_locate_date(s, date_ptr, arr_size, tm_val);
+    auto *idx = hd::llvm_eop_sw_data_locate_date(s, date_ptr, arr_size, tm_val);
 
     // Codegen nan for use later.
     auto *nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});

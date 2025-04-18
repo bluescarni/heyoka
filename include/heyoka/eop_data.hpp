@@ -95,9 +95,6 @@ void validate_eop_data_table(const eop_data_table &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dX(llvm_state &, const eop_data &, llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dY(llvm_state &, const eop_data &, llvm::Type *);
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_data_locate_date(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                       llvm::Value *);
-
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

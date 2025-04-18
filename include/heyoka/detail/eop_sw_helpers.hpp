@@ -15,6 +15,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -22,12 +23,17 @@ namespace detail
 {
 
 template <typename Data>
-llvm::Value *llvm_get_eop_sw_data(llvm_state &, const Data &, llvm::Type *, const std::string_view &,
-                                  const std::function<llvm::Constant *(const typename Data::row_type &)> &,
-                                  const std::string_view &);
+[[nodiscard]] llvm::Value *
+llvm_get_eop_sw_data(llvm_state &, const Data &, llvm::Type *, const std::string_view &,
+                     const std::function<llvm::Constant *(const typename Data::row_type &)> &,
+                     const std::string_view &);
 
 template <typename Data>
-llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &, const Data &, llvm::Type *, const std::string_view &);
+[[nodiscard]] llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &, const Data &, llvm::Type *,
+                                                                 const std::string_view &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                          llvm::Value *);
 
 } // namespace detail
 
