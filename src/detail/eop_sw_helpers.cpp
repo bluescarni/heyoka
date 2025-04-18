@@ -39,7 +39,6 @@
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -152,9 +151,7 @@ template <typename Data>
 llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &s, const Data &data, llvm::Type *scal_t,
                                                    const std::string_view &data_id)
 {
-    auto *logger = get_logger();
-
-    const auto value_getter = [logger, &s, scal_t](const auto &r) {
+    const auto value_getter = [&s, scal_t](const auto &r) {
         // Fetch the UTC mjd.
         const auto utc_mjd = r.mjd;
 

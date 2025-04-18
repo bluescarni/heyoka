@@ -36,7 +36,6 @@
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -195,8 +194,6 @@ namespace detail
 // global array is itself a 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
-    auto *logger = get_logger();
-
     // NOTE: for the ERA data specifically, we want to make sure that the array size x 2 is representable
     // as a 32-bit int. The reason for this is that in the implementation of the era/erap functions,
     // we will be reinterpreting the array of size-2 arrays as a 1D flattened array, into which we want
@@ -210,7 +207,7 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
     // Determine the value type.
     auto *value_t = llvm::ArrayType::get(scal_t, 2);
 
-    const auto value_getter = [logger, &s, scal_t, value_t](const eop_data_row &r) {
+    const auto value_getter = [&s, scal_t, value_t](const eop_data_row &r) {
         // Fetch the UTC mjd.
         const auto utc_mjd = r.mjd;
 
