@@ -1151,7 +1151,7 @@ llvm::Function *taylor_c_diff_func_eopp_impl(llvm_state &, llvm::Type *, const e
                                              std::uint32_t, const eop_data &, const std::string &)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of an eop quantity compact mode");
+                                "of the derivative of an eop quantity in compact mode");
 }
 
 // LCOV_EXCL_STOP
