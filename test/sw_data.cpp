@@ -23,18 +23,18 @@
 
 // #include <fmt/core.h>
 
-// #include <llvm/IR/BasicBlock.h>
-// #include <llvm/IR/DerivedTypes.h>
-// #include <llvm/IR/Function.h>
-// #include <llvm/IR/IRBuilder.h>
-// #include <llvm/IR/LLVMContext.h>
-// #include <llvm/IR/Module.h>
-// #include <llvm/IR/Type.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
-// #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/sw_data.hpp>
-// #include <heyoka/llvm_state.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/sw_data.hpp>
 
 #include "catch.hpp"
 // #include "test_utils.hpp"
@@ -376,12 +376,10 @@ TEST_CASE("s11n")
     REQUIRE(oidentifier == idata.get_identifier());
 }
 
-#if 0
-
-TEST_CASE("eop_data_date_tt_cy_j2000")
+TEST_CASE("sw_data_Ap_avg")
 {
-    // Fetch the default eop_data.
-    const eop_data data;
+    // Fetch the default sw_data.
+    const sw_data data;
 
     auto tester = [&data]<typename T>() {
         llvm_state s;
@@ -392,157 +390,31 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
 
         auto *scal_t = detail::to_external_llvm_type<T>(ctx);
 
-        // Add dummy function that uses the array, returning a pointer to the first element.
+        // Add dummy functions that use the arrays, returning pointers to the first elements.
         auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
-
-        // Add a second function to test that we do not generate the data twice.
-        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
-        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_sw_data_Ap_avg(s, data, scal_t));
 
         // Compile and fetch the function pointer.
         s.compile();
         auto *fptr = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
 
-        // Check manually a few values. These values have been computed with astropy.
-        REQUIRE(*fptr() == approximately(static_cast<T>(-0.2699657628640961)));
-        REQUIRE(*(fptr() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
-    };
-
-    tester.operator()<float>();
-    tester.operator()<double>();
-
-    // A test with llvm multi state to check proper linkonce behaviour.
-    auto multi_tester = [&data]<typename T>() {
-        std::vector<llvm_state> vs;
-
-        for (auto i : {1, 2}) {
-            llvm_state s;
-
-            auto &bld = s.builder();
-            auto &ctx = s.context();
-            auto &md = s.module();
-
-            auto *scal_t = detail::to_external_llvm_type<T>(ctx);
-
-            // Add dummy function that uses the array, returning a pointer to the first element.
-            auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
-            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fmt::format("test_{}", i), &md);
-            bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-            bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
-
-            vs.push_back(std::move(s));
-        }
-
-        llvm_multi_state ms(std::move(vs));
-
-        // Compile and fetch the function pointer.
-        ms.compile();
-        auto *fptr1 = reinterpret_cast<const T *(*)()>(ms.jit_lookup("test_1"));
-        auto *fptr2 = reinterpret_cast<const T *(*)()>(ms.jit_lookup("test_2"));
-
-        // Check manually a few values. These values have been computed with astropy.
-        REQUIRE(*fptr1() == approximately(static_cast<T>(-0.2699657628640961)));
-        REQUIRE(*(fptr1() + 6308) == approximately(static_cast<T>(-0.09726213109235177)));
-        REQUIRE(*(fptr1() + 19128) == approximately(static_cast<T>(0.2537303436205542)));
-
-        REQUIRE(*fptr1() == *fptr2());
-        REQUIRE(*(fptr1() + 6308) == *(fptr2() + 6308));
-        REQUIRE(*(fptr1() + 19128) == *(fptr2() + 19128));
-    };
-
-    multi_tester.operator()<float>();
-    multi_tester.operator()<double>();
-}
-
-TEST_CASE("eop_data_era")
-{
-    // Fetch the default eop_data.
-    const eop_data data;
-
-    auto tester = [&data]<typename T>() {
-        llvm_state s;
-
-        auto &bld = s.builder();
-        auto &ctx = s.context();
-        auto &md = s.module();
-
-        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
-
-        // Add dummy function that uses the array, returning a pointer to the first element.
-        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
-        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
-        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_era(s, data, scal_t));
-
-        // Compile and fetch the function pointer.
-        s.compile();
-        using arr_t = T[2];
-        auto *fptr = reinterpret_cast<const arr_t *(*)()>(s.jit_lookup("test"));
-
         // Fetch the array pointer.
         const auto *arr_ptr = fptr();
 
-        // We will be loading the double-length ERA approximation and reduce it in octuple precision.
-        // Then, we will compare it to values computed with astropy.
-        using oct_t = boost::multiprecision::cpp_bin_float_oct;
-        auto reducer = [](const auto &x) {
-            using std::atan2;
-            using std::sin;
-            using std::cos;
-
-            auto ret = atan2(sin(x), cos(x));
-            if (ret < 0) {
-
-                ret = 2 * boost::math::constants::pi<oct_t>() + ret;
-            }
-            return ret;
-        };
-
-        // NOTE: here we use a high tolerance of 1e-6 because for the life of me
-        // I cannot figure out what kind of IERS data astropy is actually using for these
-        // calculations. They say they are using some sort of mix between IERS A and IERS B
-        // data but my attempts at trying to figure out exactly how this is done have consistently
-        // failed. The fact that I cannot really understand whether or not I am using the very
-        // latest data (and not a cached and outdated copy) just adds to the confusion.
-        //
-        // More generally, it seems like the whole situation about self-consistency of IERS
-        // data is a mess, with slightly contradictory data being distributed in the "rapid" and
-        // "long-term" datasets. See, e.g., the comments here:
-        //
-        // https://github.com/astropy/astropy/pull/4436
-        using std::abs;
-        {
-            oct_t era{arr_ptr[0][0]};
-            era += arr_ptr[0][1];
-            REQUIRE(abs(reducer(era) - 1.7773390613567774) < 1e-6);
-        }
-
-        {
-            oct_t era{arr_ptr[6308][0]};
-            era += arr_ptr[6308][1];
-            REQUIRE(abs(reducer(era) - 3.4744869507397453) < 1e-6);
-        }
-
-        {
-            oct_t era{arr_ptr[19128][0]};
-            era += arr_ptr[19128][1];
-            REQUIRE(abs(reducer(era) - 4.094937357962103) < 1e-6);
-        }
+        // Just check the first value.
+        REQUIRE(arr_ptr[0] == 2);
     };
 
-    // NOTE: test only double for the ERA.
+    tester.operator()<float>();
     tester.operator()<double>();
 }
 
-TEST_CASE("eop_data_pm_x_pm_y")
+TEST_CASE("sw_data_f107")
 {
-    // Fetch the default eop_data.
-    const eop_data data;
+    // Fetch the default sw_data.
+    const sw_data data;
 
     auto tester = [&data]<typename T>() {
         llvm_state s;
@@ -557,11 +429,11 @@ TEST_CASE("eop_data_pm_x_pm_y")
         auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_pm_x(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_sw_data_f107(s, data, scal_t));
 
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_pm_y(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_sw_data_f107a_center81(s, data, scal_t));
 
         // Compile and fetch the function pointers.
         s.compile();
@@ -573,64 +445,23 @@ TEST_CASE("eop_data_pm_x_pm_y")
         const auto *arr_ptr2 = fptr2();
 
         // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(0.143 * boost::math::constants::pi<double>() / (180. * 3600)));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(0.137 * boost::math::constants::pi<double>() / (180. * 3600)));
+        REQUIRE(arr_ptr1[0] == static_cast<T>(71.8));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(71.4));
     };
 
     tester.operator()<float>();
     tester.operator()<double>();
 }
 
-TEST_CASE("eop_data_dX_dY")
+// Test to check the download code.
+TEST_CASE("download")
 {
-    // Fetch the default eop_data.
-    const eop_data data;
-
-    auto tester = [&data]<typename T>() {
-        llvm_state s;
-
-        auto &bld = s.builder();
-        auto &ctx = s.context();
-        auto &md = s.module();
-
-        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
-
-        // Add dummy functions that use the arrays, returning pointers to the first elements.
-        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
-        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
-        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_dX(s, data, scal_t));
-
-        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
-        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_dY(s, data, scal_t));
-
-        // Compile and fetch the function pointers.
-        s.compile();
-        auto *fptr1 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test"));
-        auto *fptr2 = reinterpret_cast<const T *(*)()>(s.jit_lookup("test2"));
-
-        // Fetch the array pointers.
-        const auto *arr_ptr1 = fptr1();
-        const auto *arr_ptr2 = fptr2();
-
-        // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(-18.637 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(-3.667 * boost::math::constants::pi<double>() / (180. * 3600 * 1000)));
-    };
-
-    tester.operator()<float>();
-    tester.operator()<double>();
-}
-
-// Test to check the download code. We pick a small file for testing.
-TEST_CASE("download finals2000A.daily")
-{
-    const auto data = eop_data::fetch_latest_iers_rapid("finals2000A.daily");
+    const auto data = sw_data::fetch_latest_celestrak();
     REQUIRE(!data.get_table().empty());
-    REQUIRE(data.get_identifier() == "iers_rapid_finals2000A_daily");
+    REQUIRE(data.get_identifier() == "celestrak_last_5_years");
 }
 
+#if 0
 TEST_CASE("eop_data upper_bound")
 {
     auto tester = []<typename T>() {

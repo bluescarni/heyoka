@@ -15,8 +15,17 @@
 
 #include <fmt/core.h>
 
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
+
 #include <heyoka/config.hpp>
+#include <heyoka/detail/eop_sw_helpers.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/sw_data/builtin_sw_data.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/sw_data.hpp>
 
@@ -144,5 +153,37 @@ const std::string &sw_data::get_identifier() const noexcept
 {
     return m_impl->m_identifier;
 }
+
+namespace detail
+{
+
+llvm::Value *llvm_get_sw_data_Ap_avg(llvm_state &s, const sw_data &data, llvm::Type *scal_t)
+{
+    return llvm_get_eop_sw_data(
+        s, data, scal_t, "Ap_avg",
+        [&s, scal_t](const sw_data_row &r) {
+            return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{static_cast<double>(r.Ap_avg)}));
+        },
+        "sw");
+}
+
+// NOTE: these are all similar, use a macro (yuck) to avoid repetition.
+#define HEYOKA_LLVM_GET_SW_DATA_IMPL(name)                                                                             \
+    llvm::Value *llvm_get_sw_data_##name(llvm_state &s, const sw_data &data, llvm::Type *scal_t)                       \
+    {                                                                                                                  \
+        return llvm_get_eop_sw_data(                                                                                   \
+            s, data, scal_t, #name,                                                                                    \
+            [&s, scal_t](const sw_data_row &r) {                                                                       \
+                return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{r.name}));                            \
+            },                                                                                                         \
+            "sw");                                                                                                     \
+    }
+
+HEYOKA_LLVM_GET_SW_DATA_IMPL(f107)
+HEYOKA_LLVM_GET_SW_DATA_IMPL(f107a_center81)
+
+#undef HEYOKA_LLVM_GET_SW_DATA_IMPL
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE

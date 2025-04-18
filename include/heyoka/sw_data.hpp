@@ -16,6 +16,8 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -83,6 +85,11 @@ namespace detail
 void validate_sw_data_table(const sw_data_table &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC sw_data_table parse_sw_data_celestrak(const std::string &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_sw_data_Ap_avg(llvm_state &, const sw_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_sw_data_f107(llvm_state &, const sw_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_sw_data_f107a_center81(llvm_state &, const sw_data &,
+                                                                             llvm::Type *);
 
 } // namespace detail
 

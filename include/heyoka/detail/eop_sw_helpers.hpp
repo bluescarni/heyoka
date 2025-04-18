@@ -17,6 +17,8 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 
+// NOTE: this header contains implementation details common to EOP and SW data.
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
