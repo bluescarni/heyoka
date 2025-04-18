@@ -298,6 +298,8 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
                                   const char *name,
                                   llvm::Value *(*eop_data_getter)(llvm_state &, const eop_data &, llvm::Type *))
 {
+    assert(eop_data_getter != nullptr);
+
     namespace hy = heyoka;
     namespace hd = hy::detail;
 
