@@ -15,7 +15,7 @@
 int main()
 {
     // Download the latest sw data.
-    const auto idata = heyoka::sw_data::fetch_latest_celestrak();
+    const auto idata = heyoka::sw_data::fetch_latest_celestrak(true);
 
     // Create the header file first.
     std::ofstream oheader("builtin_sw_data.hpp");

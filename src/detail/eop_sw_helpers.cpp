@@ -170,10 +170,6 @@ llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &s, const Data &da
             throw std::invalid_argument(
                 fmt::format("Unable to convert the UTC Julian date ({}, {}) into a TAI Julian date", utc_jd1, utc_jd2));
         }
-        if (ret == 1) [[unlikely]] {
-            logger->warn("Potentially inaccurate UTC->TAI conversion detected for the UTC Julian date ({}, {})",
-                         utc_jd1, utc_jd2);
-        }
         // LCOV_EXCL_STOP
 
         // Transform TAI into TT.

@@ -135,7 +135,7 @@ sw_data::sw_data()
     : m_impl(std::make_shared<const impl>(
           sw_data_table(std::ranges::begin(detail::builtin_sw_data), std::ranges::end(detail::builtin_sw_data)),
           // NOTE: the builtin SW data is from celestrak's SW-Last5Years.csv file.
-          detail::builtin_sw_data_ts, "celestrak_last_5_years"))
+          detail::builtin_sw_data_ts, "celestrak_long_term"))
 {
 }
 

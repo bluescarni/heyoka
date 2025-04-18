@@ -36,7 +36,7 @@ TEST_CASE("basic")
 
     REQUIRE(!idata.get_table().empty());
     REQUIRE(!idata.get_timestamp().empty());
-    REQUIRE(idata.get_identifier() == "celestrak_last_5_years");
+    REQUIRE(idata.get_identifier() == "celestrak_long_term");
 }
 
 TEST_CASE("parse_sw_data_celestrak test")
@@ -391,7 +391,7 @@ TEST_CASE("sw_data_Ap_avg")
         const auto *arr_ptr = fptr();
 
         // Just check the first value.
-        REQUIRE(arr_ptr[0] == 2);
+        REQUIRE(arr_ptr[0] == 21);
     };
 
     tester.operator()<float>();
@@ -432,8 +432,8 @@ TEST_CASE("sw_data_f107")
         const auto *arr_ptr2 = fptr2();
 
         // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(71.8));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(71.4));
+        REQUIRE(arr_ptr1[0] == static_cast<T>(269.3));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(266.6));
     };
 
     tester.operator()<float>();

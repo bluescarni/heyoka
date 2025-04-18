@@ -229,10 +229,6 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
             throw std::invalid_argument(
                 fmt::format("Unable to convert the UTC Julian date ({}, {}) into a UT1 Julian date", utc_jd1, utc_jd2));
         }
-        if (ret == 1) [[unlikely]] {
-            logger->warn("Potentially inaccurate UTC->UT1 conversion detected for the UTC Julian date ({}, {})",
-                         utc_jd1, utc_jd2);
-        }
         // LCOV_EXCL_STOP
 
         // Compute the ERA and return. See:
