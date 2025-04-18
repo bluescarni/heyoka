@@ -84,7 +84,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.get_era_erap.{}.{}_{}.{}", table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.eop_get_era_erap.{}.{}_{}.{}", table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -319,7 +319,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.

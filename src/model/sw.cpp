@@ -85,7 +85,7 @@ llvm::Function *llvm_get_sw_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
     // - the total number of rows in the sw data table,
     // - the timestamp and identifier of the sw data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.get_{}.{}.{}_{}.{}", name, table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.sw_get_{}.{}.{}_{}.{}", name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
