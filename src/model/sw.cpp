@@ -306,8 +306,7 @@ namespace
 // Derivative of sw(number).
 template <typename U>
     requires(heyoka::detail::is_num_param_v<U>)
-llvm::Value *taylor_diff_sw_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &, const U &num,
-                                 const std::vector<llvm::Value *> &,
+llvm::Value *taylor_diff_sw_impl(llvm_state &s, llvm::Type *fp_t, const U &num, const std::vector<llvm::Value *> &,
                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t batch_size,
                                  const sw_data &data, const std::string &sw_name)
