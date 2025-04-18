@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
@@ -534,12 +535,16 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "fuffoooo"));
 
         // Add a second function to test that we do not generate the data twice.
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "faffoooo"));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "fuffoooo"));
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "faffoooo"));
 
         // Compile and fetch the function pointer.
         s.compile();
@@ -616,6 +621,9 @@ TEST_CASE("eop_data_era")
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
         bld.CreateRet(detail::llvm_get_eop_data_era(s, data, scal_t));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "eop_data"));
 
         // Compile and fetch the function pointer.
         s.compile();

@@ -11,6 +11,8 @@
 #include <string>
 #include <utility>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -377,6 +379,9 @@ TEST_CASE("sw_data_Ap_avg")
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
         bld.CreateRet(detail::llvm_get_sw_data_Ap_avg(s, data, scal_t));
+
+        // Check name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "sw_data"));
 
         // Compile and fetch the function pointer.
         s.compile();
