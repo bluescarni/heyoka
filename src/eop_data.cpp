@@ -196,63 +196,6 @@ const std::string &eop_data::get_identifier() const noexcept
 namespace detail
 {
 
-// eop data getter for the date measured in TT Julian centuries since J2000.0.
-llvm::Value *llvm_get_eop_data_date_tt_cy_j2000(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
-{
-    auto *logger = get_logger();
-
-    const auto value_getter = [logger, &s, scal_t](const eop_data_row &r) {
-        // Fetch the UTC mjd.
-        const auto utc_mjd = r.mjd;
-
-        // Turn it into a UTC jd.
-        const auto utc_jd1 = 2400000.5;
-        const auto utc_jd2 = utc_mjd;
-
-        // Convert it into a TAI julian date.
-        double tai_jd1{}, tai_jd2{};
-        const auto ret = eraUtctai(utc_jd1, utc_jd2, &tai_jd1, &tai_jd2);
-        // LCOV_EXCL_START
-        if (ret == -1) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("Unable to convert the UTC Julian date ({}, {}) into a TAI Julian date", utc_jd1, utc_jd2));
-        }
-        if (ret == 1) [[unlikely]] {
-            logger->warn("Potentially inaccurate UTC->TAI conversion detected for the UTC Julian date ({}, {})",
-                         utc_jd1, utc_jd2);
-        }
-        // LCOV_EXCL_STOP
-
-        // Transform TAI into TT.
-        double tt_jd1{}, tt_jd2{};
-        eraTaitt(tai_jd1, tai_jd2, &tt_jd1, &tt_jd2);
-
-        // Normalise.
-        std::tie(tt_jd1, tt_jd2) = eft_add_knuth(tt_jd1, tt_jd2);
-
-        // Compute in dfloat the number of days since J2000.0.
-        const auto ndays = dfloat(tt_jd1, tt_jd2) - dfloat(2451545.0, 0.);
-
-        // Convert to Julian centuries and return.
-        const auto retval = static_cast<double>(ndays) / 36525;
-        if (!std::isfinite(retval)) [[unlikely]] {
-            // LCOV_EXCL_START
-            throw std::invalid_argument(fmt::format(
-                "The conversion of the UTC MJD {} to TT centuries since J2000.0 produced the non-finite value {}",
-                utc_mjd, retval));
-            // LCOV_EXCL_STOP
-        }
-        // NOTE: in principle the truncation of retval to lower-than-double precision could
-        // result in an infinity being produced. This is still ok, as the important thing for the
-        // dates array is the absence of NaNs. If infinities are generated, the bisection algorithm
-        // will still work (although we will likely generate NaNs once we start using the infinite
-        // date in calculations).
-        return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{retval}));
-    };
-
-    return llvm_get_eop_sw_data(s, data, scal_t, "date_tt_cy_j2000", value_getter, "eop");
-}
-
 // eop data getter for the ERA.
 //
 // The ERA will be represented as a double-length floating-point, hence the value type of the

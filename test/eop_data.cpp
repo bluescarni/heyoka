@@ -31,6 +31,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -533,12 +534,12 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
 
         // Add a second function to test that we do not generate the data twice.
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
 
         // Compile and fetch the function pointer.
         s.compile();
@@ -570,7 +571,7 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
             auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fmt::format("test_{}", i), &md);
             bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-            bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+            bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
 
             vs.push_back(std::move(s));
         }

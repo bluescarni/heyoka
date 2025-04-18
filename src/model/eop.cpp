@@ -34,6 +34,7 @@
 #include <llvm/Support/Alignment.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -115,7 +116,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // Get/generate the date and ERA data.
-    auto *date_ptr = hd::llvm_get_eop_data_date_tt_cy_j2000(s, data, fp_t);
+    auto *date_ptr = hd::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, "eop");
     auto *era_ptr = hd::llvm_get_eop_data_era(s, data, fp_t);
 
     // Codegen the array size (and its splatted counterpart).
@@ -348,7 +349,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // Get/generate the date and EOP data.
-    auto *date_ptr = hd::llvm_get_eop_data_date_tt_cy_j2000(s, data, fp_t);
+    auto *date_ptr = hd::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, "eop");
     auto *eop_ptr = eop_data_getter(s, data, fp_t);
 
     // Codegen the array size (and its splatted counterpart).

@@ -66,6 +66,8 @@ class HEYOKA_DLL_PUBLIC sw_data
     explicit sw_data(sw_data_table, std::string, std::string);
 
 public:
+    using row_type = sw_data_row;
+
     sw_data();
 
     [[nodiscard]] const sw_data_table &get_table() const noexcept;
