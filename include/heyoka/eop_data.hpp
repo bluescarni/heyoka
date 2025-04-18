@@ -69,6 +69,8 @@ class HEYOKA_DLL_PUBLIC eop_data
     explicit eop_data(eop_data_table, std::string, std::string);
 
 public:
+    using row_type = eop_data_row;
+
     eop_data();
 
     [[nodiscard]] const eop_data_table &get_table() const noexcept;
