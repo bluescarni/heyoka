@@ -911,9 +911,10 @@ eopp_impl::eopp_impl(std::string name, expression time_expr, eop_data data)
 {
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::vector<expression> eopp_impl::gradient() const
 {
+    eop_check_eop_data(m_eop_data);
+
     return {0_dbl};
 }
 
