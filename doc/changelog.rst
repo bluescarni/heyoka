@@ -7,6 +7,14 @@ Changelog
 New
 ~~~
 
+- New models: time conversions, frame transformations, Earth orientation
+  parameters (including ERA, polar motion, etc.), space weather.
+  (`#486 <https://github.com/bluescarni/heyoka/pull/486>`__,
+  `#480 <https://github.com/bluescarni/heyoka/pull/480>`__,
+  `#477 <https://github.com/bluescarni/heyoka/pull/477>`__,
+  `#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
+- Introduce class to represent, manage and update space weather data
+  (`#486 <https://github.com/bluescarni/heyoka/pull/486>`__).
 - Add function to convert from geodetic to Cartesian coordinates
   (`#484 <https://github.com/bluescarni/heyoka/pull/484>`__).
 - Add an implementation of the EGM2008 geopotential model
@@ -17,16 +25,11 @@ New
   (`#477 <https://github.com/bluescarni/heyoka/pull/477>`__).
 - Introduce class to represent, manage and update EOP data
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
-- New models: time conversions, frame transformations, Earth orientation
-  parameters (including ERA, polar motion, etc.)
-  (`#480 <https://github.com/bluescarni/heyoka/pull/480>`__,
-  `#477 <https://github.com/bluescarni/heyoka/pull/477>`__,
-  `#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 
 Changes
 ~~~~~~~
 
-- The size of the compiled library has been drastically reduced thanks
+- The size of the compiled library has been reduced thanks
   to optimisations in the storage of the datafiles of the VSOP2013 theory
   (`#484 <https://github.com/bluescarni/heyoka/pull/484>`__).
 - heyoka now requires LLVM >= 16
