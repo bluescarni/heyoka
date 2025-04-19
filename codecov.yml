@@ -5,6 +5,7 @@ coverage:
   - "src/detail/vsop2013/.*"
   - "src/detail/elp2000/.*"
   - "src/detail/eop_data/.*"
+  - "src/detail/sw_data/.*"
   - "src/detail/iau2006/.*"
   - "src/detail/egm2008.cpp"
   - "include/heyoka/detail/tanuki*"

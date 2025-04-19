@@ -6,12 +6,6 @@
 heyoka
 ======
 
-    The `heyókȟa <https://en.wikipedia.org/wiki/Heyoka>`__ [...] is a kind of
-    sacred clown in the culture of the Sioux (Lakota and Dakota people)
-    of the Great Plains of North America. The heyoka is a contrarian, jester,
-    and satirist, who speaks, moves and reacts in an opposite fashion to the
-    people around them.
-
 heyoka is a C++ library for the integration of ordinary differential equations
 (ODEs) via Taylor's method, based
 on automatic differentiation techniques and aggressive just-in-time
@@ -23,6 +17,9 @@ compilation via `LLVM <https://llvm.org/>`__. Notable features include:
 * accurate and reliable event detection,
 * builtin support for analytical mechanics - bring your own Lagrangians/Hamiltonians
   and let heyoka formulate and solve the equations of motion,
+* builtin support for operational Earth-orbiting spacecraft analysis, including frame
+  transformations, high-fidelity geopotential models, Earth Orientation Parameters (EOP),
+  atmospheric models, space weather effects, ephemeris-based third-body perturbations,
 * builtin support for high-order variational equations - compute not only the solution,
   but also its partial derivatives,
 * builtin support for machine learning applications via neural network models,

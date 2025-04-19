@@ -45,8 +45,9 @@ ninja -v
 # Run the tests.
 ctest -VV -j4
 
-# Also run the eop data updater.
+# Also run the data updaters.
 ./utils/eop_data_updater
+./utils/sw_data_updater
 
 # Create lcov report
 lcov --capture --directory . --output-file coverage.info

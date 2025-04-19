@@ -13,8 +13,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include <xtensor/xadapt.hpp>
-#include <xtensor/xview.hpp>
+#include <xtensor/containers/xadapt.hpp>
+#include <xtensor/views/xview.hpp>
 
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>

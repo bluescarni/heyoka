@@ -13,10 +13,12 @@
 #include <limits>
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
@@ -30,6 +32,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -470,6 +473,19 @@ TEST_CASE("parse_eop_data_iers_long_term test")
                                Message("Error parsing a IERS long term EOP data file: at least 26 fields "
                                        "were expected in a data row, but 3 were found instead"));
     }
+    {
+        const std::string str
+            = "MJD;Year;Month;Day;Type;x_pole;sigma_x_pole;y_pole;sigma_y_pole;x_rate;sigma_x_rate;y_rate;sigma_y_rate;"
+              "Type;UT1-UTC;sigma_UT1-UTC;LOD;sigma_LOD;Type;dPsi;sigma_dPsi;dEpsilon;sigma_dEpsilon;dX;sigma_dX;dY;"
+              "sigma_dY\n37665;1962;01;01;;-0.012700;0.030000;0.213000;0.030000;0.000000;0.000000;0.000000;0.000000;;0."
+              "0326338;0.0020000;0.0017230;0.0014000;;;;;;-2.000000;0.004774;4.000000;0.002000\n37666;1962;01;02;;-0."
+              "015900;0.030000;0.214100;0.030000;0.000000;0.000000;0.000000;0.000000;;0.0320547;0.0020000;0.0016690;0."
+              "0014000;;;;;;1.000000;0.004774";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
+                               Message("Error parsing a IERS long term EOP data file: at least 26 fields "
+                                       "were expected in a data row, but 25 were found instead"));
+    }
 }
 
 TEST_CASE("s11n")
@@ -519,12 +535,16 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
         auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "fuffoooo"));
 
         // Add a second function to test that we do not generate the data twice.
         f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test2", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-        bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+        bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "faffoooo"));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "fuffoooo"));
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "faffoooo"));
 
         // Compile and fetch the function pointer.
         s.compile();
@@ -556,7 +576,7 @@ TEST_CASE("eop_data_date_tt_cy_j2000")
             auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fmt::format("test_{}", i), &md);
             bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-            bld.CreateRet(detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t));
+            bld.CreateRet(detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop"));
 
             vs.push_back(std::move(s));
         }
@@ -601,6 +621,9 @@ TEST_CASE("eop_data_era")
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
         bld.CreateRet(detail::llvm_get_eop_data_era(s, data, scal_t));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "eop_data"));
 
         // Compile and fetch the function pointer.
         s.compile();
@@ -783,7 +806,7 @@ TEST_CASE("eop_data upper_bound")
             auto *date = detail::ext_load_vector_from_memory(s, scal_t, date_ptr, batch_size);
 
             // Run the binary search.
-            auto *ret = detail::llvm_eop_data_upper_bound(s, arr_ptr, arr_size, date);
+            auto *ret = detail::llvm_upper_bound(s, arr_ptr, arr_size, date);
 
             // Write the result to out_ptr.
             detail::ext_store_vector_to_memory(s, out_ptr, ret);
@@ -924,7 +947,7 @@ TEST_CASE("eop_data locate_date")
             auto *date = detail::ext_load_vector_from_memory(s, scal_t, date_ptr, batch_size);
 
             // Run the binary search.
-            auto *ret = detail::llvm_eop_data_locate_date(s, arr_ptr, arr_size, date);
+            auto *ret = detail::llvm_eop_sw_data_locate_date(s, arr_ptr, arr_size, date);
 
             // Write the result to out_ptr.
             detail::ext_store_vector_to_memory(s, out_ptr, ret);

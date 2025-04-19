@@ -23,6 +23,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/http_download.hpp>
 #include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -217,7 +218,7 @@ eop_data eop_data::fetch_latest_iers_rapid(const std::string &filename)
     }
 
     // Download it.
-    auto [text, timestamp] = download("maia.usno.navy.mil", 443, fmt::format("/ser7/{}", filename));
+    auto [text, timestamp] = detail::https_download("maia.usno.navy.mil", 443, fmt::format("/ser7/{}", filename));
 
     // Build the identifier string.
     auto identifier = fmt::format("iers_rapid_{}", filename);
