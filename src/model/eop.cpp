@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -34,6 +35,7 @@
 #include <llvm/Support/Alignment.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -41,6 +43,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/eop_data.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -81,7 +84,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.get_era_erap.{}.{}_{}.{}", table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.eop_get_era_erap.{}.{}_{}.{}", table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -115,7 +118,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // Get/generate the date and ERA data.
-    auto *date_ptr = hd::llvm_get_eop_data_date_tt_cy_j2000(s, data, fp_t);
+    auto *date_ptr = hd::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, "eop");
     auto *era_ptr = hd::llvm_get_eop_data_era(s, data, fp_t);
 
     // Codegen the array size (and its splatted counterpart).
@@ -123,7 +126,7 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     auto *arr_size_splat = hd::vector_splat(bld, arr_size, batch_size);
 
     // Locate the index in date_ptr of the time interval containing tm_val.
-    auto *idx = hd::llvm_eop_data_locate_date(s, date_ptr, arr_size, tm_val);
+    auto *idx = hd::llvm_eop_sw_data_locate_date(s, date_ptr, arr_size, tm_val);
 
     // Codegen nan for use later.
     auto *nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});
@@ -297,6 +300,8 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
                                   const char *name,
                                   llvm::Value *(*eop_data_getter)(llvm_state &, const eop_data &, llvm::Type *))
 {
+    assert(eop_data_getter != nullptr);
+
     namespace hy = heyoka;
     namespace hd = hy::detail;
 
@@ -314,7 +319,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -348,7 +353,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
     // Get/generate the date and EOP data.
-    auto *date_ptr = hd::llvm_get_eop_data_date_tt_cy_j2000(s, data, fp_t);
+    auto *date_ptr = hd::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, "eop");
     auto *eop_ptr = eop_data_getter(s, data, fp_t);
 
     // Codegen the array size (and its splatted counterpart).
@@ -356,7 +361,7 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     auto *arr_size_splat = hd::vector_splat(bld, arr_size, batch_size);
 
     // Locate the index in date_ptr of the time interval containing tm_val.
-    auto *idx = hd::llvm_eop_data_locate_date(s, date_ptr, arr_size, tm_val);
+    auto *idx = hd::llvm_eop_sw_data_locate_date(s, date_ptr, arr_size, tm_val);
 
     // Codegen nan for use later.
     auto *nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});
@@ -908,9 +913,10 @@ eopp_impl::eopp_impl(std::string name, expression time_expr, eop_data data)
 {
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::vector<expression> eopp_impl::gradient() const
 {
+    eop_check_eop_data(m_eop_data);
+
     return {0_dbl};
 }
 
@@ -1147,7 +1153,7 @@ llvm::Function *taylor_c_diff_func_eopp_impl(llvm_state &, llvm::Type *, const e
                                              std::uint32_t, const eop_data &, const std::string &)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of an eop quantity compact mode");
+                                "of the derivative of an eop quantity in compact mode");
 }
 
 // LCOV_EXCL_STOP

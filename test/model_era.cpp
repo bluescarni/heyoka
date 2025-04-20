@@ -38,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
@@ -133,7 +134,7 @@ TEST_CASE("get_era_erap_func")
 
             bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
-            auto *date_data_ptr = detail::llvm_get_eop_data_date_tt_cy_j2000(s, data, scal_t);
+            auto *date_data_ptr = detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "eop");
             auto *era_data_ptr = detail::llvm_get_eop_data_era(s, data, scal_t);
 
             bld.CreateStore(date_data_ptr, date_ptr_ptr);

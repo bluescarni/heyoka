@@ -190,6 +190,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/http_download.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -208,9 +209,11 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data_celestrak.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_helpers.cpp"
     # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
@@ -280,6 +283,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/egm2008.cpp"
     # EOP data details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_data/builtin_eop_data.cpp"
+    # SW data details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sw_data/builtin_sw_data.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
@@ -297,6 +302,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eop.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sw.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2006.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/egm2008.cpp"
     # Callbacks.

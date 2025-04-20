@@ -17,6 +17,7 @@ int eraTaitt(double, double, double *, double *);
 int eraUtcut1(double, double, double, double *, double *);
 int eraTaiutc(double, double, double *, double *);
 double eraEra00(double, double);
+int eraCal2jd(int, int, int, double *, double *);
 }
 
 #endif

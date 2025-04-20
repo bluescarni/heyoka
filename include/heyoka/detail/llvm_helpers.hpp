@@ -235,6 +235,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Val
 // Greater-than.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
+// std::upper_bound() implementation.
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_upper_bound(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
