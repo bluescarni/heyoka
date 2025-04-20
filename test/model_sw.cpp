@@ -72,6 +72,10 @@ TEST_CASE("basics")
     REQUIRE(model::Ap_avg() != model::Ap_avg(kw::time_expr = x, kw::sw_data = sw_data{}));
     REQUIRE(model::f107() != model::f107(kw::time_expr = x, kw::sw_data = sw_data{}));
     REQUIRE(model::f107a_center81() != model::f107a_center81(kw::time_expr = x, kw::sw_data = sw_data{}));
+
+    REQUIRE(model::Ap_avg() != model::f107());
+    REQUIRE(model::f107a_center81() != model::f107());
+    REQUIRE(model::Ap_avg() != model::f107a_center81());
 }
 
 TEST_CASE("sw s11n")

@@ -90,6 +90,11 @@ TEST_CASE("basics")
     REQUIRE(model::dXp() != model::dXp(kw::time_expr = x, kw::eop_data = eop_data{}));
     REQUIRE(model::dY() != model::dY(kw::time_expr = x, kw::eop_data = eop_data{}));
     REQUIRE(model::dYp() != model::dYp(kw::time_expr = x, kw::eop_data = eop_data{}));
+
+    REQUIRE(model::pm_x() != model::pm_y());
+    REQUIRE(model::pm_x() != model::pm_xp());
+    REQUIRE(model::pm_y() != model::pm_yp());
+    REQUIRE(model::pm_xp() != model::pm_yp());
 }
 
 TEST_CASE("eop s11n")
