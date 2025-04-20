@@ -25,3 +25,4 @@ function(ADD_HEYOKA_UTIL arg1)
 endfunction()
 
 ADD_HEYOKA_UTIL(eop_data_updater)
+ADD_HEYOKA_UTIL(sw_data_updater)

@@ -25,6 +25,7 @@
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/model/rotating.hpp>
 #include <heyoka/model/sgp4.hpp>
+#include <heyoka/model/sw.hpp>
 #include <heyoka/model/time_conversions.hpp>
 #include <heyoka/model/vsop2013.hpp>
 

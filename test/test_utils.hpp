@@ -28,8 +28,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <xtensor-blas/xlinalg.hpp>
-#include <xtensor/xfixed.hpp>
-#include <xtensor/xshape.hpp>
+#include <xtensor/containers/xfixed.hpp>
+#include <xtensor/core/xshape.hpp>
 
 #if defined(HEYOKA_HAVE_REAL)
 

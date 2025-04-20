@@ -18,8 +18,8 @@
 #include <utility>
 
 #include <xtensor-blas/xlinalg.hpp>
-#include <xtensor/xfixed.hpp>
-#include <xtensor/xshape.hpp>
+#include <xtensor/containers/xfixed.hpp>
+#include <xtensor/core/xshape.hpp>
 
 namespace heyoka_benchmark
 {
