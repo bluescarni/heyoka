@@ -833,6 +833,11 @@ llvm::Function *kepE_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 // a cache of llvm states to fetch the pointer from?
 expression kepE(expression e, expression M)
 {
+    // NOTE: if e == 0, we can just return M.
+    if (const auto *num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
+        return M;
+    }
+
     return expression{func{detail::kepE_impl{std::move(e), std::move(M)}}};
 }
 

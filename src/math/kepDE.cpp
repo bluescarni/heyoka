@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -143,6 +144,13 @@ llvm::Function *kepDE_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, st
 // a cache of llvm states to fetch the pointer from?
 expression kepDE(expression s0, expression c0, expression DM)
 {
+    // NOTE: if s0 and c0 are both zero, then we can just return DM.
+    const auto *s0_num = std::get_if<number>(&s0.value());
+    const auto *c0_num = std::get_if<number>(&c0.value());
+    if (s0_num != nullptr && c0_num != nullptr && is_zero(*s0_num) && is_zero(*c0_num)) {
+        return DM;
+    }
+
     return expression{func{detail::kepDE_impl{std::move(s0), std::move(c0), std::move(DM)}}};
 }
 

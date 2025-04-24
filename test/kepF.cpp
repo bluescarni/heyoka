@@ -81,6 +81,18 @@ TEST_CASE("kepF def ctor")
     REQUIRE(k.args()[2] == 0_dbl);
 }
 
+TEST_CASE("kepF zero h k")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(kepF(0., 0., x) == x);
+    REQUIRE(kepF(0.f, 0.f, x) == x);
+    REQUIRE(kepF(0.l, 0.l, x) == x);
+
+    REQUIRE(kepF(0., x, x) != x);
+    REQUIRE(kepF(x, 0., x) != x);
+}
+
 TEST_CASE("kepF diff")
 {
     auto [x, y, z] = make_vars("x", "y", "z");

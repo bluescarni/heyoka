@@ -111,6 +111,15 @@ TEST_CASE("kepE def ctor")
     REQUIRE(k.args()[1] == 0_dbl);
 }
 
+TEST_CASE("kepE zero ecc")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(kepE(0., x) == x);
+    REQUIRE(kepE(0.f, x) == x);
+    REQUIRE(kepE(0.l, x) == x);
+}
+
 TEST_CASE("kepE diff")
 {
     auto [x, y] = make_vars("x", "y");
