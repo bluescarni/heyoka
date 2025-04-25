@@ -1047,7 +1047,7 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
         stack.pop_back();
 
         // NOTE: the logic here is slightly different from the usual flow, in the sense
-        // that we anticipate the lookup into func_map to happen *before* the lookup
+        // that we want the lookup into func_map to happen *before* the lookup
         // in smap. The reason is that the lookup in func_map is cheap, while the lookup
         // in smap can potentially be costly. If we already performed substitution on
         // cur_ex before, we want to take advantage of the cached result before performing
