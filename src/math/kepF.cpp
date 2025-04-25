@@ -1721,6 +1721,13 @@ llvm::Function *kepF_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 // a cache of llvm states to fetch the pointer from?
 expression kepF(expression h, expression k, expression lam)
 {
+    // NOTE: if h and k are both zero, then we can just return lam.
+    const auto *h_num = std::get_if<number>(&h.value());
+    const auto *k_num = std::get_if<number>(&k.value());
+    if (h_num != nullptr && k_num != nullptr && is_zero(*h_num) && is_zero(*k_num)) {
+        return lam;
+    }
+
     return expression{func{detail::kepF_impl{std::move(h), std::move(k), std::move(lam)}}};
 }
 

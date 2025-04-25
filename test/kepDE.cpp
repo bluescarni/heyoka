@@ -80,6 +80,18 @@ TEST_CASE("kepDE def ctor")
     REQUIRE(k.args()[2] == 0_dbl);
 }
 
+TEST_CASE("kepDE zero s0 c0")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(kepDE(0., 0., x) == x);
+    REQUIRE(kepDE(0.f, 0.f, x) == x);
+    REQUIRE(kepDE(0.l, 0.l, x) == x);
+
+    REQUIRE(kepDE(0., x, x) != x);
+    REQUIRE(kepDE(x, 0., x) != x);
+}
+
 TEST_CASE("kepDE diff")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
