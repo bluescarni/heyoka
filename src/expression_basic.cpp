@@ -980,6 +980,7 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
             }
 
             // Non-variable node, or variable node which does *not* show up in smap.
+            // Just return it unchanged.
             subs_stack.emplace_back(*cur_ex);
         }
     }
