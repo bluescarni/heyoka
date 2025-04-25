@@ -894,7 +894,7 @@ namespace
 expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expression &e,
                      const std::unordered_map<std::string, expression> &smap)
 {
-    assert(func_map.empty());
+    assert(stack.empty());
     assert(subs_stack.empty());
 
     // Seed the stack.
