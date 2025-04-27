@@ -1131,7 +1131,7 @@ template <typename Archive>
 void llvm_state::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
-    if (version < static_cast<unsigned>(boost::serialization::version<llvm_state>::type::value)) {
+    if (version < static_cast<unsigned>(boost::serialization::version<llvm_state>::type::value)) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Unable to load an llvm_state object: "
                                                 "the archive version ({}) is too old",
                                                 version));
