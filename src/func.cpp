@@ -226,6 +226,16 @@ void func_default_to_stream(std::ostringstream &oss, const shared_func_base &f)
 
 null_func::null_func() : func_base("null_func", {}) {}
 
+void null_func::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << boost::serialization::base_object<func_base>(*this);
+}
+
+void null_func::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> boost::serialization::base_object<func_base>(*this);
+}
+
 namespace
 {
 

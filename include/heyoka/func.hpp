@@ -314,6 +314,13 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
 // The udf used in the default construction of a func.
 struct HEYOKA_DLL_PUBLIC null_func : func_base {
     null_func();
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 } // namespace detail
