@@ -45,6 +45,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -57,6 +58,80 @@
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+void func_args::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_args;
+}
+
+void func_args::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_args;
+}
+
+func_args::func_args() = default;
+
+namespace detail
+{
+
+namespace
+{
+
+// Implementation of the func_args constructor from a list of arguments.
+auto func_args_ctor_impl(std::vector<expression> args, bool shared)
+{
+    using ret_t = std::variant<std::vector<expression>, func_args::shared_args_t>;
+
+    if (shared) {
+        return ret_t(std::make_shared<const std::vector<expression>>(std::move(args)));
+    } else {
+        return ret_t(std::move(args));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+func_args::func_args(std::vector<expression> args, bool shared)
+    : m_args(detail::func_args_ctor_impl(std::move(args), shared))
+{
+}
+
+func_args::func_args(shared_args_t args) : m_args(std::move(args))
+{
+    if (!std::get<1>(m_args)) [[unlikely]] {
+        throw std::invalid_argument("Cannot initialise a func_args instance from a null pointer");
+    }
+}
+
+func_args::func_args(const func_args &) = default;
+
+func_args::func_args(func_args &&) noexcept = default;
+
+func_args &func_args::operator=(const func_args &) = default;
+
+func_args &func_args::operator=(func_args &&) noexcept = default;
+
+func_args::~func_args() = default;
+
+const std::vector<expression> &func_args::get_args() const noexcept
+{
+    if (const auto *args_ptr = std::get_if<std::vector<expression>>(&m_args)) {
+        return *args_ptr;
+    } else {
+        return *std::get<1>(m_args);
+    }
+}
+
+func_args::shared_args_t func_args::get_shared_args() const noexcept
+{
+    if (const auto *shared_args_ptr = std::get_if<shared_args_t>(&m_args)) {
+        return *shared_args_ptr;
+    } else {
+        return {};
+    }
+}
 
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
@@ -81,8 +156,15 @@ void func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_args;
 }
 
-void func_base::load(boost::archive::binary_iarchive &ar, unsigned)
+void func_base::load(boost::archive::binary_iarchive &ar, unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<func_base>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a func_base object: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ar >> m_name;
     ar >> m_args;
 }
@@ -94,20 +176,20 @@ const std::string &func_base::get_name() const noexcept
 
 const std::vector<expression> &func_base::args() const noexcept
 {
-    return m_args;
+    return m_args.get_args();
 }
 
 void func_base::replace_args(std::vector<expression> new_args)
 {
     // LCOV_EXCL_START
-    if (new_args.size() != m_args.size()) [[unlikely]] {
+    if (new_args.size() != args().size()) [[unlikely]] {
         throw std::invalid_argument(fmt::format("func_base::replace_args() was invoked with a new_args argument of "
                                                 "size {}, but the current argument size is {}",
-                                                new_args.size(), m_args.size()));
+                                                new_args.size(), args().size()));
     }
     // LCOV_EXCL_STOP
 
-    m_args = std::move(new_args);
+    m_args = func_args(std::move(new_args));
 }
 
 shared_func_base::shared_func_base(std::string name, std::vector<expression> args)
