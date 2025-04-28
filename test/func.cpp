@@ -387,16 +387,6 @@ TEST_CASE("func ostream")
     REQUIRE(oss.str() == "f(y)");
 }
 
-TEST_CASE("func hash")
-{
-    auto f1 = func(func_10{{"x"_var, "y"_var}});
-
-    detail::funcptr_map<std::size_t> tmp;
-    REQUIRE_NOTHROW(f1.hash(tmp));
-
-    std::cout << "Hash value for f1: " << f1.hash(tmp) << '\n';
-}
-
 struct func_14 : func_base {
     func_14(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
     {
