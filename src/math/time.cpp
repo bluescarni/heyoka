@@ -49,7 +49,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-time_impl::time_impl() : func_base("time", {}) {}
+time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void time_impl::to_stream(std::ostringstream &oss) const
