@@ -69,6 +69,10 @@ TEST_CASE("func_args basics")
         REQUIRE(f.get_shared_args());
         REQUIRE(f.get_args().size() == 1u);
         REQUIRE(f.get_args()[0] == "x"_var);
+
+        REQUIRE(f.get_args().data() == f2.get_args().data());
+        auto f3(f2);
+        REQUIRE(f.get_args().data() == f3.get_args().data());
     }
 
     {

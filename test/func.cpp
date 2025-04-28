@@ -51,6 +51,7 @@ struct func_00_s : func_base {
     explicit func_00_s(std::vector<expression> args) : func_base("f", std::move(args), true) {}
     explicit func_00_s(func_args::shared_args_t args) : func_base("f", std::move(args)) {}
     explicit func_00_s(const std::string &name, func_args::shared_args_t args) : func_base(name, std::move(args)) {}
+    explicit func_00_s(const std::string &name, func_args fargs) : func_base(name, std::move(fargs)) {}
 };
 
 struct func_01 {
@@ -149,6 +150,14 @@ TEST_CASE("func minimal")
     // A few tests for shared arguments semantics.
     {
         func f_s(func_00_s{{"x"_var, "y"_var}});
+        REQUIRE(f_s.get_type_index() == typeid(func_00_s));
+        REQUIRE(f_s.get_name() == "f");
+        REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
+        REQUIRE(f_s.shared_args());
+    }
+
+    {
+        func f_s(func_00_s{"f", func_args({"x"_var, "y"_var}, true)});
         REQUIRE(f_s.get_type_index() == typeid(func_00_s));
         REQUIRE(f_s.get_name() == "f");
         REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
