@@ -160,12 +160,19 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         }
     }
 
-    [[nodiscard]] const std::vector<expression> &args() const final
+    [[nodiscard]] const std::vector<expression> &args() const noexcept final
     {
         // NOTE: make sure we are invoking the member function from func_base,
         // as in principle there could be an args() function in the derived
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).args();
+    }
+    [[nodiscard]] func_args::shared_args_t shared_args() const noexcept final
+    {
+        // NOTE: make sure we are invoking the member function from func_base,
+        // as in principle there could be a shared_args() function in the derived
+        // function class that hides it.
+        return static_cast<const func_base &>(getval<Holder>(this)).shared_args();
     }
     void replace_args(std::vector<expression>) final;
 
@@ -275,7 +282,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
 
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
 
-    [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
+    [[nodiscard]] virtual const std::vector<expression> &args() const noexcept = 0;
+    [[nodiscard]] virtual func_args::shared_args_t shared_args() const noexcept = 0;
     virtual void replace_args(std::vector<expression>) = 0;
 
     [[nodiscard]] virtual bool has_gradient() const = 0;
@@ -371,9 +379,10 @@ public:
     func &operator=(func &&) noexcept;
     ~func();
 
-    [[nodiscard]] const void *get_ptr() const;
+    [[nodiscard]] const void *get_ptr() const noexcept;
 
-    [[nodiscard]] const std::vector<expression> &args() const;
+    [[nodiscard]] const std::vector<expression> &args() const noexcept;
+    [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
     // NOTE: this creates a new func containing
     // a copy of the inner object in which the original

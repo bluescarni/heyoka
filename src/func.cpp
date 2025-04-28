@@ -364,14 +364,19 @@ void func::load(boost::archive::binary_iarchive &ar, unsigned version)
     ar >> m_func;
 }
 
-const void *func::get_ptr() const
+const void *func::get_ptr() const noexcept
 {
     return raw_value_ptr(m_func);
 }
 
-const std::vector<expression> &func::args() const
+const std::vector<expression> &func::args() const noexcept
 {
     return m_func->args();
+}
+
+func_args::shared_args_t func::shared_args() const noexcept
+{
+    return m_func->shared_args();
 }
 
 func func::copy(std::vector<expression> new_args) const
