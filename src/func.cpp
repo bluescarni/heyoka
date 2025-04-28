@@ -45,6 +45,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -58,11 +59,114 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
+void func_args::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
-    if (m_name.empty()) [[unlikely]] {
+    ar << m_args;
+}
+
+void func_args::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_args;
+}
+
+func_args::func_args() = default;
+
+namespace detail
+{
+
+namespace
+{
+
+// Implementation of the func_args constructor from a list of arguments.
+auto func_args_ctor_impl(std::vector<expression> args, bool shared)
+{
+    using ret_t = std::variant<std::vector<expression>, func_args::shared_args_t>;
+
+    if (shared) {
+        return ret_t(std::make_shared<const std::vector<expression>>(std::move(args)));
+    } else {
+        return ret_t(std::move(args));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+func_args::func_args(std::vector<expression> args, bool shared)
+    : m_args(detail::func_args_ctor_impl(std::move(args), shared))
+{
+}
+
+func_args::func_args(shared_args_t args)
+    : m_args(args ? std::move(args)
+                  : throw std::invalid_argument("Cannot initialise a func_args instance from a null pointer"))
+{
+}
+
+func_args::func_args(const func_args &) = default;
+
+func_args::func_args(func_args &&) noexcept = default;
+
+func_args &func_args::operator=(const func_args &) = default;
+
+func_args &func_args::operator=(func_args &&) noexcept = default;
+
+func_args::~func_args() = default;
+
+const std::vector<expression> &func_args::get_args() const noexcept
+{
+    if (const auto *args_ptr = std::get_if<std::vector<expression>>(&m_args)) {
+        return *args_ptr;
+    } else {
+        assert(std::get<1>(m_args));
+        return *std::get<1>(m_args);
+    }
+}
+
+func_args::shared_args_t func_args::get_shared_args() const noexcept
+{
+    if (const auto *shared_args_ptr = std::get_if<shared_args_t>(&m_args)) {
+        assert(*shared_args_ptr);
+        return *shared_args_ptr;
+    } else {
+        return {};
+    }
+}
+
+namespace detail
+{
+
+namespace
+{
+
+// Helper to check the name of a func_base right after construction.
+void func_base_check_name(const std::string &name)
+{
+    if (name.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot create a function with no name");
     }
+}
+
+} // namespace
+
+} // namespace detail
+
+func_base::func_base(std::string name, std::vector<expression> args, bool shared)
+    : m_name(std::move(name)), m_args(std::move(args), shared)
+{
+    detail::func_base_check_name(m_name);
+}
+
+func_base::func_base(std::string name, func_args::shared_args_t sargs)
+    : m_name(std::move(name)), m_args(std::move(sargs))
+{
+    detail::func_base_check_name(m_name);
+}
+
+func_base::func_base(std::string name, func_args fargs) : m_name(std::move(name)), m_args(std::move(fargs))
+{
+    detail::func_base_check_name(m_name);
 }
 
 func_base::func_base(const func_base &) = default;
@@ -81,8 +185,15 @@ void func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_args;
 }
 
-void func_base::load(boost::archive::binary_iarchive &ar, unsigned)
+void func_base::load(boost::archive::binary_iarchive &ar, unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<func_base>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a func_base object: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ar >> m_name;
     ar >> m_args;
 }
@@ -94,99 +205,27 @@ const std::string &func_base::get_name() const noexcept
 
 const std::vector<expression> &func_base::args() const noexcept
 {
-    return m_args;
+    return m_args.get_args();
+}
+
+func_args::shared_args_t func_base::shared_args() const noexcept
+{
+    return m_args.get_shared_args();
 }
 
 void func_base::replace_args(std::vector<expression> new_args)
 {
     // LCOV_EXCL_START
-    if (new_args.size() != m_args.size()) [[unlikely]] {
+    if (new_args.size() != args().size()) [[unlikely]] {
         throw std::invalid_argument(fmt::format("func_base::replace_args() was invoked with a new_args argument of "
                                                 "size {}, but the current argument size is {}",
-                                                new_args.size(), m_args.size()));
+                                                new_args.size(), args().size()));
     }
     // LCOV_EXCL_STOP
 
-    m_args = std::move(new_args);
-}
-
-shared_func_base::shared_func_base(std::string name, std::vector<expression> args)
-    : m_name(std::move(name)), m_args(std::make_shared<const std::vector<expression>>(std::move(args)))
-{
-    if (m_name.empty()) [[unlikely]] {
-        throw std::invalid_argument("Cannot create a function with no name");
-    }
-}
-
-// NOTE: this ctor requires a non-null pointer.
-shared_func_base::shared_func_base(std::string name, args_ptr_t args) : m_name(std::move(name)), m_args(std::move(args))
-{
-    // LCOV_EXCL_START
-    if (m_args == nullptr) [[unlikely]] {
-        throw std::invalid_argument("Cannot create a shared_func_base from a null pointer to the arguments");
-    }
-    // LCOV_EXCL_STOP
-
-    if (m_name.empty()) [[unlikely]] {
-        throw std::invalid_argument("Cannot create a function with no name");
-    }
-}
-
-shared_func_base::shared_func_base(const shared_func_base &) = default;
-
-shared_func_base::shared_func_base(shared_func_base &&) noexcept = default;
-
-shared_func_base &shared_func_base::operator=(const shared_func_base &) = default;
-
-shared_func_base &shared_func_base::operator=(shared_func_base &&) noexcept = default;
-
-shared_func_base::~shared_func_base() = default;
-
-void shared_func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
-{
-    ar << m_name;
-    ar << m_args;
-}
-
-void shared_func_base::load(boost::archive::binary_iarchive &ar, unsigned)
-{
-    ar >> m_name;
-    ar >> m_args;
-}
-
-const std::string &shared_func_base::get_name() const noexcept
-{
-    return m_name;
-}
-
-const std::vector<expression> &shared_func_base::args() const noexcept
-{
-    assert(m_args != nullptr);
-
-    return *m_args;
-}
-
-void shared_func_base::replace_args(std::vector<expression> new_args)
-{
-    assert(m_args != nullptr);
-
-    // LCOV_EXCL_START
-    if (new_args.size() != m_args->size()) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("shared_func_base::replace_args() was invoked with a new_args argument of "
-                        "size {}, but the current argument size is {}",
-                        new_args.size(), m_args->size()));
-    }
-    // LCOV_EXCL_STOP
-
-    m_args = std::make_shared<const std::vector<expression>>(std::move(new_args));
-}
-
-shared_func_base::args_ptr_t shared_func_base::get_args_ptr() const noexcept
-{
-    assert(m_args != nullptr);
-
-    return m_args;
+    // NOTE: the idea here is that if we are storing the arguments via shared pointer,
+    // we want to make sure that the new arguments are also stored via shared pointer.
+    m_args = func_args(std::move(new_args), static_cast<bool>(shared_args()));
 }
 
 namespace detail
@@ -219,12 +258,17 @@ void func_default_to_stream(std::ostringstream &oss, const func_base &f)
     func_default_to_stream_impl(oss, f);
 }
 
-void func_default_to_stream(std::ostringstream &oss, const shared_func_base &f)
+null_func::null_func() : func_base("null_func", std::vector<expression>{}) {}
+
+void null_func::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
-    func_default_to_stream_impl(oss, f);
+    ar << boost::serialization::base_object<func_base>(*this);
 }
 
-null_func::null_func() : func_base("null_func", {}) {}
+void null_func::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> boost::serialization::base_object<func_base>(*this);
+}
 
 namespace
 {
@@ -320,14 +364,19 @@ void func::load(boost::archive::binary_iarchive &ar, unsigned version)
     ar >> m_func;
 }
 
-const void *func::get_ptr() const
+const void *func::get_ptr() const noexcept
 {
     return raw_value_ptr(m_func);
 }
 
-const std::vector<expression> &func::args() const
+const std::vector<expression> &func::args() const noexcept
 {
     return m_func->args();
+}
+
+func_args::shared_args_t func::shared_args() const noexcept
+{
+    return m_func->shared_args();
 }
 
 func func::copy(std::vector<expression> new_args) const
@@ -634,7 +683,7 @@ bool operator==(const func &a, const func &b) noexcept
     }
 
     // Check if the vectors of arguments are the same object - this
-    // could happen when the UDF derives from shared_func_base.
+    // could happen when the arguments are stored in a shared pointer.
     if (&a.args() == &b.args()) {
         return true;
     }
@@ -675,7 +724,7 @@ bool operator<(const func &a, const func &b)
     // The names are equal, check the arguments next.
 
     // First we check if the vectors of arguments are the same object - this
-    // could happen when the UDF derives from shared_func_base.
+    // could happen when the arguments are stored in a shared pointer.
     if (&a.args() == &b.args()) {
         return false;
     }

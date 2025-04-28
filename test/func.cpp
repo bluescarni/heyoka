@@ -40,20 +40,18 @@ using namespace heyoka;
 using smap_t = std::unordered_map<std::string, expression>;
 
 struct func_00 : func_base {
-    func_00() : func_base("f", {}) {}
-    func_00(const std::string &name) : func_base(name, {}) {}
+    func_00() : func_base("f", std::vector<expression>{}) {}
+    func_00(const std::string &name) : func_base(name, std::vector<expression>{}) {}
     explicit func_00(std::vector<expression> args) : func_base("f", std::move(args)) {}
 };
 
-struct func_00_s : shared_func_base {
-    func_00_s() : shared_func_base("f", std::vector<expression>{}) {}
-    func_00_s(const std::string &name) : shared_func_base(name, std::vector<expression>{}) {}
-    explicit func_00_s(std::vector<expression> args) : shared_func_base("f", std::move(args)) {}
-    explicit func_00_s(shared_func_base::args_ptr_t args) : shared_func_base("f", std::move(args)) {}
-    explicit func_00_s(const std::string &name, shared_func_base::args_ptr_t args)
-        : shared_func_base(name, std::move(args))
-    {
-    }
+struct func_00_s : func_base {
+    func_00_s() : func_base("f", std::vector<expression>{}, true) {}
+    func_00_s(const std::string &name) : func_base(name, std::vector<expression>{}, true) {}
+    explicit func_00_s(std::vector<expression> args) : func_base("f", std::move(args), true) {}
+    explicit func_00_s(func_args::shared_args_t args) : func_base("f", std::move(args)) {}
+    explicit func_00_s(const std::string &name, func_args::shared_args_t args) : func_base(name, std::move(args)) {}
+    explicit func_00_s(const std::string &name, func_args fargs) : func_base(name, std::move(fargs)) {}
 };
 
 struct func_01 {
@@ -76,15 +74,6 @@ TEST_CASE("func minimal")
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
-
-    func f_s(func_00_s{{"x"_var, "y"_var}});
-    REQUIRE(f_s.get_type_index() == typeid(func_00_s));
-    REQUIRE(f_s.get_name() == "f");
-    REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
-    REQUIRE(f_s.args().data() == f_s.extract<func_00_s>()->get_args_ptr()->data());
-
-    REQUIRE_THROWS_MATCHES(func{func_00_s{""}}, std::invalid_argument,
-                           Message("Cannot create a function with no name"));
 
     llvm_state s;
 
@@ -157,6 +146,26 @@ TEST_CASE("func minimal")
     f = func{func_00{{"x"_var, "y"_var}}};
     detail::funcptr_map<taylor_dc_t::size_type> func_map2;
     f.taylor_decompose(func_map2, dec);
+
+    // A few tests for shared arguments semantics.
+    {
+        func f_s(func_00_s{{"x"_var, "y"_var}});
+        REQUIRE(f_s.get_type_index() == typeid(func_00_s));
+        REQUIRE(f_s.get_name() == "f");
+        REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
+        REQUIRE(f_s.shared_args());
+    }
+
+    {
+        func f_s(func_00_s{"f", func_args({"x"_var, "y"_var}, true)});
+        REQUIRE(f_s.get_type_index() == typeid(func_00_s));
+        REQUIRE(f_s.get_name() == "f");
+        REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
+        REQUIRE(f_s.shared_args());
+    }
+
+    REQUIRE_THROWS_MATCHES(func(func_00_s{"f", nullptr}), std::invalid_argument,
+                           Message("Cannot initialise a func_args instance from a null pointer"));
 }
 
 TEST_CASE("shared func copy move")
@@ -184,8 +193,26 @@ TEST_CASE("shared func copy move")
     REQUIRE(f.args().data() == f2.args().data());
 }
 
+TEST_CASE("shared func ostream")
+{
+    auto f1 = func(func_00_s{{"x"_var, "y"_var}});
+
+    std::ostringstream oss;
+    oss << expression{f1};
+
+    REQUIRE(oss.str() == "f(x, y)");
+
+    oss.str("");
+
+    f1 = func(func_00_s{{"y"_var}});
+
+    oss << expression{f1};
+
+    REQUIRE(oss.str() == "f(y)");
+}
+
 struct func_05 : func_base {
-    func_05() : func_base("f", {}) {}
+    func_05() : func_base("f", std::vector<expression>{}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     std::vector<expression> gradient() const
@@ -195,7 +222,7 @@ struct func_05 : func_base {
 };
 
 struct func_05a : func_base {
-    func_05a() : func_base("f", {}) {}
+    func_05a() : func_base("f", std::vector<expression>{}) {}
     explicit func_05a(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     std::vector<expression> gradient() const
@@ -215,7 +242,7 @@ TEST_CASE("func diff")
 }
 
 struct func_10 : func_base {
-    func_10() : func_base("f", {}) {}
+    func_10() : func_base("f", std::vector<expression>{}) {}
     explicit func_10(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
@@ -227,7 +254,7 @@ struct func_10 : func_base {
 };
 
 struct func_10a : func_base {
-    func_10a() : func_base("f", {}) {}
+    func_10a() : func_base("f", std::vector<expression>{}) {}
     explicit func_10a(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
@@ -239,7 +266,7 @@ struct func_10a : func_base {
 };
 
 struct func_10b : func_base {
-    func_10b() : func_base("f", {}) {}
+    func_10b() : func_base("f", std::vector<expression>{}) {}
     explicit func_10b(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
@@ -278,7 +305,7 @@ TEST_CASE("func taylor_decompose")
 }
 
 struct func_12 : func_base {
-    func_12() : func_base("f", {}) {}
+    func_12() : func_base("f", std::vector<expression>{}) {}
     explicit func_12(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
@@ -304,7 +331,7 @@ TEST_CASE("func taylor diff")
 }
 
 struct func_13 : func_base {
-    func_13() : func_base("f", {}) {}
+    func_13() : func_base("f", std::vector<expression>{}) {}
     explicit func_13(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
@@ -354,24 +381,6 @@ TEST_CASE("func ostream")
     oss.str("");
 
     f1 = func(func_10{{"y"_var}});
-
-    oss << expression{f1};
-
-    REQUIRE(oss.str() == "f(y)");
-}
-
-TEST_CASE("shared func ostream")
-{
-    auto f1 = func(func_00_s{{"x"_var, "y"_var}});
-
-    std::ostringstream oss;
-    oss << expression{f1};
-
-    REQUIRE(oss.str() == "f(x, y)");
-
-    oss.str("");
-
-    f1 = func(func_00_s{{"y"_var}});
 
     oss << expression{f1};
 
@@ -569,9 +578,9 @@ private:
     }
 };
 
-struct func_19_s : shared_func_base {
+struct func_19_s : func_base {
     func_19_s(std::string name = "pippo", std::vector<expression> args = {})
-        : shared_func_base(std::move(name), std::move(args))
+        : func_base(std::move(name), std::move(args), true)
     {
     }
 
@@ -580,12 +589,11 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &boost::serialization::base_object<shared_func_base>(*this);
+        ar &boost::serialization::base_object<func_base>(*this);
     }
 };
 
 HEYOKA_S11N_FUNC_EXPORT(func_19)
-
 HEYOKA_S11N_FUNC_EXPORT(func_19_s)
 
 TEST_CASE("func s11n")
@@ -790,7 +798,7 @@ TEST_CASE("shared_func_base cmp")
 {
     using Catch::Matchers::Message;
 
-    func_00_s a{{"x"_var, "y"_var}}, b{a.get_args_ptr()};
+    func_00_s a{{"x"_var, "y"_var}}, b{a.shared_args()};
 
     func f_s0(std::move(a));
     func f_s1(std::move(b));
@@ -802,7 +810,7 @@ TEST_CASE("shared_func_base cmp")
 
     // Check throwing for the ctor from args ptr.
     func_00_s c{{"x"_var, "y"_var}};
-    REQUIRE_THROWS_MATCHES((func{func_00_s{"", c.get_args_ptr()}}), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES((func{func_00_s{"", c.shared_args()}}), std::invalid_argument,
                            Message("Cannot create a function with no name"));
 }
 

@@ -26,6 +26,13 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC sinh_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     sinh_impl();
     explicit sinh_impl(expression);

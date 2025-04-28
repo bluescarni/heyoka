@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_DFUN_HPP
 
 #include <cstdint>
-#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -28,29 +27,25 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC dfun_impl : public shared_func_base
+class HEYOKA_DLL_PUBLIC dfun_impl : public func_base
 {
     std::string m_id_name;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> m_didx;
 
+    // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<shared_func_base>(*this);
-        ar & m_id_name;
-        ar & m_didx;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // A private ctor used only in the implementation of gradient().
-    explicit dfun_impl(std::string, std::string, std::shared_ptr<const std::vector<expression>>,
+    explicit dfun_impl(std::string, std::string, func_args::shared_args_t,
                        std::vector<std::pair<std::uint32_t, std::uint32_t>>);
 
 public:
     dfun_impl();
     explicit dfun_impl(std::string, std::vector<expression>, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
-    explicit dfun_impl(std::string, std::shared_ptr<const std::vector<expression>>,
-                       std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+    explicit dfun_impl(std::string, func_args::shared_args_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
 
     [[nodiscard]] const std::string &get_id_name() const;
     [[nodiscard]] const std::vector<std::pair<std::uint32_t, std::uint32_t>> &get_didx() const;
@@ -69,10 +64,17 @@ HEYOKA_DLL_PUBLIC std::set<expression> get_dfuns(const std::vector<expression> &
 HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
-HEYOKA_DLL_PUBLIC expression dfun(std::string, std::shared_ptr<const std::vector<expression>>,
+HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args::shared_args_t,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
 HEYOKA_END_NAMESPACE
+
+// Current archive version is 2.
+//
+// Changelog:
+// - version 2: changed class base to func_base (from the now-deleted
+//   shared_func_base class).
+BOOST_CLASS_VERSION(heyoka::detail::dfun_impl, 2)
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::dfun_impl)
 

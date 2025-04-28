@@ -119,8 +119,7 @@ TEST_CASE("basic")
     REQUIRE_THROWS_MATCHES((dfun("x", {y, z}, {{1, 1}, {0, 1}})), std::invalid_argument,
                            Message("The indices in the indices vector passed to "
                                    "the constructor of a dfun must be sorted in strictly ascending order"));
-    REQUIRE_THROWS_MATCHES((dfun("x", std::shared_ptr<const std::vector<expression>>{}, {{0, 1}})),
-                           std::invalid_argument,
+    REQUIRE_THROWS_MATCHES((dfun("x", func_args::shared_args_t{}, {{0, 1}})), std::invalid_argument,
                            Message("Cannot construct a dfun from a null shared pointer to its arguments"));
 }
 
