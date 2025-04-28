@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_DFUN_HPP
 
 #include <cstdint>
-#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -33,14 +32,11 @@ class HEYOKA_DLL_PUBLIC dfun_impl : public func_base
     std::string m_id_name;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> m_didx;
 
+    // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-        ar & m_id_name;
-        ar & m_didx;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // A private ctor used only in the implementation of gradient().
     explicit dfun_impl(std::string, std::string, func_args::shared_args_t,
@@ -72,6 +68,13 @@ HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args::shared_args_t,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
 HEYOKA_END_NAMESPACE
+
+// Current archive version is 2.
+//
+// Changelog:
+// - version 2: changed class base to func_base (from the now-deleted
+//   shared_func_base class).
+BOOST_CLASS_VERSION(heyoka::detail::dfun_impl, 2)
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::dfun_impl)
 

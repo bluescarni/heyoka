@@ -28,11 +28,33 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
+#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
+
+void dfun_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
+{
+    oa << boost::serialization::base_object<func_base>(*this);
+    oa << m_id_name;
+    oa << m_didx;
+}
+
+void dfun_impl::load(boost::archive::binary_iarchive &ia, unsigned version)
+{
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<dfun_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a dfun_impl object: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
+    ia >> boost::serialization::base_object<func_base>(*this);
+    ia >> m_id_name;
+    ia >> m_didx;
+}
 
 dfun_impl::dfun_impl() : dfun_impl("x", std::vector<expression>{}, {}) {}
 
