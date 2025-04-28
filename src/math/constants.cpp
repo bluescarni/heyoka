@@ -136,7 +136,7 @@ const std::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
 constant::constant() : constant("null_constant", detail::null_constant_func{}) {}
 
 constant::constant(std::string name, str_func_t f, std::optional<std::string> repr)
-    : func_base(std::move(name), {}), m_str_func(std::move(f)), m_repr(std::move(repr))
+    : func_base(std::move(name), std::vector<expression>{}), m_str_func(std::move(f)), m_repr(std::move(repr))
 {
     if (!m_str_func) {
         throw std::invalid_argument("Cannot construct a constant with an empty string function");

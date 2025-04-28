@@ -87,7 +87,9 @@ class HEYOKA_DLL_PUBLIC func_base
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
-    explicit func_base(std::string, std::vector<expression>);
+    explicit func_base(std::string, std::vector<expression>, bool = false);
+    explicit func_base(std::string, func_args::shared_args_t);
+    explicit func_base(std::string, func_args);
 
     func_base(const func_base &);
     func_base(func_base &&) noexcept;
@@ -99,6 +101,7 @@ public:
 
     [[nodiscard]] const std::string &get_name() const noexcept;
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
+    [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
     // NOTE: this is supposed to be private, but there are issues making friends
     // with concept constraints on clang. Leave it public and undocumented for now.
@@ -107,56 +110,15 @@ public:
     void replace_args(std::vector<expression>);
 };
 
-// NOTE: this is a version of func_base which uses reference
-// semantics for storing the arguments.
-class HEYOKA_DLL_PUBLIC shared_func_base
-{
-public:
-    using args_ptr_t = std::shared_ptr<const std::vector<expression>>;
-
-private:
-    std::string m_name;
-    args_ptr_t m_args;
-
-    // Serialization.
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-public:
-    explicit shared_func_base(std::string, std::vector<expression>);
-    explicit shared_func_base(std::string, args_ptr_t);
-
-    shared_func_base(const shared_func_base &);
-    shared_func_base(shared_func_base &&) noexcept;
-
-    shared_func_base &operator=(const shared_func_base &);
-    shared_func_base &operator=(shared_func_base &&) noexcept;
-
-    ~shared_func_base();
-
-    [[nodiscard]] const std::string &get_name() const noexcept;
-    [[nodiscard]] const std::vector<expression> &args() const noexcept;
-
-    void replace_args(std::vector<expression>);
-
-    // NOTE: this will return a new shared reference to the
-    // internal vector of arguments.
-    [[nodiscard]] args_ptr_t get_args_ptr() const noexcept;
-};
-
 // UDF concept.
 template <typename T>
-concept is_udf = std::default_initializable<T> && std::copyable<T>
-                 && (std::derived_from<T, func_base> || std::derived_from<T, shared_func_base>);
+concept is_udf = std::default_initializable<T> && std::copyable<T> && std::derived_from<T, func_base>;
 
 namespace detail
 {
 
 // Default implementation of output streaming for func.
 HEYOKA_DLL_PUBLIC void func_default_to_stream(std::ostringstream &, const func_base &);
-HEYOKA_DLL_PUBLIC void func_default_to_stream(std::ostringstream &, const shared_func_base &);
 
 template <typename T>
 concept func_has_gradient = requires(const T &x) {
@@ -172,15 +134,12 @@ concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
 template <typename Base, typename Holder, typename T>
     requires is_udf<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
-    // The base function class.
-    using fbase = std::conditional_t<std::derived_from<T, func_base>, func_base, shared_func_base>;
-
     [[nodiscard]] const std::string &get_name() const final
     {
-        // NOTE: make sure we are invoking the member function from fbase,
+        // NOTE: make sure we are invoking the member function from func_base,
         // as in principle there could be a get_name() function in the derived
         // function class that hides it.
-        return static_cast<const fbase &>(getval<Holder>(this)).get_name();
+        return static_cast<const func_base &>(getval<Holder>(this)).get_name();
     }
 
     void to_stream(std::ostringstream &oss) const final
@@ -188,7 +147,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         if constexpr (requires(const T &x) { static_cast<void>(x.to_stream(oss)); }) {
             static_cast<void>(getval<Holder>(this).to_stream(oss));
         } else {
-            func_default_to_stream(oss, static_cast<const fbase &>(getval<Holder>(this)));
+            func_default_to_stream(oss, static_cast<const func_base &>(getval<Holder>(this)));
         }
     }
 
@@ -203,10 +162,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
-        // NOTE: make sure we are invoking the member function from fbase,
+        // NOTE: make sure we are invoking the member function from func_base,
         // as in principle there could be an args() function in the derived
         // function class that hides it.
-        return static_cast<const fbase &>(getval<Holder>(this)).args();
+        return static_cast<const func_base &>(getval<Holder>(this)).args();
     }
     void replace_args(std::vector<expression>) final;
 
@@ -308,7 +267,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
 };
 
 // The function interface.
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::string &get_name() const = 0;
 

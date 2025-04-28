@@ -136,7 +136,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 template <char... Chars>
 expression operator""_f128()
 {
-    return expression{mppp::literals::operator""_rq < Chars...>()};
+    return expression { mppp::literals::operator""_rq < Chars...>() };
 }
 
 #endif
@@ -154,7 +154,7 @@ template <typename Base, typename Holder, typename T>
     requires is_udf<T>
 inline void func_iface_impl<Base, Holder, T>::replace_args(std::vector<expression> new_args)
 {
-    return static_cast<fbase &>(getval<Holder>(this)).replace_args(std::move(new_args));
+    static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
 }
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {

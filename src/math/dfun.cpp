@@ -39,11 +39,14 @@ dfun_impl::dfun_impl() : dfun_impl("x", std::vector<expression>{}, {}) {}
 namespace
 {
 
-// Helper to validate the construction arguments of a dfun and assemble
-// the full function name.
+// This function will validate the construction arguments of a dfun, assemble
+// the full function name, and finally return a tuple of arguments
+// to be passed to the constructor of func_base.
+//
 // NOTE: Args can be either a vector of arguments or a shared pointer to
 // a vector of arguments.
 template <typename Args>
+    requires std::same_as<Args, std::vector<expression>> || std::same_as<Args, func_args::shared_args_t>
 auto make_dfun_name(const std::string &id_name, Args args_,
                     const std::vector<std::pair<std::uint32_t, std::uint32_t>> &didx)
 {
@@ -104,29 +107,35 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     full_name += "_";
     full_name += id_name;
 
-    return std::make_tuple(std::move(full_name), std::move(args_));
+    if constexpr (std::same_as<Args, std::vector<expression>>) {
+        // NOTE: if we will be constructing a func_base with a vector of arguments,
+        // we need to make sure we pass shared=true to the constructor.
+        return std::make_tuple(std::move(full_name), std::move(args_), true);
+    } else {
+        return std::make_tuple(std::move(full_name), std::move(args_));
+    }
 }
 
 } // namespace
 
 dfun_impl::dfun_impl(std::string id_name, std::vector<expression> args,
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
-    : shared_func_base(std::make_from_tuple<shared_func_base>(make_dfun_name(id_name, std::move(args), didx))),
+    : func_base(std::make_from_tuple<func_base>(make_dfun_name(id_name, std::move(args), didx))),
       m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
 }
 
-dfun_impl::dfun_impl(std::string id_name, std::shared_ptr<const std::vector<expression>> args,
+dfun_impl::dfun_impl(std::string id_name, func_args::shared_args_t args,
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
-    : shared_func_base(std::make_from_tuple<shared_func_base>(make_dfun_name(id_name, std::move(args), didx))),
+    : func_base(std::make_from_tuple<func_base>(make_dfun_name(id_name, std::move(args), didx))),
       m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
 }
 
 // NOTE: private ctor used in the implementation of gradient().
-dfun_impl::dfun_impl(std::string full_name, std::string id_name, std::shared_ptr<const std::vector<expression>> args,
+dfun_impl::dfun_impl(std::string full_name, std::string id_name, func_args::shared_args_t args,
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
-    : shared_func_base(std::move(full_name), std::move(args)), m_id_name(std::move(id_name)), m_didx(std::move(didx))
+    : func_base(std::move(full_name), std::move(args)), m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
 #if !defined(NDEBUG)
 
@@ -275,7 +284,7 @@ std::vector<expression> dfun_impl::gradient() const
         new_name += m_id_name;
 
         // Build and add the gradient component.
-        retval.emplace_back(func{dfun_impl{std::move(new_name), m_id_name, get_args_ptr(), std::move(new_didx)}});
+        retval.emplace_back(func{dfun_impl{std::move(new_name), m_id_name, shared_args(), std::move(new_didx)}});
     }
 
     return retval;
@@ -403,7 +412,7 @@ expression dfun(std::string id_name, std::vector<expression> args,
     return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
 }
 
-expression dfun(std::string id_name, std::shared_ptr<const std::vector<expression>> args,
+expression dfun(std::string id_name, func_args::shared_args_t args,
                 std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
 {
     return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
