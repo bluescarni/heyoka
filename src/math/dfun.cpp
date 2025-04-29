@@ -24,6 +24,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
@@ -315,7 +316,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-bool contains_dfun_impl(funcptr_set &func_set, const expression &ex)
+bool contains_dfun_impl(void_ptr_set &func_set, const expression &ex)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -362,7 +363,7 @@ bool contains_dfun(const std::vector<expression> &v_ex)
 {
     // NOTE: this set will contain subexpressions which are not a dfun
     // and which do not contain any dfun in the arguments.
-    funcptr_set func_set;
+    void_ptr_set func_set;
 
     for (const auto &ex : v_ex) {
         if (contains_dfun_impl(func_set, ex)) {
@@ -377,7 +378,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void get_dfuns_impl(funcptr_set &func_set, std::set<expression> &retval, const expression &ex)
+void get_dfuns_impl(void_ptr_set &func_set, std::set<expression> &retval, const expression &ex)
 {
     std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -414,7 +415,7 @@ void get_dfuns_impl(funcptr_set &func_set, std::set<expression> &retval, const e
 // Helper to fetch the set of all dfuns contained in v_ex.
 std::set<expression> get_dfuns(const std::vector<expression> &v_ex)
 {
-    funcptr_set func_set;
+    void_ptr_set func_set;
 
     std::set<expression> retval;
 

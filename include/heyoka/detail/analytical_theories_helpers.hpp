@@ -15,8 +15,9 @@
 #include <functional>
 #include <vector>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <heyoka/config.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/expression.hpp>
 
 // NOTE: this header contains utilities for the implementation of analytical theories
@@ -47,11 +48,11 @@ std::array<expression, 2> ex_cmul(const std::array<expression, 2> &, const std::
 std::array<expression, 2> ex_cinv(const std::array<expression, 2> &);
 
 // Dictionary to map an integral exponent to the corresponding integral power of a complex expression.
-using pow_dict_t = fast_umap<std::int8_t, std::array<expression, 2>>;
+using pow_dict_t = boost::unordered_flat_map<std::int8_t, std::array<expression, 2>>;
 
 // Dictionary to map an expression "ex" to a a dictionary of integral powers of
 // cos(ex) + im * sin(ex).
-using trig_eval_dict_t = fast_umap<expression, pow_dict_t, std::hash<expression>>;
+using trig_eval_dict_t = boost::unordered_flat_map<expression, pow_dict_t, std::hash<expression>>;
 
 std::array<expression, 2> ccpow(const expression &, trig_eval_dict_t &, std::int8_t);
 std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &);

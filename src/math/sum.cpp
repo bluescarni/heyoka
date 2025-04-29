@@ -31,6 +31,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sub.hpp>
@@ -538,7 +539,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &ex)
+expression sum_to_sub_impl(void_ptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -646,7 +647,7 @@ expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &
 // away the cost of a multiplication.
 std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());

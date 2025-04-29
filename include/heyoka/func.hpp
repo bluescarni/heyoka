@@ -23,7 +23,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/tanuki.hpp>
@@ -363,7 +363,7 @@ class HEYOKA_DLL_PUBLIC func
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(detail::funcptr_map<expression> &, const T &) const;
+    HEYOKA_DLL_LOCAL expression diff_impl(detail::void_ptr_map<expression> &, const T &) const;
 
 public:
     func();
@@ -404,18 +404,18 @@ public:
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
-    [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const std::string &) const;
-    [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const param &) const;
+    [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const std::string &) const;
+    [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const param &) const;
 
     [[nodiscard]] std::vector<expression>::size_type
-    decompose(detail::funcptr_map<std::vector<expression>::size_type> &, std::vector<expression> &) const;
+    decompose(detail::void_ptr_map<std::vector<expression>::size_type> &, std::vector<expression> &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    taylor_dc_t::size_type taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
+    taylor_dc_t::size_type taylor_decompose(detail::void_ptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;

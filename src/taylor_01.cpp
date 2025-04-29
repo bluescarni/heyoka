@@ -48,7 +48,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -777,7 +777,7 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression pow_to_explog(funcptr_map<expression> &func_map, const expression &ex)
+expression pow_to_explog(void_ptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -832,7 +832,7 @@ expression pow_to_explog(funcptr_map<expression> &func_map, const expression &ex
 // Helper to transform x**y -> exp(y*log(x)), if y is not a number.
 std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
@@ -920,7 +920,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on the equations.
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
+    detail::void_ptr_map<taylor_dc_t::size_type> func_map;
     for (std::vector<expression>::size_type i = 0; i < n_eq; ++i) {
         const auto &ex = all_ex[i];
 

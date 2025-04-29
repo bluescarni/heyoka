@@ -21,11 +21,12 @@
 #include <variant>
 #include <vector>
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
@@ -193,7 +194,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
 
         // Fetch the list of state variables from sys and put it into
         // a set for fast lookup.
-        detail::fast_uset<std::string> sv_set;
+        boost::unordered_flat_set<std::string> sv_set;
         sv_set.reserve(sys.size());
         for (const auto &[lhs, rhs] : sys) {
             assert(!sv_set.contains(std::get<variable>(lhs.value()).name()));
@@ -237,7 +238,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
         }
 
         // Check that there are no duplicates in vargs.
-        const detail::fast_uset<expression, std::hash<expression>> vargs_set(vargs.begin(), vargs.end());
+        const boost::unordered_flat_set<expression, std::hash<expression>> vargs_set(vargs.begin(), vargs.end());
         if (vargs_set.size() != vargs.size()) [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Duplicate entries detected in the list of expressions with respect to which the "

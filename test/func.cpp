@@ -24,7 +24,7 @@
 #include <llvm/IR/IRBuilder.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -79,7 +79,7 @@ TEST_CASE("func minimal")
 
     auto *fp_t = s.builder().getDoubleTy();
 
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
@@ -144,7 +144,7 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    detail::funcptr_map<taylor_dc_t::size_type> func_map2;
+    detail::void_ptr_map<taylor_dc_t::size_type> func_map2;
     f.taylor_decompose(func_map2, dec);
 
     // A few tests for shared arguments semantics.
@@ -235,7 +235,7 @@ TEST_CASE("func diff")
 {
     using Catch::Matchers::Message;
 
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
@@ -284,7 +284,7 @@ TEST_CASE("func taylor_decompose")
     auto f = func(func_10{{"x"_var}});
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
+    detail::void_ptr_map<taylor_dc_t::size_type> func_map;
     REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
@@ -398,7 +398,7 @@ TEST_CASE("func eq ineq")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
-    detail::funcptr_map<std::size_t> tmp;
+    detail::void_ptr_map<std::size_t> tmp;
 
     REQUIRE(f1 == f1);
     REQUIRE(!(f1 != f1));

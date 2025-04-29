@@ -31,6 +31,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/div.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -827,7 +828,7 @@ namespace
 // negative powers are collected is established by the
 // input partitioning function fpart.
 // NOLINTNEXTLINE(misc-no-recursion)
-expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression &ex,
+expression prod_to_div_impl(void_ptr_map<expression> &func_map, const expression &ex,
                             const std::function<bool(const expression &)> &fpart)
 {
     return std::visit(
@@ -916,7 +917,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
 // Transform products to divisions. Version for compiled functions.
 std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     // NOTE: for compiled functions, we want to transform into divisions
     // all small negative powers which would be evaluated via multiplications,
@@ -958,7 +959,7 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
 // Transform products to divisions. Version for Taylor integrators.
 std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     // NOTE: for Taylor integrators, it is generally not worth it to transform
     // negative powers into divisions because this results in having to compute

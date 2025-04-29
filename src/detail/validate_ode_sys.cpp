@@ -17,6 +17,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <fmt/core.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -31,7 +33,6 @@
 
 #endif
 
-#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -70,7 +71,7 @@ void validate_ode_sys_impl(const std::vector<std::pair<expression, expression>> 
     // of all variables in the system.
     std::vector<std::string> lhs_vars;
     // Maintain a set as well to check for duplicates.
-    fast_uset<std::string> lhs_vars_set;
+    boost::unordered_flat_set<std::string> lhs_vars_set;
 
     for (const auto &[lhs, rhs] : sys) {
         // Infer the variable from the current lhs.

@@ -34,6 +34,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -69,8 +70,7 @@
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/debug.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -106,7 +106,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
+std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &func_map,
                                                             const expression &ex, std::vector<expression> &dc)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
@@ -229,7 +229,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // all the unique expressions from v_ex, and it will
     // map them to their indices in retval (which will
     // in general differ from their indices in v_ex).
-    fast_umap<expression, idx_t, std::hash<expression>> ex_map;
+    boost::unordered_flat_map<expression, idx_t, std::hash<expression>> ex_map;
 
     // Map for the renaming of u variables
     // in the expressions.
@@ -597,7 +597,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on each component of the function.
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    detail::void_ptr_map<std::vector<expression>::size_type> func_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
         if (const auto dres = detail::decompose(func_map, ex, ret)) {

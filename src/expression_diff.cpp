@@ -28,6 +28,8 @@
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -36,8 +38,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dtens_impl.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -54,7 +55,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-expression diff(funcptr_map<expression> &func_map, const expression &e, const std::string &s)
+expression diff(void_ptr_map<expression> &func_map, const expression &e, const std::string &s)
 {
     return std::visit(
         [&func_map, &s](const auto &arg) {
@@ -94,7 +95,7 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const st
         e.value());
 }
 
-expression diff(funcptr_map<expression> &func_map, const expression &e, const param &p)
+expression diff(void_ptr_map<expression> &func_map, const expression &e, const param &p)
 {
     return std::visit(
         [&func_map, &p](const auto &arg) {
@@ -138,14 +139,14 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
 
 expression diff(const expression &e, const std::string &s)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
 
     return detail::diff(func_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
 
     return detail::diff(func_map, e, p);
 }
@@ -158,7 +159,7 @@ namespace
 
 std::vector<expression> diff_vec_impl(const std::vector<expression> &v_ex, const auto &x)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
@@ -291,7 +292,7 @@ diff_decompose(const std::vector<expression> &v_ex_)
     spdlog::stopwatch sw;
 
     // Run the decomposition.
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    detail::void_ptr_map<std::vector<expression>::size_type> func_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
         if (const auto dres = detail::decompose(func_map, ex, ret)) {
@@ -377,7 +378,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // Do an initial pass to create the adjoints, the
     // vectors of direct and reverse dependencies,
     // and the substitution map.
-    std::vector<fast_umap<std::uint32_t, expression>> adj;
+    std::vector<boost::unordered_flat_map<std::uint32_t, expression>> adj;
     adj.resize(boost::numeric_cast<decltype(adj.size())>(dc.size()));
 
     std::vector<std::vector<std::uint32_t>> dep;
@@ -405,7 +406,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // NOTE: as usual, use a sorted map (instead of a hash map) in order
     // to avoid non-deterministic ordering of operations.
     // NOTE: if this turns out to be a bottleneck, we can always
-    // re-implement in terms of fast_umap and manually sort after construction.
+    // re-implement in terms of boost::unordered_flat_map and manually sort after construction.
     std::map<std::string, std::vector<expression>> grad_map;
 
     // Elementary subexpressions.
@@ -578,7 +579,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
 // This is an alternative version of dtens_sv_idx_t that uses a dictionary
 // for storing the index/order pairs instead of a sorted vector. Using a dictionary
 // allows for faster/easier manipulation.
-using dtens_ss_idx_t = std::pair<std::uint32_t, fast_umap<std::uint32_t, std::uint32_t>>;
+using dtens_ss_idx_t = std::pair<std::uint32_t, boost::unordered_flat_map<std::uint32_t, std::uint32_t>>;
 
 // Helper to turn a dtens_sv_idx_t into a dtens_ss_idx_t.
 void vidx_v2s(dtens_ss_idx_t &output, const dtens_sv_idx_t &input)
@@ -677,7 +678,7 @@ void diff_tensors_forward_impl(
     // in the decomposition. This is used to locate diff arguments
     // in the decomposition.
     const auto input_idx_map = [&]() {
-        fast_umap<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
+        boost::unordered_flat_map<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
 
         for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
             const auto &cur_in = dc[i];
@@ -696,7 +697,7 @@ void diff_tensors_forward_impl(
     // to prevent duplicates. For order-1 derivatives, no duplicate
     // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
-    using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
+    using diff_map_t = boost::unordered_flat_map<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
     using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
     auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
@@ -714,7 +715,7 @@ void diff_tensors_forward_impl(
     // to avoid iterating over those subexpressions which do not depend on
     // an input. We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    fast_uset<std::uint32_t> in_deps;
+    boost::unordered_flat_set<std::uint32_t> in_deps;
     std::vector<std::uint32_t> sorted_in_deps;
 
     // A stack to be used when filling up in_deps/sorted_in_deps.
@@ -915,7 +916,7 @@ void diff_tensors_reverse_impl(
     // to prevent duplicates. For order-1 derivatives, no duplicate
     // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
-    using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
+    using diff_map_t = boost::unordered_flat_map<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
     using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
     auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
@@ -940,7 +941,7 @@ void diff_tensors_reverse_impl(
     // does not depend (recall that the decomposition contains the subexpressions
     // for ALL outputs). We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    fast_uset<std::uint32_t> out_deps;
+    boost::unordered_flat_set<std::uint32_t> out_deps;
     std::vector<std::uint32_t> sorted_out_deps;
 
     // A stack to be used when filling up out_deps/sorted_out_deps.
@@ -1049,7 +1050,7 @@ void diff_tensors_reverse_impl(
         // to fetch from diffs only the derivatives we are interested in
         // (since there may be vars/params in the decomposition wrt which
         // the derivatives are not requested).
-        fast_umap<expression, expression, std::hash<expression>> dmap;
+        boost::unordered_flat_map<expression, expression, std::hash<expression>> dmap;
         for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
             [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
             assert(flag);
@@ -1361,7 +1362,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
     }
 
     // Check if there are repeated entries in args.
-    const fast_uset<expression, std::hash<expression>> args_set(args.begin(), args.end());
+    const boost::unordered_flat_set<expression, std::hash<expression>> args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
         throw std::invalid_argument(
             fmt::format("Duplicate entries detected in the list of variables/parameters with respect to which the "

@@ -29,9 +29,9 @@
 #include <variant>
 #include <vector>
 
-#include <boost/container/small_vector.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
@@ -51,8 +51,7 @@
 
 #endif
 
-#include <heyoka/detail/fast_unordered.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -159,16 +158,6 @@ namespace detail
 namespace
 {
 
-// NOTE: here we define a couple of stack data structures to be used when traversing
-// the nodes of an expression. We use boost::small_vector in order to avoid paying for
-// heap allocations on small expressions.
-constexpr std::size_t static_stack_size = 20;
-
-using traverse_stack = boost::container::small_vector<std::pair<const expression *, bool>, static_stack_size>;
-
-template <typename T>
-using return_stack = boost::container::small_vector<std::optional<T>, static_stack_size>;
-
 // NOTE: the idea here is to have two stacks: the usual stack ('stack') for depth-first traversal, and a stack of copies
 // of the expression nodes ('copy_stack'). As we traverse the expression, we keep on pusing to copy_stack copies of the
 // nodes.
@@ -274,7 +263,7 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
 
 expression copy(const expression &e)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> copy_stack;
 
@@ -283,7 +272,7 @@ expression copy(const expression &e)
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> copy_stack;
 
@@ -448,8 +437,8 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    detail::funcptr_set func_set;
-    detail::fast_uset<std::string> s_set;
+    detail::void_ptr_set func_set;
+    boost::unordered_flat_set<std::string> s_set;
     detail::traverse_stack stack;
 
     detail::get_variables_impl(func_set, stack, s_set, e);
@@ -463,8 +452,8 @@ std::vector<std::string> get_variables(const expression &e)
 
 std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_set func_set;
-    detail::fast_uset<std::string> s_set;
+    detail::void_ptr_set func_set;
+    boost::unordered_flat_set<std::string> s_set;
     detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
@@ -594,7 +583,7 @@ expression rename_variables_impl(auto &func_map, auto &stack, auto &rename_stack
 
 expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> rename_stack;
 
@@ -604,7 +593,7 @@ expression rename_variables(const expression &e, const std::unordered_map<std::s
 std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
                                          const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> rename_stack;
 
@@ -628,7 +617,7 @@ namespace detail
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const expression &ex) noexcept
 {
-    detail::funcptr_map<std::size_t> func_map;
+    detail::void_ptr_map<std::size_t> func_map;
     detail::traverse_stack stack;
     detail::return_stack<std::size_t> hash_stack;
 
@@ -789,7 +778,7 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
 // zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
-    detail::funcptr_map<std::size_t> func_map;
+    detail::void_ptr_map<std::size_t> func_map;
     detail::traverse_stack stack{{&e, false}};
     boost::safe_numerics::safe<std::size_t> retval = 0;
 
@@ -1001,7 +990,7 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -1011,7 +1000,7 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
 std::vector<expression> subs(const std::vector<expression> &v_ex,
                              const std::unordered_map<std::string, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -1163,7 +1152,7 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
 // to traverse the entire subexpression in order to compute its hash value.
 expression subs(const expression &e, const std::map<expression, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -1172,7 +1161,7 @@ expression subs(const expression &e, const std::map<expression, expression> &sma
 
 std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<expression> func_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -1189,7 +1178,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &func_map, const expression &ex,
+taylor_dc_t::size_type taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &func_map, const expression &ex,
                                         taylor_dc_t &dc)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
@@ -1244,7 +1233,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex)
+std::uint32_t get_param_size(void_ptr_set &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
 
@@ -1290,7 +1279,7 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     return detail::get_param_size(func_set, ex);
 }
@@ -1299,7 +1288,7 @@ std::uint32_t get_param_size(const std::vector<expression> &v_ex)
 {
     std::uint32_t retval = 0;
 
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     for (const auto &ex : v_ex) {
         retval = std::max(retval, detail::get_param_size(func_set, ex));
@@ -1315,7 +1304,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
+void get_params(std::unordered_set<std::uint32_t> &idx_set, void_ptr_set &func_set, const expression &ex)
 {
     std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -1355,7 +1344,7 @@ void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set 
 std::vector<expression> get_params(const expression &ex)
 {
     std::unordered_set<std::uint32_t> idx_set;
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     // Write the indices of all parameters appearing in ex
     // into idx_set.
@@ -1377,7 +1366,7 @@ std::vector<expression> get_params(const expression &ex)
 std::vector<expression> get_params(const std::vector<expression> &v_ex)
 {
     std::unordered_set<std::uint32_t> idx_set;
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     // Write the indices of all parameters appearing in v_ex
     // into idx_set.
@@ -1405,7 +1394,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-bool is_time_dependent(funcptr_set &func_set, const expression &ex)
+bool is_time_dependent(void_ptr_set &func_set, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
     //   if any of its arguments is time-dependent,
@@ -1460,14 +1449,14 @@ bool is_time_dependent(const expression &ex)
 {
     // NOTE: this will contain pointers to (sub)expressions
     // which are *not* time-dependent.
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     return detail::is_time_dependent(func_set, ex);
 }
 
 bool is_time_dependent(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
 
     for (const auto &ex : v_ex) {
         if (detail::is_time_dependent(func_set, ex)) {
@@ -1489,7 +1478,7 @@ namespace
 constexpr std::uint32_t decompose_split = 8u;
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
+expression split_sums_for_decompose(void_ptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -1533,7 +1522,7 @@ expression split_sums_for_decompose(funcptr_map<expression> &func_map, const exp
 
 std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
@@ -1549,7 +1538,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
+expression split_prods_for_decompose(void_ptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -1593,7 +1582,7 @@ expression split_prods_for_decompose(funcptr_map<expression> &func_map, const ex
 
 std::vector<expression> split_prods_for_decompose(const std::vector<expression> &v_ex, std::uint32_t split)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
@@ -1609,7 +1598,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
+expression sums_to_sum_sqs_for_decompose(void_ptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
@@ -1654,7 +1643,7 @@ expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, cons
 // Replace sum({square(x), square(y), ...}) with sum_sq({x, y, ...}).
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<expression> func_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());

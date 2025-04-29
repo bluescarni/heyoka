@@ -50,7 +50,7 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -361,8 +361,8 @@ class HEYOKA_DLL_PUBLIC dtens;
 namespace detail
 {
 
-expression diff(funcptr_map<expression> &, const expression &, const std::string &);
-expression diff(funcptr_map<expression> &, const expression &, const param &);
+expression diff(void_ptr_map<expression> &, const expression &, const std::string &);
+expression diff(void_ptr_map<expression> &, const expression &, const param &);
 
 // NOTE: public only for testing purposes.
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
@@ -521,7 +521,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<ex
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
+taylor_dc_t::size_type taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
 
 } // namespace detail
 
@@ -584,7 +584,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> split_prods_for_decompose(const std::v
 
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
 
-std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
+std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &,
                                                             const expression &, std::vector<expression> &);
 
 llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);

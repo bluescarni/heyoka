@@ -37,7 +37,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -283,7 +283,7 @@ auto make_adl_copy(const auto &x)
 // - a variable,
 // - a number,
 // - a param.
-std::vector<expression> func_td_args(const auto &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+std::vector<expression> func_td_args(const auto &fb, void_ptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
     std::vector<expression> retval;
     retval.reserve(fb.args().size());
@@ -309,7 +309,7 @@ std::vector<expression> func_td_args(const auto &fb, funcptr_map<taylor_dc_t::si
 // - a variable,
 // - a number,
 // - a param.
-std::vector<expression> func_d_args(const auto &fb, funcptr_map<std::vector<expression>::size_type> &func_map,
+std::vector<expression> func_d_args(const auto &fb, void_ptr_map<std::vector<expression>::size_type> &func_map,
                                     std::vector<expression> &dc)
 {
     std::vector<expression> retval;
@@ -442,7 +442,7 @@ std::vector<expression> func::gradient() const
 }
 
 template <typename T>
-expression func::diff_impl(detail::funcptr_map<expression> &func_map, const T &arg) const
+expression func::diff_impl(detail::void_ptr_map<expression> &func_map, const T &arg) const
 {
     const auto arity = args().size();
 
@@ -459,17 +459,17 @@ expression func::diff_impl(detail::funcptr_map<expression> &func_map, const T &a
     return sum(std::move(prod));
 }
 
-expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
+expression func::diff(detail::void_ptr_map<expression> &func_map, const std::string &s) const
 {
     return this->diff_impl(func_map, s);
 }
 
-expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
+expression func::diff(detail::void_ptr_map<expression> &func_map, const param &p) const
 {
     return this->diff_impl(func_map, p);
 }
 
-std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
+std::vector<expression>::size_type func::decompose(detail::void_ptr_map<std::vector<expression>::size_type> &func_map,
                                                    std::vector<expression> &dc) const
 {
     const auto *const f_id = get_ptr();
@@ -529,7 +529,7 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uin
     return m_func->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 }
 
-taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &func_map,
+taylor_dc_t::size_type func::taylor_decompose(detail::void_ptr_map<taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
     const auto *const f_id = get_ptr();
