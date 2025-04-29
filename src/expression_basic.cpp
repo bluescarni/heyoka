@@ -59,6 +59,7 @@
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>

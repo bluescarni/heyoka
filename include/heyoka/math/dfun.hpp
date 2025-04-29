@@ -20,6 +20,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE

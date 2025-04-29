@@ -13,7 +13,7 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"

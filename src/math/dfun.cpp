@@ -27,6 +27,7 @@
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/math/dfun.hpp>
 #include <heyoka/s11n.hpp>
 

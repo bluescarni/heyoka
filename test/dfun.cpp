@@ -19,6 +19,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/dfun.hpp>
 #include <heyoka/math/sin.hpp>
