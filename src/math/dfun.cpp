@@ -76,7 +76,7 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     std::string full_name = "dfun_";
 
     // Fetch a reference to the arguments.
-    const auto &args = [&args_]() -> const auto & {
+    const auto &args = [&args_]() -> const std::vector<expression> & {
         if constexpr (std::same_as<Args, std::vector<expression>>) {
             return args_;
         } else {
