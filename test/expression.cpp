@@ -598,6 +598,47 @@ TEST_CASE("rename_variables")
     ex = (y + tmp) / foo * tmp - foo;
     ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_copy = rename_variables(bar, {{"x", "x1"}, {"y", "y1"}, {"z", "z1"}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_copy[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_copy[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).shared_args());
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_copy = rename_variables(bar, {{"x", "x1"}, {"y", "y1"}, {"z", "z1"}});
+
+        REQUIRE(std::get<func>(bar_copy[0].value()).shared_args() == std::get<func>(bar_copy[1].value()).shared_args());
+    }
 }
 
 TEST_CASE("copy")
