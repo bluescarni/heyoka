@@ -624,7 +624,7 @@ TEST_CASE("copy")
         REQUIRE(bar_copy == bar);
     }
 
-    // Test with shared arguments.
+    // Tests with shared arguments.
     {
         func_args sargs({x, y, z}, true);
 
@@ -651,6 +651,20 @@ TEST_CASE("copy")
                 == std::get<func>(bar_copy[2].value()).shared_args());
         REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).shared_args()
                 == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).shared_args());
+
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_copy = copy(bar);
+
+        REQUIRE(std::get<func>(bar_copy[0].value()).shared_args() == std::get<func>(bar_copy[1].value()).shared_args());
 
         REQUIRE(bar_copy == bar);
     }
