@@ -6,13 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// NOTE: this header contains typedefs for data structures used for the
-// traversal of expression trees.
+// NOTE: this header contains utilities used when traversing expressions.
 
 #ifndef HEYOKA_DETAIL_EX_TRAVERSAL_HPP
 #define HEYOKA_DETAIL_EX_TRAVERSAL_HPP
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -22,13 +22,15 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/func_args.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-// NOTE: these are set/map structures used to cache the result of a computation.
+// NOTE: these are set/map structures used to cache the result of a computation
+// during expression traversal.
 using void_ptr_set = boost::unordered_flat_set<const void *>;
 
 template <typename T>
@@ -44,6 +46,11 @@ using traverse_stack
 
 template <typename T>
 using return_stack = boost::container::small_vector<std::optional<T>, static_ex_traversal_stack_size>;
+
+expression ex_traverse_transform_leaves(void_ptr_map<const expression> &,
+                                        void_ptr_map<const func_args::shared_args_t> &, traverse_stack &,
+                                        return_stack<expression> &, const expression &,
+                                        const std::function<expression(const expression &)> &);
 
 } // namespace detail
 
