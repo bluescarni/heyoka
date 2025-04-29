@@ -421,7 +421,7 @@ namespace detail
 namespace
 {
 
-void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expression &e)
+void get_variables_impl(auto &func_set, auto &sargs_set, auto &stack, auto &s_set, const expression &e)
 {
     assert(stack.empty());
 
@@ -440,22 +440,49 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
             // Fetch the function id.
             const auto *f_id = f.get_ptr();
 
-            if (auto it = func_set.find(f_id); it != func_set.end()) {
+            if (func_set.contains(f_id)) {
                 // We already got the list of variables for the current function,
                 // no need to do anything else.
                 assert(!visited);
                 continue;
             }
 
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
             if (visited) {
                 // We have now visited all the children of the function node and determined
-                // the list of variables. We just have to add f_id to the cache so that we
+                // the list of variables. We have to add f_id to the cache so that we
                 // won't repeat the same computation again.
-                assert(!func_set.contains(f_id));
                 func_set.emplace(f_id);
+
+                if (shared_args) {
+                    // NOTE: if the function manages its arguments via a shared reference,
+                    // we must make sure to record in sargs_set that we have determined
+                    // the list of variables for shared_args, so that when we run again into the
+                    // same shared reference we avoid needlessly repeating the computation.
+                    assert(!sargs_set.contains(&*shared_args));
+                    sargs_set.emplace(&*shared_args);
+                }
             } else {
-                // It is the first time we visit this function. Re-add it to the stack
-                // with visited=true, and add all of its arguments to the stack as well.
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already computed the list of variables for the arguments.
+                    if (sargs_set.contains(&*shared_args)) {
+                        // The list of variables for the arguments has already been computed.
+                        // Add f_id to the cache and move on.
+                        func_set.emplace(f_id);
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that we haven't determined the list of variables
+                    // for the shared arguments of the function yet. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its arguments
+                // to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
                 for (const auto &ex : f.args()) {
@@ -479,11 +506,11 @@ void get_variables_impl(auto &func_set, auto &stack, auto &s_set, const expressi
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
     boost::unordered_flat_set<std::string> s_set;
     detail::traverse_stack stack;
 
-    detail::get_variables_impl(func_set, stack, s_set, e);
+    detail::get_variables_impl(func_set, sargs_set, stack, s_set, e);
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
@@ -494,12 +521,12 @@ std::vector<std::string> get_variables(const expression &e)
 
 std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
     boost::unordered_flat_set<std::string> s_set;
     detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
-        detail::get_variables_impl(func_set, stack, s_set, ex);
+        detail::get_variables_impl(func_set, sargs_set, stack, s_set, ex);
     }
 
     // Turn the set into an ordered vector.

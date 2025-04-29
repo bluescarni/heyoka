@@ -550,6 +550,27 @@ TEST_CASE("get_variables")
     // The vectorised version
     REQUIRE(get_variables({(y + tmp) / foo * tmp - foo, "a"_var + "b"_var})
             == std::vector<std::string>{"a", "b", "x", "y", "z"});
+
+    // Testing for the shared arguments variant.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        REQUIRE(get_variables(bar) == std::vector<std::string>{"x", "y", "z"});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        REQUIRE(get_variables(bar) == std::vector<std::string>{"x", "y", "z"});
+    }
 }
 
 TEST_CASE("rename_variables")
