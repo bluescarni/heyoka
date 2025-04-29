@@ -475,7 +475,7 @@ namespace detail
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const expression &ex) noexcept
 {
-    detail::void_ptr_map<std::size_t> func_map;
+    detail::void_ptr_map<const std::size_t> func_map;
     detail::traverse_stack stack;
     detail::return_stack<std::size_t> hash_stack;
 
@@ -528,7 +528,6 @@ std::size_t hash(const expression &ex) noexcept
                 // we are at the end of the while loop and we won't need the cached
                 // value in the future. Like this, we avoid an unnecessary heap allocation
                 // if the expression we are hashing is a simple non-recursive function.
-                assert(!func_map.contains(f_id));
                 if (!stack.empty()) {
                     func_map.emplace(f_id, seed);
                 }
