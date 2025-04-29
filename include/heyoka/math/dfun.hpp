@@ -46,6 +46,7 @@ public:
     dfun_impl();
     explicit dfun_impl(std::string, std::vector<expression>, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
     explicit dfun_impl(std::string, func_args::shared_args_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+    explicit dfun_impl(std::string, func_args, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
 
     [[nodiscard]] const std::string &get_id_name() const;
     [[nodiscard]] const std::vector<std::pair<std::uint32_t, std::uint32_t>> &get_didx() const;
@@ -66,6 +67,8 @@ HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
 
 HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args::shared_args_t,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
+
+HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args, std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
 HEYOKA_END_NAMESPACE
 

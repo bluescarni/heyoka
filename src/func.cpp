@@ -214,17 +214,21 @@ func_args::shared_args_t func_base::shared_args() const noexcept
 
 void func_base::replace_args(std::vector<expression> new_args)
 {
-    // LCOV_EXCL_START
-    if (new_args.size() != args().size()) [[unlikely]] {
-        throw std::invalid_argument(fmt::format("func_base::replace_args() was invoked with a new_args argument of "
-                                                "size {}, but the current argument size is {}",
-                                                new_args.size(), args().size()));
-    }
-    // LCOV_EXCL_STOP
+    // TODO add assertion.
 
     // NOTE: the idea here is that if we are storing the arguments via shared pointer,
     // we want to make sure that the new arguments are also stored via shared pointer.
+    // TODO change this - we now have 2 overloads for this, and we can select the shared
+    // arguments behaviour based on the invoked overload.
     m_args = func_args(std::move(new_args), static_cast<bool>(shared_args()));
+}
+
+void func_base::replace_args(func_args::shared_args_t new_args)
+{
+    assert(shared_args());
+    assert(new_args);
+
+    m_args = func_args(std::move(new_args));
 }
 
 namespace detail
@@ -382,7 +386,7 @@ func func::copy(std::vector<expression> new_args) const
 {
     const auto orig_size = args().size();
 
-    if (new_args.size() != orig_size) {
+    if (new_args.size() != orig_size) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
                         "of the original function is {} (the two sizes must be equal)",
@@ -396,16 +400,33 @@ func func::copy(std::vector<expression> new_args) const
     func ret;
     ret.m_func = detail::make_adl_copy(m_func);
 
-    // NOTE: a user-defined function might have a funky
-    // implementation of the copy constructor which, e.g.,
-    // changes the arity.
-    // LCOV_EXCL_START
-    if (ret.args().size() != orig_size) {
-        throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
-                                                "from {} to {} - this is not allowed",
-                                                orig_size, ret.args().size()));
+    // Replace the arguments.
+    ret.m_func->replace_args(std::move(new_args));
+
+    return ret;
+}
+
+func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
+{
+    if (!new_args) [[unlikely]] {
+        throw std::invalid_argument("Cannot invoke func::make_copy_with_new_args() with a null pointer argument");
     }
-    // LCOV_EXCL_STOP
+
+    const auto orig_size = args().size();
+
+    if (new_args->size() != orig_size) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The set of new arguments passed to func::make_copy_with_new_args() "
+                                                "has a size of {}, but the number of arguments "
+                                                "of the original function is {} (the two sizes must be equal)",
+                                                new_args->size(), orig_size));
+    }
+
+    // NOTE: this will end up invoking the copy constructor
+    // of the internal user-defined function.
+    // NOTE: need to go through the make_adl_copy() wrapper
+    // in order to avoid ambiguities.
+    func ret;
+    ret.m_func = detail::make_adl_copy(m_func);
 
     // Replace the arguments.
     ret.m_func->replace_args(std::move(new_args));

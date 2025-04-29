@@ -102,11 +102,12 @@ public:
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
-    // NOTE: this is supposed to be private, but there are issues making friends
-    // with concept constraints on clang. Leave it public and undocumented for now.
-    // NOTE: this is the only non-const function in the interface, and it is supposed
+    // NOTE: these are supposed to be private, but there are issues making friends
+    // with concept constraints on clang. Leave them public and undocumented for now.
+    // NOTE: these are the only non-const functions in the interface, and they are supposed
     // to be used only in the implementation of the func::copy() function.
     void replace_args(std::vector<expression>);
+    void replace_args(func_args::shared_args_t);
 };
 
 // UDF concept.
@@ -173,7 +174,13 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).shared_args();
     }
+    // NOTE: the implementation of the first overload must go in expression.hpp
+    // as the definition of the expression class must be available.
     void replace_args(std::vector<expression>) final;
+    void replace_args(func_args::shared_args_t new_args) final
+    {
+        static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
+    }
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -284,6 +291,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::vector<expression> &args() const noexcept = 0;
     [[nodiscard]] virtual func_args::shared_args_t shared_args() const noexcept = 0;
     virtual void replace_args(std::vector<expression>) = 0;
+    virtual void replace_args(func_args::shared_args_t) = 0;
 
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
@@ -388,6 +396,7 @@ public:
     // function arguments have been replaced by the
     // provided vector of arguments.
     [[nodiscard]] func copy(std::vector<expression>) const;
+    [[nodiscard]] func make_copy_with_new_args(func_args::shared_args_t) const;
 
     template <typename T>
     [[nodiscard]] const T *extract() const noexcept

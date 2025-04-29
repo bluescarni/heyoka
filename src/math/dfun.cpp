@@ -65,10 +65,11 @@ namespace
 // the full function name, and finally return a tuple of arguments
 // to be passed to the constructor of func_base.
 //
-// NOTE: Args can be either a vector of arguments or a shared pointer to
-// a vector of arguments.
+// NOTE: Args can be a vector of arguments, a shared pointer to a vector of arguments
+// or an instance of func_args.
 template <typename Args>
     requires std::same_as<Args, std::vector<expression>> || std::same_as<Args, func_args::shared_args_t>
+             || std::same_as<Args, func_args>
 auto make_dfun_name(const std::string &id_name, Args args_,
                     const std::vector<std::pair<std::uint32_t, std::uint32_t>> &didx)
 {
@@ -79,6 +80,8 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     const auto &args = [&args_]() -> const std::vector<expression> & {
         if constexpr (std::same_as<Args, std::vector<expression>>) {
             return args_;
+        } else if constexpr (std::same_as<Args, func_args>) {
+            return args_.get_args();
         } else {
             if (args_ == nullptr) [[unlikely]] {
                 throw std::invalid_argument("Cannot construct a dfun from a null shared pointer to its arguments");
@@ -152,6 +155,16 @@ dfun_impl::dfun_impl(std::string id_name, func_args::shared_args_t args,
     : func_base(std::make_from_tuple<func_base>(make_dfun_name(id_name, std::move(args), didx))),
       m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
+}
+
+dfun_impl::dfun_impl(std::string id_name, func_args args, std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
+    : func_base(std::make_from_tuple<func_base>(make_dfun_name(id_name, std::move(args), didx))),
+      m_id_name(std::move(id_name)), m_didx(std::move(didx))
+{
+    // TODO do we want to enforce this?
+    if (!shared_args()) [[unlikely]] {
+        throw std::invalid_argument("Shared function arguments are required when constructing a dfun() instance");
+    }
 }
 
 // NOTE: private ctor used in the implementation of gradient().
@@ -436,6 +449,11 @@ expression dfun(std::string id_name, std::vector<expression> args,
 
 expression dfun(std::string id_name, func_args::shared_args_t args,
                 std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
+{
+    return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
+}
+
+expression dfun(std::string id_name, func_args args, std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
 {
     return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
 }

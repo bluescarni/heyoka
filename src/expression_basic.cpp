@@ -17,6 +17,7 @@
 #include <functional>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -166,7 +167,7 @@ namespace
 // we need to copy its arguments first. As we proceed with the traversal, the second time we encounter the function
 // node we are sure that all its arguments have been copied. The copies of the arguments are at the tail end of
 // copy_stack. We can then proceed to pop them to construct the copy of the function node.
-expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expression &e)
+expression copy_impl(auto &func_map, auto &sargs_map, auto &stack, auto &copy_stack, const expression &e)
 {
     assert(stack.empty());
     assert(copy_stack.empty());
@@ -194,11 +195,16 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
                 continue;
             }
 
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
             if (visited) {
                 // We have now visited and copied all the children of the function node
                 // (i.e., the function arguments). The copies are at the tail end of
                 // copy_stack. We will be popping the copies from copy_stack and use them
                 // to initialise a new copy of the function.
+
+                // Build the new arguments.
                 std::vector<expression> new_args;
                 const auto n_args = f.args().size();
                 new_args.reserve(n_args);
@@ -214,10 +220,23 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
                 }
 
                 // Create the new copy of the function.
-                auto ex_copy = expression{f.copy(std::move(new_args))};
+                auto ex_copy = [&]() {
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference, we must make
+                        // sure to record the new arguments in sargs_map, so that when we run again into the
+                        // same shared reference we re-use the cached result.
+                        auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(new_args));
+
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, new_sargs);
+
+                        return expression{f.make_copy_with_new_args(std::move(new_sargs))};
+                    } else {
+                        return expression{f.copy(std::move(new_args))};
+                    }
+                }();
 
                 // Add it to the cache.
-                assert(!func_map.contains(f_id));
                 func_map.emplace(f_id, ex_copy);
 
                 // Add it to copy_stack.
@@ -228,8 +247,29 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
                 assert(!copy_stack.back());
                 copy_stack.back().emplace(std::move(ex_copy));
             } else {
-                // It is the first time we visit this function. Re-add it to the stack
-                // with visited=true, and add all of its arguments to the stack as well.
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already copied the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // The arguments have been copied before. Fetch them from the cache and
+                        // use them to construct a new copy of the function.
+                        auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
+
+                        // Add the new function to the cache and to the copy stack.
+                        func_map.emplace(f_id, ex_copy);
+                        copy_stack.emplace_back(std::move(ex_copy));
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that the shared arguments of the function
+                    // have never been copied before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
                 for (const auto &ex : f.args()) {
@@ -263,16 +303,18 @@ expression copy_impl(auto &func_map, auto &stack, auto &copy_stack, const expres
 
 expression copy(const expression &e)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> copy_stack;
 
-    return detail::copy_impl(func_map, stack, copy_stack, e);
+    return detail::copy_impl(func_map, sargs_map, stack, copy_stack, e);
 }
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> copy_stack;
 
@@ -280,7 +322,7 @@ std::vector<expression> copy(const std::vector<expression> &v_ex)
     ret.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        ret.push_back(detail::copy_impl(func_map, stack, copy_stack, ex));
+        ret.push_back(detail::copy_impl(func_map, sargs_map, stack, copy_stack, ex));
     }
 
     return ret;

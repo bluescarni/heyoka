@@ -623,6 +623,37 @@ TEST_CASE("copy")
 
         REQUIRE(bar_copy == bar);
     }
+
+    // Test with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_copy = copy(bar);
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_copy[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_copy[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).shared_args());
+
+        REQUIRE(bar_copy == bar);
+    }
 }
 
 TEST_CASE("subs str")
