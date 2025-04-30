@@ -25,7 +25,7 @@ namespace detail
 {
 
 // This function will return a copy of the input expression e in which the leaf nodes have been transformed
-// by the function f.
+// by the function tfunc.
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
 // stack is the stack that will be used for traversal. out_stack is the stack that will be used to store the results
@@ -33,9 +33,9 @@ namespace detail
 expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map,
                                         void_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
                                         return_stack<expression> &out_stack, const expression &e,
-                                        const std::function<expression(const expression &)> &f)
+                                        const std::function<expression(const expression &)> &tfunc)
 {
-    assert(f);
+    assert(tfunc);
     assert(stack.empty());
     assert(out_stack.empty());
 
@@ -148,9 +148,9 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
             // Non-function (i.e., leaf) node.
             assert(!visited);
 
-            // Apply the transformation f to the leaf node and add the
+            // Apply the transformation tfunc to the leaf node and add the
             // result to out_stack.
-            out_stack.emplace_back(f(*cur_ex));
+            out_stack.emplace_back(tfunc(*cur_ex));
         }
     }
 
