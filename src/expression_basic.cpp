@@ -870,8 +870,7 @@ namespace detail
 namespace
 {
 
-// NOTE: this follows the same scheme as the copy() primitive.
-expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expression &e,
+expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_stack, const expression &e,
                      const std::map<expression, expression> &smap)
 {
     assert(stack.empty());
@@ -910,7 +909,6 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
             // If cur_ex is a function, record the result of the substitution into func_map.
             if (f_ptr != nullptr) {
                 const auto *f_id = f_ptr->get_ptr();
-                assert(!func_map.contains(f_id));
                 func_map.emplace(f_id, it->second);
             }
 
@@ -926,10 +924,15 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
             // Fetch the function id.
             const auto *f_id = f.get_ptr();
 
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
             if (visited) {
                 // We have now visited and performed substitution on all the children of the function node
-                // (i.e., the function arguments). The results are at the tail end of subs_stack. We will be popping
-                // the new arguments from subs_stack and use them to initialise a new function.
+                // (i.e., the function arguments). The results are at the tail end of subs_stack. We will be
+                // popping them from subs_stack and use them to initialise a new copy of the function.
+
+                // Build the new arguments.
                 std::vector<expression> new_args;
                 const auto n_args = f.args().size();
                 new_args.reserve(n_args);
@@ -944,11 +947,24 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
                     subs_stack.pop_back();
                 }
 
-                // Create the new function.
-                auto ex_copy = expression{f.copy(std::move(new_args))};
+                // Create the new copy of the function.
+                auto ex_copy = [&]() {
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference, we must make
+                        // sure to record the new arguments in sargs_map, so that when we run again into the
+                        // same shared reference we re-use the cached result.
+                        auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(new_args));
+
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, new_sargs);
+
+                        return expression{f.make_copy_with_new_args(std::move(new_sargs))};
+                    } else {
+                        return expression{f.copy(std::move(new_args))};
+                    }
+                }();
 
                 // Add it to the cache.
-                assert(!func_map.contains(f_id));
                 func_map.emplace(f_id, ex_copy);
 
                 // Add it to subs_stack.
@@ -959,8 +975,29 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
                 assert(!subs_stack.back());
                 subs_stack.back().emplace(std::move(ex_copy));
             } else {
-                // It is the first time we visit this function. Re-add it to the stack
-                // with visited=true, and add all of its arguments to the stack as well.
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already performed substitution on the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // We performed substitution on the arguments before. Fetch the results from the cache and
+                        // use them to construct a new copy of the function.
+                        auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
+
+                        // Add the new function to the cache and to subs_stack.
+                        func_map.emplace(f_id, ex_copy);
+                        subs_stack.emplace_back(std::move(ex_copy));
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that we never performed substitution on the shared arguments
+                    // before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
                 for (const auto &ex : f.args()) {
@@ -1002,16 +1039,18 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
 // to traverse the entire subexpression in order to compute its hash value.
 expression subs(const expression &e, const std::map<expression, expression> &smap)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
-    return detail::subs_impl(func_map, stack, subs_stack, e, smap);
+    return detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -1019,7 +1058,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs_impl(func_map, stack, subs_stack, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap));
     }
 
     return ret;

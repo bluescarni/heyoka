@@ -835,20 +835,73 @@ TEST_CASE("subs")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
-    REQUIRE(subs(x, {{z, x + y}}) == x);
-    REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
-    REQUIRE(subs(x, {{x, x + y}}) == x + y);
-    REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
+    {
+        REQUIRE(subs(x, {{z, x + y}}) == x);
+        REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
+        REQUIRE(subs(x, {{x, x + y}}) == x + y);
+        REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
 
-    REQUIRE(subs(x + y, {{x + y, z}}) == z);
-    REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
+        REQUIRE(subs(x + y, {{x + y, z}}) == z);
+        REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
 
-    auto tmp = x + y;
-    auto tmp2 = x - y;
-    auto ex = tmp - par[0] * tmp;
-    auto subs_res = subs(ex, {{tmp, tmp2}});
+        auto tmp = x + y;
+        auto tmp2 = x - y;
+        auto ex = tmp - par[0] * tmp;
+        auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
+        REQUIRE(subs_res == tmp2 - par[0] * tmp2);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_subs = subs(bar, {{f1, x * x}, {y, y * y}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[3].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(bar_subs[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).shared_args());
+
+        func_args sargs2({x, y * y, z}, true);
+        auto f1a = x * x;
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a + f2a, f1a, f2a, f1a * f2a});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_subs = subs(bar, {{x, x * x}, {z, z * z}});
+
+        REQUIRE(std::get<func>(bar_subs[0].value()).shared_args() == std::get<func>(bar_subs[1].value()).shared_args());
+
+        func_args sargs2({x * x, y, z * z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a, f2a});
+    }
 }
 
 // cfunc N-body with fixed masses.
