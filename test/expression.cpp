@@ -1904,10 +1904,10 @@ TEST_CASE("hash")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, std::hash<variable>{}(std::get<variable>(z.value())));
         boost::hash_combine(seed, nr_hash);
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1923,10 +1923,10 @@ TEST_CASE("hash")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1942,10 +1942,10 @@ TEST_CASE("hash")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1961,11 +1961,75 @@ TEST_CASE("hash")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        const auto hash = std::hash<expression>{}(ex);
+
+        // Compute manually the hash.
+        std::size_t hash_sargs = 0;
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("x"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("y"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("z"));
+
+        std::size_t f1_hash = hash_sargs;
+        boost::hash_combine(f1_hash, std::get<func>(f1.value()).get_name());
+
+        std::size_t f2_hash = hash_sargs;
+        boost::hash_combine(f2_hash, std::get<func>(f2.value()).get_name());
+
+        std::size_t ex_hash = 0;
+        boost::hash_combine(ex_hash, f1_hash);
+        boost::hash_combine(ex_hash, f2_hash);
+        boost::hash_combine(ex_hash, std::get<func>(ex.value()).get_name());
+
+        REQUIRE(hash == ex_hash);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * f1;
+        const auto hash = std::hash<expression>{}(ex);
+
+        // Compute manually the hash.
+        std::size_t hash_sargs = 0;
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("x"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("y"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("z"));
+
+        std::size_t f1_hash = hash_sargs;
+        boost::hash_combine(f1_hash, std::get<func>(f1.value()).get_name());
+
+        std::size_t f2_hash = hash_sargs;
+        boost::hash_combine(f2_hash, std::get<func>(f2.value()).get_name());
+
+        std::size_t f1_p_f2_hash = 0;
+        boost::hash_combine(f1_p_f2_hash, f1_hash);
+        boost::hash_combine(f1_p_f2_hash, f2_hash);
+        boost::hash_combine(f1_p_f2_hash, std::get<func>((f1 + f2).value()).get_name());
+
+        std::size_t ex_hash = 0;
+        boost::hash_combine(ex_hash, f1_p_f2_hash);
+        boost::hash_combine(ex_hash, f1_hash);
+        boost::hash_combine(ex_hash, std::get<func>(ex.value()).get_name());
+
+        REQUIRE(hash == ex_hash);
     }
 }

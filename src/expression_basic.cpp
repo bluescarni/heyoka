@@ -474,7 +474,7 @@ namespace detail
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const expression &ex) noexcept
 {
-    detail::void_ptr_map<const std::size_t> func_map;
+    detail::void_ptr_map<const std::size_t> func_map, sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<std::size_t> hash_stack;
 
@@ -501,15 +501,18 @@ std::size_t hash(const expression &ex) noexcept
                 continue;
             }
 
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
             if (visited) {
                 // We have now visited and computed the hash of all the children of the function node
                 // (i.e., the function arguments). The hashes are at the tail end of
                 // hash_stack. We will be popping and combining them in order to compute the hash
                 // of the function.
 
-                // NOTE: the hash of a function is obtained by combining the function
-                // name with the hashes of the function arguments.
-                auto seed = std::hash<std::string>{}(f.get_name());
+                // NOTE: the hash of a function is obtained by combining the hashes of the
+                // arguments with the hash of the function name.
+                std::size_t seed = 0;
                 const auto n_args = f.args().size();
                 for (decltype(f.args().size()) i = 0; i < n_args; ++i) {
                     // NOTE: the hash stack must not be empty and its last element
@@ -521,26 +524,61 @@ std::size_t hash(const expression &ex) noexcept
                     boost::hash_combine(seed, *hash_stack.back());
                     hash_stack.pop_back();
                 }
+                // Record the hash of the arguments.
+                const auto args_hash = seed;
 
-                // Add the hash to the cache.
+                // Final combination with the hash of the name.
+                boost::hash_combine(seed, f.get_name());
+
+                // Add the hashes to the caches.
                 // NOTE: here we apply an optimisation: if the stack is empty,
                 // we are at the end of the while loop and we won't need the cached
-                // value in the future. Like this, we avoid an unnecessary heap allocation
+                // values in the future. Thus, we can avoid unnecessary heap allocations
                 // if the expression we are hashing is a simple non-recursive function.
                 if (!stack.empty()) {
                     func_map.emplace(f_id, seed);
+
+                    if (shared_args) {
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, args_hash);
+                    }
                 }
 
                 // Add it to hash_stack.
-                // NOTE: the hash stack must not be empty and its last element
+                // NOTE: hash_stack must not be empty and its last element
                 // must be empty (it is supposed to be the empty hash we
                 // pushed the first time we visited).
                 assert(!hash_stack.empty());
                 assert(!hash_stack.back());
                 hash_stack.back().emplace(seed);
             } else {
-                // It is the first time we visit this function. Re-add it to the stack
-                // with visited=true, and add all of its arguments to the stack as well.
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already computed the hash of the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // We already have the hash of the arguments. Fetch it and combine it
+                        // with the hash of the function name
+                        auto seed = it->second;
+                        boost::hash_combine(seed, f.get_name());
+
+                        // Add the function to the cache and its hash value to hash_stack.
+                        // NOTE: there's no point here in eliding the addition of f_id to the cache,
+                        // because if we end up here it means that we already inserted some values
+                        // in the caches.
+                        func_map.emplace(f_id, seed);
+                        hash_stack.emplace_back(seed);
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that the shared arguments of the function have never
+                    // been hashed before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
                 stack.emplace_back(cur_ex, true);
 
                 for (const auto &arg : f.args()) {
