@@ -774,6 +774,59 @@ TEST_CASE("subs str")
 
     // Check the substitution.
     REQUIRE(bar_subs == bar_a);
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_subs = subs(bar, {{"x", x * x}, {"y", y * y}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_subs[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_subs[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).shared_args());
+
+        func_args sargs2({x * x, y * y, z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a + f2a, f1a, f2a, f1a * f2a});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_subs = subs(bar, {{"x", x * x}, {"z", z * z}});
+
+        REQUIRE(std::get<func>(bar_subs[0].value()).shared_args() == std::get<func>(bar_subs[1].value()).shared_args());
+
+        func_args sargs2({x * x, y, z * z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a, f2a});
+    }
 }
 
 TEST_CASE("subs")

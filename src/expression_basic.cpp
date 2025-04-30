@@ -812,109 +812,24 @@ namespace detail
 namespace
 {
 
-// NOTE: this follows the same scheme as the copy() primitive.
-expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expression &e,
+expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_stack, const expression &e,
                      const std::unordered_map<std::string, expression> &smap)
 {
-    assert(stack.empty());
-    assert(subs_stack.empty());
-
-    // Seed the stack.
-    stack.emplace_back(&e, false);
-
-    while (!stack.empty()) {
-        // Pop the traversal stack.
-        const auto [cur_ex, visited] = stack.back();
-        stack.pop_back();
-
-        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
-            // Function (i.e., internal) node.
-            const auto &f = *f_ptr;
-
-            // Fetch the function id.
-            const auto *f_id = f.get_ptr();
-
-            if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                // We already performed substitution on the current function,
-                // fetch the result from the cache.
-                assert(!visited);
-                subs_stack.emplace_back(it->second);
-                continue;
+    const auto subs_func = [&smap](const expression &ex) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            // Variable node.
+            if (const auto it = smap.find(var_ptr->name()); it != smap.end()) {
+                // The variable shows up in smap. Return the corresponding expression.
+                return it->second;
             }
-
-            if (visited) {
-                // We have now visited and performed substitution on all the children of the function node
-                // (i.e., the function arguments). The results are at the tail end of subs_stack. We will be popping
-                // the new arguments from subs_stack and use them to initialise a new function.
-                std::vector<expression> new_args;
-                const auto n_args = f.args().size();
-                new_args.reserve(n_args);
-                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
-                    // NOTE: the subs stack must not be empty and its last element
-                    // also cannot be empty.
-                    assert(!subs_stack.empty());
-                    assert(subs_stack.back());
-
-                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-                    new_args.push_back(std::move(*subs_stack.back()));
-                    subs_stack.pop_back();
-                }
-
-                // Create the new function.
-                auto ex_copy = expression{f.copy(std::move(new_args))};
-
-                // Add it to the cache.
-                assert(!func_map.contains(f_id));
-                func_map.emplace(f_id, ex_copy);
-
-                // Add it to subs_stack.
-                // NOTE: the subs stack must not be empty and its last element
-                // must be empty (it is supposed to be the empty function we
-                // pushed the first time we visited).
-                assert(!subs_stack.empty());
-                assert(!subs_stack.back());
-                subs_stack.back().emplace(std::move(ex_copy));
-            } else {
-                // It is the first time we visit this function. Re-add it to the stack
-                // with visited=true, and add all of its arguments to the stack as well.
-                stack.emplace_back(cur_ex, true);
-
-                for (const auto &ex : f.args()) {
-                    stack.emplace_back(&ex, false);
-                }
-
-                // Add an empty function to subs_stack. The actual result of the substitution
-                // will be emplaced once we have performed substitution on all arguments.
-                subs_stack.emplace_back();
-            }
-        } else {
-            // Non-function (i.e., leaf) node.
-            assert(!visited);
-
-            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
-                // Variable node.
-                if (const auto it = smap.find(var_ptr->name()); it != smap.end()) {
-                    // The variable shows up in smap. Emplace the corresponding expression
-                    // and move on to the next loop iteration.
-                    subs_stack.emplace_back(it->second);
-                    continue;
-                }
-            }
-
-            // Non-variable node, or variable node which does *not* show up in smap.
-            // Just return it unchanged.
-            subs_stack.emplace_back(*cur_ex);
         }
-    }
 
-    assert(subs_stack.size() == 1u);
-    assert(subs_stack.back());
+        // Non-variable node, or variable node which does *not* show up in smap.
+        // Just return it unchanged.
+        return ex;
+    };
 
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto ret = std::move(*subs_stack.back());
-    subs_stack.pop_back();
-
-    return ret;
+    return ex_traverse_transform_leaves(func_map, sargs_map, stack, subs_stack, e, subs_func);
 }
 
 } // namespace
@@ -923,17 +838,19 @@ expression subs_impl(auto &func_map, auto &stack, auto &subs_stack, const expres
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
-    return detail::subs_impl(func_map, stack, subs_stack, e, smap);
+    return detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
                              const std::unordered_map<std::string, expression> &smap)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::void_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> subs_stack;
 
@@ -941,7 +858,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs_impl(func_map, stack, subs_stack, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap));
     }
 
     return ret;
