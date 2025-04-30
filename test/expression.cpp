@@ -519,6 +519,27 @@ TEST_CASE("get_n_nodes")
     }
 
     REQUIRE(get_n_nodes(foo) == 0u);
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_n_nodes(ex) == 9);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * f1;
+        REQUIRE(get_n_nodes(ex) == 14);
+    }
 }
 
 TEST_CASE("equality")

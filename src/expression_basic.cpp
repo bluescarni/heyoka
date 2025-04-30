@@ -672,9 +672,13 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
 // zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
-    detail::void_ptr_map<std::size_t> func_map;
-    detail::traverse_stack stack{{&e, false}};
+    detail::void_ptr_map<const std::size_t> func_map, sargs_map;
+    detail::traverse_stack stack;
+
     boost::safe_numerics::safe<std::size_t> retval = 0;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
     try {
         while (!stack.empty()) {
@@ -696,6 +700,9 @@ std::size_t get_n_nodes(const expression &e)
                     retval += it->second;
                     continue;
                 }
+
+                // Check if the function manages its arguments via a shared reference.
+                const auto shared_args = f.shared_args();
 
                 if (visited) {
                     // This is the second time we visit the function. We can now
@@ -720,8 +727,16 @@ std::size_t get_n_nodes(const expression &e)
 
                     // Store the number of nodes for the current function
                     // in the cache.
-                    assert(!func_map.contains(f_id));
                     func_map.emplace(f_id, n_nodes);
+
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference,
+                        // we must make sure to record in sargs_map the number of nodes for the
+                        // arguments, so that we do not have to recompute it when we encounter again
+                        // the same shared reference.
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, n_nodes - 1);
+                    }
 
                     // NOTE: by incrementing by 1 here we are accounting only for the function node
                     // itself. It is not necessary to account for the total number of nodes n_nodes
@@ -729,8 +744,32 @@ std::size_t get_n_nodes(const expression &e)
                     // of the current function.
                     ++retval;
                 } else {
-                    // It is the first time we visit this function. Re-add it to the stack
-                    // with visited=true, and add all of its arguments to the stack as well.
+                    // It is the first time we visit this function.
+                    if (shared_args) {
+                        // The function manages its arguments via a shared reference. Check
+                        // if we already computed the total number of nodes for the arguments.
+                        if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                            // We already have the total number of nodes for the arguments. Fetch it and add 1
+                            // to account for the function itself.
+                            boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+                            n_nodes += it->second;
+
+                            // Add the function to the cache.
+                            func_map.emplace(f_id, n_nodes);
+
+                            // Update retval and move on.
+                            retval += n_nodes;
+                            continue;
+                        }
+
+                        // NOTE: if we arrive here, it means that we have not computed the number of nodes
+                        // for the shared arguments of the function yet. We thus fall through the usual
+                        // visitation process.
+                        ;
+                    }
+
+                    // Re-add the function to the stack with visited=true, and add all of its
+                    // arguments to the stack as well.
                     stack.emplace_back(cur_ex, true);
 
                     for (const auto &ex : f.args()) {
