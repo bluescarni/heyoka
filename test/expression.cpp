@@ -758,22 +758,24 @@ TEST_CASE("subs str")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
-    const auto *foo_id = std::get<func>(foo.value()).get_ptr();
-    const auto *bar_id = std::get<func>(bar.value()).get_ptr();
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+        const auto *foo_id = std::get<func>(foo.value()).get_ptr();
+        const auto *bar_id = std::get<func>(bar.value()).get_ptr();
 
-    auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
+        auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
-    auto bar_subs = subs(bar, smap_t{{"x", a}});
+        auto bar_subs = subs(bar, smap_t{{"x", a}});
 
-    // Ensure foo/bar were not modified.
-    REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
-    REQUIRE(bar == (foo - x) / (2. * foo));
-    REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
-    REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
+        // Ensure foo/bar were not modified.
+        REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
+        REQUIRE(bar == (foo - x) / (2. * foo));
+        REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
+        REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
 
-    // Check the substitution.
-    REQUIRE(bar_subs == bar_a);
+        // Check the substitution.
+        REQUIRE(bar_subs == bar_a);
+    }
 
     // Testing with shared arguments.
     {
