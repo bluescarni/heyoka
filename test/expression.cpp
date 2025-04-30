@@ -783,7 +783,7 @@ TEST_CASE("subs str")
         auto f2 = dfun("f2", sargs);
         std::vector bar{f1 + f2, f1, f2, f1 * f2};
 
-        auto bar_subs = subs(bar, {{"x", x * x}, {"y", y * y}});
+        auto bar_subs = subs(bar, smap_t{{"x", x * x}, {"y", y * y}});
 
         // Check the functions' identity.
         REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
@@ -817,7 +817,7 @@ TEST_CASE("subs str")
         auto f2 = dfun("f2", sargs);
         std::vector bar{f1, f2};
 
-        auto bar_subs = subs(bar, {{"x", x * x}, {"z", z * z}});
+        auto bar_subs = subs(bar, smap_t{{"x", x * x}, {"z", z * z}});
 
         REQUIRE(std::get<func>(bar_subs[0].value()).shared_args() == std::get<func>(bar_subs[1].value()).shared_args());
 
