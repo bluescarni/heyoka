@@ -1855,6 +1855,8 @@ TEST_CASE("output too long")
 
 TEST_CASE("get_params")
 {
+    const auto [x, y, z] = make_vars("x", "y", "z");
+
     REQUIRE(get_params(expression{}).empty());
     REQUIRE(get_params("x"_var).empty());
     REQUIRE(get_params("x"_var + "y"_var).empty());
@@ -1862,18 +1864,19 @@ TEST_CASE("get_params")
     REQUIRE(get_params("x"_var - par[10]) == std::vector{par[10]});
     REQUIRE(get_params(("x"_var + par[1]) - ("y"_var - par[10])) == std::vector{par[1], par[10]});
 
-    auto tmp1 = "x"_var + par[3];
-    auto tmp2 = par[56] / "y"_var;
-    auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
+    {
+        auto tmp1 = "x"_var + par[3];
+        auto tmp2 = par[56] / "y"_var;
+        auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
 
-    REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
+        REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
 
-    // Test the vectorised version too.
-    auto ex2 = 3_dbl + par[4];
-    REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+        // Test the vectorised version too.
+        auto ex2 = 3_dbl + par[4];
+        REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+    }
 
     // Testing with shared arguments.
-    const auto [x, y, z] = make_vars("x", "y", "z");
     {
         func_args sargs({x, y, z}, true);
 
