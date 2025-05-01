@@ -387,53 +387,76 @@ TEST_CASE("is_time_dependent")
     REQUIRE(is_time_dependent((x + y) * (hy::time + 1_dbl)));
     REQUIRE(is_time_dependent((x + y) * (par[0] * hy::time + 1_dbl)));
 
-    // With common subexpressions.
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        // With common subexpressions.
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(!is_time_dependent(bar));
+        REQUIRE(!is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = (foo - x) / (2. * foo);
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo);
+        foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = hy::time + (foo - x) / (2. * foo);
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = hy::time + (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = hy::time + (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = hy::time + (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    // Tests with vectorization.
-    REQUIRE(is_time_dependent({bar}));
-    REQUIRE(is_time_dependent({x, bar}));
-    REQUIRE(is_time_dependent({bar, x}));
-    REQUIRE(!is_time_dependent({2_dbl - par[0], x}));
+        // Tests with vectorization.
+        REQUIRE(is_time_dependent({bar}));
+        REQUIRE(is_time_dependent({x, bar}));
+        REQUIRE(is_time_dependent({bar, x}));
+        REQUIRE(!is_time_dependent({2_dbl - par[0], x}));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo);
-    REQUIRE(!is_time_dependent({x, bar}));
-    REQUIRE(is_time_dependent({x, bar, hy::time}));
-    REQUIRE(is_time_dependent({x, hy::time, bar}));
-    REQUIRE(is_time_dependent({hy::time, x, bar}));
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo);
+        REQUIRE(!is_time_dependent({x, bar}));
+        REQUIRE(is_time_dependent({x, bar, hy::time}));
+        REQUIRE(is_time_dependent({x, hy::time, bar}));
+        REQUIRE(is_time_dependent({hy::time, x, bar}));
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = {f1 + f2, f1, f2, f1 * f2};
+        REQUIRE(!is_time_dependent(ex));
+    }
+
+    {
+        func_args sargs({x, hy::time, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = {f1 + f2, f1, f2, f1 * f2};
+        REQUIRE(is_time_dependent(ex));
+    }
 }
 
 TEST_CASE("s11n")

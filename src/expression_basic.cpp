@@ -24,7 +24,6 @@
 #include <system_error>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -1173,51 +1172,18 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-bool is_time_dependent(void_ptr_set &func_set, const expression &ex)
+bool is_time_dependent(auto &func_set, auto &sargs_set, auto &stack, const expression &e)
 {
-    // - If ex is a function, check if it is time-dependent, or
-    //   if any of its arguments is time-dependent,
-    // - otherwise, return false.
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_set](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
+    const auto pred = [](const expression &ex) {
+        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+            return fptr->is_time_dependent();
+        } else {
+            // NOTE: non-function expressions cannot be time-dependent.
+            return false;
+        }
+    };
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                // Did we already determine that v is *not* time-dependent?
-                if (const auto it = func_set.find(f_id); it != func_set.end()) {
-                    return false;
-                }
-
-                // Check if the function is intrinsically time-dependent.
-                if (v.is_time_dependent()) {
-                    return true;
-                }
-
-                // The function does *not* intrinsically depend on time.
-                // Check its arguments.
-                for (const auto &a : v.args()) {
-                    if (is_time_dependent(func_set, a)) {
-                        // A time-dependent argument was found, return true.
-                        return true;
-                    }
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.emplace(f_id);
-
-                // An expression cannot contain itself.
-                assert(flag);
-
-                return false;
-            } else {
-                return false;
-            }
-        },
-        ex.value());
+    return ex_traverse_test_any(func_set, sargs_set, stack, e, pred);
 }
 
 } // namespace
@@ -1227,19 +1193,21 @@ bool is_time_dependent(void_ptr_set &func_set, const expression &ex)
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    // NOTE: this will contain pointers to (sub)expressions
-    // which are *not* time-dependent.
-    detail::void_ptr_set func_set;
+    // NOTE: these sets will contain pointers to functions and
+    // arguments sets which are *not* time-dependent.
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
 
-    return detail::is_time_dependent(func_set, ex);
+    return detail::is_time_dependent(func_set, sargs_set, stack, ex);
 }
 
 bool is_time_dependent(const std::vector<expression> &v_ex)
 {
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
-        if (detail::is_time_dependent(func_set, ex)) {
+        if (detail::is_time_dependent(func_set, sargs_set, stack, ex)) {
             return true;
         }
     }

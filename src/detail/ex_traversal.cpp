@@ -168,7 +168,6 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
 // stack is the stack that will be used for traversal.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, traverse_stack &stack,
                               const expression &e, const std::function<void(const expression &)> &vfunc)
 {
@@ -244,6 +243,111 @@ void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, t
             vfunc(*cur_ex);
         }
     }
+}
+
+// This function will visit the all the nodes of the expression e and it will return true if at least
+// one node satisfies the predicate pred.
+//
+// func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
+// stack is the stack that will be used for traversal.
+bool ex_traverse_test_any(void_ptr_set &func_set, void_ptr_set &sargs_set, traverse_stack &stack, const expression &e,
+                          const std::function<bool(const expression &)> &pred)
+{
+    assert(pred);
+    assert(stack.empty());
+
+    // Init the return value.
+    auto retval = false;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        assert(!visited || std::holds_alternative<func>(cur_ex->value()));
+
+        // If the current expression is a function, check if we already tested
+        // that it does *not* satisfy the predicate.
+        const auto *f_ptr = std::get_if<func>(&cur_ex->value());
+        if (f_ptr != nullptr) {
+            // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache.
+            if (visited) {
+                assert(!func_set.contains(f_ptr));
+            } else if (func_set.contains(f_ptr)) {
+                continue;
+            }
+        }
+
+        // Check the predicate.
+        // NOTE: no need to check the predicate if this is the second visit.
+        if (!visited && pred(*cur_ex)) {
+            // The expression satisfies the predicate. Set retval
+            // to true and break out.
+            retval = true;
+            break;
+        }
+
+        // The current expression does *not* satisfy the predicate. If it is a function,
+        // we need to test its arguments, otherwise we don't have do do anything else.
+        if (f_ptr != nullptr) {
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now determined that neither the function nor all its children satisfy
+                // the predicate. We have to add f_id to the cache so that we won't re-test it.
+                func_set.emplace(f_id);
+
+                if (shared_args) {
+                    // NOTE: if the function manages its arguments via a shared reference,
+                    // we must make sure to record in sargs_set that we have tested shared_args,
+                    // so that when we run again into the same shared reference we avoid redundant
+                    // computations.
+                    assert(!sargs_set.contains(&*shared_args));
+                    sargs_set.emplace(&*shared_args);
+                }
+            } else {
+                // It is the first time we test this function.
+                if (shared_args) {
+                    // The function does not satisfy the predicate and it manages its arguments via a
+                    // shared reference. Check if we already tested that all arguments do *not* satisfy
+                    // the predicate.
+                    if (sargs_set.contains(&*shared_args)) {
+                        // We already determined that all arguments do *not* satisfy the predicate. Add f_id
+                        // to the cache and move on.
+                        func_set.emplace(f_id);
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that we haven't tested the shared arguments of the
+                    // function yet. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its arguments
+                // to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+            }
+        }
+    }
+
+    // Make sure to clear out the stack in case we interrupted
+    // the traversal early.
+    stack.clear();
+
+    return retval;
 }
 
 } // namespace detail

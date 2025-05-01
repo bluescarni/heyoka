@@ -55,6 +55,9 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &,
 void ex_traverse_visit_leaves(void_ptr_set &, void_ptr_set &, traverse_stack &, const expression &,
                               const std::function<void(const expression &)> &);
 
+bool ex_traverse_test_any(void_ptr_set &, void_ptr_set &, traverse_stack &, const expression &,
+                          const std::function<bool(const expression &)> &);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
