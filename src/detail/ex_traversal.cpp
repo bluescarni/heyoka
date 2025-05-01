@@ -31,7 +31,7 @@ namespace detail
 // stack is the stack that will be used for traversal. out_stack is the stack that will be used to store the results
 // of the transformations.
 expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map,
-                                        void_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
+                                        sargs_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
                                         return_stack<expression> &out_stack, const expression &e,
                                         const std::function<expression(const expression &)> &tfunc)
 {
@@ -168,7 +168,7 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
 // stack is the stack that will be used for traversal.
-void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, traverse_stack &stack,
+void ex_traverse_visit_leaves(void_ptr_set &func_set, sargs_ptr_set &sargs_set, traverse_stack &stack,
                               const expression &e, const std::function<void(const expression &)> &vfunc)
 {
     assert(vfunc);
@@ -250,7 +250,7 @@ void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, t
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
 // stack is the stack that will be used for traversal.
-bool ex_traverse_test_any(void_ptr_set &func_set, void_ptr_set &sargs_set, traverse_stack &stack, const expression &e,
+bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, traverse_stack &stack, const expression &e,
                           const std::function<bool(const expression &)> &pred)
 {
     assert(pred);

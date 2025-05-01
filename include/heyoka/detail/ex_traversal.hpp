@@ -15,6 +15,7 @@
 #include <functional>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -36,6 +37,11 @@ using void_ptr_set = boost::unordered_flat_set<const void *>;
 template <typename T>
 using void_ptr_map = boost::unordered_flat_map<const void *, T>;
 
+using sargs_ptr_set = boost::unordered_flat_set<const std::vector<expression> *>;
+
+template <typename T>
+using sargs_ptr_map = boost::unordered_flat_map<const std::vector<expression> *, T>;
+
 // NOTE: here we define a couple of stack data structures to be used when traversing
 // the nodes of an expression. We use boost::small_vector in order to avoid paying for
 // heap allocations on small expressions.
@@ -48,14 +54,14 @@ template <typename T>
 using return_stack = boost::container::small_vector<std::optional<T>, static_ex_traversal_stack_size>;
 
 expression ex_traverse_transform_leaves(void_ptr_map<const expression> &,
-                                        void_ptr_map<const func_args::shared_args_t> &, traverse_stack &,
+                                        sargs_ptr_map<const func_args::shared_args_t> &, traverse_stack &,
                                         return_stack<expression> &, const expression &,
                                         const std::function<expression(const expression &)> &);
 
-void ex_traverse_visit_leaves(void_ptr_set &, void_ptr_set &, traverse_stack &, const expression &,
+void ex_traverse_visit_leaves(void_ptr_set &, sargs_ptr_set &, traverse_stack &, const expression &,
                               const std::function<void(const expression &)> &);
 
-bool ex_traverse_test_any(void_ptr_set &, void_ptr_set &, traverse_stack &, const expression &,
+bool ex_traverse_test_any(void_ptr_set &, sargs_ptr_set &, traverse_stack &, const expression &,
                           const std::function<bool(const expression &)> &);
 
 } // namespace detail
