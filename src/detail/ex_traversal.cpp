@@ -54,10 +54,13 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
             // Fetch the function id.
             const auto *f_id = f.get_ptr();
 
-            if (const auto it = func_map.find(f_id); it != func_map.end()) {
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
                 // We already created a copy of the current function containing the transformed leaf nodes.
                 // Fetch the transformed copy from the cache and add it to out_stack.
-                assert(!visited);
                 out_stack.emplace_back(it->second);
                 continue;
             }
@@ -189,9 +192,12 @@ void ex_traverse_visit_leaves(void_ptr_set &func_set, sargs_ptr_set &sargs_set, 
             // Fetch the function id.
             const auto *f_id = f.get_ptr();
 
-            if (func_set.contains(f_id)) {
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_set.contains(f_id));
+            } else if (func_set.contains(f_id)) {
                 // We already visited the current function, no need to do anything else.
-                assert(!visited);
                 continue;
             }
 
@@ -273,8 +279,9 @@ bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, trav
         // that it does *not* satisfy the predicate.
         const auto *f_ptr = std::get_if<func>(&cur_ex->value());
         if (f_ptr != nullptr) {
-            // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache.
             if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
                 assert(!func_set.contains(f_ptr->get_ptr()));
             } else if (func_set.contains(f_ptr->get_ptr())) {
                 continue;

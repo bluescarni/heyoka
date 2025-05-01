@@ -427,10 +427,13 @@ std::size_t hash(const expression &ex) noexcept
             // Fetch the function id.
             const auto *f_id = f.get_ptr();
 
-            if (const auto it = func_map.find(f_id); it != func_map.end()) {
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
                 // We already computed the hash of the current function. Fetch it from the cache
                 // and add it to the hash stack.
-                assert(!visited);
                 hash_stack.emplace_back(it->second);
                 continue;
             }
@@ -628,10 +631,13 @@ std::size_t get_n_nodes(const expression &e)
                 // Fetch the function id.
                 const auto *f_id = f.get_ptr();
 
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                if (visited) {
+                    // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                    // and thus we can avoid an unnecessary lookup.
+                    assert(!func_map.contains(f_id));
+                } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already computed the number of nodes for the current
                     // function, add it to retval.
-                    assert(!visited);
                     retval += it->second;
                     continue;
                 }
@@ -827,29 +833,34 @@ expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_st
         // expression comparisons in the smap lookup.
         const auto *f_ptr = std::get_if<func>(&cur_ex->value());
         if (f_ptr != nullptr) {
-            if (const auto it = func_map.find(f_ptr->get_ptr()); it != func_map.end()) {
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_ptr->get_ptr()));
+            } else if (const auto it = func_map.find(f_ptr->get_ptr()); it != func_map.end()) {
                 // We already performed substitution on the current function,
                 // fetch the result from the cache.
-                assert(!visited);
                 subs_stack.emplace_back(it->second);
                 continue;
             }
         }
 
         // Check if the current expression is in the substitution map.
-        if (const auto it = smap.find(*cur_ex); it != smap.end()) {
-            // cur_ex is in the substitution map.
-            assert(!visited);
+        // NOTE: no need to check if this is the second visit.
+        if (!visited) {
+            if (const auto it = smap.find(*cur_ex); it != smap.end()) {
+                // cur_ex is in the substitution map.
 
-            // If cur_ex is a function, record the result of the substitution into func_map.
-            if (f_ptr != nullptr) {
-                const auto *f_id = f_ptr->get_ptr();
-                func_map.emplace(f_id, it->second);
+                // If cur_ex is a function, record the result of the substitution into func_map.
+                if (f_ptr != nullptr) {
+                    const auto *f_id = f_ptr->get_ptr();
+                    func_map.emplace(f_id, it->second);
+                }
+
+                // Push to subs_stack the result of the substitution and move on.
+                subs_stack.emplace_back(it->second);
+                continue;
             }
-
-            // Push to subs_stack the result of the substitution and move on.
-            subs_stack.emplace_back(it->second);
-            continue;
         }
 
         if (f_ptr != nullptr) {
