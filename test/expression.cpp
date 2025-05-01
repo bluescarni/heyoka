@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -201,33 +202,64 @@ TEST_CASE("get_param_size")
     // Test with repeated subexpressions.
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(get_param_size(bar) == 0u);
+        REQUIRE(get_param_size(bar) == 0u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[23] + (foo - x) / (2. * foo) + par[32];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[23] + (foo - x) / (2. * foo) + par[32];
 
-    REQUIRE(get_param_size(bar) == 43u);
+        REQUIRE(get_param_size(bar) == 43u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[83] + (foo - x) / (2. * foo) + par[32];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[83] + (foo - x) / (2. * foo) + par[32];
 
-    REQUIRE(get_param_size(bar) == 84u);
+        REQUIRE(get_param_size(bar) == 84u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[23] + (foo - x) / (2. * foo) + par[92];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[23] + (foo - x) / (2. * foo) + par[92];
 
-    REQUIRE(get_param_size(bar) == 93u);
+        REQUIRE(get_param_size(bar) == 93u);
 
-    // Tests with vectorisation.
-    REQUIRE(get_param_size({par[0], par[123]}) == 124u);
-    REQUIRE(get_param_size({par[123], par[0]}) == 124u);
-    REQUIRE(get_param_size({bar, bar + par[86]}) == 93u);
-    REQUIRE(get_param_size({bar, bar + par[186]}) == 187u);
-    REQUIRE(get_param_size({bar + par[86], bar}) == 93u);
-    REQUIRE(get_param_size({bar + par[186], bar}) == 187u);
-    REQUIRE(get_param_size({"x"_var, 2_dbl}) == 0u);
+        // Tests with vectorisation.
+        REQUIRE(get_param_size({par[0], par[123]}) == 124u);
+        REQUIRE(get_param_size({par[123], par[0]}) == 124u);
+        REQUIRE(get_param_size({bar, bar + par[86]}) == 93u);
+        REQUIRE(get_param_size({bar, bar + par[186]}) == 187u);
+        REQUIRE(get_param_size({bar + par[86], bar}) == 93u);
+        REQUIRE(get_param_size({bar + par[186], bar}) == 187u);
+        REQUIRE(get_param_size({"x"_var, 2_dbl}) == 0u);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_param_size(ex) == 0);
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_param_size(ex) == 43);
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * par[100];
+        REQUIRE(get_param_size(ex) == 101);
+    }
 }
 
 TEST_CASE("binary simpls")
@@ -1839,6 +1871,36 @@ TEST_CASE("get_params")
     // Test the vectorised version too.
     auto ex2 = 3_dbl + par[4];
     REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+
+    // Testing with shared arguments.
+    const auto [x, y, z] = make_vars("x", "y", "z");
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_params(ex) == std::vector<expression>{});
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_params(ex) == std::vector{par[42]});
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = par[100] * (f1 + f2);
+        REQUIRE(get_params(ex) == std::vector{par[42], par[100]});
+    }
 }
 
 TEST_CASE("swap")

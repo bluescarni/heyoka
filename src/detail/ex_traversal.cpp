@@ -164,6 +164,88 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
     return ret;
 }
 
+// This function will visit the leaves of the expression e and invoke vfunc on each leaf.
+//
+// func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
+// stack is the stack that will be used for traversal.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, traverse_stack &stack,
+                              const expression &e, const std::function<void(const expression &)> &vfunc)
+{
+    assert(vfunc);
+    assert(stack.empty());
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (func_set.contains(f_id)) {
+                // We already visited the current function, no need to do anything else.
+                assert(!visited);
+                continue;
+            }
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited all the children of the function node. We have to add f_id
+                // to the cache so that we won't re-visit.
+                func_set.emplace(f_id);
+
+                if (shared_args) {
+                    // NOTE: if the function manages its arguments via a shared reference,
+                    // we must make sure to record in sargs_set that we have visited shared_args,
+                    // so that when we run again into the same shared reference we avoid needlessly
+                    // re-visiting computation.
+                    assert(!sargs_set.contains(&*shared_args));
+                    sargs_set.emplace(&*shared_args);
+                }
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already visited the arguments.
+                    if (sargs_set.contains(&*shared_args)) {
+                        // We already visited the arguments. Add f_id to the cache and move on.
+                        func_set.emplace(f_id);
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that we haven't visited the shared arguments of the
+                    // function yet. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its arguments
+                // to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Visit the leaf node.
+            vfunc(*cur_ex);
+        }
+    }
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

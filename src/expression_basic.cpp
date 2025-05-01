@@ -291,81 +291,13 @@ namespace
 
 void get_variables_impl(auto &func_set, auto &sargs_set, auto &stack, auto &s_set, const expression &e)
 {
-    assert(stack.empty());
-
-    // Seed the stack.
-    stack.emplace_back(&e, false);
-
-    while (!stack.empty()) {
-        // Pop the stack.
-        const auto [cur_ex, visited] = stack.back();
-        stack.pop_back();
-
-        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
-            // Function (i.e., internal) node.
-            const auto &f = *f_ptr;
-
-            // Fetch the function id.
-            const auto *f_id = f.get_ptr();
-
-            if (func_set.contains(f_id)) {
-                // We already got the list of variables for the current function,
-                // no need to do anything else.
-                assert(!visited);
-                continue;
-            }
-
-            // Check if the function manages its arguments via a shared reference.
-            const auto shared_args = f.shared_args();
-
-            if (visited) {
-                // We have now visited all the children of the function node and determined
-                // the list of variables. We have to add f_id to the cache so that we
-                // won't repeat the same computation again.
-                func_set.emplace(f_id);
-
-                if (shared_args) {
-                    // NOTE: if the function manages its arguments via a shared reference,
-                    // we must make sure to record in sargs_set that we have determined
-                    // the list of variables for shared_args, so that when we run again into the
-                    // same shared reference we avoid needlessly repeating the computation.
-                    assert(!sargs_set.contains(&*shared_args));
-                    sargs_set.emplace(&*shared_args);
-                }
-            } else {
-                // It is the first time we visit this function.
-                if (shared_args) {
-                    // The function manages its arguments via a shared reference. Check
-                    // if we already computed the list of variables for the arguments.
-                    if (sargs_set.contains(&*shared_args)) {
-                        // The list of variables for the arguments has already been computed.
-                        // Add f_id to the cache and move on.
-                        func_set.emplace(f_id);
-                        continue;
-                    }
-
-                    // NOTE: if we arrive here, it means that we haven't determined the list of variables
-                    // for the shared arguments of the function yet. We thus fall through the usual visitation process.
-                    ;
-                }
-
-                // Re-add the function to the stack with visited=true, and add all of its arguments
-                // to the stack as well.
-                stack.emplace_back(cur_ex, true);
-
-                for (const auto &ex : f.args()) {
-                    stack.emplace_back(&ex, false);
-                }
-            }
-        } else {
-            // Non-function (i.e., leaf) node.
-            assert(!visited);
-
-            if (const auto *var_ptr = std::get_if<variable>(&cur_ex->value())) {
-                s_set.emplace(var_ptr->name());
-            }
+    const auto vfunc = [&s_set](const expression &ex) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            s_set.emplace(var_ptr->name());
         }
-    }
+    };
+
+    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
 }
 
 } // namespace
@@ -1121,42 +1053,16 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-std::uint32_t get_param_size(void_ptr_set &func_set, const expression &ex)
+void get_param_size(auto &func_set, auto &sargs_set, auto &stack, std::uint32_t &retval, const expression &e)
 {
-    std::uint32_t retval = 0;
+    const auto vfunc = [&retval](const expression &ex) {
+        if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
+            const auto tmp = static_cast<std::uint32_t>(par_ptr->idx() + boost::safe_numerics::safe<std::uint32_t>(1));
+            retval = std::max(retval, tmp);
+        }
+    };
 
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&retval, &func_set]<typename T>(const T &v) {
-            if constexpr (std::same_as<T, param>) {
-                retval = v.idx() + boost::safe_numerics::safe<std::uint32_t>(1);
-            } else if constexpr (std::same_as<T, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (func_set.contains(f_id)) {
-                    // We already computed the number of params for the current
-                    // function, exit.
-                    // NOTE: we will be end up returning 0 as retval. This is ok
-                    // because the number of params for the current function was
-                    // already considered in the calculation.
-                    return;
-                }
-
-                // Recursively fetch the number of params from the function arguments.
-                for (const auto &a : v.args()) {
-                    retval = std::max(get_param_size(func_set, a), retval);
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            }
-        },
-        ex.value());
-
-    return retval;
+    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
 }
 
 } // namespace
@@ -1168,19 +1074,25 @@ std::uint32_t get_param_size(void_ptr_set &func_set, const expression &ex)
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
 
-    return detail::get_param_size(func_set, ex);
+    std::uint32_t retval = 0;
+
+    detail::get_param_size(func_set, sargs_set, stack, retval, ex);
+
+    return retval;
 }
 
 std::uint32_t get_param_size(const std::vector<expression> &v_ex)
 {
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
+
     std::uint32_t retval = 0;
 
-    detail::void_ptr_set func_set;
-
     for (const auto &ex : v_ex) {
-        retval = std::max(retval, detail::get_param_size(func_set, ex));
+        detail::get_param_size(func_set, sargs_set, stack, retval, ex);
     }
 
     return retval;
@@ -1192,35 +1104,15 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-void get_params(std::unordered_set<std::uint32_t> &idx_set, void_ptr_set &func_set, const expression &ex)
+void get_params(auto &func_set, auto &sargs_set, auto &stack, auto &idx_set, const expression &e)
 {
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
+    const auto vfunc = [&idx_set](const expression &ex) {
+        if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
+            idx_set.insert(par_ptr->idx());
+        }
+    };
 
-            if constexpr (std::is_same_v<type, param>) {
-                idx_set.insert(v.idx());
-            } else if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_set.find(f_id); it != func_set.end()) {
-                    // We already got the params for the current function, exit.
-                    return;
-                }
-
-                for (const auto &a : v.args()) {
-                    get_params(idx_set, func_set, a);
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            }
-        },
-        ex.value());
+    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
 }
 
 } // namespace
@@ -1232,46 +1124,45 @@ void get_params(std::unordered_set<std::uint32_t> &idx_set, void_ptr_set &func_s
 // expressions sorted according to the indices.
 std::vector<expression> get_params(const expression &ex)
 {
-    std::unordered_set<std::uint32_t> idx_set;
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
 
-    // Write the indices of all parameters appearing in ex
-    // into idx_set.
-    detail::get_params(idx_set, func_set, ex);
+    boost::unordered_flat_set<std::uint32_t> idx_set;
 
-    // Transform idx_set into a sorted vector.
-    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::ranges::sort(idx_vec);
+    // Write the indices of all parameters appearing in ex into idx_set.
+    detail::get_params(func_set, sargs_set, stack, idx_set, ex);
 
-    // Transform the sorted indices into a vector of
-    // sorted parameter expressions.
+    // Transform idx_set into a sorted vector of parameter expressions.
     std::vector<expression> retval;
-    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    retval.reserve(idx_set.size());
+    std::ranges::transform(idx_set, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::sort(retval, [](const auto &e1, const auto &e2) {
+        return std::get<param>(e1.value()).idx() < std::get<param>(e2.value()).idx();
+    });
 
     return retval;
 }
 
 std::vector<expression> get_params(const std::vector<expression> &v_ex)
 {
-    std::unordered_set<std::uint32_t> idx_set;
-    detail::void_ptr_set func_set;
+    detail::void_ptr_set func_set, sargs_set;
+    detail::traverse_stack stack;
+
+    boost::unordered_flat_set<std::uint32_t> idx_set;
 
     // Write the indices of all parameters appearing in v_ex
     // into idx_set.
     for (const auto &e : v_ex) {
-        detail::get_params(idx_set, func_set, e);
+        detail::get_params(func_set, sargs_set, stack, idx_set, e);
     }
 
-    // Transform idx_set into a sorted vector.
-    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::ranges::sort(idx_vec);
-
-    // Transform the sorted indices into a vector of
-    // sorted parameter expressions.
+    // Transform idx_set into a sorted vector of parameter expressions.
     std::vector<expression> retval;
-    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    retval.reserve(idx_set.size());
+    std::ranges::transform(idx_set, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::sort(retval, [](const auto &e1, const auto &e2) {
+        return std::get<param>(e1.value()).idx() < std::get<param>(e2.value()).idx();
+    });
 
     return retval;
 }
