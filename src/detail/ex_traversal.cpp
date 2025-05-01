@@ -207,8 +207,8 @@ void ex_traverse_visit_leaves(void_ptr_set &func_set, void_ptr_set &sargs_set, t
                 if (shared_args) {
                     // NOTE: if the function manages its arguments via a shared reference,
                     // we must make sure to record in sargs_set that we have visited shared_args,
-                    // so that when we run again into the same shared reference we avoid needlessly
-                    // re-visiting computation.
+                    // so that when we run again into the same shared reference we avoid unnecessary
+                    // re-visiting.
                     assert(!sargs_set.contains(&*shared_args));
                     sargs_set.emplace(&*shared_args);
                 }
