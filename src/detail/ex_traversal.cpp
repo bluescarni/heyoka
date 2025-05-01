@@ -275,8 +275,8 @@ bool ex_traverse_test_any(void_ptr_set &func_set, void_ptr_set &sargs_set, trave
         if (f_ptr != nullptr) {
             // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache.
             if (visited) {
-                assert(!func_set.contains(f_ptr));
-            } else if (func_set.contains(f_ptr)) {
+                assert(!func_set.contains(f_ptr->get_ptr()));
+            } else if (func_set.contains(f_ptr->get_ptr())) {
                 continue;
             }
         }
