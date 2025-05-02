@@ -776,69 +776,40 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
     }
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression pow_to_explog(void_ptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&]<typename T>(const T &v) {
-            if constexpr (std::same_as<T, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already performed the transformation on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Perform the transformation on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(pow_to_explog(func_map, orig_arg));
-                }
-
-                // Prepare the return value.
-                std::optional<expression> retval;
-
-                if (v.template extract<detail::pow_impl>() != nullptr
-                    && !std::holds_alternative<number>(new_args[1].value())) {
-                    // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
-                    //
-                    // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
-                    // is a number. For instance, if we have pow(2_dbl, par[0]), then we would end up computing
-                    // log(2) in double precision. This would result in an inaccurate result if the fp type
-                    // or precision in use during integration is higher than double.
-                    // NOTE: because the exponent is not a number, no other constant folding should take
-                    // place here.
-                    retval.emplace(exp(new_args[1] * expression{func{detail::log_impl(new_args[0])}}));
-                } else {
-                    // Create a copy of v with the new arguments.
-                    retval.emplace(v.copy(std::move(new_args)));
-                }
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return std::move(*retval);
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
 // Helper to transform x**y -> exp(y*log(x)), if y is not a number.
 std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> ret_stack;
+
+    const auto tfunc = [](const expression &ex) {
+        const auto &f = std::get<func>(ex.value());
+        const auto &args = f.args();
+
+        if (f.extract<detail::pow_impl>() != nullptr && !std::holds_alternative<number>(args[1].value())) {
+            // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
+            //
+            // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
+            // is a number. For instance, if we have pow(2_dbl, par[0]), then we would end up computing
+            // log(2) in double precision. This would result in an inaccurate result if the fp type
+            // or precision in use during integration is higher than double.
+            // NOTE: because the exponent is not a number, no other constant folding should take
+            // place here.
+            return exp(args[1] * expression{func{detail::log_impl(args[0])}});
+        } else {
+            // The function is not a pow(), or it is a pow() whose exponent is a number. Return
+            // it unchanged.
+            return ex;
+        }
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(pow_to_explog(func_map, e));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
     }
 
     return retval;
