@@ -36,6 +36,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/udf_split.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -766,58 +767,9 @@ llvm::Function *prod_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 // 'split' terms, 'e' will be returned unmodified.
 // NOTE: 'e' is assumed to be a function.
 // NOTE: quite a bit of repetition with sum_split() here.
-// NOLINTNEXTLINE(misc-no-recursion)
 expression prod_split(const expression &e, std::uint32_t split)
 {
-    assert(split >= 2u);
-    assert(std::holds_alternative<func>(e.value()));
-
-    const auto *prod_ptr = std::get<func>(e.value()).extract<prod_impl>();
-
-    // NOTE: return 'e' unchanged if it is not a prod,
-    // or if it is a prod that does not need to be split.
-    // The latter condition is also used to terminate the
-    // recursion.
-    if (prod_ptr == nullptr || prod_ptr->args().size() <= split) {
-        return e;
-    }
-
-    // NOTE: ret_seq will be a list
-    // of prods each containing 'split' terms.
-    // tmp is a temporary vector
-    // used to accumulate the arguments for each
-    // prod in ret_seq.
-    std::vector<expression> ret_seq, tmp;
-    for (const auto &arg : prod_ptr->args()) {
-        tmp.push_back(arg);
-
-        if (tmp.size() == split) {
-            ret_seq.emplace_back(func{detail::prod_impl{std::move(tmp)}});
-
-            // NOTE: tmp is practically guaranteed to be empty, but let's
-            // be paranoid.
-            tmp.clear();
-        }
-    }
-
-    // NOTE: tmp is not empty if 'split' does not divide
-    // exactly prod_ptr->args().size(). In such a case, we need to do the
-    // last iteration manually.
-    if (!tmp.empty()) {
-        // NOTE: contrary to the previous loop, here we could
-        // in principle end up creating a prod_impl with only one
-        // term. We don't want to create such a prod as it would
-        // break the Taylor diff implementations (which are all assuming
-        // binary products).
-        if (tmp.size() == 1u) {
-            ret_seq.push_back(std::move(tmp[0]));
-        } else {
-            ret_seq.emplace_back(func{detail::prod_impl{std::move(tmp)}});
-        }
-    }
-
-    // Recurse to split further, if needed.
-    return prod_split(expression{func{detail::prod_impl{std::move(ret_seq)}}}, split);
+    return udf_split<prod_impl>(e, split);
 }
 
 namespace
