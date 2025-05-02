@@ -2250,3 +2250,96 @@ TEST_CASE("hash")
         REQUIRE(hash == ex_hash);
     }
 }
+
+TEST_CASE("split_sums_for_decompose")
+{
+    const auto x = make_vars("x");
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        REQUIRE(s == new_s);
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        REQUIRE(new_s == sum({sum({x, x, x, x, x, x, x, x}), x}));
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s * s})[0];
+        REQUIRE(new_s == sum({sum({x, x, x, x, x, x, x, x}), x}) * sum({sum({x, x, x, x, x, x, x, x}), x}));
+
+        REQUIRE(std::get<func>(std::get<func>(new_s.value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(new_s.value()).args()[1].value()).get_ptr());
+    }
+
+    {
+        auto s1 = sum({x, x, x, x, x, x, x, x, x});
+        auto s = sum({s1, x, x, x, x, x, x, x, x});
+
+        auto new_s = detail::split_sums_for_decompose({s * s})[0];
+
+        auto s1_split = sum({x, x, x, x, x, x, x, x}) + x;
+        auto s_split = sum({s1_split, x, x, x, x, x, x, x}) + x;
+
+        REQUIRE(new_s == s_split * s_split);
+    }
+
+    // Testing with shared arguments.
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+
+        func_args sargs({s}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        auto ex = f1 * f2;
+
+        auto new_ex = detail::split_sums_for_decompose({ex})[0];
+
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        auto new_sargs = func_args({new_s}, true);
+
+        REQUIRE(new_ex == dfun("f1", new_sargs) * dfun("f2", new_sargs));
+
+        REQUIRE(std::get<func>(std::get<func>(new_ex.value()).args()[0].value()).shared_args() != nullptr);
+        REQUIRE(std::get<func>(std::get<func>(new_ex.value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex.value()).args()[1].value()).shared_args());
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+
+        func_args sargs({s}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        auto ex = std::vector{f1 * f2, f1, f2, f1 + f2};
+
+        auto new_ex = detail::split_sums_for_decompose({ex});
+
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        auto new_sargs = func_args({new_s}, true);
+
+        REQUIRE(new_ex[0] == dfun("f1", new_sargs) * dfun("f2", new_sargs));
+        REQUIRE(new_ex[1] == dfun("f1", new_sargs));
+        REQUIRE(new_ex[2] == dfun("f2", new_sargs));
+        REQUIRE(new_ex[3] == dfun("f1", new_sargs) + dfun("f2", new_sargs));
+
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(new_ex[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(new_ex[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[3].value()).args()[0].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[3].value()).args()[1].value()).shared_args());
+    }
+}
