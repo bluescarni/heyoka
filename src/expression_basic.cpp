@@ -1240,15 +1240,17 @@ namespace detail
 
 std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
 {
-    // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
-    constexpr std::uint32_t decompose_split = 8;
-
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
     detail::return_stack<expression> ret_stack;
 
-    const auto tfunc = [](const expression &ex) { return sum_split(ex, decompose_split); };
+    const auto tfunc = [](const expression &ex) {
+        // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
+        constexpr std::uint32_t decompose_split = 8;
+
+        return sum_split(ex, decompose_split);
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
