@@ -1281,62 +1281,21 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
     return retval;
 }
 
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression sums_to_sum_sqs_for_decompose(void_ptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already converted sums to sum_sqs on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Convert sums to sum_sqs on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(sums_to_sum_sqs_for_decompose(func_map, orig_arg));
-                }
-
-                // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // After having taken care of the arguments, convert
-                // v itself.
-                auto ret = sum_to_sum_sq(expression{std::move(f_copy)});
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ret;
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
-
 // Replace sum({square(x), square(y), ...}) with sum_sq({x, y, ...}).
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> ret_stack;
+
+    const auto tfunc = [](const expression &ex) { return sum_to_sum_sq(ex); };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(sums_to_sum_sqs_for_decompose(func_map, e));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
     }
 
     return retval;
