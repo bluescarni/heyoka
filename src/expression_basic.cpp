@@ -1238,17 +1238,11 @@ bool is_time_dependent(const std::vector<expression> &v_ex)
 namespace detail
 {
 
-namespace
-{
-
-// NOTE: the default split value is a power of two so that the
-// internal pairwise sums are rounded up exactly.
-constexpr std::uint32_t decompose_split = 8u;
-
-} // namespace
-
 std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
 {
+    // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
+    constexpr std::uint32_t decompose_split = 8;
+
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     detail::traverse_stack stack;
@@ -1266,61 +1260,20 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
     return retval;
 }
 
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression split_prods_for_decompose(void_ptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &ex, split](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already split prods on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Split prods on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(split_prods_for_decompose(func_map, orig_arg, split));
-                }
-
-                // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // After having taken care of the arguments, split
-                // v itself.
-                auto ret = prod_split(expression{std::move(f_copy)}, split);
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ret;
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
-
 std::vector<expression> split_prods_for_decompose(const std::vector<expression> &v_ex, std::uint32_t split)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> ret_stack;
+
+    const auto tfunc = [split](const expression &ex) { return prod_split(ex, split); };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(split_prods_for_decompose(func_map, e, split));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
     }
 
     return retval;
