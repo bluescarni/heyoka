@@ -766,7 +766,6 @@ llvm::Function *prod_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 // If 'e' is not a prod, or if it is a prod with no more than
 // 'split' terms, 'e' will be returned unmodified.
 // NOTE: 'e' is assumed to be a function.
-// NOTE: quite a bit of repetition with sum_split() here.
 expression prod_split(const expression &e, std::uint32_t split)
 {
     return udf_split<prod_impl>(e, split);

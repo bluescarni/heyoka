@@ -407,6 +407,7 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 // of which will have at most 'split' arguments.
 // If 'e' is not a sum, or if it is a sum with no more than
 // 'split' terms, 'e' will be returned unmodified.
+// NOTE: 'e' is assumed to be a function.
 expression sum_split(const expression &e, std::uint32_t split)
 {
     return udf_split<sum_impl>(e, split);
