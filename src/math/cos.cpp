@@ -347,7 +347,6 @@ std::vector<expression> cos_impl::gradient() const
 
 } // namespace detail
 
-// NOLINTNEXTLINE(misc-no-recursion)
 expression cos(expression e)
 {
     // Simplify cos(number) to its value.
