@@ -25,19 +25,26 @@ namespace detail
 {
 
 // This function will return a copy of the input expression e in which the leaf nodes have been transformed
-// by the function tfunc.
+// by the leaf_tfunc function and the branch nodes by the branch_tfunc function.
+//
+// The transformations are applied in a depth-first fashion. That is, the children of a branch node are
+// transformed first, and branch_tfunc is applied afterwards to the new branch node with the transformed
+// children. If an input tfunc is empty, no transformation is applied.
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
 // stack is the stack that will be used for traversal. out_stack is the stack that will be used to store the results
 // of the transformations.
-expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map,
-                                        sargs_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
-                                        return_stack<expression> &out_stack, const expression &e,
-                                        const std::function<expression(const expression &)> &tfunc)
+expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
+                                       sargs_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
+                                       return_stack<expression> &out_stack, const expression &e,
+                                       const std::function<expression(const expression &)> &leaf_tfunc,
+                                       const std::function<expression(const expression &)> &branch_tfunc)
 {
-    assert(tfunc);
     assert(stack.empty());
     assert(out_stack.empty());
+
+    const auto wih_leaf_tfunc = static_cast<bool>(leaf_tfunc);
+    const auto wih_branch_tfunc = static_cast<bool>(branch_tfunc);
 
     // Seed the stack.
     stack.emplace_back(&e, false);
@@ -59,8 +66,8 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
                 // and thus we can avoid an unnecessary lookup.
                 assert(!func_map.contains(f_id));
             } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                // We already created a copy of the current function containing the transformed leaf nodes.
-                // Fetch the transformed copy from the cache and add it to out_stack.
+                // We already created a transformed copy of the current function. Fetch it from the cache
+                // and add it to out_stack.
                 out_stack.emplace_back(it->second);
                 continue;
             }
@@ -104,6 +111,11 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
                     }
                 }();
 
+                // Transform the new copy, if necessary
+                if (wih_branch_tfunc) {
+                    ex_copy = branch_tfunc(ex_copy);
+                }
+
                 // Add it to the cache.
                 func_map.emplace(f_id, ex_copy);
 
@@ -122,6 +134,11 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
                         // The arguments have been transformed before. Fetch them from the cache and
                         // use them to construct a new copy of the function.
                         auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
+
+                        // Transform the new copy, if necessary
+                        if (wih_branch_tfunc) {
+                            ex_copy = branch_tfunc(ex_copy);
+                        }
 
                         // Add the new function to the cache and to out_stack.
                         func_map.emplace(f_id, ex_copy);
@@ -151,9 +168,9 @@ expression ex_traverse_transform_leaves(void_ptr_map<const expression> &func_map
             // Non-function (i.e., leaf) node.
             assert(!visited);
 
-            // Apply the transformation tfunc to the leaf node and add the
+            // Apply the transformation leaf_tfunc to the leaf node, if necessary, and add the
             // result to out_stack.
-            out_stack.emplace_back(tfunc(*cur_ex));
+            out_stack.emplace_back(wih_leaf_tfunc ? leaf_tfunc(*cur_ex) : *cur_ex);
         }
     }
 

@@ -53,10 +53,11 @@ using traverse_stack
 template <typename T>
 using return_stack = boost::container::small_vector<std::optional<T>, static_ex_traversal_stack_size>;
 
-expression ex_traverse_transform_leaves(void_ptr_map<const expression> &,
-                                        sargs_ptr_map<const func_args::shared_args_t> &, traverse_stack &,
-                                        return_stack<expression> &, const expression &,
-                                        const std::function<expression(const expression &)> &);
+expression ex_traverse_transform_nodes(void_ptr_map<const expression> &,
+                                       sargs_ptr_map<const func_args::shared_args_t> &, traverse_stack &,
+                                       return_stack<expression> &, const expression &,
+                                       const std::function<expression(const expression &)> &,
+                                       const std::function<expression(const expression &)> &);
 
 void ex_traverse_visit_leaves(void_ptr_set &, sargs_ptr_set &, traverse_stack &, const expression &,
                               const std::function<void(const expression &)> &);

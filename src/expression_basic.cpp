@@ -160,8 +160,7 @@ namespace
 
 expression copy_impl(auto &func_map, auto &sargs_map, auto &stack, auto &copy_stack, const expression &e)
 {
-    return ex_traverse_transform_leaves(func_map, sargs_map, stack, copy_stack, e,
-                                        [](const expression &ex) { return ex; });
+    return ex_traverse_transform_nodes(func_map, sargs_map, stack, copy_stack, e, {}, {});
 }
 
 } // namespace
@@ -362,7 +361,7 @@ expression rename_variables_impl(auto &func_map, auto &sargs_map, auto &stack, a
         return ex;
     };
 
-    return ex_traverse_transform_leaves(func_map, sargs_map, stack, rename_stack, e, rename_func);
+    return ex_traverse_transform_nodes(func_map, sargs_map, stack, rename_stack, e, rename_func, {});
 }
 
 } // namespace
@@ -770,7 +769,7 @@ expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_st
         return ex;
     };
 
-    return ex_traverse_transform_leaves(func_map, sargs_map, stack, subs_stack, e, subs_func);
+    return ex_traverse_transform_nodes(func_map, sargs_map, stack, subs_stack, e, subs_func, {});
 }
 
 } // namespace
