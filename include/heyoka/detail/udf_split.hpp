@@ -85,7 +85,8 @@ expression udf_split(const expression &e, std::uint32_t split)
     if (!tmp.empty()) {
         // NOTE: contrary to the previous loop, here we could
         // in principle end up creating a UDF with only one
-        // term. In such a case, return arg directly.
+        // term. In such a case, return arg directly, taking advantage
+        // of the assumption that UDF(arg) == arg.
         if (tmp.size() == 1u) {
             ret_seq.push_back(std::move(tmp[0]));
         } else {
