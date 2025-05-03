@@ -10,7 +10,6 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
