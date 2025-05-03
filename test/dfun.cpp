@@ -413,30 +413,3 @@ TEST_CASE("contains_dfun")
     REQUIRE(detail::contains_dfun({cos(ex + 1_dbl), sin(ex)}));
     REQUIRE(detail::contains_dfun({cos("x"_var + 1_dbl), sin(ex)}));
 }
-
-TEST_CASE("get_dfuns")
-{
-    auto [y, z] = make_vars("y", "z");
-
-    REQUIRE(detail::get_dfuns({y}).empty());
-    REQUIRE(detail::get_dfuns({y, z}).empty());
-    REQUIRE(detail::get_dfuns({y + z, 2_dbl * z - 1_dbl}).empty());
-
-    auto ex = y + z;
-
-    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).empty());
-
-    ex = dfun("x", {y, z}, {{0, 1}});
-
-    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).size() == 1u);
-    REQUIRE(*detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).begin() == ex);
-    REQUIRE(detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).size() == 1u);
-    REQUIRE(*detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).begin() == ex);
-
-    auto ex2 = dfun("z", {y, ex}, {{1, 1}});
-
-    auto ds = detail::get_dfuns({cos(ex2 + 1_dbl), sin(ex)});
-    REQUIRE(ds.size() == 2u);
-    REQUIRE(ds.contains(ex));
-    REQUIRE(ds.contains(ex2));
-}

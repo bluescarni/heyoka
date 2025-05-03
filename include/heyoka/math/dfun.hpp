@@ -59,8 +59,6 @@ public:
 
 HEYOKA_DLL_PUBLIC bool contains_dfun(const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC std::set<expression> get_dfuns(const std::vector<expression> &);
-
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
