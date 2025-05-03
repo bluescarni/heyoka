@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -774,93 +775,63 @@ expression prod_split(const expression &e, std::uint32_t split)
 namespace
 {
 
-// Transform a product into a division by collecting
-// negative powers among the operands. Exactly which
-// negative powers are collected is established by the
-// input partitioning function fpart.
-// NOLINTNEXTLINE(misc-no-recursion)
-expression prod_to_div_impl(void_ptr_map<expression> &func_map, const expression &ex,
-                            const std::function<bool(const expression &)> &fpart)
+// This is the function to be used for the transformation of branch nodes in the prod_to_div()
+// implementations. It will transform a product into a division by collecting negative powers among
+// the operands. Exactly which negative powers are collected is established by the input partitioning
+// function fpart.
+expression prod_to_div_tfunc(const expression &ex, const std::function<bool(const expression &)> &fpart)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
+    assert(fpart);
 
-                // Check if we already handled ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
+    // Fetch a reference to the function.
+    const auto &fn = std::get<func>(ex.value());
 
-                // Recursively transform products into divisions
-                // in the arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(prod_to_div_impl(func_map, orig_arg, fpart));
-                }
+    if (fn.extract<prod_impl>() == nullptr) {
+        // The current function is not a prod(). Just create
+        // a copy of it.
+        return ex;
+    }
 
-                // Prepare the return value.
-                std::optional<expression> retval;
+    // The current function is a prod(). Partition its arguments according to fpart.
+    // NOTE: we will need a copy of fn.args() to perform the partitioning.
+    auto new_args(fn.args());
+    // NOLINTNEXTLINE(modernize-use-ranges)
+    const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
 
-                if (v.template extract<prod_impl>() == nullptr) {
-                    // The current function is not a prod(). Just create
-                    // a copy of it with the new args.
-                    retval.emplace(v.copy(std::move(new_args)));
-                } else {
-                    // The current function is a prod(). Partition its
-                    // arguments according to fpart.
-                    // NOLINTNEXTLINE(modernize-use-ranges)
-                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
+    if (it == new_args.end()) {
+        // There are no small negative powers in the product, just make a copy.
+        return ex;
+    }
 
-                    if (it == new_args.end()) {
-                        // There are no small negative powers in the prod, just make a copy.
-                        retval.emplace(v.copy(std::move(new_args)));
-                    } else {
-                        // There are some small negative powers in the prod.
-                        // Group them into a divisor, negate the exponents, and transform
-                        // into a division.
+    // There are some small negative powers in the prod.
+    // Group them into a divisor, negate the exponents, and transform
+    // into a division.
 
-                        // Construct the terms of the divisor.
-                        std::vector<expression> div_args;
-                        for (auto d_it = it; d_it != new_args.end(); ++d_it) {
-                            const auto &f = std::get<func>(d_it->value());
+    // Construct the terms of the divisor.
+    std::vector<expression> div_args;
+    for (const auto &cur_ex : std::ranges::subrange(it, new_args.end())) {
+        const auto &f = std::get<func>(cur_ex.value());
 
-                            assert(f.args().size() == 2u);
-                            assert(f.template extract<pow_impl>() != nullptr);
+        assert(f.args().size() == 2u);
+        assert(f.extract<pow_impl>() != nullptr);
 
-                            const auto &base = f.args()[0];
-                            const auto &expo = f.args()[1];
+        const auto &base = f.args()[0];
+        const auto &expo = f.args()[1];
 
-                            div_args.push_back(pow(base, expression{-std::get<number>(expo.value())}));
-                        }
+        div_args.push_back(pow(base, expression{-std::get<number>(expo.value())}));
+    }
 
-                        // Construct the divisor.
-                        auto divisor = prod(div_args);
+    // Construct the divisor.
+    auto divisor = prod(std::move(div_args));
 
-                        // Construct the numerator.
-                        new_args.erase(it, new_args.end());
-                        // NOTE: if there are *only* small negative powers, then
-                        // new_args will be empty and num will end up being 1.
-                        auto num = prod(new_args);
+    // Construct the numerator.
+    new_args.erase(it, new_args.end());
+    // NOTE: if there are *only* small negative powers, then
+    // new_args will be empty and num will end up being 1.
+    auto num = prod(std::move(new_args));
 
-                        // Construct the return value.
-                        retval.emplace(div(std::move(num), std::move(divisor)));
-                    }
-                }
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return std::move(*retval);
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
+    // Construct and return the result.
+    return div(std::move(num), std::move(divisor));
 }
 
 } // namespace
@@ -868,7 +839,10 @@ expression prod_to_div_impl(void_ptr_map<expression> &func_map, const expression
 // Transform products to divisions. Version for compiled functions.
 std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_ex)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> ret_stack;
 
     // NOTE: for compiled functions, we want to transform into divisions
     // all small negative powers which would be evaluated via multiplications,
@@ -897,11 +871,13 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
         return pea.algo != pow_eval_algo::type::neg_small_int && pea.algo != pow_eval_algo::type::neg_small_half;
     };
 
+    const auto tfunc = [fpart](const expression &ex) { return prod_to_div_tfunc(ex, fpart); };
+
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(prod_to_div_impl(func_map, e, fpart));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
     }
 
     return retval;
@@ -910,7 +886,10 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
 // Transform products to divisions. Version for Taylor integrators.
 std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v_ex)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<expression> ret_stack;
 
     // NOTE: for Taylor integrators, it is generally not worth it to transform
     // negative powers into divisions because this results in having to compute
@@ -948,11 +927,13 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
         }
     };
 
+    const auto tfunc = [fpart](const expression &ex) { return prod_to_div_tfunc(ex, fpart); };
+
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(prod_to_div_impl(func_map, e, fpart));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
     }
 
     return retval;
