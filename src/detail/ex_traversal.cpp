@@ -27,7 +27,7 @@ namespace detail
 // This function will return a copy of the input expression e in which the leaf nodes have been transformed
 // by the leaf_tfunc function and the branch nodes by the branch_tfunc function.
 //
-// The transformations are applied in a depth-first fashion. That is, the children of a branch node are
+// The transformations are applied in a depth-first post-order fashion. That is, the children of a branch node are
 // transformed first, and branch_tfunc is applied afterwards to the new branch node with the transformed
 // children. If an input tfunc is empty, no transformation is applied.
 //
@@ -43,6 +43,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
     assert(stack.empty());
     assert(out_stack.empty());
 
+    // Check if we have the transformation functions.
     const auto wih_leaf_tfunc = static_cast<bool>(leaf_tfunc);
     const auto wih_branch_tfunc = static_cast<bool>(branch_tfunc);
 
