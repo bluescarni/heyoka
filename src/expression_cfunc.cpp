@@ -492,7 +492,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 // Function decomposition from with explicit list of input variables.
 std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
 {
-    if (v_ex_.empty()) {
+    if (v_ex_.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
     }
 
@@ -512,13 +512,13 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     for (const auto &ex : vars) {
         if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
             // Check if this is a duplicate variable.
-            if (auto res = var_set.emplace(var_ptr->name()); !res.second) {
+            if (auto res = var_set.emplace(var_ptr->name()); !res.second) [[unlikely]] {
                 // Duplicate, error out.
                 throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the variable '{}' "
                                                         "appears in the user-provided list of variables twice",
                                                         var_ptr->name()));
             }
-        } else {
+        } else [[unlikely]] {
             throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
                                                     "user-provided list of variables contains the expression '{}', "
                                                     "which is not a variable",
