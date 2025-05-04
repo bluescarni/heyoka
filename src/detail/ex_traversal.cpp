@@ -368,9 +368,10 @@ bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, trav
         }
     }
 
-    // Make sure to clear out the stack in case we interrupted
-    // the traversal early.
-    stack.clear();
+    // NOTE: in case of an early exit, retval will be true and the stack may not be empty.
+    // This is ok, as when this function is used on a vector of expressions a return value
+    // of true will stop the iteration on the vector components and thus we will not run
+    // afoul of the assert(stack.empty()) assertion at the beginning of this function.
 
     return retval;
 }
