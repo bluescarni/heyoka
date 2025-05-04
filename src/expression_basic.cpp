@@ -158,9 +158,9 @@ namespace detail
 namespace
 {
 
-expression copy_impl(auto &func_map, auto &sargs_map, auto &stack, auto &copy_stack, const expression &e)
+expression copy_impl(auto &func_map, auto &sargs_map, const expression &e)
 {
-    return ex_traverse_transform_nodes(func_map, sargs_map, stack, copy_stack, e, {}, {});
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, {}, {});
 }
 
 } // namespace
@@ -171,24 +171,20 @@ expression copy(const expression &e)
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> copy_stack;
 
-    return detail::copy_impl(func_map, sargs_map, stack, copy_stack, e);
+    return detail::copy_impl(func_map, sargs_map, e);
 }
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> copy_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        ret.push_back(detail::copy_impl(func_map, sargs_map, stack, copy_stack, ex));
+        ret.push_back(detail::copy_impl(func_map, sargs_map, ex));
     }
 
     return ret;
@@ -287,7 +283,7 @@ namespace detail
 namespace
 {
 
-void get_variables_impl(auto &func_set, auto &sargs_set, auto &stack, auto &s_set, const expression &e)
+void get_variables_impl(auto &func_set, auto &sargs_set, auto &s_set, const expression &e)
 {
     const auto vfunc = [&s_set](const expression &ex) {
         if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
@@ -295,7 +291,7 @@ void get_variables_impl(auto &func_set, auto &sargs_set, auto &stack, auto &s_se
         }
     };
 
-    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -307,9 +303,8 @@ std::vector<std::string> get_variables(const expression &e)
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
     boost::unordered_flat_set<std::string> s_set;
-    detail::traverse_stack stack;
 
-    detail::get_variables_impl(func_set, sargs_set, stack, s_set, e);
+    detail::get_variables_impl(func_set, sargs_set, s_set, e);
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
@@ -323,10 +318,9 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
     boost::unordered_flat_set<std::string> s_set;
-    detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
-        detail::get_variables_impl(func_set, sargs_set, stack, s_set, ex);
+        detail::get_variables_impl(func_set, sargs_set, s_set, ex);
     }
 
     // Turn the set into an ordered vector.
@@ -342,7 +336,7 @@ namespace detail
 namespace
 {
 
-expression rename_variables_impl(auto &func_map, auto &sargs_map, auto &stack, auto &rename_stack, const expression &e,
+expression rename_variables_impl(auto &func_map, auto &sargs_map, const expression &e,
                                  const std::unordered_map<std::string, std::string> &repl_map)
 {
     const auto rename_func = [&repl_map](const expression &ex) {
@@ -361,7 +355,7 @@ expression rename_variables_impl(auto &func_map, auto &sargs_map, auto &stack, a
         return ex;
     };
 
-    return ex_traverse_transform_nodes(func_map, sargs_map, stack, rename_stack, e, rename_func, {});
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, rename_func, {});
 }
 
 } // namespace
@@ -372,10 +366,8 @@ expression rename_variables(const expression &e, const std::unordered_map<std::s
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> rename_stack;
 
-    return detail::rename_variables_impl(func_map, sargs_map, stack, rename_stack, e, repl_map);
+    return detail::rename_variables_impl(func_map, sargs_map, e, repl_map);
 }
 
 std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
@@ -383,14 +375,12 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> rename_stack;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(detail::rename_variables_impl(func_map, sargs_map, stack, rename_stack, ex, repl_map));
+        retval.push_back(detail::rename_variables_impl(func_map, sargs_map, ex, repl_map));
     }
 
     return retval;
@@ -400,9 +390,7 @@ namespace detail
 {
 
 // NOTE: at this time there is no apparent need for a vectorised version of this.
-// In case we ever need one, remember to adapt the end of the function to pop
-// the return value from hash_stack. The simple function optimisation would also need
-// to be reconsidered.
+// In case we ever need one, the simple function optimisation would need to be reconsidered.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const expression &ex) noexcept
 {
@@ -547,10 +535,6 @@ std::size_t hash(const expression &ex) noexcept
     assert(hash_stack.size() == 1u);
     assert(hash_stack.back());
 
-    // NOTE: usually we pop back the only element of hash_stack here, but because
-    // we do not have a vectorised counterpart of hashing we can omit this step
-    // (which is needed in order to prepare hash_stack for the next expression in
-    // the vector).
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return *hash_stack.back();
 }
@@ -752,7 +736,7 @@ namespace detail
 namespace
 {
 
-expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_stack, const expression &e,
+expression subs_impl(auto &func_map, auto &sargs_map, const expression &e,
                      const std::unordered_map<std::string, expression> &smap)
 {
     const auto subs_func = [&smap](const expression &ex) {
@@ -769,7 +753,7 @@ expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_st
         return ex;
     };
 
-    return ex_traverse_transform_nodes(func_map, sargs_map, stack, subs_stack, e, subs_func, {});
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, subs_func, {});
 }
 
 } // namespace
@@ -780,10 +764,8 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> subs_stack;
 
-    return detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap);
+    return detail::subs_impl(func_map, sargs_map, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
@@ -791,14 +773,12 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> subs_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, e, smap));
     }
 
     return ret;
@@ -810,11 +790,10 @@ namespace detail
 namespace
 {
 
-expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_stack, const expression &e,
-                     const std::map<expression, expression> &smap)
+expression subs_impl(auto &func_map, auto &sargs_map, const expression &e, const std::map<expression, expression> &smap)
 {
-    assert(stack.empty());
-    assert(subs_stack.empty());
+    detail::traverse_stack stack;
+    detail::return_stack<expression> subs_stack;
 
     // Seed the stack.
     stack.emplace_back(&e, false);
@@ -965,10 +944,7 @@ expression subs_impl(auto &func_map, auto &sargs_map, auto &stack, auto &subs_st
     assert(subs_stack.back());
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto ret = std::move(*subs_stack.back());
-    subs_stack.pop_back();
-
-    return ret;
+    return std::move(*subs_stack.back());
 }
 
 } // namespace
@@ -986,24 +962,20 @@ expression subs(const expression &e, const std::map<expression, expression> &sma
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> subs_stack;
 
-    return detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap);
+    return detail::subs_impl(func_map, sargs_map, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap)
 {
     detail::void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> subs_stack;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs_impl(func_map, sargs_map, stack, subs_stack, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, e, smap));
     }
 
     return ret;
@@ -1066,7 +1038,7 @@ namespace detail
 namespace
 {
 
-void get_param_size(auto &func_set, auto &sargs_set, auto &stack, std::uint32_t &retval, const expression &e)
+void get_param_size(auto &func_set, auto &sargs_set, std::uint32_t &retval, const expression &e)
 {
     const auto vfunc = [&retval](const expression &ex) {
         if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
@@ -1075,7 +1047,7 @@ void get_param_size(auto &func_set, auto &sargs_set, auto &stack, std::uint32_t 
         }
     };
 
-    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -1089,11 +1061,10 @@ std::uint32_t get_param_size(const expression &ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     std::uint32_t retval = 0;
 
-    detail::get_param_size(func_set, sargs_set, stack, retval, ex);
+    detail::get_param_size(func_set, sargs_set, retval, ex);
 
     return retval;
 }
@@ -1102,12 +1073,11 @@ std::uint32_t get_param_size(const std::vector<expression> &v_ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     std::uint32_t retval = 0;
 
     for (const auto &ex : v_ex) {
-        detail::get_param_size(func_set, sargs_set, stack, retval, ex);
+        detail::get_param_size(func_set, sargs_set, retval, ex);
     }
 
     return retval;
@@ -1119,7 +1089,7 @@ namespace detail
 namespace
 {
 
-void get_params(auto &func_set, auto &sargs_set, auto &stack, auto &idx_set, const expression &e)
+void get_params(auto &func_set, auto &sargs_set, auto &idx_set, const expression &e)
 {
     const auto vfunc = [&idx_set](const expression &ex) {
         if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
@@ -1127,7 +1097,7 @@ void get_params(auto &func_set, auto &sargs_set, auto &stack, auto &idx_set, con
         }
     };
 
-    ex_traverse_visit_leaves(func_set, sargs_set, stack, e, vfunc);
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -1141,12 +1111,11 @@ std::vector<expression> get_params(const expression &ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     boost::unordered_flat_set<std::uint32_t> idx_set;
 
     // Write the indices of all parameters appearing in ex into idx_set.
-    detail::get_params(func_set, sargs_set, stack, idx_set, ex);
+    detail::get_params(func_set, sargs_set, idx_set, ex);
 
     // Transform idx_set into a sorted vector of parameter expressions.
     std::vector<expression> retval;
@@ -1163,14 +1132,13 @@ std::vector<expression> get_params(const std::vector<expression> &v_ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     boost::unordered_flat_set<std::uint32_t> idx_set;
 
     // Write the indices of all parameters appearing in v_ex
     // into idx_set.
     for (const auto &e : v_ex) {
-        detail::get_params(func_set, sargs_set, stack, idx_set, e);
+        detail::get_params(func_set, sargs_set, idx_set, e);
     }
 
     // Transform idx_set into a sorted vector of parameter expressions.
@@ -1190,7 +1158,7 @@ namespace detail
 namespace
 {
 
-bool is_time_dependent(auto &func_set, auto &sargs_set, auto &stack, const expression &e)
+bool is_time_dependent(auto &func_set, auto &sargs_set, const expression &e)
 {
     const auto pred = [](const expression &ex) {
         if (const auto *fptr = std::get_if<func>(&ex.value())) {
@@ -1201,7 +1169,7 @@ bool is_time_dependent(auto &func_set, auto &sargs_set, auto &stack, const expre
         }
     };
 
-    return ex_traverse_test_any(func_set, sargs_set, stack, e, pred);
+    return ex_traverse_test_any(func_set, sargs_set, e, pred);
 }
 
 } // namespace
@@ -1215,19 +1183,17 @@ bool is_time_dependent(const expression &ex)
     // arguments sets which are *not* time-dependent.
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
-    return detail::is_time_dependent(func_set, sargs_set, stack, ex);
+    return detail::is_time_dependent(func_set, sargs_set, ex);
 }
 
 bool is_time_dependent(const std::vector<expression> &v_ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     for (const auto &ex : v_ex) {
-        if (detail::is_time_dependent(func_set, sargs_set, stack, ex)) {
+        if (detail::is_time_dependent(func_set, sargs_set, ex)) {
             return true;
         }
     }
@@ -1242,8 +1208,6 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     const auto tfunc = [](const expression &ex) {
         // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
@@ -1256,7 +1220,7 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -1266,8 +1230,6 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     const auto tfunc = [split](const expression &ex) { return prod_split(ex, split); };
 
@@ -1275,7 +1237,7 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -1286,8 +1248,6 @@ std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expressi
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     const auto tfunc = [](const expression &ex) { return sum_to_sum_sq(ex); };
 
@@ -1295,7 +1255,7 @@ std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expressi
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;

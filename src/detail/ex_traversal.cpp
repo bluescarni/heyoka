@@ -32,16 +32,13 @@ namespace detail
 // children. If an input tfunc is empty, no transformation is applied.
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
-// stack is the stack that will be used for traversal. out_stack is the stack that will be used to store the results
-// of the transformations.
 expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
-                                       sargs_ptr_map<const func_args::shared_args_t> &sargs_map, traverse_stack &stack,
-                                       return_stack<expression> &out_stack, const expression &e,
+                                       sargs_ptr_map<const func_args::shared_args_t> &sargs_map, const expression &e,
                                        const std::function<expression(const expression &)> &leaf_tfunc,
                                        const std::function<expression(const expression &)> &branch_tfunc)
 {
-    assert(stack.empty());
-    assert(out_stack.empty());
+    traverse_stack stack;
+    return_stack<expression> out_stack;
 
     // Check if we have the transformation functions.
     const auto wih_leaf_tfunc = static_cast<bool>(leaf_tfunc);
@@ -179,21 +176,18 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
     assert(out_stack.back());
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto ret = std::move(*out_stack.back());
-    out_stack.pop_back();
-
-    return ret;
+    return std::move(*out_stack.back());
 }
 
 // This function will visit the leaves of the expression e and invoke vfunc on each leaf.
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
-// stack is the stack that will be used for traversal.
-void ex_traverse_visit_leaves(void_ptr_set &func_set, sargs_ptr_set &sargs_set, traverse_stack &stack,
-                              const expression &e, const std::function<void(const expression &)> &vfunc)
+void ex_traverse_visit_leaves(void_ptr_set &func_set, sargs_ptr_set &sargs_set, const expression &e,
+                              const std::function<void(const expression &)> &vfunc)
 {
     assert(vfunc);
-    assert(stack.empty());
+
+    traverse_stack stack;
 
     // Seed the stack.
     stack.emplace_back(&e, false);
@@ -273,12 +267,12 @@ void ex_traverse_visit_leaves(void_ptr_set &func_set, sargs_ptr_set &sargs_set, 
 // one node satisfies the predicate pred.
 //
 // func_map and sargs_map are caches used during the traversal in order to avoid repeating redundant computations.
-// stack is the stack that will be used for traversal.
-bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, traverse_stack &stack, const expression &e,
+bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, const expression &e,
                           const std::function<bool(const expression &)> &pred)
 {
     assert(pred);
-    assert(stack.empty());
+
+    traverse_stack stack;
 
     // Init the return value.
     auto retval = false;
@@ -367,11 +361,6 @@ bool ex_traverse_test_any(void_ptr_set &func_set, sargs_ptr_set &sargs_set, trav
             }
         }
     }
-
-    // NOTE: in case of an early exit, retval will be true and the stack may not be empty.
-    // This is ok, as when this function is used on a vector of expressions a return value
-    // of true will stop the iteration on the vector components and thus we will not run
-    // afoul of the assert(stack.empty()) assertion at the beginning of this function.
 
     return retval;
 }

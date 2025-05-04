@@ -331,7 +331,6 @@ bool contains_dfun(const std::vector<expression> &v_ex)
 {
     detail::void_ptr_set func_set;
     detail::sargs_ptr_set sargs_set;
-    detail::traverse_stack stack;
 
     const auto pred = [](const expression &ex) {
         if (const auto *fptr = std::get_if<func>(&ex.value())) {
@@ -344,7 +343,7 @@ bool contains_dfun(const std::vector<expression> &v_ex)
     };
 
     for (const auto &ex : v_ex) {
-        if (ex_traverse_test_any(func_set, sargs_set, stack, ex, pred)) {
+        if (ex_traverse_test_any(func_set, sargs_set, ex, pred)) {
             return true;
         }
     }

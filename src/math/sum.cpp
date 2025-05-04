@@ -496,8 +496,6 @@ std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     const auto tfunc = [](const expression &ex) {
         // Fetch a reference to the function.
@@ -573,7 +571,7 @@ std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;

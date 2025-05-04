@@ -840,8 +840,6 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     // NOTE: for compiled functions, we want to transform into divisions
     // all small negative powers which would be evaluated via multiplications,
@@ -876,7 +874,7 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -887,8 +885,6 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
 {
     void_ptr_map<const expression> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
-    detail::traverse_stack stack;
-    detail::return_stack<expression> ret_stack;
 
     // NOTE: for Taylor integrators, it is generally not worth it to transform
     // negative powers into divisions because this results in having to compute
@@ -932,7 +928,7 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, stack, ret_stack, e, {}, tfunc));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
