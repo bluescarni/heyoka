@@ -731,11 +731,8 @@ std::size_t get_n_nodes(const expression &e)
 namespace detail
 {
 
-namespace
-{
-
-expression subs_impl(auto &func_map, auto &sargs_map, const expression &e,
-                     const std::unordered_map<std::string, expression> &smap)
+expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
     const auto subs_func = [&smap](const expression &ex) {
         if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
@@ -753,8 +750,6 @@ expression subs_impl(auto &func_map, auto &sargs_map, const expression &e,
 
     return ex_traverse_transform_nodes(func_map, sargs_map, e, subs_func, {});
 }
-
-} // namespace
 
 } // namespace detail
 
@@ -785,13 +780,11 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
 namespace detail
 {
 
-namespace
+expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const std::map<expression, expression> &smap)
 {
-
-expression subs_impl(auto &func_map, auto &sargs_map, const expression &e, const std::map<expression, expression> &smap)
-{
-    detail::traverse_stack stack;
-    detail::return_stack<expression> subs_stack;
+    traverse_stack stack;
+    return_stack<expression> subs_stack;
 
     // Seed the stack.
     stack.emplace_back(&e, false);
@@ -944,8 +937,6 @@ expression subs_impl(auto &func_map, auto &sargs_map, const expression &e, const
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return std::move(*subs_stack.back());
 }
-
-} // namespace
 
 } // namespace detail
 

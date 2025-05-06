@@ -346,6 +346,17 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexce
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
+namespace detail
+{
+
+expression subs_impl(detail::void_ptr_map<const expression> &, detail::sargs_ptr_map<const func_args::shared_args_t> &,
+                     const expression &, const std::unordered_map<std::string, expression> &);
+
+expression subs_impl(void_ptr_map<const expression> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                     const expression &, const std::map<expression, expression> &);
+
+} // namespace detail
+
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
