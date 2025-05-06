@@ -560,10 +560,8 @@ void stream_expression(std::ostringstream &oss, const expression &e)
     }
 
     std::visit(
-        [&oss](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+        [&oss]<typename T>(const T &v) {
+            if constexpr (std::is_same_v<T, func>) {
                 v.to_stream(oss);
             } else {
                 oss << v;
@@ -1207,7 +1205,7 @@ namespace detail
 std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
 {
     void_ptr_map<const expression> func_map;
-    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     const auto tfunc = [](const expression &ex) {
         // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
@@ -1220,7 +1218,7 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -1229,7 +1227,7 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 std::vector<expression> split_prods_for_decompose(const std::vector<expression> &v_ex, std::uint32_t split)
 {
     void_ptr_map<const expression> func_map;
-    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     const auto tfunc = [split](const expression &ex) { return prod_split(ex, split); };
 
@@ -1237,7 +1235,7 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -1247,7 +1245,7 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
 {
     void_ptr_map<const expression> func_map;
-    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     const auto tfunc = [](const expression &ex) { return sum_to_sum_sq(ex); };
 
@@ -1255,7 +1253,7 @@ std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expressi
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
