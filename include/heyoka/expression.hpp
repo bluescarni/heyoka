@@ -592,7 +592,7 @@ namespace detail
 void verify_function_dec(const std::vector<expression> &, const std::vector<expression> &,
                          std::vector<expression>::size_type, bool = false);
 
-std::vector<expression> function_decompose_cse(std::vector<expression> &, std::vector<expression>::size_type,
+std::vector<expression> function_decompose_cse(const std::vector<expression> &, std::vector<expression>::size_type,
                                                std::vector<expression>::size_type);
 
 std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<expression>::size_type,

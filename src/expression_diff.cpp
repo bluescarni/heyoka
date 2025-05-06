@@ -394,7 +394,6 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         // The initial definitions must all consist of
         // variables or parameters.
         assert(std::holds_alternative<variable>(dc[i].value()) || std::holds_alternative<param>(dc[i].value()));
-        assert(subs(dc[i], subs_map) == dc[i]);
 
         // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions,
         // we only need to fill in subs_map.
@@ -408,6 +407,10 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // NOTE: if this turns out to be a bottleneck, we can always
     // re-implement in terms of boost::unordered_flat_map and manually sort after construction.
     std::map<std::string, std::vector<expression>> grad_map;
+
+    // NOTE: these are caches used in the construction of subs_map.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     // Elementary subexpressions.
     for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
@@ -463,7 +466,10 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         }
 
         assert(!subs_map.contains(fmt::format("u_{}", i)));
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+        subs_map.emplace(fmt::format("u_{}", i),
+                         // NOTE: the point of using subs_impl() with the caches, rather than subs(), is that we want
+                         // to avoid creating multiple copies of shared arguments.
+                         subs_impl(func_map, sargs_map, dc[i], subs_map));
     }
 
     // Outputs.

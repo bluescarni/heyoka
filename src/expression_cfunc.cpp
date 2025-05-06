@@ -201,9 +201,8 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     }
 }
 
-// Simplify a function decomposition by removing
-// common subexpressions.
-std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
+// Simplify a function decomposition by removing common subexpressions.
+std::vector<expression> function_decompose_cse(const std::vector<expression> &v_ex,
                                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                std::vector<expression>::size_type nvars,
                                                std::vector<expression>::size_type nouts)
@@ -235,10 +234,14 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // in the expressions.
     std::unordered_map<std::string, std::string> uvars_rename;
 
+    // NOTE: these are caches used in the renaming of the expressions in v_ex.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
     // The first nvars definitions are just renaming
     // of the original variables into u variables.
     for (idx_t i = 0; i < nvars; ++i) {
-        retval.push_back(std::move(v_ex[i]));
+        retval.push_back(v_ex[i]);
 
         // NOTE: the u vars that correspond to the original
         // variables are never simplified,
@@ -249,20 +252,22 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
 
     // Handle the u variables which do not correspond to the original variables.
     for (auto i = nvars; i < v_ex.size() - nouts; ++i) {
-        auto &ex = v_ex[i];
+        const auto &orig_ex = v_ex[i];
 
-        // Rename the u variables in ex.
-        ex = rename_variables(ex, uvars_rename);
+        // Rename the u variables in orig_ex.
+        // NOTE: the point of using rename_variables_impl() with the caches, rather than rename_variables(), is that we
+        // want to avoid creating multiple copies of shared arguments.
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        if (auto it = ex_map.find(ex); it == ex_map.end()) {
-            // This is the first occurrence of ex in the
+        if (const auto it = ex_map.find(new_ex); it == ex_map.end()) {
+            // This is the first occurrence of new_ex in the
             // decomposition. Add it to retval.
-            retval.push_back(ex);
+            retval.push_back(new_ex);
 
-            // Add ex to ex_map, mapping it to
+            // Add new_ex to ex_map, mapping it to
             // the index it corresponds to in retval
             // (let's call it j).
-            ex_map.emplace(std::move(ex), retval.size() - 1u);
+            ex_map.emplace(std::move(new_ex), retval.size() - 1u);
 
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
@@ -271,7 +276,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
                 = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
             assert(res.second);
         } else {
-            // ex is redundant. This means
+            // new_ex is redundant. This means
             // that it already appears in retval at index
             // it->second. Don't add anything to retval,
             // and remap the variable name 'u_i' to
@@ -287,15 +292,15 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // the u variables in their definitions are renamed with
     // the new indices.
     for (auto i = v_ex.size() - nouts; i < v_ex.size(); ++i) {
-        auto &ex = v_ex[i];
+        const auto &orig_ex = v_ex[i];
 
         // NOTE: here we expect only vars, numbers or params.
-        assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-               || std::holds_alternative<param>(ex.value()));
+        assert(std::holds_alternative<variable>(orig_ex.value()) || std::holds_alternative<number>(orig_ex.value())
+               || std::holds_alternative<param>(orig_ex.value()));
 
-        ex = rename_variables(ex, uvars_rename);
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        retval.push_back(std::move(ex));
+        retval.push_back(std::move(new_ex));
     }
 
     get_logger()->debug("function CSE reduced decomposition size from {} to {}", orig_size, retval.size());
@@ -469,10 +474,16 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         assert(res.second);
     }
 
+    // NOTE: these are caches used in the renaming of the expressions in dc.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
     // Do the remap for the definitions of the u variables and of the components.
     for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
-        *it = rename_variables(*it, remap);
+        // NOTE: the point of using rename_variables_impl() with the caches, rather than rename_variables(), is that we
+        // want to avoid creating multiple copies of shared arguments.
+        *it = rename_variables_impl(func_map, sargs_map, *it, remap);
     }
 
     // Reorder the decomposition.
