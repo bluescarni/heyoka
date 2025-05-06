@@ -50,6 +50,8 @@ int main(int, char *[])
     const auto ffnn = model::ffnn(kw::inputs = state, kw::nn_hidden = std::vector(nh, h), kw::n_out = n,
                                   kw::activations = activations);
 
+    std::cout << "Total number of parameters: " << get_param_size(ffnn) << '\n';
+
     // Create the dynamics.
     std::vector<std::pair<expression, expression>> dyn;
     dyn.reserve(n);
