@@ -333,10 +333,8 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 namespace detail
 {
 
-namespace
-{
-
-expression rename_variables_impl(auto &func_map, auto &sargs_map, const expression &e,
+expression rename_variables_impl(void_ptr_map<const expression> &func_map,
+                                 sargs_ptr_map<const func_args::shared_args_t> &sargs_map, const expression &e,
                                  const std::unordered_map<std::string, std::string> &repl_map)
 {
     const auto rename_func = [&repl_map](const expression &ex) {
@@ -357,8 +355,6 @@ expression rename_variables_impl(auto &func_map, auto &sargs_map, const expressi
 
     return ex_traverse_transform_nodes(func_map, sargs_map, e, rename_func, {});
 }
-
-} // namespace
 
 } // namespace detail
 

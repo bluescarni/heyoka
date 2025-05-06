@@ -210,6 +210,15 @@ HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const std::vector<expression> &);
+
+namespace detail
+{
+
+expression rename_variables_impl(void_ptr_map<const expression> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                                 const expression &, const std::unordered_map<std::string, std::string> &);
+
+} // namespace detail
+
 HEYOKA_DLL_PUBLIC expression rename_variables(const expression &, const std::unordered_map<std::string, std::string> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<expression> &,
                                                            const std::unordered_map<std::string, std::string> &);
