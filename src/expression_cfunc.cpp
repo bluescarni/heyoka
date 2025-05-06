@@ -107,13 +107,164 @@ namespace detail
 {
 
 std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &func_map,
-                                                            const expression &ex, std::vector<expression> &dc)
+                                                            sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                                                            const expression &e, std::vector<expression> &dc)
 {
-    if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        return fptr->decompose(func_map, dc);
-    } else {
-        return {};
+    traverse_stack stack;
+    return_stack<std::optional<std::vector<expression>::size_type>> out_stack;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already decomposed the current function. Fetch the result from the cache
+                // and add it to out_stack.
+                out_stack.emplace_back(it->second);
+                continue;
+            }
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited and decomposed all the children of the function node (i.e., the function
+                // arguments). The results of the decomposition are at the tail end of out_stack. We will be popping
+                // them from out_stack and use them to initialise the decomposed version of the function.
+
+                // Build the arguments for the decomposed function.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // Fetch the original function argument.
+                    const auto &orig_arg = f.args()[i];
+
+                    // NOTE: out_stack must not be empty and its last element also cannot be empty.
+                    assert(!out_stack.empty());
+                    assert(out_stack.back());
+
+                    // Fetch the current decomposition index.
+                    const auto opt_idx = *out_stack.back();
+                    if (opt_idx) {
+                        // The current argument is a decomposed function. It will be replaced
+                        // by the corresponding u variable.
+                        assert(std::holds_alternative<func>(orig_arg.value()));
+                        new_args.emplace_back(fmt::format("u_{}", *opt_idx));
+                    } else {
+                        assert(std::holds_alternative<variable>(orig_arg.value())
+                               || std::holds_alternative<number>(orig_arg.value())
+                               || std::holds_alternative<param>(orig_arg.value()));
+                        // The current argument is a non-function, just copy it.
+                        new_args.push_back(orig_arg);
+                    }
+
+                    out_stack.pop_back();
+                }
+
+                // Create the decomposed function.
+                auto ex_copy = [&]() {
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference, we must make
+                        // sure to record the new arguments in sargs_map, so that when we run again into the
+                        // same shared reference we re-use the cached result.
+                        auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(new_args));
+
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, new_sargs);
+
+                        return expression{f.make_copy_with_new_args(std::move(new_sargs))};
+                    } else {
+                        return expression{f.copy(std::move(new_args))};
+                    }
+                }();
+
+                // Record the index at which ex_copy will be appended to dc.
+                const auto ret = dc.size();
+
+                // Add ex_copy to dc.
+                dc.push_back(std::move(ex_copy));
+
+                // Add it to the cache.
+                func_map.emplace(f_id, ret);
+
+                // Add ret to out_stack.
+                // NOTE: out_stack must not be empty and its last element must be empty (it is supposed to be
+                // the empty index we pushed the first time we visited).
+                assert(!out_stack.empty());
+                assert(!out_stack.back());
+                out_stack.back().emplace(ret);
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already decomposed the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // The arguments have been decomposed before. Fetch them from the cache and
+                        // use them to construct the decomposed version of the function.
+                        auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
+
+                        // Record the index at which ex_copy will be appended to dc.
+                        const auto ret = dc.size();
+
+                        // Add ex_copy to dc.
+                        dc.push_back(std::move(ex_copy));
+
+                        // Add the decomposed function to the cache.
+                        func_map.emplace(f_id, ret);
+
+                        // Add ret to out_stack.
+                        out_stack.emplace_back(ret);
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that the shared arguments of the function have never
+                    // been decomposed before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty return value to out_stack. We will create the real return value once
+                // we have decomposed all arguments.
+                out_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Leaf nodes are not decomposed.
+            out_stack.push_back(std::optional<std::vector<expression>::size_type>{});
+        }
     }
+
+    assert(out_stack.size() == 1u);
+    assert(out_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return *out_stack.back();
 }
 
 // Helper to verify a function decomposition.
@@ -609,9 +760,10 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     // Run the decomposition on each component of the function.
     detail::void_ptr_map<std::vector<expression>::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
-        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+        if (const auto dres = detail::decompose(func_map, sargs_map, ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.

@@ -293,9 +293,10 @@ diff_decompose(const std::vector<expression> &v_ex_)
 
     // Run the decomposition.
     detail::void_ptr_map<std::vector<expression>::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
-        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+        if (const auto dres = detail::decompose(func_map, sargs_map, ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.

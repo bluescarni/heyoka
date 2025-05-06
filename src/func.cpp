@@ -231,33 +231,6 @@ std::vector<expression> func_td_args(const auto &fb, void_ptr_map<taylor_dc_t::s
     return retval;
 } // LCOV_EXCL_LINE
 
-// Perform the decomposition of the arguments of a function. This function
-// will return a vector of arguments in which each element will be either:
-// - a variable,
-// - a number,
-// - a param.
-std::vector<expression> func_d_args(const auto &fb, void_ptr_map<std::vector<expression>::size_type> &func_map,
-                                    std::vector<expression> &dc)
-{
-    std::vector<expression> retval;
-    retval.reserve(fb.args().size());
-
-    for (const auto &arg : fb.args()) {
-        const auto dres = decompose(func_map, arg, dc);
-
-        if (dres) {
-            retval.emplace_back(fmt::format("u_{}", *dres));
-        } else {
-            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
-                   || std::holds_alternative<param>(arg.value()));
-
-            retval.push_back(arg);
-        }
-    }
-
-    return retval;
-} // LCOV_EXCL_LINE
-
 } // namespace
 
 } // namespace detail
@@ -411,34 +384,6 @@ expression func::diff(detail::void_ptr_map<expression> &func_map, const std::str
 expression func::diff(detail::void_ptr_map<expression> &func_map, const param &p) const
 {
     return this->diff_impl(func_map, p);
-}
-
-std::vector<expression>::size_type func::decompose(detail::void_ptr_map<std::vector<expression>::size_type> &func_map,
-                                                   std::vector<expression> &dc) const
-{
-    const auto *const f_id = get_ptr();
-
-    if (auto it = func_map.find(f_id); it != func_map.end()) {
-        // We already decomposed the current function, fetch the result
-        // from the cache.
-        return it->second;
-    }
-
-    // Compute the decomposed arguments.
-    const auto new_args = detail::func_d_args(*this, func_map, dc);
-
-    // Make a copy of this containing the new arguments.
-    auto f_copy = copy(new_args);
-
-    // Append f_copy and return the index at which it was appended.
-    const auto ret = dc.size();
-    dc.emplace_back(std::move(f_copy));
-
-    // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-    assert(flag);
-
-    return ret;
 }
 
 // NOTE: time dependency here means **intrinsic** time

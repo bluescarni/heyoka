@@ -605,6 +605,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> split_prods_for_decompose(const std::v
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
 
 std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &,
+                                                            sargs_ptr_map<const func_args::shared_args_t> &,
                                                             const expression &, std::vector<expression> &);
 
 llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);

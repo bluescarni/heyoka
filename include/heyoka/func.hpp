@@ -388,9 +388,6 @@ public:
     [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const std::string &) const;
     [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const param &) const;
 
-    [[nodiscard]] std::vector<expression>::size_type
-    decompose(detail::void_ptr_map<std::vector<expression>::size_type> &, std::vector<expression> &) const;
-
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
