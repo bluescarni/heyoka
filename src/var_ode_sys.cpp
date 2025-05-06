@@ -27,8 +27,10 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/math/dfun.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/param.hpp>
@@ -101,6 +103,70 @@ void var_ode_sys::load(boost::archive::binary_iarchive &ar, unsigned)
     }
     // LCOV_EXCL_STOP
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// This function will identify all dfuns in v_ex whose arguments are equal to new_sargs and transform them to use
+// new_sargs as arguments instead.
+std::vector<expression> transform_dfun_sargs(const std::vector<expression> &v_ex,
+                                             const func_args::shared_args_t &new_sargs)
+{
+    assert(new_sargs);
+    assert(std::ranges::none_of(*new_sargs, [](const auto &ex) { return std::holds_alternative<func>(ex.value()); }));
+
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    // NOTE: this map will record the result of comparing a set of arguments to new_sargs.
+    sargs_ptr_map<const bool> new_sargs_cmp;
+
+    const auto tfunc = [&new_sargs, &new_sargs_cmp](const auto &ex) {
+        const auto &fn = std::get<func>(ex.value());
+
+        if (const auto *dfun_ptr = fn.template extract<dfun_impl>()) {
+            // We encountered a dfun. Fetch its arguments.
+            const auto &args = dfun_ptr->args();
+
+            if (const auto it = new_sargs_cmp.find(&args); it != new_sargs_cmp.end()) {
+                // The arguments of the current dfun were already compared to new_sargs
+                // before. If they compared equal, return a copy of fn containing new_sargs.
+                // Otherwise, return ex unchanged.
+                return it->second ? expression{fn.make_copy_with_new_args(new_sargs)} : ex;
+            } else {
+                // We never compared the arguments of the current dfun to new_sargs before. Do it now.
+                // NOTE: here we know the comparison is cheap because we are assuming that new_sargs contains
+                // only non-function expressions.
+                const auto cmp_res = (args == *new_sargs);
+
+                // Record the result of the comparison.
+                new_sargs_cmp.emplace(&args, cmp_res);
+
+                // If the arguments compare equal, return a copy of fn containing new_sargs. Otherwise,
+                // return ex unchanged.
+                return cmp_res ? expression{fn.make_copy_with_new_args(new_sargs)} : ex;
+            }
+        } else {
+            // The function is not a dfun, return ex unchanged.
+            return ex;
+        }
+    };
+
+    std::vector<expression> out;
+    out.reserve(v_ex.size());
+    for (const auto &e : v_ex) {
+        out.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
+    }
+
+    return out;
+}
+
+} // namespace
+
+} // namespace detail
 
 // NOTE: this initialises into the moved-from state, this needs
 // to be documented properly.
@@ -300,6 +366,23 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
         // Add the current variational equation.
         new_rhs.push_back(diff_ex);
     }
+
+    // NOTE: this is an important step. Throughout all the expression manipulations involving the construction of the
+    // variational equations, we end up creating multiple deep copies of the arguments in vargs_ptr. This is unavoidable
+    // as in diff_tensors() we need to transform the arguments to u variables and then back to the original variables,
+    // and thus what was initially a shallow copy of vargs_ptr ends up being a deep copy. The differentiation process
+    // itself also creates additional deep copies.
+    //
+    // This creates redundant computations when applying the dfun_subs_map substitution map, because while dfun_subs_map
+    // will contain dfuns equivalent to those in new_rhs, the comparison to establish equivalence will be costly as it
+    // needs to compare the full arguments sets (instead of just their pointers). This can have disastrous performance
+    // effects with large sets of arguments (e.g., neural networks).
+    //
+    // Thus, the idea here is to traverse all expressions in new_rhs, identify the dfuns and, if their arguments are
+    // equivalent to vargs_ptr, transform the dfuns to use vargs_ptr for the representation of the arguments. Like this,
+    // the substitution with dfun_subs_map will perform much better as now the equivalence of the arguments sets can be
+    // established via a simple pointer comparison.
+    new_rhs = detail::transform_dfun_sargs(new_rhs, vargs_ptr);
 
     // Run the substitution.
     new_rhs = subs(new_rhs, dfun_subs_map);

@@ -1283,6 +1283,30 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // Do the substitution.
         subs_ret = subs(subs_ret, subs_map);
 
+        // NOTE: the substitution we just performed results in deep copies of shared arguments. The reason is as
+        // follows.
+        //
+        // subs_map maps "u_i" strings to expressions containing the original variables/parameters. subs_ret, instead,
+        // is expressed in terms of the u_i variables, representing the result of the differentiation process. The
+        // purpose of the substitution is to express the result of the differentiation process in terms of the original
+        // variables/parameters (rather than in terms of u_i variables).
+        //
+        // If the expressions that were differentiated originally contained shared arguments, these sets of shared
+        // arguments are transformed from the original variables/parameters into u_i variables for the purpose of
+        // differentiation. Thus, for instance, if originally we had a dfun of (p0, p1, p2), subs_ret will contain
+        // a dfun of (u_0, u_1, u_2) instead.
+        //
+        // The issue is then that, during the substitution, the (u_0, u_1, u_2) set of shared arguments in subs_ret is
+        // transformed back into (p0, p1, p2), but we have no way of knowing that this is the exact same set of
+        // arguments that shows up in subs_map. Hence, the unnecessary duplication.
+        //
+        // At this time it does not seem like this duplication is detrimental to performance, at least in tests
+        // involving first-order derivatives of neural networks (which is the primary use case for shared arguments). If
+        // this becomes a problem, we can consider doing a transformation pass on subs_ret that consolidates identical
+        // deep copies of shared arguments in a single shared instance. This would be a bit of a kludge and it should
+        // probably be limited to shared arguments containing only non-function expressions (due to the potentially very
+        // expensive cost of comparing large expressions trees). This needs to be investigated more.
+
         // Replace the original expressions in diff_map.
         decltype(subs_ret.size()) i = 0;
         for (auto *it = cur_begin; i < subs_ret.size(); ++i, ++it) {
