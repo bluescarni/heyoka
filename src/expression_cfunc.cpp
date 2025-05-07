@@ -463,7 +463,7 @@ std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
         [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
         assert(res.second);
     }
-    // NOTE: no need to rename the outputs.
+    // NOTE: no need to remap the outputs.
 
     // NOTE: these are caches used in the renaming of the expressions in dc.
     void_ptr_map<const expression> func_map;

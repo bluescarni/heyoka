@@ -10,12 +10,12 @@
 #include <cassert>
 #include <concepts>
 #include <cstdint>
-#include <deque>
 #include <exception>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -25,6 +25,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -435,25 +436,20 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     return retval;
 }
 
-// Perform a topological sort on a graph representation
-// of a Taylor decomposition. This can improve performance
-// by grouping together operations that can be performed in parallel,
-// and it also makes compact mode much more effective by creating
-// clusters of subexpressions whose derivatives can be computed in
-// parallel.
-// NOTE: the original decomposition dc is already topologically sorted,
-// in the sense that the definitions of the u variables are already
-// ordered according to dependency. However, because the original decomposition
-// comes from a depth-first search, it has the tendency to group together
-// expressions which are dependent on each other. By doing another topological
-// sort, this time based on breadth-first search, we determine another valid
-// sorting in which independent operations tend to be clustered together.
-auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, taylor_dc_t::size_type n_eq)
+// Perform a topological sort on a graph representation of a Taylor decomposition. This can improve performance by
+// grouping together operations that can be performed in parallel, and it also makes compact mode much more effective by
+// creating clusters of subexpressions whose derivatives can be computed in parallel.
+//
+// NOTE: the original decomposition dc is already topologically sorted, in the sense that the definitions of the u
+// variables are already ordered according to dependency. However, because the original decomposition comes from a
+// depth-first search, it has the tendency to group together expressions which are dependent on each other. By doing
+// another topological sort, this time based on breadth-first search, we determine another valid sorting in which
+// independent operations tend to be clustered together.
+auto taylor_sort_dc(const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc,
+                    const taylor_dc_t::size_type n_eq)
 {
-    // A Taylor decomposition is supposed
-    // to have n_eq variables at the beginning,
-    // n_eq variables at the end and possibly
-    // extra variables in the middle
+    // A Taylor decomposition is supposed to have n_eq variables at the beginning, n_eq variables at the end and
+    // possibly extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
 
     // Log runtime in trace mode.
@@ -476,18 +472,24 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     const auto root_v = boost::add_vertex(g);
 
     // Add the nodes corresponding to the state variables.
-    for (decltype(n_eq) i = 0; i < n_eq; ++i) {
-        auto v = boost::add_vertex(g);
+    for (taylor_dc_t::size_type i = 0; i < n_eq; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Add a dependency on the root node.
         boost::add_edge(root_v, v, g);
     }
 
     // Add the rest of the u variables.
-    for (decltype(n_eq) i = n_eq; i < dc.size() - n_eq; ++i) {
-        auto v = boost::add_vertex(g);
+    for (taylor_dc_t::size_type i = n_eq; i < dc.size() - n_eq; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Fetch the list of variables in the current expression.
+        //
+        // NOTE: performance with large shared arguments sets here will be quite poor, as we will keep on creating new
+        // deep copies of the same set of arguments over and over. This is not currently a practical concern because
+        // taylor_sort_dc() is at the moment called only in Taylor integrators, which are not supported by dfun (which
+        // is the only use of shared arguments we have thus far). If this becomes an issue in the future, we will have
+        // to think of an alternative API that avoids the explosion in complexity.
         const auto vars = get_variables(dc[i].first);
 
         if (vars.empty()) {
@@ -525,7 +527,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
 
     // The set of all nodes with no incoming edge.
-    std::deque<decltype(dc.size())> tmp;
+    boost::container::deque<decltype(dc.size())> tmp;
     // The root node has no incoming edge.
     tmp.push_back(0);
 
@@ -571,9 +573,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     assert(v_idx.size() == boost::num_vertices(g));
     assert(boost::num_edges(g) == 0u);
 
-    // Adjust v_idx: remove the index of the root node,
-    // decrease by one all other indices, insert the final
-    // n_eq indices.
+    // Adjust v_idx: remove the index of the root node decrease by one all other indices, insert the final n_eq indices.
     for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
         v_idx[i] = v_idx[i + 1u] - 1u;
     }
@@ -582,10 +582,9 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
 
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
-    // NOTE: the u vars that correspond to state
-    // variables were inserted into v_idx in the original
-    // order, thus they are not re-sorted and they do not
-    // need renaming.
+    // NOTE: the u vars that correspond to state variables were inserted into v_idx in the original order, thus they are
+    // not re-sorted and they do not need renaming. However, we need them to show up in 'remap' because sv funcs might
+    // be state variables, and when remapping sv funcs below we are relying on them showing up in 'remap'.
     for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
         assert(v_idx[i] == i);
         [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
@@ -598,33 +597,43 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         assert(res.second);
     }
 
-    // Do the remap for the definitions of the u variables, the
-    // derivatives and the hidden deps.
-    for (auto *it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
-        // Remap the expression.
-        it->first = rename_variables(it->first, remap);
+    // NOTE: these are caches used in the renaming of the expressions in dc.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-        // Remap the hidden dependencies.
-        for (auto &idx : it->second) {
-            auto it_remap = remap.find(fmt::format("u_{}", idx));
-            assert(it_remap != remap.end());
-            idx = uname_to_index(it_remap->second);
-        }
-    }
+    // Do the reordering and remapping of the decomposition.
+    auto dc_transform_view = v_idx | std::views::transform([&dc](auto idx) -> const auto & { return dc[idx]; })
+                             | std::views::transform([&func_map, &sargs_map, &remap](const auto &p) {
+                                   const auto &[ex, deps] = p;
+
+                                   // Remap the expression.
+                                   // NOTE: the point of using rename_variables_impl() with the caches, rather than
+                                   // rename_variables(), is that we want to avoid creating multiple copies of shared
+                                   // arguments.
+                                   auto new_ex = rename_variables_impl(func_map, sargs_map, ex, remap);
+
+                                   // Remap the hidden deps.
+                                   std::vector<std::uint32_t> new_deps;
+                                   new_deps.reserve(deps.size());
+                                   for (const auto idx : deps) {
+                                       const auto it_remap = remap.find(fmt::format("u_{}", idx));
+                                       assert(it_remap != remap.end());
+                                       new_deps.push_back(uname_to_index(it_remap->second));
+                                   }
+
+                                   return std::make_pair(std::move(new_ex), std::move(new_deps));
+                               });
 
     // Do the remap for sv_funcs.
-    for (auto &idx : sv_funcs_dc) {
-        auto it_remap = remap.find(fmt::format("u_{}", idx));
-        assert(it_remap != remap.end());
-        idx = uname_to_index(it_remap->second);
-    }
+    auto sv_funcs_dc_transform_view = sv_funcs_dc | std::views::transform([&remap](auto idx) {
+                                          const auto it_remap = remap.find(fmt::format("u_{}", idx));
+                                          assert(it_remap != remap.end());
+                                          return uname_to_index(it_remap->second);
+                                      });
 
-    // Reorder the decomposition.
-    taylor_dc_t retval;
-    retval.reserve(v_idx.size());
-    for (auto idx : v_idx) {
-        retval.push_back(std::move(dc[idx]));
-    }
+    auto retval = std::make_pair(
+        std::vector(std::ranges::begin(dc_transform_view), std::ranges::end(dc_transform_view)),
+        std::vector(std::ranges::begin(sv_funcs_dc_transform_view), std::ranges::end(sv_funcs_dc_transform_view)));
 
     get_logger()->trace("Taylor topological sort runtime: {}", sw);
 
@@ -964,7 +973,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     // Run the breadth-first topological sort on the decomposition.
     // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
     // the size of the Taylor decomposition is always > n_eq anyway.
-    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
+    std::tie(u_vars_defs, sv_funcs_dc) = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
