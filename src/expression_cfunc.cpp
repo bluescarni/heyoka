@@ -34,7 +34,6 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
-#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -375,11 +374,13 @@ std::vector<expression> function_decompose_cse(const std::vector<expression> &v_
     // Init the return value.
     std::vector<expression> retval;
 
-    // expression -> idx map. This will end up containing
-    // all the unique expressions from v_ex, and it will
-    // map them to their indices in retval (which will
-    // in general differ from their indices in v_ex).
-    boost::unordered_flat_map<expression, idx_t, std::hash<expression>> ex_map;
+    // expression -> idx map. This will end up containing all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will in general differ from their indices in v_ex).
+    //
+    // NOTE: use std::map (rather than an unordered map) for the usual reason that comparison-based
+    // containers can perform better than hashing on account of the fact that comparison does not
+    // need to traverse the entire expression.
+    std::map<expression, idx_t> ex_map;
 
     // Map for the renaming of u variables
     // in the expressions.

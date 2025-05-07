@@ -14,8 +14,8 @@
 #include <exception>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <numeric>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -150,7 +150,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
             [&](const auto &v) -> llvm::Type * {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, number>) {
+                if constexpr (std::same_as<type, number>) {
                     // For numbers, the argument is passed as a scalar
                     // floating-point value.
                     return val_t->getScalarType();
@@ -331,11 +331,13 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // Init the return value.
     taylor_dc_t retval;
 
-    // expression -> idx map. This will end up containing
-    // all the unique expressions from v_ex, and it will
-    // map them to their indices in retval (which will
-    // in general differ from their indices in v_ex).
-    std::unordered_map<expression, idx_t> ex_map;
+    // expression -> idx map. This will end up containing all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will in general differ from their indices in v_ex).
+    //
+    // NOTE: use std::map (rather than an unordered map) for the usual reason that comparison-based
+    // containers can perform better than hashing on account of the fact that comparison does not
+    // need to traverse the entire expression.
+    std::map<expression, idx_t> ex_map;
 
     // Map for the renaming of u variables
     // in the expressions.
