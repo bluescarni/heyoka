@@ -344,18 +344,8 @@ diff_decompose(const std::vector<expression> &v_ex_)
 
 #endif
 
-    // Run the breadth-first topological sort on the decomposition.
-    // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars + npars items.
-    ret = function_sort_dc(ret, nvars + npars, nouts);
-
-#if !defined(NDEBUG)
-
-    // Verify the decomposition.
-    verify_function_dec(v_ex_verify, ret, nvars + npars, true);
-
-#endif
-
+    // NOTE: we do not run here the topological sorting like we do in cfuncs and Taylor integrators, as I do not see at
+    // this time any benefit in doing so.
     return {std::move(ret), nvars + npars};
 }
 

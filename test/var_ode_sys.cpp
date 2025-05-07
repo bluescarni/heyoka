@@ -269,17 +269,17 @@ TEST_CASE("vareqs")
         REQUIRE(vsys.get_sys()[9].first == v_x0_x0);
         REQUIRE(vsys.get_sys()[9].second
                 == -(((((v_x0 * x) + (x_x0 * v)) * -sin((x * v))) * ((x_x0 * v) + (v_x0 * x)))
-                     + ((((x_x0_x0 * v) + (v_x0 * x_x0)) + ((v_x0_x0 * x) + (x_x0 * v_x0))) * cos((x * v)))));
+                     + ((((v_x0_x0 * x) + (x_x0 * v_x0)) + ((x_x0_x0 * v) + (v_x0 * x_x0))) * cos((x * v)))));
 
         REQUIRE(vsys.get_sys()[10].first == v_x0_v0);
         REQUIRE(vsys.get_sys()[10].second
                 == -(((((v_x0 * x) + (x_x0 * v)) * -sin((x * v))) * ((x_v0 * v) + (v_v0 * x)))
-                     + ((((x_x0_v0 * v) + (v_x0 * x_v0)) + ((v_x0_v0 * x) + (x_x0 * v_v0))) * cos((x * v)))));
+                     + ((((v_x0_v0 * x) + (x_x0 * v_v0)) + ((x_x0_v0 * v) + (v_x0 * x_v0))) * cos((x * v)))));
 
         REQUIRE(vsys.get_sys()[11].first == v_v0_v0);
         REQUIRE(vsys.get_sys()[11].second
                 == -(((((v_v0 * x) + (x_v0 * v)) * -sin((x * v))) * ((x_v0 * v) + (v_v0 * x)))
-                     + ((((x_v0_v0 * v) + (v_v0 * x_v0)) + ((v_v0_v0 * x) + (x_v0 * v_v0))) * cos((x * v)))));
+                     + ((((v_v0_v0 * x) + (x_v0 * v_v0)) + ((x_v0_v0 * v) + (v_v0 * x_v0))) * cos((x * v)))));
 
         auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(12, 0.), kw::tol = 1e-3};
     }
@@ -305,7 +305,7 @@ TEST_CASE("vareqs")
 
         REQUIRE(vsys.get_sys()[5].first == v_v0_v0);
         REQUIRE(vsys.get_sys()[5].second
-                == -(((((x_v0_v0 * v) + (v_v0 * x_v0)) + ((v_v0_v0 * x) + (x_v0 * v_v0))) * cos((x * v)))
+                == -(((((v_v0_v0 * x) + (x_v0 * v_v0)) + ((x_v0_v0 * v) + (v_v0 * x_v0))) * cos((x * v)))
                      + ((((v_v0 * x) + (x_v0 * v)) * -sin((x * v))) * ((x_v0 * v) + (v_v0 * x)))));
 
         auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(6, 0.), kw::tol = 1e-3};
