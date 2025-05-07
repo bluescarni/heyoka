@@ -541,7 +541,9 @@ dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<ex
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
+HEYOKA_DLL_PUBLIC std::optional<taylor_dc_t::size_type>
+taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                 const expression &, taylor_dc_t &);
 
 } // namespace detail
 

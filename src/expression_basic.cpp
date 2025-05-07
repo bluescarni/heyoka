@@ -966,21 +966,6 @@ std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map
     return ret;
 }
 
-namespace detail
-{
-
-taylor_dc_t::size_type taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &func_map, const expression &ex,
-                                        taylor_dc_t &dc)
-{
-    if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        return fptr->taylor_decompose(func_map, dc);
-    } else {
-        return 0;
-    }
-}
-
-} // namespace detail
-
 llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,

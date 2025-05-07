@@ -66,7 +66,7 @@ namespace detail
 template <typename>
 struct tm_data;
 
-}
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 

@@ -17,6 +17,7 @@
 #include <string>
 #include <typeindex>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -205,32 +206,6 @@ auto make_adl_copy(const auto &x)
     return copy(x);
 }
 
-// Perform the Taylor decomposition of the arguments of a function. This function
-// will return a vector of arguments in which each element will be either:
-// - a variable,
-// - a number,
-// - a param.
-std::vector<expression> func_td_args(const auto &fb, void_ptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
-{
-    std::vector<expression> retval;
-    retval.reserve(fb.args().size());
-
-    for (const auto &arg : fb.args()) {
-        const auto dres = taylor_decompose(func_map, arg, dc);
-
-        if (dres == 0u) {
-            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
-                   || std::holds_alternative<param>(arg.value()));
-
-            retval.push_back(arg);
-        } else {
-            retval.emplace_back(fmt::format("u_{}", dres));
-        }
-    }
-
-    return retval;
-} // LCOV_EXCL_LINE
-
 } // namespace
 
 } // namespace detail
@@ -418,53 +393,47 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uin
     return m_func->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 }
 
-taylor_dc_t::size_type func::taylor_decompose(detail::void_ptr_map<taylor_dc_t::size_type> &func_map,
-                                              taylor_dc_t &dc) const
+namespace detail
 {
-    const auto *const f_id = get_ptr();
 
-    if (auto it = func_map.find(f_id); it != func_map.end()) {
-        // We already decomposed the current function, fetch the result
-        // from the cache.
-        return it->second;
-    }
+// NOTE: this is a small helper to perform the Taylor decomposition of the input function fn (which will be consumed by
+// the operation) into the decomposition dc. The decomposition will be performed either by invoking the custom
+// taylor_decompose() member function from the UDF (if available) or by just appending fn to dc (the default behaviour).
+// It is assumed that the arguments of fn have already been decomposed.
+//
+// We implement this as a separate external (friend) function (rather than, e.g., a member function) because we do not
+// want to have mutating functions in the public API of func.
+taylor_dc_t::size_type func_taylor_decompose_impl(func &&fn, taylor_dc_t &dc)
+{
+    assert(std::ranges::none_of(fn.args(), [](const auto &ex) { return std::holds_alternative<func>(ex.value()); }));
 
-    // Compute the decomposed arguments.
-    const auto new_args = detail::func_td_args(*this, func_map, dc);
-
-    // Make a copy of this containing the new arguments.
-    auto f_copy = copy(new_args);
-
-    // Run the decomposition.
     taylor_dc_t::size_type ret = 0;
-    if (f_copy.m_func->has_taylor_decompose()) {
+    if (fn.m_func->has_taylor_decompose()) {
         // Custom implementation.
-        ret = std::move(*f_copy.m_func).taylor_decompose(dc);
+        ret = std::move(*fn.m_func).taylor_decompose(dc);
     } else {
-        // Default implementation: append f_copy and return the index
+        // Default implementation: append fn and return the index
         // at which it was appended.
         ret = dc.size();
-        dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
+        dc.emplace_back(std::move(fn), std::vector<std::uint32_t>{});
     }
 
-    if (ret == 0u) {
+    // Checks on the return value.
+    if (ret == 0u) [[unlikely]] {
         throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
     }
 
-    if (ret >= dc.size()) {
+    if (ret >= dc.size()) [[unlikely]] {
         throw std::invalid_argument(
-            fmt::format("Invalid value returned by the Taylor decomposition function for the function '{}': "
-                        "the return value is {}, which is not less than the current size of the decomposition "
-                        "({})",
-                        get_name(), ret, dc.size()));
+            fmt::format("Invalid value returned by the Taylor decomposition of a function: the return value is {}, "
+                        "which is not less than the current size of the decomposition ({})",
+                        ret, dc.size()));
     }
-
-    // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-    assert(flag);
 
     return ret;
 }
+
+} // namespace detail
 
 llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,

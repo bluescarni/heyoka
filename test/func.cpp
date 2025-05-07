@@ -143,11 +143,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func(s, fp_t, 2, 1, false), not_implemented_error,
                            Message("Taylor diff in compact mode is not implemented for the function 'f'"));
 
-    taylor_dc_t dec{{"x"_var, {}}};
-    f = func{func_00{{"x"_var, "y"_var}}};
-    detail::void_ptr_map<taylor_dc_t::size_type> func_map2;
-    f.taylor_decompose(func_map2, dec);
-
     // A few tests for shared arguments semantics.
     {
         func f_s(func_00_s{{"x"_var, "y"_var}});
@@ -282,26 +277,29 @@ TEST_CASE("func taylor_decompose")
 {
     using Catch::Matchers::Message;
 
-    auto f = func(func_10{{"x"_var}});
+    auto f = expression{func(func_10{{"x"_var}})};
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
     detail::void_ptr_map<taylor_dc_t::size_type> func_map;
-    REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    REQUIRE(detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
     func_map = {};
-
-    f = func(func_10a{{"x"_var}});
+    sargs_map = {};
+    f = expression{func(func_10a{{"x"_var}})};
 
     REQUIRE_THROWS_MATCHES(
-        f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
-        Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
+        detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs), std::invalid_argument,
+        Message("Invalid value returned by the Taylor decomposition of a function: "
                 "the return value is 3, which is not less than the current size of the decomposition "
                 "(3)"));
 
-    f = func(func_10b{{"x"_var}});
+    func_map = {};
+    sargs_map = {};
+    f = expression{func(func_10b{{"x"_var}})};
 
-    REQUIRE_THROWS_MATCHES(f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs), std::invalid_argument,
                            Message("The return value for the Taylor decomposition of a function can never be zero"));
 }
 

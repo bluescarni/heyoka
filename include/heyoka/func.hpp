@@ -312,11 +312,19 @@ HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
+namespace detail
+{
+
+taylor_dc_t::size_type func_taylor_decompose_impl(func &&, taylor_dc_t &);
+
+} // namespace detail
+
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
+    friend taylor_dc_t::size_type detail::func_taylor_decompose_impl(func &&, taylor_dc_t &);
 
 #if defined(__GNUC__)
 
@@ -393,7 +401,6 @@ public:
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    taylor_dc_t::size_type taylor_decompose(detail::void_ptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;

@@ -58,6 +58,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
@@ -892,11 +893,12 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
 
     // Run the decomposition on the equations.
     detail::void_ptr_map<taylor_dc_t::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (std::vector<expression>::size_type i = 0; i < n_eq; ++i) {
         const auto &ex = all_ex[i];
 
         // Decompose the current equation.
-        if (const auto dres = detail::taylor_decompose(func_map, ex, u_vars_defs)) {
+        if (const auto dres = detail::taylor_decompose(func_map, sargs_map, ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.
@@ -904,11 +906,10 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            outs.emplace_back(fmt::format("u_{}", dres), std::vector<std::uint32_t>{});
+            assert(std::holds_alternative<func>(ex.value()));
+            outs.emplace_back(fmt::format("u_{}", *dres), std::vector<std::uint32_t>{});
         } else {
-            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-                   || std::holds_alternative<param>(ex.value()));
-
+            assert(!std::holds_alternative<func>(ex.value()));
             outs.emplace_back(ex, std::vector<std::uint32_t>{});
         }
     }
@@ -923,12 +924,14 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
         if (const auto *const var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = detail::taylor_decompose(func_map, sv_ex, u_vars_defs)) {
+        } else if (const auto dres = detail::taylor_decompose(func_map, sargs_map, sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
-            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(dres));
-        } else {
+            assert(std::holds_alternative<func>(sv_ex.value()));
+            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(*dres));
+        } else [[unlikely]] {
+            assert(!std::holds_alternative<func>(sv_ex.value()));
             // The sv_func was not decomposed, meaning it's a const/param.
             throw std::invalid_argument(
                 "The extra functions in a Taylor decomposition cannot be constants or parameters");
