@@ -542,7 +542,7 @@ namespace detail
 {
 
 HEYOKA_DLL_PUBLIC std::optional<taylor_dc_t::size_type>
-taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &, sargs_ptr_map<const func_args::shared_args_t> &,
+taylor_decompose(void_ptr_map<const taylor_dc_t::size_type> &, sargs_ptr_map<const func_args::shared_args_t> &,
                  const expression &, taylor_dc_t &);
 
 } // namespace detail
@@ -606,7 +606,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> split_prods_for_decompose(const std::v
 
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
 
-std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &,
+std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<const std::vector<expression>::size_type> &,
                                                             sargs_ptr_map<const func_args::shared_args_t> &,
                                                             const expression &, std::vector<expression> &);
 

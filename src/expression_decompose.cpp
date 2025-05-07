@@ -42,7 +42,7 @@ namespace
 // shared argument sets.
 template <typename T>
 std::optional<typename std::vector<T>::size_type>
-expression_decompose_impl(void_ptr_map<typename std::vector<T>::size_type> &func_map,
+expression_decompose_impl(void_ptr_map<const typename std::vector<T>::size_type> &func_map,
                           sargs_ptr_map<const func_args::shared_args_t> &sargs_map, const expression &e,
                           std::vector<T> &dc, const auto &f_dc)
 {
@@ -210,9 +210,9 @@ expression_decompose_impl(void_ptr_map<typename std::vector<T>::size_type> &func
 
 } // namespace
 
-std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::vector<expression>::size_type> &func_map,
-                                                            sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
-                                                            const expression &e, std::vector<expression> &dc)
+std::optional<std::vector<expression>::size_type>
+decompose(void_ptr_map<const std::vector<expression>::size_type> &func_map,
+          sargs_ptr_map<const func_args::shared_args_t> &sargs_map, const expression &e, std::vector<expression> &dc)
 {
     const auto f_dc = [](func &&f, std::vector<expression> &dc) {
         assert(std::ranges::none_of(f.args(), [](const auto &ex) { return std::holds_alternative<func>(ex.value()); }));
@@ -229,7 +229,7 @@ std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<std::ve
     return expression_decompose_impl(func_map, sargs_map, e, dc, f_dc);
 }
 
-std::optional<taylor_dc_t::size_type> taylor_decompose(void_ptr_map<taylor_dc_t::size_type> &func_map,
+std::optional<taylor_dc_t::size_type> taylor_decompose(void_ptr_map<const taylor_dc_t::size_type> &func_map,
                                                        sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
                                                        const expression &e, taylor_dc_t &dc)
 {

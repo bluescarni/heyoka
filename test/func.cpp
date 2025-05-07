@@ -280,7 +280,7 @@ TEST_CASE("func taylor_decompose")
     auto f = expression{func(func_10{{"x"_var}})};
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    detail::void_ptr_map<taylor_dc_t::size_type> func_map;
+    detail::void_ptr_map<const taylor_dc_t::size_type> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     REQUIRE(detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});

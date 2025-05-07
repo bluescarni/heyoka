@@ -599,7 +599,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on each component of the function.
-    detail::void_ptr_map<std::vector<expression>::size_type> func_map;
+    detail::void_ptr_map<const std::vector<expression>::size_type> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.

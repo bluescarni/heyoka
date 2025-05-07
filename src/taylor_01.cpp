@@ -892,7 +892,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on the equations.
-    detail::void_ptr_map<taylor_dc_t::size_type> func_map;
+    detail::void_ptr_map<const taylor_dc_t::size_type> func_map;
     detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (std::vector<expression>::size_type i = 0; i < n_eq; ++i) {
         const auto &ex = all_ex[i];
