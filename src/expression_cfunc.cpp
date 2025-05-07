@@ -13,7 +13,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <limits>
 #include <list>
@@ -30,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
@@ -300,27 +300,22 @@ std::vector<expression> function_decompose_cse(const std::vector<expression> &v_
     return retval;
 }
 
-// Perform a topological sort on a graph representation
-// of a function decomposition. This can improve performance
-// by grouping together operations that can be performed in parallel,
-// and it also makes compact mode much more effective by creating
-// clusters of subexpressions which can be evaluated in parallel.
-// NOTE: the original decomposition dc is already topologically sorted,
-// in the sense that the definitions of the u variables are already
-// ordered according to dependency. However, because the original decomposition
-// comes from a depth-first search, it has the tendency to group together
-// expressions which are dependent on each other. By doing another topological
-// sort, this time based on breadth-first search, we determine another valid
-// sorting in which independent operations tend to be clustered together.
-std::vector<expression> function_sort_dc(std::vector<expression> &dc,
+// Perform a topological sort on a graph representation of a function decomposition. This can improve performance by
+// grouping together operations that can be performed in parallel, and it also makes compact mode much more effective by
+// creating clusters of subexpressions which can be evaluated in parallel.
+//
+// NOTE: the original decomposition dc is already topologically sorted, in the sense that the definitions of the u
+// variables are already ordered according to dependency. However, because the original decomposition comes from a
+// depth-first search, it has the tendency to group together expressions which are dependent on each other. By doing
+// another topological sort, this time based on breadth-first search, we determine another valid sorting in which
+// independent operations tend to be clustered together.
+std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
                                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                         std::vector<expression>::size_type nvars,
-                                         std::vector<expression>::size_type nouts)
+                                         const std::vector<expression>::size_type nvars,
+                                         const std::vector<expression>::size_type nouts)
 {
-    // A function decomposition is supposed
-    // to have nvars variables at the beginning,
-    // nouts variables at the end and possibly
-    // extra variables in the middle.
+    // A function decomposition is supposed to have nvars variables at the beginning, nouts variables at the end and
+    // possibly extra variables in the middle.
     assert(dc.size() >= nouts + nvars);
 
     // Log runtime in trace mode.
@@ -343,18 +338,24 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     const auto root_v = boost::add_vertex(g);
 
     // Add the nodes corresponding to the original variables.
-    for (decltype(nvars) i = 0; i < nvars; ++i) {
-        auto v = boost::add_vertex(g);
+    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Add a dependency on the root node.
         boost::add_edge(root_v, v, g);
     }
 
     // Add the rest of the u variables.
-    for (decltype(nvars) i = nvars; i < dc.size() - nouts; ++i) {
-        auto v = boost::add_vertex(g);
+    for (std::vector<expression>::size_type i = nvars; i < dc.size() - nouts; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Fetch the list of variables in the current expression.
+        //
+        // NOTE: performance with large shared arguments sets here will be quite poor, as we will keep on creating new
+        // deep copies of the same set of arguments over and over. This is not currently a practical concern because
+        // function_sort_dc() is at the moment called only in compiled functions, which are not supported by dfun (which
+        // is the only use of shared arguments we have thus far). If this becomes an issue in the future, we will have
+        // to think of an alternative API that avoids the explosion in complexity.
         const auto vars = get_variables(dc[i]);
 
         if (vars.empty()) {
@@ -380,6 +381,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         }
     }
 
+    // NOTE: the outputs do not need to be added to the graph: by definition they have no dependee and they do not need
+    // to be re-ordered.
     assert(boost::num_vertices(g) - 1u == dc.size() - nouts);
 
     // Run the BF topological sort on the graph. This is Kahn's algorithm:
@@ -392,7 +395,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
 
     // The set of all nodes with no incoming edge.
-    std::deque<decltype(dc.size())> tmp;
+    boost::container::deque<decltype(dc.size())> tmp;
     // The root node has no incoming edge.
     tmp.push_back(0);
 
@@ -438,9 +441,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     assert(v_idx.size() == boost::num_vertices(g));
     assert(boost::num_edges(g) == 0u);
 
-    // Adjust v_idx: remove the index of the root node,
-    // decrease by one all other indices, insert the final
-    // nouts indices.
+    // Adjust v_idx: remove the index of the root node, decrease by one all other indices and insert by hand the indices
+    // of the outputs.
     for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
         v_idx[i] = v_idx[i + 1u] - 1u;
     }
@@ -449,14 +451,11 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
-    // NOTE: the u vars that correspond to the original
-    // variables were inserted into v_idx in the original
-    // order, thus they are not re-sorted and they do not
-    // need renaming.
+    // NOTE: the u vars that correspond to the original variables were inserted into v_idx in the original order, thus
+    // they are not re-sorted and they do not need renaming. We just check that they are indeed present at the beginning
+    // of v_idx in debug mode.
     for (decltype(v_idx.size()) i = 0; i < nvars; ++i) {
         assert(v_idx[i] == i);
-        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
-        assert(res.second);
     }
     // Establish the remapping for the u variables that are not
     // original variables.
@@ -464,25 +463,21 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
         assert(res.second);
     }
+    // NOTE: no need to rename the outputs.
 
     // NOTE: these are caches used in the renaming of the expressions in dc.
     void_ptr_map<const expression> func_map;
     sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    // Do the remap for the definitions of the u variables and of the components.
-    for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
-        // Remap the expression.
-        // NOTE: the point of using rename_variables_impl() with the caches, rather than rename_variables(), is that we
-        // want to avoid creating multiple copies of shared arguments.
-        *it = rename_variables_impl(func_map, sargs_map, *it, remap);
-    }
-
-    // Reorder the decomposition.
-    std::vector<expression> retval;
-    retval.reserve(v_idx.size());
-    for (auto idx : v_idx) {
-        retval.push_back(std::move(dc[idx]));
-    }
+    // Do the reordering and remapping of the decomposition.
+    auto transform_view = v_idx | std::views::transform([&dc](auto idx) -> const auto & { return dc[idx]; })
+                          | std::views::transform([&func_map, &sargs_map, &remap](const auto &ex) {
+                                // NOTE: the point of using rename_variables_impl() with the caches, rather than
+                                // rename_variables(), is that we want to avoid creating multiple copies of shared
+                                // arguments.
+                                return rename_variables_impl(func_map, sargs_map, ex, remap);
+                            });
+    auto retval = std::vector(std::ranges::begin(transform_view), std::ranges::end(transform_view));
 
     get_logger()->trace("function topological sort runtime: {}", sw);
 
