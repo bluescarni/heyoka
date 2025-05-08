@@ -703,6 +703,12 @@ TEST_CASE("make_copy_with_new_args shared")
     // Error modes.
     REQUIRE_THROWS_MATCHES(f_s.make_copy_with_new_args(func_args::shared_args_t{}), std::invalid_argument,
                            Message("Cannot invoke func::make_copy_with_new_args() with a null pointer argument"));
+    REQUIRE_THROWS_MATCHES(f_s.make_copy_with_new_args(
+                               std::make_shared<const std::vector<expression>>(std::vector{"x"_var, "y"_var, "z"_var})),
+                           std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() "
+                                   "has a size of 3, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
 
     auto [x, y, z] = make_vars("x", "y", "z");
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));

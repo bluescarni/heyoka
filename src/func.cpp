@@ -283,13 +283,10 @@ func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
     const auto orig_size = args().size();
 
     if (new_args->size() != orig_size) [[unlikely]] {
-        throw std::invalid_argument(fmt::format(
-            // LCOV_EXCL_START
-            "The set of new arguments passed to func::make_copy_with_new_args() "
-            "has a size of {}, but the number of arguments "
-            "of the original function is {} (the two sizes must be equal)",
-            // LCOV_EXCL_STOP
-            new_args->size(), orig_size));
+        throw std::invalid_argument(fmt::format("The set of new arguments passed to func::make_copy_with_new_args() "
+                                                "has a size of {}, but the number of arguments "
+                                                "of the original function is {} (the two sizes must be equal)",
+                                                new_args->size(), orig_size));
     }
 
     // NOTE: this will end up invoking the copy constructor
