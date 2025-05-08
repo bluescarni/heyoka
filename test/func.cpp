@@ -655,16 +655,16 @@ TEST_CASE("copy")
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
 
     // Error mode.
-    REQUIRE_THROWS_MATCHES(
-        expression{std::get<func>(foo.value()).copy({x})}, std::invalid_argument,
-        Message("The set of new arguments passed to func::copy() has a size of 1, but the number of arguments "
-                "of the original function is 2 (the two sizes must be equal)"));
+    REQUIRE_THROWS_MATCHES(expression{std::get<func>(foo.value()).make_copy_with_new_args({x})}, std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() has a size of "
+                                   "1, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
 
     std::vector new_args = {x, y};
 
     auto new_args_ptr = new_args.data();
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy(std::move(new_args))};
+    auto foo_copy = expression{std::get<func>(foo.value()).make_copy_with_new_args(std::move(new_args))};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
@@ -680,9 +680,9 @@ TEST_CASE("shared_func_base copy")
 
     std::vector new_args = {"x"_var, "y"_var};
 
-    auto new_args_ptr = new_args.data();
+    const auto *new_args_ptr = new_args.data();
 
-    auto foo_copy = f_s.copy(std::move(new_args));
+    auto foo_copy = f_s.make_copy_with_new_args(std::make_shared<const std::vector<expression>>(std::move(new_args)));
 
     // Check that copy creates a new obejct.
     REQUIRE(foo_copy.get_ptr() != f_s.get_ptr());

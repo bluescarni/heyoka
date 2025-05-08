@@ -74,6 +74,13 @@ template <typename Args>
 auto make_dfun_name(const std::string &id_name, Args args_,
                     const std::vector<std::pair<std::uint32_t, std::uint32_t>> &didx)
 {
+    if constexpr (std::same_as<Args, func_args>) {
+        // NOTE: don't allow construction of a dfun() with a non-shared func_args.
+        if (!args_.get_shared_args()) [[unlikely]] {
+            throw std::invalid_argument("Shared function arguments are required when constructing a dfun() instance");
+        }
+    }
+
     // Init the name.
     std::string full_name = "dfun_";
 
@@ -162,10 +169,6 @@ dfun_impl::dfun_impl(std::string id_name, func_args args, std::vector<std::pair<
     : func_base(std::make_from_tuple<func_base>(make_dfun_name(id_name, std::move(args), didx))),
       m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
-    // TODO do we want to enforce this?
-    if (!shared_args()) [[unlikely]] {
-        throw std::invalid_argument("Shared function arguments are required when constructing a dfun() instance");
-    }
 }
 
 // NOTE: private ctor used in the implementation of gradient().

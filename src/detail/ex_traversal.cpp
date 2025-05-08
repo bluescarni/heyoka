@@ -105,7 +105,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
 
                         return expression{f.make_copy_with_new_args(std::move(new_sargs))};
                     } else {
-                        return expression{f.copy(std::move(new_args))};
+                        return expression{f.make_copy_with_new_args(std::move(new_args))};
                     }
                 }();
 

@@ -124,7 +124,7 @@ expression_decompose_impl(void_ptr_map<const typename std::vector<T>::size_type>
 
                         return f.make_copy_with_new_args(std::move(new_sargs));
                     } else {
-                        return f.copy(std::move(new_args));
+                        return f.make_copy_with_new_args(std::move(new_args));
                     }
                 }();
 

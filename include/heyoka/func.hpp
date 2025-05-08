@@ -77,7 +77,7 @@ public:
     // NOTE: these are supposed to be private, but there are issues making friends
     // with concept constraints on clang. Leave them public and undocumented for now.
     // NOTE: these are the only non-const functions in the interface, and they are supposed
-    // to be used only in the implementation of the func::copy() function.
+    // to be used only in the implementation of the func::make_copy_with_new_args() function.
     void replace_args(std::vector<expression>);
     void replace_args(func_args::shared_args_t);
 };
@@ -368,11 +368,9 @@ public:
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
-    // NOTE: this creates a new func containing
-    // a copy of the inner object in which the original
-    // function arguments have been replaced by the
-    // provided vector of arguments.
-    [[nodiscard]] func copy(std::vector<expression>) const;
+    // NOTE: these create a new func containing a copy of the inner object in which the original function arguments have
+    // been replaced by the provided set of arguments.
+    [[nodiscard]] func make_copy_with_new_args(std::vector<expression>) const;
     [[nodiscard]] func make_copy_with_new_args(func_args::shared_args_t) const;
 
     template <typename T>

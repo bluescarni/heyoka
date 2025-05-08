@@ -871,7 +871,7 @@ expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<con
 
                         return expression{f.make_copy_with_new_args(std::move(new_sargs))};
                     } else {
-                        return expression{f.copy(std::move(new_args))};
+                        return expression{f.make_copy_with_new_args(std::move(new_args))};
                     }
                 }();
 

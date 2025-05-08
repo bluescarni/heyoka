@@ -136,15 +136,15 @@ func_args::shared_args_t func_base::shared_args() const noexcept
     return m_args.get_shared_args();
 }
 
+// NOTE: here we are enforcing that the two overloads are called consistently with how the function stores its
+// arguments. The idea is that the way the function stores its arguments is an invariant property of the function.
+//
+// NOTE: we use assertions here instead of throws because the checks are already done in make_copy_with_new_args().
 void func_base::replace_args(std::vector<expression> new_args)
 {
-    // TODO add assertion.
+    assert(!shared_args());
 
-    // NOTE: the idea here is that if we are storing the arguments via shared pointer,
-    // we want to make sure that the new arguments are also stored via shared pointer.
-    // TODO change this - we now have 2 overloads for this, and we can select the shared
-    // arguments behaviour based on the invoked overload.
-    m_args = func_args(std::move(new_args), static_cast<bool>(shared_args()));
+    m_args = func_args(std::move(new_args));
 }
 
 void func_base::replace_args(func_args::shared_args_t new_args)
@@ -197,17 +197,6 @@ void null_func::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> boost::serialization::base_object<func_base>(*this);
 }
 
-namespace
-{
-
-// Helper to invoke the copy() function via ADL.
-auto make_adl_copy(const auto &x)
-{
-    return copy(x);
-}
-
-} // namespace
-
 } // namespace detail
 
 func::func() = default;
@@ -253,23 +242,27 @@ func_args::shared_args_t func::shared_args() const noexcept
     return m_func->shared_args();
 }
 
-func func::copy(std::vector<expression> new_args) const
+func func::make_copy_with_new_args(std::vector<expression> new_args) const
 {
+    if (shared_args()) [[unlikely]] {
+        throw std::invalid_argument(
+            "Cannot invoke func::make_copy_with_new_args() with a non-shared arguments set if the "
+            "function manages its arguments via a shared reference");
+    }
+
     const auto orig_size = args().size();
 
     if (new_args.size() != orig_size) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
-                        "of the original function is {} (the two sizes must be equal)",
-                        new_args.size(), orig_size));
+        throw std::invalid_argument(fmt::format("The set of new arguments passed to func::make_copy_with_new_args() "
+                                                "has a size of {}, but the number of arguments "
+                                                "of the original function is {} (the two sizes must be equal)",
+                                                new_args.size(), orig_size));
     }
 
     // NOTE: this will end up invoking the copy constructor
     // of the internal user-defined function.
-    // NOTE: need to go through the make_adl_copy() wrapper
-    // in order to avoid ambiguities.
     func ret;
-    ret.m_func = detail::make_adl_copy(m_func);
+    ret.m_func = copy(m_func);
 
     // Replace the arguments.
     ret.m_func->replace_args(std::move(new_args));
@@ -281,6 +274,10 @@ func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
 {
     if (!new_args) [[unlikely]] {
         throw std::invalid_argument("Cannot invoke func::make_copy_with_new_args() with a null pointer argument");
+    }
+    if (!shared_args()) [[unlikely]] {
+        throw std::invalid_argument("Cannot invoke func::make_copy_with_new_args() with a shared arguments set if the "
+                                    "function does not manage its arguments via a shared reference");
     }
 
     const auto orig_size = args().size();
@@ -294,10 +291,8 @@ func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
 
     // NOTE: this will end up invoking the copy constructor
     // of the internal user-defined function.
-    // NOTE: need to go through the make_adl_copy() wrapper
-    // in order to avoid ambiguities.
     func ret;
-    ret.m_func = detail::make_adl_copy(m_func);
+    ret.m_func = copy(m_func);
 
     // Replace the arguments.
     ret.m_func->replace_args(std::move(new_args));
