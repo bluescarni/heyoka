@@ -1,6 +1,25 @@
 Changelog
 =========
 
+8.0.0 (unreleased)
+------------------
+
+New
+~~~
+
+- New ``func_args`` class for the management of function arguments in the expression
+  system
+  (`#489 <https://github.com/bluescarni/heyoka/pull/489>`__).
+
+Changes
+~~~~~~~
+
+- General overhaul of several symbolic transformation primitives,
+  avoiding recursion in favour of a stack-based iterative approach and taking better
+  advantage of shared function arguments sets
+  (`#485 <https://github.com/bluescarni/heyoka/pull/485>`__). One visibile and important outcome
+  is a drastic performance increase in the formulation of the variational equations for neural ODEs.
+
 7.3.0 (2025-04-21)
 ------------------
 
@@ -38,7 +57,6 @@ Changes
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
 - heyoka now depends on OpenSSL
   (`#476 <https://github.com/bluescarni/heyoka/pull/476>`__).
-
 
 7.2.1 (2025-01-07)
 ------------------
