@@ -268,7 +268,7 @@ func func::make_copy_with_new_args(std::vector<expression> new_args) const
     ret.m_func->replace_args(std::move(new_args));
 
     return ret;
-}
+} // LCOV_EXCL_LINE
 
 func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
 {

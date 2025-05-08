@@ -946,8 +946,8 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
             // the result of the decomposition.
             assert(std::holds_alternative<func>(sv_ex.value()));
             sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(*dres));
-        } else [[unlikely]] {
-            assert(!std::holds_alternative<func>(sv_ex.value()));
+        } else [[unlikely]] {                                     // LCOV_EXCL_LINE
+            assert(!std::holds_alternative<func>(sv_ex.value())); // LCOV_EXCL_LINE
             // The sv_func was not decomposed, meaning it's a const/param.
             throw std::invalid_argument(
                 "The extra functions in a Taylor decomposition cannot be constants or parameters");

@@ -173,6 +173,41 @@ TEST_CASE("diff ex")
             == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
+TEST_CASE("diff shared args")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    func_args sargs({x, y, z}, true);
+
+    auto f1 = dfun("f1", sargs);
+    auto f2 = dfun("f2", sargs);
+    std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+    auto bar_diff = diff(bar, {x});
+
+    // Check the functions' identity.
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(bar_diff[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[1].value()).get_ptr()
+            == std::get<func>(bar_diff[2].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[0].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(f1.value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[1].value()).args()[0].value())
+                   .get_ptr());
+
+    // Check the arguments' identity.
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).shared_args()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[0].value()).args()[1].value())
+                   .shared_args());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).shared_args()
+            == std::get<func>(bar_diff[1].value()).shared_args());
+    REQUIRE(std::get<func>(f1.value()).shared_args()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[1].value()).args()[0].value())
+                   .shared_args());
+}
+
 TEST_CASE("get_param_size")
 {
     using Catch::Matchers::Message;

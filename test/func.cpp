@@ -646,7 +646,7 @@ TEST_CASE("ref semantics")
     REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 }
 
-TEST_CASE("copy")
+TEST_CASE("make_copy_with_new_args value")
 {
     using Catch::Matchers::Message;
 
@@ -672,10 +672,19 @@ TEST_CASE("copy")
     // Check the new arguments.
     REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
     REQUIRE(std::get<func>(foo_copy.value()).args().data() == new_args_ptr);
+
+    // Check that we cannot use the value overload of make_copy_with_new_args() with a shared-args func.
+    func f_s(func_00_s{{"y"_var, "x"_var}});
+    REQUIRE_THROWS_MATCHES(
+        expression{f_s.make_copy_with_new_args(std::vector{"y"_var, "x"_var})}, std::invalid_argument,
+        Message("Cannot invoke func::make_copy_with_new_args() with a non-shared arguments set if the "
+                "function manages its arguments via a shared reference"));
 }
 
-TEST_CASE("shared_func_base copy")
+TEST_CASE("make_copy_with_new_args shared")
 {
+    using Catch::Matchers::Message;
+
     func f_s(func_00_s{{"y"_var, "x"_var}});
 
     std::vector new_args = {"x"_var, "y"_var};
@@ -690,6 +699,24 @@ TEST_CASE("shared_func_base copy")
     // Check the new arguments.
     REQUIRE(foo_copy.args() == std::vector{"x"_var, "y"_var});
     REQUIRE(foo_copy.args().data() == new_args_ptr);
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(f_s.make_copy_with_new_args(func_args::shared_args_t{}), std::invalid_argument,
+                           Message("Cannot invoke func::make_copy_with_new_args() with a null pointer argument"));
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    REQUIRE_THROWS_MATCHES(
+        std::get<func>(foo.value())
+            .make_copy_with_new_args(std::make_shared<const std::vector<expression>>(std::vector{"y"_var, "x"_var})),
+        std::invalid_argument,
+        Message("Cannot invoke func::make_copy_with_new_args() with a shared arguments set if the "
+                "function does not manage its arguments via a shared reference"));
+    REQUIRE_THROWS_MATCHES(std::get<func>(foo.value()).make_copy_with_new_args(std::vector{"y"_var}),
+                           std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() "
+                                   "has a size of 1, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
 }
 
 // Bug: a default-constructed function is not serialisable.
@@ -780,7 +807,7 @@ TEST_CASE("func lt")
     REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
 }
 
-TEST_CASE("shared_func_base cmp")
+TEST_CASE("shared args cmp")
 {
     using Catch::Matchers::Message;
 
