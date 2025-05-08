@@ -175,7 +175,7 @@ expression diff_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<con
                     // same shared reference we re-use the cached result.
                     auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(diff_args));
 
-                    assert(!sargs_map.contains(&*shared_args));
+                    assert(!sargs_map.contains(&*shared_args)); // LCOV_EXCL_LINE
                     sargs_map.emplace(&*shared_args, new_sargs);
                 }
 
@@ -204,7 +204,7 @@ expression diff_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<con
 
                         // Compute the gradient of the function wrt the original arguments.
                         const auto grad = f.gradient();
-                        assert(n_args == grad.size());
+                        assert(n_args == grad.size()); // LCOV_EXCL_LINE
 
                         // Build the arguments for the sum of derivatives (i.e., the total derivative).
                         std::vector<expression> sum_args;
