@@ -231,14 +231,12 @@ std::vector<expression> function_decompose_cse(const std::vector<expression> &v_
 
     // The first nvars definitions are just renaming
     // of the original variables into u variables.
+    retval.reserve(nvars);
     for (idx_t i = 0; i < nvars; ++i) {
         retval.push_back(v_ex[i]);
 
-        // NOTE: the u vars that correspond to the original
-        // variables are never simplified,
-        // thus map them onto themselves.
-        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
-        assert(res.second);
+        // NOTE: the u vars that correspond to the original variables are never simplified, thus they do not need
+        // remapping. We just add them to retval as-is.
     }
 
     // Handle the u variables which do not correspond to the original variables.
@@ -285,11 +283,13 @@ std::vector<expression> function_decompose_cse(const std::vector<expression> &v_
     for (auto i = v_ex.size() - nouts; i < v_ex.size(); ++i) {
         const auto &orig_ex = v_ex[i];
 
-        // NOTE: here we expect only vars, numbers or params.
-        assert(std::holds_alternative<variable>(orig_ex.value()) || std::holds_alternative<number>(orig_ex.value())
-               || std::holds_alternative<param>(orig_ex.value()));
+        // NOTE: here we expect only non-func expressions.
+        assert(!std::holds_alternative<func>(orig_ex.value()));
 
         auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
+
+        // The new expression must not show up in ex_map.
+        assert(!ex_map.contains(new_ex));
 
         retval.push_back(std::move(new_ex));
     }
