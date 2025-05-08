@@ -381,9 +381,6 @@ class HEYOKA_DLL_PUBLIC dtens;
 namespace detail
 {
 
-expression diff(void_ptr_map<expression> &, const expression &, const std::string &);
-expression diff(void_ptr_map<expression> &, const expression &, const param &);
-
 // NOTE: public only for testing purposes.
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
 diff_decompose(const std::vector<expression> &);

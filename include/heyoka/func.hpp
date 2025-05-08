@@ -350,9 +350,6 @@ class HEYOKA_DLL_PUBLIC func
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(detail::void_ptr_map<expression> &, const T &) const;
-
 public:
     func();
     template <typename T>
@@ -393,8 +390,6 @@ public:
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
-    [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const std::string &) const;
-    [[nodiscard]] expression diff(detail::void_ptr_map<expression> &, const param &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

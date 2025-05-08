@@ -333,34 +333,6 @@ std::vector<expression> func::gradient() const
     return grad;
 }
 
-template <typename T>
-expression func::diff_impl(detail::void_ptr_map<expression> &func_map, const T &arg) const
-{
-    const auto arity = args().size();
-
-    // Fetch the gradient.
-    auto grad = gradient();
-
-    // Compute the total derivative.
-    std::vector<expression> prod;
-    prod.reserve(arity);
-    for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], arg));
-    }
-
-    return sum(std::move(prod));
-}
-
-expression func::diff(detail::void_ptr_map<expression> &func_map, const std::string &s) const
-{
-    return this->diff_impl(func_map, s);
-}
-
-expression func::diff(detail::void_ptr_map<expression> &func_map, const param &p) const
-{
-    return this->diff_impl(func_map, p);
-}
-
 // NOTE: time dependency here means **intrinsic** time
 // dependence of the function. That is, we are not concerned
 // with the arguments' time dependence and, e.g., cos(time)

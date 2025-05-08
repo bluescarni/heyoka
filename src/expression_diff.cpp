@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -55,100 +56,224 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-expression diff(void_ptr_map<expression> &func_map, const expression &e, const std::string &s)
+namespace
 {
-    return std::visit(
-        [&func_map, &s](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
 
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
-                    arg.value());
-            } else if constexpr (std::is_same_v<type, param>) {
-                return 0_dbl;
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (s == arg.name()) {
+// Implementation of expression diff wrt a variable or a parameter.
+//
+// NOTE: this is quite similar to ex_traverse_transform_nodes(), but unfortunately we need access to the original
+// arguments of the function in order to compute derivatives via the chain rule, and ex_traverse_transform_nodes()
+// instead applies the branch node transformation function *after* the arguments have already been replaced with their
+// derivatives. Hence, we have a custom implementation of this traversal. Perhaps in the future we can try to generalise
+// ex_traverse_transform_nodes() for this use case.
+template <typename T>
+    requires std::same_as<T, std::string> || std::same_as<T, param>
+expression diff_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const T &diff_arg)
+{
+    // The leaf transformation function.
+    const auto leaf_tfunc = [&diff_arg](const expression &e) {
+        if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+            // The leaf is a number, its derivative is always zero. Make sure to create the zero with the correct type.
+            return std::visit([]<typename U>(const U &) { return expression{number{static_cast<U>(0)}}; },
+                              num_ptr->value());
+        } else if (const auto *par_ptr = std::get_if<param>(&e.value())) {
+            // The leaf is a param.
+            if constexpr (std::same_as<T, param>) {
+                // We are differentiating wrt a param.
+                if (par_ptr->idx() == diff_arg.idx()) {
                     return 1_dbl;
                 } else {
                     return 0_dbl;
                 }
             } else {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed diff on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
-
-                auto ret = arg.diff(func_map, s);
-
-                // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
+                // We are differentiating wrt a variable.
+                return 0_dbl;
             }
-        },
-        e.value());
-}
+        } else {
+            // The leaf is a variable.
+            const auto &var = std::get<variable>(e.value());
 
-expression diff(void_ptr_map<expression> &func_map, const expression &e, const param &p)
-{
-    return std::visit(
-        [&func_map, &p](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
-                    arg.value());
-            } else if constexpr (std::is_same_v<type, param>) {
-                if (p.idx() == arg.idx()) {
+            if constexpr (std::same_as<T, param>) {
+                // We are differentiating wrt a param.
+                return 0_dbl;
+            } else {
+                // We are differentiating wrt a variable.
+                if (var.name() == diff_arg) {
                     return 1_dbl;
                 } else {
                     return 0_dbl;
                 }
-            } else if constexpr (std::is_same_v<type, variable>) {
-                return 0_dbl;
-            } else {
-                const auto f_id = arg.get_ptr();
+            }
+        }
+    };
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed diff on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
+    traverse_stack stack;
+    return_stack<expression> out_stack;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already differentiated the current function. Fetch the result from the cache and add it to
+                // out_stack.
+                out_stack.emplace_back(it->second);
+                continue;
+            }
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited and differentiated all the children of the function node (i.e., the function
+                // arguments). The results are at the tail end of out_stack. We will be popping them from out_stack and
+                // use them to differentiate the function.
+
+                // Build the set of differentiated arguments.
+                std::vector<expression> diff_args;
+                const auto n_args = f.args().size();
+                diff_args.reserve(n_args);
+                for (decltype(diff_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: out_stack must not be empty and its last element also cannot be empty.
+                    assert(!out_stack.empty());
+                    assert(out_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    diff_args.push_back(std::move(*out_stack.back()));
+                    out_stack.pop_back();
                 }
 
-                auto ret = arg.diff(func_map, p);
+                // Compute the gradient of the function wrt the original arguments.
+                const auto grad = f.gradient();
 
-                // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
+                // Build the arguments for the sum of derivatives (i.e., the total derivative).
+                std::vector<expression> sum_args;
+                sum_args.reserve(n_args);
+                for (decltype(sum_args.size()) i = 0; i < n_args; ++i) {
+                    sum_args.push_back(grad[i] * diff_args[i]);
+                }
 
-                return ret;
+                if (shared_args) {
+                    // NOTE: if the function manages its arguments via a shared reference, we must make
+                    // sure to record the differentiated arguments in sargs_map, so that when we run again into the
+                    // same shared reference we re-use the cached result.
+                    auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(diff_args));
+
+                    assert(!sargs_map.contains(&*shared_args));
+                    sargs_map.emplace(&*shared_args, new_sargs);
+                }
+
+                // Create the derivative of the function.
+                auto ex_diff = sum(std::move(sum_args));
+
+                // Add it to the cache.
+                func_map.emplace(f_id, ex_diff);
+
+                // Add it to out_stack.
+                // NOTE: out_stack must not be empty and its last element must be empty (it is supposed to be
+                // the empty function we pushed the first time we visited).
+                assert(!out_stack.empty());
+                assert(!out_stack.back());
+                out_stack.back().emplace(std::move(ex_diff));
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check if we already differentiated the
+                    // arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // The arguments have been differentiated before. Fetch them from the cache and
+                        // use them to compute the derivative of the function.
+                        const auto &diff_args = *it->second;
+                        const auto n_args = diff_args.size();
+
+                        // Compute the gradient of the function wrt the original arguments.
+                        const auto grad = f.gradient();
+                        assert(n_args == grad.size());
+
+                        // Build the arguments for the sum of derivatives (i.e., the total derivative).
+                        std::vector<expression> sum_args;
+                        sum_args.reserve(n_args);
+                        for (decltype(sum_args.size()) i = 0; i < n_args; ++i) {
+                            sum_args.push_back(grad[i] * diff_args[i]);
+                        }
+
+                        // Create the derivative of the function.
+                        auto ex_diff = sum(std::move(sum_args));
+
+                        // Add the new function to the cache and to out_stack.
+                        func_map.emplace(f_id, ex_diff);
+                        out_stack.emplace_back(std::move(ex_diff));
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that the shared arguments of the function have never
+                    // been differentiated before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty expression to out_stack. We will create its derivative once we have differentiated all
+                // arguments.
+                out_stack.emplace_back();
             }
-        },
-        e.value());
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Differentiate the leaf node and add the result to out_stack.
+            out_stack.emplace_back(leaf_tfunc(*cur_ex));
+        }
+    }
+
+    assert(out_stack.size() == 1u);
+    assert(out_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return std::move(*out_stack.back());
 }
+
+} // namespace
 
 } // namespace detail
 
 expression diff(const expression &e, const std::string &s)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::diff(func_map, e, s);
+    return detail::diff_impl(func_map, sargs_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    detail::void_ptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::diff(func_map, e, p);
+    return detail::diff_impl(func_map, sargs_map, e, p);
 }
 
 namespace detail
@@ -159,13 +284,14 @@ namespace
 
 std::vector<expression> diff_vec_impl(const std::vector<expression> &v_ex, const auto &x)
 {
-    void_ptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(diff(func_map, ex, x));
+        retval.push_back(diff_impl(func_map, sargs_map, ex, x));
     }
 
     return retval;

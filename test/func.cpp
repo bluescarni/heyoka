@@ -80,11 +80,10 @@ TEST_CASE("func minimal")
 
     auto *fp_t = s.builder().getDoubleTy();
 
-    detail::void_ptr_map<expression> func_map;
-    REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(diff(expression{f}, ""), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
-    REQUIRE_THROWS_MATCHES(f.diff(func_map, std::get<param>(par[0].value())), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(diff(expression{f}, std::get<param>(par[0].value())), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
@@ -231,8 +230,7 @@ TEST_CASE("func diff")
 {
     using Catch::Matchers::Message;
 
-    detail::void_ptr_map<expression> func_map;
-    REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(diff(expression{func{func_05a{{"x"_var}}}}, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
 }
