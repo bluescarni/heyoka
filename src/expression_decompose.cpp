@@ -96,6 +96,7 @@ expression_decompose_impl(void_ptr_map<const typename std::vector<T>::size_type>
                     assert(out_stack.back());
 
                     // Fetch the current decomposition index.
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
                     const auto opt_idx = *out_stack.back();
                     if (opt_idx) {
                         // The current argument is a decomposed function. It will be replaced
