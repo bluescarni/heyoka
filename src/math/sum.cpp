@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
-#include <optional>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -31,12 +31,13 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/udf_split.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -407,57 +408,9 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 // If 'e' is not a sum, or if it is a sum with no more than
 // 'split' terms, 'e' will be returned unmodified.
 // NOTE: 'e' is assumed to be a function.
-// NOLINTNEXTLINE(misc-no-recursion)
 expression sum_split(const expression &e, std::uint32_t split)
 {
-    assert(split >= 2u);
-    assert(std::holds_alternative<func>(e.value()));
-
-    const auto *sum_ptr = std::get<func>(e.value()).extract<sum_impl>();
-
-    // NOTE: return 'e' unchanged if it is not a sum,
-    // or if it is a sum that does not need to be split.
-    // The latter condition is also used to terminate the
-    // recursion.
-    if (sum_ptr == nullptr || sum_ptr->args().size() <= split) {
-        return e;
-    }
-
-    // NOTE: ret_seq will be a list
-    // of sums each containing 'split' terms.
-    // tmp is a temporary vector
-    // used to accumulate the arguments for each
-    // sum in ret_seq.
-    std::vector<expression> ret_seq, tmp;
-    for (const auto &arg : sum_ptr->args()) {
-        tmp.push_back(arg);
-
-        if (tmp.size() == split) {
-            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-
-            // NOTE: tmp is practically guaranteed to be empty, but let's
-            // be paranoid.
-            tmp.clear();
-        }
-    }
-
-    // NOTE: tmp is not empty if 'split' does not divide
-    // exactly sum_ptr->args().size(). In such a case, we need to do the
-    // last iteration manually.
-    if (!tmp.empty()) {
-        // NOTE: contrary to the previous loop, here we could
-        // in principle end up creating a sum_impl with only one
-        // term. In such a case, for consistency with the general
-        // behaviour of sum({arg}), return arg directly.
-        if (tmp.size() == 1u) {
-            ret_seq.push_back(std::move(tmp[0]));
-        } else {
-            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-        }
-    }
-
-    // Recurse to split further, if needed.
-    return sum_split(expression{func{detail::sum_impl{std::move(ret_seq)}}}, split);
+    return udf_split<sum_impl>(e, split);
 }
 
 namespace
@@ -535,125 +488,90 @@ expression sum_to_sum_sq(const expression &e)
     return expression{func{sum_sq_impl{std::move(new_args)}}};
 }
 
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already handled ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Recursively transform sums into subs
-                // in the arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(sum_to_sub_impl(func_map, orig_arg));
-                }
-
-                // Prepare the return value.
-                std::optional<expression> retval;
-
-                if (v.template extract<sum_impl>() == nullptr) {
-                    // The current function is not a sum(). Just create
-                    // a copy of it with the new args.
-                    retval.emplace(v.copy(std::move(new_args)));
-                } else {
-                    // The current function is a sum(). Partition its
-                    // arguments so that those in the form -1 * a * ...
-                    // are at the end.
-                    const auto fpart = [](const expression &arg) {
-                        if (const auto &fptr = std::get_if<func>(&arg.value());
-                            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
-                            && std::holds_alternative<number>(fptr->args()[0].value())) {
-                            return !is_negative_one(std::get<number>(fptr->args()[0].value()));
-                        }
-
-                        return true;
-                    };
-
-                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
-
-                    if (it == new_args.end()) {
-                        // There are no negations in the sum, just make a copy.
-                        retval.emplace(v.copy(std::move(new_args)));
-                    } else {
-                        // There are some negations in the sum.
-                        // Group them into a subtrahend, negate, and transform
-                        // into a subtraction.
-
-                        // Construct the terms of the subtrahend.
-                        std::vector<expression> sub_args, tmp_args;
-                        for (auto s_it = it; s_it != new_args.end(); ++s_it) {
-                            const auto &fn = std::get<func>(s_it->value());
-
-                            assert(fn.template extract<prod_impl>() != nullptr);
-                            assert(fn.args().size() >= 2u);
-                            assert(is_negative_one(std::get<number>(fn.args()[0].value())));
-
-                            // Build tmp_args from fn.args(), skipping the first term (-1).
-                            tmp_args.clear();
-                            tmp_args.reserve(fn.args().size() - 1u);
-                            tmp_args.insert(tmp_args.end(), fn.args().begin() + 1, fn.args().end());
-
-                            // Reconstruct the negated product.
-                            sub_args.push_back(prod(tmp_args));
-                        }
-
-                        // Construct the subtrahend.
-                        auto st = sum(sub_args);
-
-                        if (it == new_args.begin()) {
-                            // There are *only* negations, return the negation of st.
-                            retval.emplace(prod({-1_dbl, std::move(st)}));
-                        } else {
-                            // Construct the minuend.
-                            new_args.erase(it, new_args.end());
-                            auto mend = sum(new_args);
-
-                            // Construct the return value.
-                            retval.emplace(sub(std::move(mend), std::move(st)));
-                        }
-                    }
-                }
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return std::move(*retval);
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
-
 // This function will transform sums containing negated terms
 // (i.e., terms of the form -1 * a * ...) into subtractions. E.g.,
 // (x + -1 * y) will be transformed into (x - y), thereby shaving
 // away the cost of a multiplication.
 std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    const auto tfunc = [](const expression &ex) {
+        // Fetch a reference to the function.
+        const auto &fn = std::get<func>(ex.value());
+
+        if (fn.extract<sum_impl>() == nullptr) {
+            // The current function is not a sum(). Just create
+            // a copy of it.
+            return ex;
+        }
+
+        // The current function is a sum(). Partition its
+        // arguments so that those in the form -1 * a * ...
+        // are at the end.
+        // NOTE: we will need a copy of fn.args() to perform the partitioning.
+        auto new_args(fn.args());
+        const auto fpart = [](const expression &arg) {
+            if (const auto &fptr = std::get_if<func>(&arg.value());
+                fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
+                && std::holds_alternative<number>(fptr->args()[0].value())) {
+                return !is_negative_one(std::get<number>(fptr->args()[0].value()));
+            }
+
+            return true;
+        };
+        // NOLINTNEXTLINE(modernize-use-ranges)
+        const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
+
+        if (it == new_args.end()) {
+            // There are no negations in the sum, just make a copy.
+            return ex;
+        }
+
+        // There are some negations in the sum.
+        // Group them into a subtrahend, negate, and transform
+        // into a subtraction.
+
+        // Construct the terms of the subtrahend.
+        std::vector<expression> sub_args, tmp_args;
+        for (const auto &cur_ex : std::ranges::subrange(it, new_args.end())) {
+            const auto &f = std::get<func>(cur_ex.value());
+
+            assert(f.extract<prod_impl>() != nullptr);
+            assert(f.args().size() >= 2u);
+            assert(is_negative_one(std::get<number>(f.args()[0].value())));
+
+            // Build tmp_args from f.args(), skipping the first term (-1).
+            tmp_args.clear();
+            tmp_args.reserve(f.args().size() - 1u);
+            tmp_args.insert(tmp_args.end(), f.args().begin() + 1, f.args().end());
+
+            // Reconstruct the negated product.
+            sub_args.push_back(prod(tmp_args));
+        }
+
+        // Construct the subtrahend.
+        auto st = sum(std::move(sub_args));
+
+        if (it == new_args.begin()) {
+            // There are *only* negations, return the negation of st.
+            return prod({-1_dbl, std::move(st)});
+        } else {
+            // Construct the minuend.
+            new_args.erase(it, new_args.end());
+            auto mend = sum(std::move(new_args));
+
+            // Construct the return value.
+            return sub(std::move(mend), std::move(st));
+        }
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(sum_to_sub_impl(func_map, e));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;

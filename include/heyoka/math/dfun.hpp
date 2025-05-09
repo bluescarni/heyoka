@@ -20,6 +20,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -46,6 +47,7 @@ public:
     dfun_impl();
     explicit dfun_impl(std::string, std::vector<expression>, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
     explicit dfun_impl(std::string, func_args::shared_args_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+    explicit dfun_impl(std::string, func_args, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
 
     [[nodiscard]] const std::string &get_id_name() const;
     [[nodiscard]] const std::vector<std::pair<std::uint32_t, std::uint32_t>> &get_didx() const;
@@ -57,8 +59,6 @@ public:
 
 HEYOKA_DLL_PUBLIC bool contains_dfun(const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC std::set<expression> get_dfuns(const std::vector<expression> &);
-
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
@@ -66,6 +66,8 @@ HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
 
 HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args::shared_args_t,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
+
+HEYOKA_DLL_PUBLIC expression dfun(std::string, func_args, std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
 HEYOKA_END_NAMESPACE
 

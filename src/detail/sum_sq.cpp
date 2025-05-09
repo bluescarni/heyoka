@@ -37,7 +37,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sum_sq.hpp>

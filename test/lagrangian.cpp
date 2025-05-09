@@ -249,20 +249,20 @@ TEST_CASE("damped wheel")
     ta.propagate_until(3.);
 
     // Compare with the integration as formulated by sympy.
-    REQUIRE(ta.get_state()[0] == approximately(-1.27403829953764));
-    REQUIRE(ta.get_state()[1] == approximately(0.16376361801359088));
-    REQUIRE(ta.get_state()[2] == approximately(1.323428337349071));
-    REQUIRE(ta.get_state()[3] == approximately(-0.0038352625671087643));
-    REQUIRE(ta.get_state()[4] == approximately(-0.0038785147615456833));
-    REQUIRE(ta.get_state()[5] == approximately(-0.004319076923234549));
-    REQUIRE(ta.get_state()[6] == approximately(-0.0003951318230739097));
-    REQUIRE(ta.get_state()[7] == approximately(-0.4247224818094968));
-    REQUIRE(ta.get_state()[8] == approximately(0.05460006135548661));
-    REQUIRE(ta.get_state()[9] == approximately(0.4394061018791296));
-    REQUIRE(ta.get_state()[10] == approximately(0.003381629943640583));
-    REQUIRE(ta.get_state()[11] == approximately(0.006350901803721282));
-    REQUIRE(ta.get_state()[12] == approximately(0.004490453710403928));
-    REQUIRE(ta.get_state()[13] == approximately(-0.0013988052681859328));
+    REQUIRE(ta.get_state()[0] == approximately(-1.27403829953764, 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(0.16376361801359088, 1000.));
+    REQUIRE(ta.get_state()[2] == approximately(1.323428337349071, 1000.));
+    REQUIRE(ta.get_state()[3] == approximately(-0.0038352625671087643, 1000.));
+    REQUIRE(ta.get_state()[4] == approximately(-0.0038785147615456833, 1000.));
+    REQUIRE(ta.get_state()[5] == approximately(-0.004319076923234549, 1000.));
+    REQUIRE(ta.get_state()[6] == approximately(-0.0003951318230739097, 1000.));
+    REQUIRE(ta.get_state()[7] == approximately(-0.4247224818094968, 1000.));
+    REQUIRE(ta.get_state()[8] == approximately(0.05460006135548661, 1000.));
+    REQUIRE(ta.get_state()[9] == approximately(0.4394061018791296, 1000.));
+    REQUIRE(ta.get_state()[10] == approximately(0.003381629943640583, 1000.));
+    REQUIRE(ta.get_state()[11] == approximately(0.006350901803721282, 1000.));
+    REQUIRE(ta.get_state()[12] == approximately(0.004490453710403928, 1000.));
+    REQUIRE(ta.get_state()[13] == approximately(-0.0013988052681859328, 1000.));
 }
 
 TEST_CASE("error handling")

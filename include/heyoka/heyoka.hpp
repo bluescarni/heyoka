@@ -11,6 +11,7 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/callbacks.hpp>
+#include <heyoka/config.hpp>
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/eop_data.hpp>
@@ -18,6 +19,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/hamiltonian.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/lagrangian.hpp>
@@ -31,6 +33,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/sw_data.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/var_ode_sys.hpp>
 #include <heyoka/variable.hpp>

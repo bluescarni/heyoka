@@ -25,7 +25,6 @@
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
 #include <heyoka/detail/elp2000/elp2000_22_36.hpp>
 #include <heyoka/detail/elp2000/elp2000_4_9.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>

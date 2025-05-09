@@ -13,13 +13,11 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <limits>
 #include <list>
 #include <map>
 #include <numeric>
-#include <optional>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -31,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
@@ -69,8 +68,7 @@
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/debug.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -80,6 +78,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
@@ -105,16 +104,6 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
-
-std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
-                                                            const expression &ex, std::vector<expression> &dc)
-{
-    if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        return fptr->decompose(func_map, dc);
-    } else {
-        return {};
-    }
-}
 
 // Helper to verify a function decomposition.
 void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
@@ -201,9 +190,8 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     }
 }
 
-// Simplify a function decomposition by removing
-// common subexpressions.
-std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
+// Simplify a function decomposition by removing common subexpressions.
+std::vector<expression> function_decompose_cse(const std::vector<expression> &v_ex,
                                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                std::vector<expression>::size_type nvars,
                                                std::vector<expression>::size_type nouts)
@@ -225,44 +213,50 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // Init the return value.
     std::vector<expression> retval;
 
-    // expression -> idx map. This will end up containing
-    // all the unique expressions from v_ex, and it will
-    // map them to their indices in retval (which will
-    // in general differ from their indices in v_ex).
-    fast_umap<expression, idx_t, std::hash<expression>> ex_map;
+    // expression -> idx map. This will end up containing all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will in general differ from their indices in v_ex).
+    //
+    // NOTE: use std::map (rather than an unordered map) for the usual reason that comparison-based
+    // containers can perform better than hashing on account of the fact that comparison does not
+    // need to traverse the entire expression.
+    std::map<expression, idx_t> ex_map;
 
     // Map for the renaming of u variables
     // in the expressions.
     std::unordered_map<std::string, std::string> uvars_rename;
 
+    // NOTE: these are caches used in the renaming of the expressions in v_ex.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
     // The first nvars definitions are just renaming
     // of the original variables into u variables.
+    retval.reserve(nvars);
     for (idx_t i = 0; i < nvars; ++i) {
-        retval.push_back(std::move(v_ex[i]));
+        retval.push_back(v_ex[i]);
 
-        // NOTE: the u vars that correspond to the original
-        // variables are never simplified,
-        // thus map them onto themselves.
-        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
-        assert(res.second);
+        // NOTE: the u vars that correspond to the original variables are never simplified, thus they do not need
+        // remapping. We just add them to retval as-is.
     }
 
     // Handle the u variables which do not correspond to the original variables.
     for (auto i = nvars; i < v_ex.size() - nouts; ++i) {
-        auto &ex = v_ex[i];
+        const auto &orig_ex = v_ex[i];
 
-        // Rename the u variables in ex.
-        ex = rename_variables(ex, uvars_rename);
+        // Rename the u variables in orig_ex.
+        // NOTE: the point of using rename_variables_impl() with the caches, rather than rename_variables(), is that we
+        // want to avoid creating multiple copies of shared arguments.
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        if (auto it = ex_map.find(ex); it == ex_map.end()) {
-            // This is the first occurrence of ex in the
+        if (const auto it = ex_map.find(new_ex); it == ex_map.end()) {
+            // This is the first occurrence of new_ex in the
             // decomposition. Add it to retval.
-            retval.push_back(ex);
+            retval.push_back(new_ex);
 
-            // Add ex to ex_map, mapping it to
+            // Add new_ex to ex_map, mapping it to
             // the index it corresponds to in retval
             // (let's call it j).
-            ex_map.emplace(std::move(ex), retval.size() - 1u);
+            ex_map.emplace(std::move(new_ex), retval.size() - 1u);
 
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
@@ -271,7 +265,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
                 = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
             assert(res.second);
         } else {
-            // ex is redundant. This means
+            // new_ex is redundant. This means
             // that it already appears in retval at index
             // it->second. Don't add anything to retval,
             // and remap the variable name 'u_i' to
@@ -287,15 +281,17 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // the u variables in their definitions are renamed with
     // the new indices.
     for (auto i = v_ex.size() - nouts; i < v_ex.size(); ++i) {
-        auto &ex = v_ex[i];
+        const auto &orig_ex = v_ex[i];
 
-        // NOTE: here we expect only vars, numbers or params.
-        assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-               || std::holds_alternative<param>(ex.value()));
+        // NOTE: here we expect only non-func expressions.
+        assert(!std::holds_alternative<func>(orig_ex.value()));
 
-        ex = rename_variables(ex, uvars_rename);
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        retval.push_back(std::move(ex));
+        // The new expression must not show up in ex_map.
+        assert(!ex_map.contains(new_ex));
+
+        retval.push_back(std::move(new_ex));
     }
 
     get_logger()->debug("function CSE reduced decomposition size from {} to {}", orig_size, retval.size());
@@ -304,27 +300,22 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     return retval;
 }
 
-// Perform a topological sort on a graph representation
-// of a function decomposition. This can improve performance
-// by grouping together operations that can be performed in parallel,
-// and it also makes compact mode much more effective by creating
-// clusters of subexpressions which can be evaluated in parallel.
-// NOTE: the original decomposition dc is already topologically sorted,
-// in the sense that the definitions of the u variables are already
-// ordered according to dependency. However, because the original decomposition
-// comes from a depth-first search, it has the tendency to group together
-// expressions which are dependent on each other. By doing another topological
-// sort, this time based on breadth-first search, we determine another valid
-// sorting in which independent operations tend to be clustered together.
-std::vector<expression> function_sort_dc(std::vector<expression> &dc,
+// Perform a topological sort on a graph representation of a function decomposition. This can improve performance by
+// grouping together operations that can be performed in parallel, and it also makes compact mode much more effective by
+// creating clusters of subexpressions which can be evaluated in parallel.
+//
+// NOTE: the original decomposition dc is already topologically sorted, in the sense that the definitions of the u
+// variables are already ordered according to dependency. However, because the original decomposition comes from a
+// depth-first search, it has the tendency to group together expressions which are dependent on each other. By doing
+// another topological sort, this time based on breadth-first search, we determine another valid sorting in which
+// independent operations tend to be clustered together.
+std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
                                          // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                         std::vector<expression>::size_type nvars,
-                                         std::vector<expression>::size_type nouts)
+                                         const std::vector<expression>::size_type nvars,
+                                         const std::vector<expression>::size_type nouts)
 {
-    // A function decomposition is supposed
-    // to have nvars variables at the beginning,
-    // nouts variables at the end and possibly
-    // extra variables in the middle.
+    // A function decomposition is supposed to have nvars variables at the beginning, nouts variables at the end and
+    // possibly extra variables in the middle.
     assert(dc.size() >= nouts + nvars);
 
     // Log runtime in trace mode.
@@ -347,18 +338,24 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     const auto root_v = boost::add_vertex(g);
 
     // Add the nodes corresponding to the original variables.
-    for (decltype(nvars) i = 0; i < nvars; ++i) {
-        auto v = boost::add_vertex(g);
+    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Add a dependency on the root node.
         boost::add_edge(root_v, v, g);
     }
 
     // Add the rest of the u variables.
-    for (decltype(nvars) i = nvars; i < dc.size() - nouts; ++i) {
-        auto v = boost::add_vertex(g);
+    for (std::vector<expression>::size_type i = nvars; i < dc.size() - nouts; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Fetch the list of variables in the current expression.
+        //
+        // NOTE: performance with large shared arguments sets here will be quite poor, as we will keep on creating new
+        // deep copies of the same set of arguments over and over. This is not currently a practical concern because
+        // function_sort_dc() is at the moment called only in compiled functions, which are not supported by dfun (which
+        // is the only use of shared arguments we have thus far). If this becomes an issue in the future, we will have
+        // to think of an alternative API that avoids the explosion in complexity.
         const auto vars = get_variables(dc[i]);
 
         if (vars.empty()) {
@@ -384,6 +381,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         }
     }
 
+    // NOTE: the outputs do not need to be added to the graph: by definition they have no dependee and they do not need
+    // to be re-ordered.
     assert(boost::num_vertices(g) - 1u == dc.size() - nouts);
 
     // Run the BF topological sort on the graph. This is Kahn's algorithm:
@@ -396,7 +395,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
 
     // The set of all nodes with no incoming edge.
-    std::deque<decltype(dc.size())> tmp;
+    boost::container::deque<decltype(dc.size())> tmp;
     // The root node has no incoming edge.
     tmp.push_back(0);
 
@@ -442,9 +441,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
     assert(v_idx.size() == boost::num_vertices(g));
     assert(boost::num_edges(g) == 0u);
 
-    // Adjust v_idx: remove the index of the root node,
-    // decrease by one all other indices, insert the final
-    // nouts indices.
+    // Adjust v_idx: remove the index of the root node, decrease by one all other indices and insert by hand the indices
+    // of the outputs.
     for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
         v_idx[i] = v_idx[i + 1u] - 1u;
     }
@@ -453,14 +451,11 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
-    // NOTE: the u vars that correspond to the original
-    // variables were inserted into v_idx in the original
-    // order, thus they are not re-sorted and they do not
-    // need renaming.
+    // NOTE: the u vars that correspond to the original variables were inserted into v_idx in the original order, thus
+    // they are not re-sorted and they do not need renaming. We just check that they are indeed present at the beginning
+    // of v_idx in debug mode.
     for (decltype(v_idx.size()) i = 0; i < nvars; ++i) {
         assert(v_idx[i] == i);
-        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
-        assert(res.second);
     }
     // Establish the remapping for the u variables that are not
     // original variables.
@@ -468,19 +463,21 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
         assert(res.second);
     }
+    // NOTE: no need to remap the outputs.
 
-    // Do the remap for the definitions of the u variables and of the components.
-    for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
-        // Remap the expression.
-        *it = rename_variables(*it, remap);
-    }
+    // NOTE: these are caches used in the renaming of the expressions in dc.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    // Reorder the decomposition.
-    std::vector<expression> retval;
-    retval.reserve(v_idx.size());
-    for (auto idx : v_idx) {
-        retval.push_back(std::move(dc[idx]));
-    }
+    // Do the reordering and remapping of the decomposition.
+    auto transform_view = v_idx | std::views::transform([&dc](auto idx) -> const auto & { return dc[idx]; })
+                          | std::views::transform([&func_map, &sargs_map, &remap](const auto &ex) {
+                                // NOTE: the point of using rename_variables_impl() with the caches, rather than
+                                // rename_variables(), is that we want to avoid creating multiple copies of shared
+                                // arguments.
+                                return rename_variables_impl(func_map, sargs_map, ex, remap);
+                            });
+    auto retval = std::vector(std::ranges::begin(transform_view), std::ranges::end(transform_view));
 
     get_logger()->trace("function topological sort runtime: {}", sw);
 
@@ -492,7 +489,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 // Function decomposition from with explicit list of input variables.
 std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
 {
-    if (v_ex_.empty()) {
+    if (v_ex_.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
     }
 
@@ -512,13 +509,13 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     for (const auto &ex : vars) {
         if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
             // Check if this is a duplicate variable.
-            if (auto res = var_set.emplace(var_ptr->name()); !res.second) {
+            if (auto res = var_set.emplace(var_ptr->name()); !res.second) [[unlikely]] {
                 // Duplicate, error out.
                 throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the variable '{}' "
                                                         "appears in the user-provided list of variables twice",
                                                         var_ptr->name()));
             }
-        } else {
+        } else [[unlikely]] {
             throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
                                                     "user-provided list of variables contains the expression '{}', "
                                                     "which is not a variable",
@@ -597,10 +594,11 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on each component of the function.
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    detail::void_ptr_map<const std::vector<expression>::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
-        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+        if (const auto dres = detail::decompose(func_map, sargs_map, ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.

@@ -191,6 +191,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/http_download.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ex_traversal.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -198,6 +199,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ensemble_propagate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/func_args.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
@@ -205,6 +207,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_diff.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_ops.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_cfunc.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_decompose.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lagrangian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"

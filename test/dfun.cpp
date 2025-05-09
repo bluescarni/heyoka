@@ -19,6 +19,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/dfun.hpp>
 #include <heyoka/math/sin.hpp>
@@ -121,6 +122,8 @@ TEST_CASE("basic")
                                    "the constructor of a dfun must be sorted in strictly ascending order"));
     REQUIRE_THROWS_MATCHES((dfun("x", func_args::shared_args_t{}, {{0, 1}})), std::invalid_argument,
                            Message("Cannot construct a dfun from a null shared pointer to its arguments"));
+    REQUIRE_THROWS_MATCHES((dfun("x", func_args{}, {{0, 1}})), std::invalid_argument,
+                           Message("Shared function arguments are required when constructing a dfun() instance"));
 }
 
 TEST_CASE("sin s11n")
@@ -411,31 +414,4 @@ TEST_CASE("contains_dfun")
 
     REQUIRE(detail::contains_dfun({cos(ex + 1_dbl), sin(ex)}));
     REQUIRE(detail::contains_dfun({cos("x"_var + 1_dbl), sin(ex)}));
-}
-
-TEST_CASE("get_dfuns")
-{
-    auto [y, z] = make_vars("y", "z");
-
-    REQUIRE(detail::get_dfuns({y}).empty());
-    REQUIRE(detail::get_dfuns({y, z}).empty());
-    REQUIRE(detail::get_dfuns({y + z, 2_dbl * z - 1_dbl}).empty());
-
-    auto ex = y + z;
-
-    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).empty());
-
-    ex = dfun("x", {y, z}, {{0, 1}});
-
-    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).size() == 1u);
-    REQUIRE(*detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).begin() == ex);
-    REQUIRE(detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).size() == 1u);
-    REQUIRE(*detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).begin() == ex);
-
-    auto ex2 = dfun("z", {y, ex}, {{1, 1}});
-
-    auto ds = detail::get_dfuns({cos(ex2 + 1_dbl), sin(ex)});
-    REQUIRE(ds.size() == 2u);
-    REQUIRE(ds.contains(ex));
-    REQUIRE(ds.contains(ex2));
 }

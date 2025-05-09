@@ -10,10 +10,8 @@
 #define HEYOKA_FUNC_HPP
 
 #include <concepts>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -24,13 +22,14 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/s11n.hpp>
 
 // Current archive version is 2.
@@ -46,34 +45,6 @@ BOOST_CLASS_VERSION(heyoka::func, 2)
 BOOST_CLASS_VERSION(heyoka::func_base, 2)
 
 HEYOKA_BEGIN_NAMESPACE
-
-class HEYOKA_DLL_PUBLIC func_args
-{
-public:
-    using shared_args_t = std::shared_ptr<const std::vector<expression>>;
-
-private:
-    std::variant<std::vector<expression>, shared_args_t> m_args;
-
-    // Serialization.
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-public:
-    func_args();
-    explicit func_args(std::vector<expression>, bool = false);
-    explicit func_args(shared_args_t);
-    func_args(const func_args &);
-    func_args(func_args &&) noexcept;
-    func_args &operator=(const func_args &);
-    func_args &operator=(func_args &&) noexcept;
-    ~func_args();
-
-    [[nodiscard]] const std::vector<expression> &get_args() const noexcept;
-    [[nodiscard]] shared_args_t get_shared_args() const noexcept;
-};
 
 class HEYOKA_DLL_PUBLIC func_base
 {
@@ -103,11 +74,12 @@ public:
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
-    // NOTE: this is supposed to be private, but there are issues making friends
-    // with concept constraints on clang. Leave it public and undocumented for now.
-    // NOTE: this is the only non-const function in the interface, and it is supposed
-    // to be used only in the implementation of the func::copy() function.
+    // NOTE: these are supposed to be private, but there are issues making friends
+    // with concept constraints on clang. Leave them public and undocumented for now.
+    // NOTE: these are the only non-const functions in the interface, and they are supposed
+    // to be used only in the implementation of the func::make_copy_with_new_args() function.
     void replace_args(std::vector<expression>);
+    void replace_args(func_args::shared_args_t);
 };
 
 // UDF concept.
@@ -174,7 +146,13 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).shared_args();
     }
+    // NOTE: the implementation of the first overload must go in expression.hpp
+    // as the definition of the expression class must be available.
     void replace_args(std::vector<expression>) final;
+    void replace_args(func_args::shared_args_t new_args) final
+    {
+        static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
+    }
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -285,6 +263,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::vector<expression> &args() const noexcept = 0;
     [[nodiscard]] virtual func_args::shared_args_t shared_args() const noexcept = 0;
     virtual void replace_args(std::vector<expression>) = 0;
+    virtual void replace_args(func_args::shared_args_t) = 0;
 
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
@@ -333,11 +312,19 @@ HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
+namespace detail
+{
+
+taylor_dc_t::size_type func_taylor_decompose_impl(func &&, taylor_dc_t &);
+
+} // namespace detail
+
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
+    friend taylor_dc_t::size_type detail::func_taylor_decompose_impl(func &&, taylor_dc_t &);
 
 #if defined(__GNUC__)
 
@@ -363,9 +350,6 @@ class HEYOKA_DLL_PUBLIC func
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(detail::funcptr_map<expression> &, const T &) const;
-
 public:
     func();
     template <typename T>
@@ -384,11 +368,10 @@ public:
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
-    // NOTE: this creates a new func containing
-    // a copy of the inner object in which the original
-    // function arguments have been replaced by the
-    // provided vector of arguments.
-    [[nodiscard]] func copy(std::vector<expression>) const;
+    // NOTE: these create a new func containing a copy of the inner object in which the original function arguments have
+    // been replaced by the provided set of arguments.
+    [[nodiscard]] func make_copy_with_new_args(std::vector<expression>) const;
+    [[nodiscard]] func make_copy_with_new_args(func_args::shared_args_t) const;
 
     template <typename T>
     [[nodiscard]] const T *extract() const noexcept
@@ -404,21 +387,13 @@ public:
 
     void to_stream(std::ostringstream &) const;
 
-    [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
-
     [[nodiscard]] std::vector<expression> gradient() const;
-    [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const std::string &) const;
-    [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const param &) const;
-
-    [[nodiscard]] std::vector<expression>::size_type
-    decompose(detail::funcptr_map<std::vector<expression>::size_type> &, std::vector<expression> &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    taylor_dc_t::size_type taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;

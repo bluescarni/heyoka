@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -35,6 +36,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
@@ -171,6 +173,47 @@ TEST_CASE("diff ex")
             == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
+TEST_CASE("diff shared args")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    func_args sargs({x, y, z}, true);
+
+    auto f1 = dfun("f1", sargs);
+    auto f2 = dfun("f2", sargs);
+    std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+    auto bar_diff = diff(bar, {x});
+
+    REQUIRE(bar_diff
+            == std::vector{dfun("f1", sargs, {{0, 1}}) + dfun("f2", sargs, {{0, 1}}), dfun("f1", sargs, {{0, 1}}),
+                           dfun("f2", sargs, {{0, 1}}),
+                           dfun("f2", sargs, {}) * dfun("f1", sargs, {{0, 1}})
+                               + dfun("f1", sargs, {}) * dfun("f2", sargs, {{0, 1}})});
+
+    // Check the functions' identity.
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(bar_diff[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[1].value()).get_ptr()
+            == std::get<func>(bar_diff[2].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[0].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(f1.value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[1].value()).args()[0].value())
+                   .get_ptr());
+
+    // Check the arguments' identity.
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).shared_args()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[0].value()).args()[1].value())
+                   .shared_args());
+    REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).shared_args()
+            == std::get<func>(bar_diff[1].value()).shared_args());
+    REQUIRE(std::get<func>(f1.value()).shared_args()
+            == std::get<func>(std::get<func>(std::get<func>(bar_diff[3].value()).args()[1].value()).args()[0].value())
+                   .shared_args());
+}
+
 TEST_CASE("get_param_size")
 {
     using Catch::Matchers::Message;
@@ -200,33 +243,64 @@ TEST_CASE("get_param_size")
     // Test with repeated subexpressions.
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(get_param_size(bar) == 0u);
+        REQUIRE(get_param_size(bar) == 0u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[23] + (foo - x) / (2. * foo) + par[32];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[23] + (foo - x) / (2. * foo) + par[32];
 
-    REQUIRE(get_param_size(bar) == 43u);
+        REQUIRE(get_param_size(bar) == 43u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[83] + (foo - x) / (2. * foo) + par[32];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[83] + (foo - x) / (2. * foo) + par[32];
 
-    REQUIRE(get_param_size(bar) == 84u);
+        REQUIRE(get_param_size(bar) == 84u);
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
-    bar = par[23] + (foo - x) / (2. * foo) + par[92];
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+        bar = par[23] + (foo - x) / (2. * foo) + par[92];
 
-    REQUIRE(get_param_size(bar) == 93u);
+        REQUIRE(get_param_size(bar) == 93u);
 
-    // Tests with vectorisation.
-    REQUIRE(get_param_size({par[0], par[123]}) == 124u);
-    REQUIRE(get_param_size({par[123], par[0]}) == 124u);
-    REQUIRE(get_param_size({bar, bar + par[86]}) == 93u);
-    REQUIRE(get_param_size({bar, bar + par[186]}) == 187u);
-    REQUIRE(get_param_size({bar + par[86], bar}) == 93u);
-    REQUIRE(get_param_size({bar + par[186], bar}) == 187u);
-    REQUIRE(get_param_size({"x"_var, 2_dbl}) == 0u);
+        // Tests with vectorisation.
+        REQUIRE(get_param_size({par[0], par[123]}) == 124u);
+        REQUIRE(get_param_size({par[123], par[0]}) == 124u);
+        REQUIRE(get_param_size({bar, bar + par[86]}) == 93u);
+        REQUIRE(get_param_size({bar, bar + par[186]}) == 187u);
+        REQUIRE(get_param_size({bar + par[86], bar}) == 93u);
+        REQUIRE(get_param_size({bar + par[186], bar}) == 187u);
+        REQUIRE(get_param_size({"x"_var, 2_dbl}) == 0u);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_param_size(ex) == 0);
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_param_size(ex) == 43);
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * par[100];
+        REQUIRE(get_param_size(ex) == 101);
+    }
 }
 
 TEST_CASE("binary simpls")
@@ -354,53 +428,76 @@ TEST_CASE("is_time_dependent")
     REQUIRE(is_time_dependent((x + y) * (hy::time + 1_dbl)));
     REQUIRE(is_time_dependent((x + y) * (par[0] * hy::time + 1_dbl)));
 
-    // With common subexpressions.
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        // With common subexpressions.
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(!is_time_dependent(bar));
+        REQUIRE(!is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = (foo - x) / (2. * foo);
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo);
+        foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = hy::time + (foo - x) / (2. * foo);
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = hy::time + (foo - x) / (2. * foo);
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
-    bar = hy::time + (foo - x) / (2. * foo) + hy::time;
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+        bar = hy::time + (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(is_time_dependent(bar));
+        REQUIRE(is_time_dependent(bar));
 
-    // Tests with vectorization.
-    REQUIRE(is_time_dependent({bar}));
-    REQUIRE(is_time_dependent({x, bar}));
-    REQUIRE(is_time_dependent({bar, x}));
-    REQUIRE(!is_time_dependent({2_dbl - par[0], x}));
+        // Tests with vectorization.
+        REQUIRE(is_time_dependent({bar}));
+        REQUIRE(is_time_dependent({x, bar}));
+        REQUIRE(is_time_dependent({bar, x}));
+        REQUIRE(!is_time_dependent({2_dbl - par[0], x}));
 
-    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
-    bar = (foo - x) / (2. * foo);
-    REQUIRE(!is_time_dependent({x, bar}));
-    REQUIRE(is_time_dependent({x, bar, hy::time}));
-    REQUIRE(is_time_dependent({x, hy::time, bar}));
-    REQUIRE(is_time_dependent({hy::time, x, bar}));
+        foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        bar = (foo - x) / (2. * foo);
+        REQUIRE(!is_time_dependent({x, bar}));
+        REQUIRE(is_time_dependent({x, bar, hy::time}));
+        REQUIRE(is_time_dependent({x, hy::time, bar}));
+        REQUIRE(is_time_dependent({hy::time, x, bar}));
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = {f1 + f2, f1, f2, f1 * f2};
+        REQUIRE(!is_time_dependent(ex));
+    }
+
+    {
+        func_args sargs({x, hy::time, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = {f1 + f2, f1, f2, f1 * f2};
+        REQUIRE(is_time_dependent(ex));
+    }
 }
 
 TEST_CASE("s11n")
@@ -518,6 +615,27 @@ TEST_CASE("get_n_nodes")
     }
 
     REQUIRE(get_n_nodes(foo) == 0u);
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_n_nodes(ex) == 9);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * f1;
+        REQUIRE(get_n_nodes(ex) == 14);
+    }
 }
 
 TEST_CASE("equality")
@@ -550,6 +668,27 @@ TEST_CASE("get_variables")
     // The vectorised version
     REQUIRE(get_variables({(y + tmp) / foo * tmp - foo, "a"_var + "b"_var})
             == std::vector<std::string>{"a", "b", "x", "y", "z"});
+
+    // Testing for the shared arguments variant.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        REQUIRE(get_variables(bar) == std::vector<std::string>{"x", "y", "z"});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        REQUIRE(get_variables(bar) == std::vector<std::string>{"x", "y", "z"});
+    }
 }
 
 TEST_CASE("rename_variables")
@@ -576,60 +715,289 @@ TEST_CASE("rename_variables")
     ex = (y + tmp) / foo * tmp - foo;
     ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_copy = rename_variables(bar, {{"x", "x1"}, {"y", "y1"}, {"z", "z1"}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_copy[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_copy[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).shared_args());
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_copy = rename_variables(bar, {{"x", "x1"}, {"y", "y1"}, {"z", "z1"}});
+
+        REQUIRE(std::get<func>(bar_copy[0].value()).shared_args() == std::get<func>(bar_copy[1].value()).shared_args());
+    }
 }
 
 TEST_CASE("copy")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    auto bar_copy = copy(bar);
+        auto bar_copy = copy(bar);
 
-    // Copy created a new object.
-    REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
+        // Check that copy created a new object.
+        REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
+
+        // Check equality.
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = foo + foo;
+
+        auto bar_copy = copy(bar);
+
+        // Check that the two foos in bar_copy point to the same underlying object.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
+
+        // Check equality.
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        // Test with a vector function.
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+        std::vector bar{foo + foo, foo * foo};
+
+        auto bar_copy = copy(bar);
+
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[1].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[1].value()).args()[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[1].value()).args()[1].value()).get_ptr());
+
+        REQUIRE(bar_copy == bar);
+    }
+
+    // Tests with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_copy = copy(bar);
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_copy[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_copy[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_copy[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_copy[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_copy[3].value()).args()[1].value()).shared_args());
+
+        REQUIRE(bar_copy == bar);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_copy = copy(bar);
+
+        REQUIRE(std::get<func>(bar_copy[0].value()).shared_args() == std::get<func>(bar_copy[1].value()).shared_args());
+
+        REQUIRE(bar_copy == bar);
+    }
 }
 
 TEST_CASE("subs str")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
-    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
-    const auto *foo_id = std::get<func>(foo.value()).get_ptr();
-    const auto *bar_id = std::get<func>(bar.value()).get_ptr();
+    {
+        auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+        const auto *foo_id = std::get<func>(foo.value()).get_ptr();
+        const auto *bar_id = std::get<func>(bar.value()).get_ptr();
 
-    auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
+        auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
-    auto bar_subs = subs(bar, smap_t{{"x", a}});
+        auto bar_subs = subs(bar, smap_t{{"x", a}});
 
-    // Ensure foo/bar were not modified.
-    REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
-    REQUIRE(bar == (foo - x) / (2. * foo));
-    REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
-    REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
+        // Ensure foo/bar were not modified.
+        REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
+        REQUIRE(bar == (foo - x) / (2. * foo));
+        REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
+        REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
 
-    // Check the substitution.
-    REQUIRE(bar_subs == bar_a);
+        // Check the substitution.
+        REQUIRE(bar_subs == bar_a);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_subs = subs(bar, smap_t{{"x", x * x}, {"y", y * y}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[0].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_subs[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(bar_subs[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).shared_args());
+
+        func_args sargs2({x * x, y * y, z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a + f2a, f1a, f2a, f1a * f2a});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_subs = subs(bar, smap_t{{"x", x * x}, {"z", z * z}});
+
+        REQUIRE(std::get<func>(bar_subs[0].value()).shared_args() == std::get<func>(bar_subs[1].value()).shared_args());
+
+        func_args sargs2({x * x, y, z * z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a, f2a});
+    }
 }
 
 TEST_CASE("subs")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
-    REQUIRE(subs(x, {{z, x + y}}) == x);
-    REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
-    REQUIRE(subs(x, {{x, x + y}}) == x + y);
-    REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
+    {
+        REQUIRE(subs(x, {{z, x + y}}) == x);
+        REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
+        REQUIRE(subs(x, {{x, x + y}}) == x + y);
+        REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
 
-    REQUIRE(subs(x + y, {{x + y, z}}) == z);
-    REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
+        REQUIRE(subs(x + y, {{x + y, z}}) == z);
+        REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
 
-    auto tmp = x + y;
-    auto tmp2 = x - y;
-    auto ex = tmp - par[0] * tmp;
-    auto subs_res = subs(ex, {{tmp, tmp2}});
+        auto tmp = x + y;
+        auto tmp2 = x - y;
+        auto ex = tmp - par[0] * tmp;
+        auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
+        REQUIRE(subs_res == tmp2 - par[0] * tmp2);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1 + f2, f1, f2, f1 * f2};
+
+        auto bar_subs = subs(bar, {{f1, x * x}, {y, y * y}});
+
+        // Check the functions' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[3].value()).args()[0].value()).get_ptr()
+                == std::get<func>(bar_subs[1].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).get_ptr()
+                == std::get<func>(bar_subs[2].value()).get_ptr());
+
+        // Check the arguments' identity.
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(bar_subs[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(bar_subs[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(bar_subs[3].value()).args()[1].value()).shared_args());
+
+        func_args sargs2({x, y * y, z}, true);
+        auto f1a = x * x;
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a + f2a, f1a, f2a, f1a * f2a});
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+        std::vector bar{f1, f2};
+
+        auto bar_subs = subs(bar, {{x, x * x}, {z, z * z}});
+
+        REQUIRE(std::get<func>(bar_subs[0].value()).shared_args() == std::get<func>(bar_subs[1].value()).shared_args());
+
+        func_args sargs2({x * x, y, z * z}, true);
+        auto f1a = dfun("f1", sargs2);
+        auto f2a = dfun("f2", sargs2);
+
+        REQUIRE(bar_subs == std::vector{f1a, f2a});
+    }
 }
 
 // cfunc N-body with fixed masses.
@@ -1551,6 +1919,8 @@ TEST_CASE("output too long")
 
 TEST_CASE("get_params")
 {
+    const auto [x, y, z] = make_vars("x", "y", "z");
+
     REQUIRE(get_params(expression{}).empty());
     REQUIRE(get_params("x"_var).empty());
     REQUIRE(get_params("x"_var + "y"_var).empty());
@@ -1558,15 +1928,46 @@ TEST_CASE("get_params")
     REQUIRE(get_params("x"_var - par[10]) == std::vector{par[10]});
     REQUIRE(get_params(("x"_var + par[1]) - ("y"_var - par[10])) == std::vector{par[1], par[10]});
 
-    auto tmp1 = "x"_var + par[3];
-    auto tmp2 = par[56] / "y"_var;
-    auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
+    {
+        auto tmp1 = "x"_var + par[3];
+        auto tmp2 = par[56] / "y"_var;
+        auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
 
-    REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
+        REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
 
-    // Test the vectorised version too.
-    auto ex2 = 3_dbl + par[4];
-    REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+        // Test the vectorised version too.
+        auto ex2 = 3_dbl + par[4];
+        REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_params(ex) == std::vector<expression>{});
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        REQUIRE(get_params(ex) == std::vector{par[42]});
+    }
+    {
+        func_args sargs({x, par[42], z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = par[100] * (f1 + f2);
+        REQUIRE(get_params(ex) == std::vector{par[42], par[100]});
+    }
 }
 
 TEST_CASE("swap")
@@ -1746,9 +2147,7 @@ TEST_CASE("cfunc sum_to_sub")
     }
 }
 
-// Test to check that the optimisation for hashing non-recursive
-// expressions is correct.
-TEST_CASE("hash opt")
+TEST_CASE("hash")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
@@ -1763,10 +2162,10 @@ TEST_CASE("hash opt")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, std::hash<variable>{}(std::get<variable>(z.value())));
         boost::hash_combine(seed, nr_hash);
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1782,10 +2181,10 @@ TEST_CASE("hash opt")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1801,10 +2200,10 @@ TEST_CASE("hash opt")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
     }
@@ -1820,11 +2219,168 @@ TEST_CASE("hash opt")
         const auto full_hash = std::hash<expression>{}(ex2);
 
         // Compute manually the hash of ex2.
-        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
-
+        std::size_t seed = 0;
         boost::hash_combine(seed, nr_hash);
         boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+        boost::hash_combine(seed, std::get<func>(ex2.value()).get_name());
 
         REQUIRE(seed == full_hash);
+    }
+
+    // Testing with shared arguments.
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = f1 + f2;
+        const auto hash = std::hash<expression>{}(ex);
+
+        // Compute manually the hash.
+        std::size_t hash_sargs = 0;
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("x"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("y"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("z"));
+
+        std::size_t f1_hash = hash_sargs;
+        boost::hash_combine(f1_hash, std::get<func>(f1.value()).get_name());
+
+        std::size_t f2_hash = hash_sargs;
+        boost::hash_combine(f2_hash, std::get<func>(f2.value()).get_name());
+
+        std::size_t ex_hash = 0;
+        boost::hash_combine(ex_hash, f1_hash);
+        boost::hash_combine(ex_hash, f2_hash);
+        boost::hash_combine(ex_hash, std::get<func>(ex.value()).get_name());
+
+        REQUIRE(hash == ex_hash);
+    }
+
+    {
+        func_args sargs({x, y, z}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        const auto ex = (f1 + f2) * f1;
+        const auto hash = std::hash<expression>{}(ex);
+
+        // Compute manually the hash.
+        std::size_t hash_sargs = 0;
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("x"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("y"));
+        boost::hash_combine(hash_sargs, std::hash<std::string>{}("z"));
+
+        std::size_t f1_hash = hash_sargs;
+        boost::hash_combine(f1_hash, std::get<func>(f1.value()).get_name());
+
+        std::size_t f2_hash = hash_sargs;
+        boost::hash_combine(f2_hash, std::get<func>(f2.value()).get_name());
+
+        std::size_t f1_p_f2_hash = 0;
+        boost::hash_combine(f1_p_f2_hash, f1_hash);
+        boost::hash_combine(f1_p_f2_hash, f2_hash);
+        boost::hash_combine(f1_p_f2_hash, std::get<func>((f1 + f2).value()).get_name());
+
+        std::size_t ex_hash = 0;
+        boost::hash_combine(ex_hash, f1_p_f2_hash);
+        boost::hash_combine(ex_hash, f1_hash);
+        boost::hash_combine(ex_hash, std::get<func>(ex.value()).get_name());
+
+        REQUIRE(hash == ex_hash);
+    }
+}
+
+TEST_CASE("split_sums_for_decompose")
+{
+    const auto x = make_vars("x");
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        REQUIRE(s == new_s);
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        REQUIRE(new_s == sum({sum({x, x, x, x, x, x, x, x}), x}));
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+        auto new_s = detail::split_sums_for_decompose({s * s})[0];
+        REQUIRE(new_s == sum({sum({x, x, x, x, x, x, x, x}), x}) * sum({sum({x, x, x, x, x, x, x, x}), x}));
+
+        REQUIRE(std::get<func>(std::get<func>(new_s.value()).args()[0].value()).get_ptr()
+                == std::get<func>(std::get<func>(new_s.value()).args()[1].value()).get_ptr());
+    }
+
+    {
+        auto s1 = sum({x, x, x, x, x, x, x, x, x});
+        auto s = sum({s1, x, x, x, x, x, x, x, x});
+
+        auto new_s = detail::split_sums_for_decompose({s * s})[0];
+
+        auto s1_split = sum({x, x, x, x, x, x, x, x}) + x;
+        auto s_split = sum({s1_split, x, x, x, x, x, x, x}) + x;
+
+        REQUIRE(new_s == s_split * s_split);
+    }
+
+    // Testing with shared arguments.
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+
+        func_args sargs({s}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        auto ex = f1 * f2;
+
+        auto new_ex = detail::split_sums_for_decompose({ex})[0];
+
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        auto new_sargs = func_args({new_s}, true);
+
+        REQUIRE(new_ex == dfun("f1", new_sargs) * dfun("f2", new_sargs));
+
+        REQUIRE(std::get<func>(std::get<func>(new_ex.value()).args()[0].value()).shared_args() != nullptr);
+        REQUIRE(std::get<func>(std::get<func>(new_ex.value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex.value()).args()[1].value()).shared_args());
+    }
+
+    {
+        auto s = sum({x, x, x, x, x, x, x, x, x});
+
+        func_args sargs({s}, true);
+
+        auto f1 = dfun("f1", sargs);
+        auto f2 = dfun("f2", sargs);
+
+        auto ex = std::vector{f1 * f2, f1, f2, f1 + f2};
+
+        auto new_ex = detail::split_sums_for_decompose({ex});
+
+        auto new_s = detail::split_sums_for_decompose({s})[0];
+        auto new_sargs = func_args({new_s}, true);
+
+        REQUIRE(new_ex[0] == dfun("f1", new_sargs) * dfun("f2", new_sargs));
+        REQUIRE(new_ex[1] == dfun("f1", new_sargs));
+        REQUIRE(new_ex[2] == dfun("f2", new_sargs));
+        REQUIRE(new_ex[3] == dfun("f1", new_sargs) + dfun("f2", new_sargs));
+
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(new_ex[1].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(new_ex[2].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[0].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[3].value()).args()[0].value()).shared_args());
+        REQUIRE(std::get<func>(std::get<func>(new_ex[0].value()).args()[1].value()).shared_args()
+                == std::get<func>(std::get<func>(new_ex[3].value()).args()[1].value()).shared_args());
     }
 }

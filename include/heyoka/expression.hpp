@@ -50,7 +50,7 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -185,8 +185,6 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 namespace detail
 {
 
-std::size_t hash(funcptr_map<std::size_t> &, const expression &) noexcept;
-
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &) noexcept;
 
 void stream_expression(std::ostringstream &, const expression &);
@@ -212,6 +210,15 @@ HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const std::vector<expression> &);
+
+namespace detail
+{
+
+expression rename_variables_impl(void_ptr_map<const expression> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                                 const expression &, const std::unordered_map<std::string, std::string> &);
+
+} // namespace detail
+
 HEYOKA_DLL_PUBLIC expression rename_variables(const expression &, const std::unordered_map<std::string, std::string> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<expression> &,
                                                            const std::unordered_map<std::string, std::string> &);
@@ -348,6 +355,17 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexce
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
+namespace detail
+{
+
+expression subs_impl(detail::void_ptr_map<const expression> &, detail::sargs_ptr_map<const func_args::shared_args_t> &,
+                     const expression &, const std::unordered_map<std::string, expression> &);
+
+expression subs_impl(void_ptr_map<const expression> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                     const expression &, const std::map<expression, expression> &);
+
+} // namespace detail
+
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
@@ -362,9 +380,6 @@ class HEYOKA_DLL_PUBLIC dtens;
 
 namespace detail
 {
-
-expression diff(funcptr_map<expression> &, const expression &, const std::string &);
-expression diff(funcptr_map<expression> &, const expression &, const param &);
 
 // NOTE: public only for testing purposes.
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
@@ -523,7 +538,9 @@ dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<ex
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
+HEYOKA_DLL_PUBLIC std::optional<taylor_dc_t::size_type>
+taylor_decompose(void_ptr_map<const taylor_dc_t::size_type> &, sargs_ptr_map<const func_args::shared_args_t> &,
+                 const expression &, taylor_dc_t &);
 
 } // namespace detail
 
@@ -574,10 +591,10 @@ namespace detail
 void verify_function_dec(const std::vector<expression> &, const std::vector<expression> &,
                          std::vector<expression>::size_type, bool = false);
 
-std::vector<expression> function_decompose_cse(std::vector<expression> &, std::vector<expression>::size_type,
+std::vector<expression> function_decompose_cse(const std::vector<expression> &, std::vector<expression>::size_type,
                                                std::vector<expression>::size_type);
 
-std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<expression>::size_type,
+std::vector<expression> function_sort_dc(const std::vector<expression> &, std::vector<expression>::size_type,
                                          std::vector<expression>::size_type);
 
 HEYOKA_DLL_PUBLIC std::vector<expression> split_sums_for_decompose(const std::vector<expression> &);
@@ -586,7 +603,8 @@ HEYOKA_DLL_PUBLIC std::vector<expression> split_prods_for_decompose(const std::v
 
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
 
-std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
+std::optional<std::vector<expression>::size_type> decompose(void_ptr_map<const std::vector<expression>::size_type> &,
+                                                            sargs_ptr_map<const func_args::shared_args_t> &,
                                                             const expression &, std::vector<expression> &);
 
 llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);

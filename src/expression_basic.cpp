@@ -21,15 +21,16 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include <boost/container_hash/hash.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
@@ -49,13 +50,14 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
@@ -156,51 +158,9 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
+expression copy_impl(auto &func_map, auto &sargs_map, const expression &e)
 {
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already copied the current function, fetch the copy
-                    // from the cache.
-                    return it->second;
-                }
-
-                // Create the new args vector by making a deep copy
-                // of the original function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    // NOTE: the argument needs to be copied via a recursive
-                    // call to copy_impl() only if it is a func. Otherwise, a normal
-                    // copy will suffice.
-                    if (std::holds_alternative<func>(orig_arg.value())) {
-                        new_args.push_back(copy_impl(func_map, orig_arg));
-                    } else {
-                        new_args.push_back(orig_arg);
-                    }
-                }
-
-                // Create a copy of v with the new arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // Construct the return value and put it into the cache.
-                auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ex;
-            } else {
-                return expression{v};
-            }
-        },
-        e.value());
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, {}, {});
 }
 
 } // namespace
@@ -209,20 +169,22 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 
 expression copy(const expression &e)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::copy_impl(func_map, e);
+    return detail::copy_impl(func_map, sargs_map, e);
 }
 
 std::vector<expression> copy(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        ret.push_back(detail::copy_impl(func_map, ex));
+        ret.push_back(detail::copy_impl(func_map, sargs_map, ex));
     }
 
     return ret;
@@ -321,38 +283,15 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
+void get_variables_impl(auto &func_set, auto &sargs_set, auto &s_set, const expression &e)
 {
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_set, &s_set](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    const auto vfunc = [&s_set](const expression &ex) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            s_set.emplace(var_ptr->name());
+        }
+    };
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
-
-                if (func_set.find(f_id) != func_set.end()) {
-                    // We already determined the list of variables for the
-                    // current function, exit.
-                    return;
-                }
-
-                // Determine the list of variables for each
-                // function argument.
-                for (const auto &farg : arg.args()) {
-                    get_variables(func_set, s_set, farg);
-                }
-
-                // Add the id of f to the set.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            } else if constexpr (std::is_same_v<type, variable>) {
-                s_set.insert(arg.name());
-            }
-        },
-        e.value());
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -361,11 +300,11 @@ void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
+    boost::unordered_flat_set<std::string> s_set;
 
-    std::unordered_set<std::string> s_set;
-
-    detail::get_variables(func_set, s_set, e);
+    detail::get_variables_impl(func_set, sargs_set, s_set, e);
 
     // Turn the set into an ordered vector.
     std::vector retval(s_set.begin(), s_set.end());
@@ -376,12 +315,12 @@ std::vector<std::string> get_variables(const expression &e)
 
 std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_set func_set;
-
-    std::unordered_set<std::string> s_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
+    boost::unordered_flat_set<std::string> s_set;
 
     for (const auto &ex : v_ex) {
-        detail::get_variables(func_set, s_set, ex);
+        detail::get_variables_impl(func_set, sargs_set, s_set, ex);
     }
 
     // Turn the set into an ordered vector.
@@ -394,80 +333,50 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
 namespace detail
 {
 
-namespace
+expression rename_variables_impl(void_ptr_map<const expression> &func_map,
+                                 sargs_ptr_map<const func_args::shared_args_t> &sargs_map, const expression &e,
+                                 const std::unordered_map<std::string, std::string> &repl_map)
 {
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
-                            const std::unordered_map<std::string, std::string> &repl_map)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &repl_map](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already renamed variables for the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
-
-                // Prepare the new args vector by renaming variables
-                // for all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(rename_variables(func_map, orig_arg, repl_map));
-                }
-
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(std::move(new_args));
-
-                // Put the return value in the cache.
-                auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
-                    return expression{it->second};
-                }
-
-                // NOTE: fall through to the default case of returning a copy
-                // of the original variable if no renaming took place.
+    const auto rename_func = [&repl_map](const expression &ex) {
+        // Check if the current expression is a variable whose name shows up
+        // in repl_map. If it is, construct and return a variable expression
+        // from the replacement string.
+        //
+        // Otherwise, just return a copy of ex.
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            const auto it = repl_map.find(var_ptr->name());
+            if (it != repl_map.end()) {
+                return expression{it->second};
             }
+        }
 
-            return expression{arg};
-        },
-        e.value());
+        return ex;
+    };
+
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, rename_func, {});
 }
-
-} // namespace
 
 } // namespace detail
 
 expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::rename_variables(func_map, e, repl_map);
+    return detail::rename_variables_impl(func_map, sargs_map, e, repl_map);
 }
 
 std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
                                          const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(detail::rename_variables(func_map, ex, repl_map));
+        retval.push_back(detail::rename_variables_impl(func_map, sargs_map, ex, repl_map));
     }
 
     return retval;
@@ -476,98 +385,155 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 namespace detail
 {
 
+// NOTE: at this time there is no apparent need for a vectorised version of this.
+// In case we ever need one, the simple function optimisation would need to be reconsidered.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexcept
-{
-    return std::visit(
-        [&func_map](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the hash for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                // Compute the hash of the current function.
-                auto retval = v.hash(func_map);
-
-                // Add it to the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return std::hash<type>{}(v);
-            }
-        },
-        ex.value());
-}
-
-// NOLINTNEXTLINE(bugprone-exception-escape,misc-no-recursion)
 std::size_t hash(const expression &ex) noexcept
 {
-    // NOTE: we implement an optimisation here: if either the expression is **not** a function,
-    // or if it is a function and none of its arguments are functions (i.e., it is a non-recursive
-    // expression), then we do not recurse into detail::hash() and we do not create/update the
-    // funcptr_map cache. This allows us to avoid memory allocations, in an effort to optimise the
-    // computation of hashes in decompositions, where the elementary subexpressions are
-    // non-recursive by definition.
-    // NOTE: we must be very careful with this optimisation: we need to make sure the hash computation
-    // result is the same whether the optimisation is enabled or not. That is, the hash
-    // **must** be the same regardless of whether a non-recursive expression is standalone
-    // or it is part of a larger expression.
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&ex](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+    detail::void_ptr_map<const std::size_t> func_map;
+    detail::sargs_ptr_map<const std::size_t> sargs_map;
+    detail::traverse_stack stack;
+    detail::return_stack<std::size_t> hash_stack;
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto no_func_args = std::none_of(v.args().begin(), v.args().end(), [](const auto &x) {
-                    return std::holds_alternative<func>(x.value());
-                });
+    // Seed the stack.
+    stack.emplace_back(&ex, false);
 
-                if (no_func_args) {
-                    // NOTE: it is very important that here we replicate *exactly* the logic
-                    // of func::hash(), so that we produce the same hash value that would
-                    // be produced if ex were part of a larger expression.
-                    std::size_t seed = std::hash<std::string>{}(v.get_name());
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
 
-                    for (const auto &arg : v.args()) {
-                        // NOTE: for non-function arguments, calling hash(arg)
-                        // is identical to calling detail::hash(func_map, arg)
-                        // (as we do in func::hash()):
-                        // both ultimately end up using directly the std::hash
-                        // specialisation on the arg.
-                        boost::hash_combine(seed, hash(arg));
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already computed the hash of the current function. Fetch it from the cache
+                // and add it to the hash stack.
+                hash_stack.emplace_back(it->second);
+                continue;
+            }
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited and computed the hash of all the children of the function node
+                // (i.e., the function arguments). The hashes are at the tail end of
+                // hash_stack. We will be popping and combining them in order to compute the hash
+                // of the function.
+
+                // NOTE: the hash of a function is obtained by combining the hashes of the
+                // arguments with the hash of the function name.
+                std::size_t seed = 0;
+                const auto n_args = f.args().size();
+                for (decltype(f.args().size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the hash stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!hash_stack.empty());
+                    assert(hash_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    boost::hash_combine(seed, *hash_stack.back());
+                    hash_stack.pop_back();
+                }
+                // Record the hash of the arguments.
+                const auto args_hash = seed;
+
+                // Final combination with the hash of the name.
+                boost::hash_combine(seed, f.get_name());
+
+                // Add the hashes to the caches.
+                // NOTE: here we apply an optimisation: if the stack is empty,
+                // we are at the end of the while loop and we won't need the cached
+                // values in the future. Thus, we can avoid unnecessary heap allocations
+                // if the expression we are hashing is a simple non-recursive function.
+                if (!stack.empty()) {
+                    func_map.emplace(f_id, seed);
+
+                    if (shared_args) {
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, args_hash);
+                    }
+                }
+
+                // Add it to hash_stack.
+                // NOTE: hash_stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty hash we
+                // pushed the first time we visited).
+                assert(!hash_stack.empty());
+                assert(!hash_stack.back());
+                hash_stack.back().emplace(seed);
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already computed the hash of the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // We already have the hash of the arguments. Fetch it and combine it
+                        // with the hash of the function name
+                        auto seed = it->second;
+                        boost::hash_combine(seed, f.get_name());
+
+                        // Add the function to the cache and its hash value to hash_stack.
+                        // NOTE: there's no point here in eliding the addition of f_id to the cache,
+                        // because if we end up here it means that we already inserted some values
+                        // in the caches.
+                        func_map.emplace(f_id, seed);
+                        hash_stack.emplace_back(seed);
+
+                        continue;
                     }
 
-                    return seed;
-                } else {
-                    // The regular, non-optimised path.
-                    detail::funcptr_map<std::size_t> func_map;
-
-                    return hash(func_map, ex);
+                    // NOTE: if we arrive here, it means that the shared arguments of the function have never
+                    // been hashed before. We thus fall through the usual visitation process.
+                    ;
                 }
-            } else {
-                // ex is not a function, compute its hash directly
-                // via a std::hash specialisation.
-                // NOTE: this is the same logic implemented in detail::hash(),
-                // except we avoid the unnecessary creation of a funcptr_map.
-                return std::hash<type>{}(v);
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &arg : f.args()) {
+                    stack.emplace_back(&arg, false);
+                }
+
+                // Add an empty hash to hash_stack. We will add the real hash
+                // later once we have hashed all arguments.
+                hash_stack.emplace_back();
             }
-        },
-        ex.value());
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            hash_stack.emplace_back(std::visit(
+                []<typename T>(const T &arg) -> std::size_t {
+                    if constexpr (std::same_as<func, T>) {
+                        // LCOV_EXCL_START
+                        assert(false);
+                        return 0;
+                        // LCOV_EXCL_STOP
+                    } else {
+                        return std::hash<T>{}(arg);
+                    }
+                },
+                cur_ex->value()));
+        }
+    }
+
+    assert(hash_stack.size() == 1u);
+    assert(hash_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return *hash_stack.back();
 }
-
-} // namespace detail
-
-namespace detail
-{
 
 namespace
 {
@@ -590,10 +556,8 @@ void stream_expression(std::ostringstream &oss, const expression &e)
     }
 
     std::visit(
-        [&oss](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+        [&oss]<typename T>(const T &v) {
+            if constexpr (std::is_same_v<T, func>) {
                 v.to_stream(oss);
             } else {
                 oss << v;
@@ -617,70 +581,145 @@ std::ostream &operator<<(std::ostream &os, const expression &e)
     return os << oss.str();
 }
 
-namespace detail
-{
-
-namespace
-{
-
-// Exception to signal that the computation
-// of the number of nodes resulted in overflow.
-struct too_many_nodes : std::exception {
-};
-
-// NOLINTNEXTLINE(misc-no-recursion)
-std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &arg) -> std::size_t {
-            if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already computed the number of nodes for the current
-                    // function, return it.
-                    return it->second;
-                }
-
-                boost::safe_numerics::safe<std::size_t> retval = 1;
-
-                for (const auto &ex : arg.args()) {
-                    try {
-                        retval += get_n_nodes(func_map, ex);
-                    } catch (...) {
-                        throw too_many_nodes{};
-                    }
-                }
-
-                // Store the number of nodes for the current function
-                // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return retval;
-            } else {
-                return 1;
-            }
-        },
-        e.value());
-}
-
-} // namespace
-
-} // namespace detail
-
 // NOTE: this always returns a number > 0, unless an overflow
 // occurs due to the expression being too large. In such case,
 // zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
-    detail::funcptr_map<std::size_t> func_map;
+    detail::void_ptr_map<const std::size_t> func_map;
+    detail::sargs_ptr_map<const std::size_t> sargs_map;
+    detail::traverse_stack stack;
+
+    boost::safe_numerics::safe<std::size_t> retval = 0;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
 
     try {
-        return detail::get_n_nodes(func_map, e);
-    } catch (const detail::too_many_nodes &) {
+        while (!stack.empty()) {
+            // Pop the stack.
+            const auto [cur_ex, visited] = stack.back();
+            stack.pop_back();
+
+            if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+                // Function (i.e., internal) node.
+                const auto &f = *f_ptr;
+
+                // Fetch the function id.
+                const auto *f_id = f.get_ptr();
+
+                if (visited) {
+                    // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                    // and thus we can avoid an unnecessary lookup.
+                    assert(!func_map.contains(f_id));
+                } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the number of nodes for the current
+                    // function, add it to retval.
+                    retval += it->second;
+                    continue;
+                }
+
+                // Check if the function manages its arguments via a shared reference.
+                const auto shared_args = f.shared_args();
+
+                if (visited) {
+                    // This is the second time we visit the function. We can now
+                    // compute its number of nodes.
+
+                    // Count the function node itself.
+                    boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+
+                    // Count the number of nodes in the arguments.
+                    for (const auto &ex : f.args()) {
+                        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+                            // The argument is a function. Its number of nodes was already
+                            // computed and it must be available in the cache.
+                            assert(func_map.contains(fptr->get_ptr()));
+                            n_nodes += func_map.find(fptr->get_ptr())->second;
+                        } else {
+                            // The argument is a non-function (i.e., a leaf node). Increase
+                            // the count by one.
+                            ++n_nodes;
+                        }
+                    }
+
+                    // Store the number of nodes for the current function
+                    // in the cache.
+                    func_map.emplace(f_id, n_nodes);
+
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference,
+                        // we must make sure to record in sargs_map the number of nodes for the
+                        // arguments, so that we do not have to recompute it when we encounter again
+                        // the same shared reference.
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, n_nodes - 1);
+                    }
+
+                    // NOTE: by incrementing by 1 here we are accounting only for the function node
+                    // itself. It is not necessary to account for the total number of nodes n_nodes
+                    // because all the children nodes were already counted during visitation
+                    // of the current function.
+                    ++retval;
+                } else {
+                    // It is the first time we visit this function.
+                    if (shared_args) {
+                        // The function manages its arguments via a shared reference. Check
+                        // if we already computed the total number of nodes for the arguments.
+                        if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                            // We already have the total number of nodes for the arguments. Fetch it and add 1
+                            // to account for the function itself.
+                            boost::safe_numerics::safe<std::size_t> n_nodes = 1;
+                            n_nodes += it->second;
+
+                            // Add the function to the cache.
+                            func_map.emplace(f_id, n_nodes);
+
+                            // Update retval and move on.
+                            retval += n_nodes;
+                            continue;
+                        }
+
+                        // NOTE: if we arrive here, it means that we have not computed the number of nodes
+                        // for the shared arguments of the function yet. We thus fall through the usual
+                        // visitation process.
+                        ;
+                    }
+
+                    // Re-add the function to the stack with visited=true, and add all of its
+                    // arguments to the stack as well.
+                    stack.emplace_back(cur_ex, true);
+
+                    for (const auto &ex : f.args()) {
+                        stack.emplace_back(&ex, false);
+                    }
+
+                    // NOTE: we do not know at this stage what the total number of nodes
+                    // for the current function is. This will be available the next time we
+                    // pop the function from the stack. In the meantime do **not** increment retval.
+                }
+            } else {
+                // Non-function (i.e., leaf) node.
+                assert(!visited);
+                ++retval;
+            }
+        }
+
+        return retval;
+    } catch (const std::system_error &) {
+        // NOTE: this is not ideal, as in principle system_error may be thrown
+        // by something other than overflow errors in boost::safe_numerics. However, as much
+        // as I tried, I could not find out a way to detect if the thrown system_error
+        // is coming out of boost::safe_numerics. It should be just a matter of comparing
+        // the error code in the exception to the predefined error codes in boost::safe_numerics,
+        // but for some reason this does not work. I suspect it has something to do with
+        // the error category comparison failing because the error category of the code
+        // in the exception is not the same object (same address) of the error category
+        // in the predefined error codes. I don't understand why this has to be so complicated
+        // but don't have the time to investigate now :(
+        //
+        // https://en.cppreference.com/w/cpp/error/error_code/operator_cmp
+
         return 0;
     }
 }
@@ -688,81 +727,47 @@ std::size_t get_n_nodes(const expression &e)
 namespace detail
 {
 
-namespace
+expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<std::string, expression> &smap)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &smap](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
-                return expression{arg};
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (auto it = smap.find(arg.name()); it == smap.end()) {
-                    return expression{arg};
-                } else {
-                    return it->second;
-                }
-            } else {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed substitution on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
-
-                // Create the new args vector by running the
-                // substitution on all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap));
-                }
-
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(std::move(new_args));
-
-                // Put the return value in the cache.
-                auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
+    const auto subs_func = [&smap](const expression &ex) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            // Variable node.
+            if (const auto it = smap.find(var_ptr->name()); it != smap.end()) {
+                // The variable shows up in smap. Return the corresponding expression.
+                return it->second;
             }
-        },
-        ex.value());
-}
+        }
 
-} // namespace
+        // Non-variable node, or variable node which does *not* show up in smap.
+        // Just return it unchanged.
+        return ex;
+    };
+
+    return ex_traverse_transform_nodes(func_map, sargs_map, e, subs_func, {});
+}
 
 } // namespace detail
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    auto ret = detail::subs(func_map, e, smap);
-
-    return ret;
+    return detail::subs_impl(func_map, sargs_map, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
                              const std::unordered_map<std::string, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, e, smap));
     }
 
     return ret;
@@ -771,60 +776,163 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
 namespace detail
 {
 
-namespace
+expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const std::map<expression, expression> &smap)
 {
+    traverse_stack stack;
+    return_stack<expression> subs_stack;
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression subs(funcptr_map<expression> &func_map, const expression &ex, const std::map<expression, expression> &smap)
-{
-    if (auto it = smap.find(ex); it != smap.end()) {
-        // ex is in the substitution map, return the value it maps to.
-        return it->second;
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        // NOTE: the logic here is slightly different from the usual flow, in the sense
+        // that we want the lookup into func_map to happen *before* the lookup
+        // in smap. The reason is that the lookup in func_map is cheap, while the lookup
+        // in smap can potentially be costly. If we already performed substitution on
+        // cur_ex before, we want to take advantage of the cached result before performing
+        // expression comparisons in the smap lookup.
+        const auto *f_ptr = std::get_if<func>(&cur_ex->value());
+        if (f_ptr != nullptr) {
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_ptr->get_ptr()));
+            } else if (const auto it = func_map.find(f_ptr->get_ptr()); it != func_map.end()) {
+                // We already performed substitution on the current function,
+                // fetch the result from the cache.
+                subs_stack.emplace_back(it->second);
+                continue;
+            }
+        }
+
+        // Check if the current expression is in the substitution map.
+        // NOTE: no need to check if this is the second visit.
+        if (!visited) {
+            if (const auto it = smap.find(*cur_ex); it != smap.end()) {
+                // cur_ex is in the substitution map.
+
+                // If cur_ex is a function, record the result of the substitution into func_map.
+                if (f_ptr != nullptr) {
+                    const auto *f_id = f_ptr->get_ptr();
+                    func_map.emplace(f_id, it->second);
+                }
+
+                // Push to subs_stack the result of the substitution and move on.
+                subs_stack.emplace_back(it->second);
+                continue;
+            }
+        }
+
+        if (f_ptr != nullptr) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited and performed substitution on all the children of the function node
+                // (i.e., the function arguments). The results are at the tail end of subs_stack. We will be
+                // popping them from subs_stack and use them to initialise a new copy of the function.
+
+                // Build the new arguments.
+                std::vector<expression> new_args;
+                const auto n_args = f.args().size();
+                new_args.reserve(n_args);
+                for (decltype(new_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: the subs stack must not be empty and its last element
+                    // also cannot be empty.
+                    assert(!subs_stack.empty());
+                    assert(subs_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    new_args.push_back(std::move(*subs_stack.back()));
+                    subs_stack.pop_back();
+                }
+
+                // Create the new copy of the function.
+                auto ex_copy = [&]() {
+                    if (shared_args) {
+                        // NOTE: if the function manages its arguments via a shared reference, we must make
+                        // sure to record the new arguments in sargs_map, so that when we run again into the
+                        // same shared reference we re-use the cached result.
+                        auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(new_args));
+
+                        assert(!sargs_map.contains(&*shared_args));
+                        sargs_map.emplace(&*shared_args, new_sargs);
+
+                        return expression{f.make_copy_with_new_args(std::move(new_sargs))};
+                    } else {
+                        return expression{f.make_copy_with_new_args(std::move(new_args))};
+                    }
+                }();
+
+                // Add it to the cache.
+                func_map.emplace(f_id, ex_copy);
+
+                // Add it to subs_stack.
+                // NOTE: the subs stack must not be empty and its last element
+                // must be empty (it is supposed to be the empty function we
+                // pushed the first time we visited).
+                assert(!subs_stack.empty());
+                assert(!subs_stack.back());
+                subs_stack.back().emplace(std::move(ex_copy));
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check
+                    // if we already performed substitution on the arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // We performed substitution on the arguments before. Fetch the results from the cache and
+                        // use them to construct a new copy of the function.
+                        auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
+
+                        // Add the new function to the cache and to subs_stack.
+                        func_map.emplace(f_id, ex_copy);
+                        subs_stack.emplace_back(std::move(ex_copy));
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that we never performed substitution on the shared arguments
+                    // before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty function to subs_stack. The actual result of the substitution
+                // will be emplaced once we have performed substitution on all arguments.
+                subs_stack.emplace_back();
+            }
+        } else {
+            // Non-function (i.e., leaf) node which does *not* show up in smap. Add it
+            // unchanged to subs_stack.
+            assert(!visited);
+            subs_stack.emplace_back(*cur_ex);
+        }
     }
 
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &smap](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
+    assert(subs_stack.size() == 1u);
+    assert(subs_stack.back());
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed substitution on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
-
-                // Create the new args vector by running the
-                // substitution on all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap));
-                }
-
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(std::move(new_args));
-
-                // Put the return value in the cache.
-                auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
-            } else {
-                // ex is not a function and it does not show
-                // up in the substitution map. Thus, we can just
-                // return a copy of it unchanged.
-                return expression{arg};
-            }
-        },
-        ex.value());
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return std::move(*subs_stack.back());
 }
-
-} // namespace
 
 } // namespace detail
 
@@ -837,41 +945,26 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex, const s
 // to traverse the entire subexpression in order to compute its hash value.
 expression subs(const expression &e, const std::map<expression, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    auto ret = detail::subs(func_map, e, smap);
-
-    return ret;
+    return detail::subs_impl(func_map, sargs_map, e, smap);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> ret;
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
+        ret.push_back(detail::subs_impl(func_map, sargs_map, e, smap));
     }
 
     return ret;
 }
-
-namespace detail
-{
-
-taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &func_map, const expression &ex,
-                                        taylor_dc_t &dc)
-{
-    if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        return fptr->taylor_decompose(func_map, dc);
-    } else {
-        return 0;
-    }
-}
-
-} // namespace detail
 
 llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
@@ -915,42 +1008,16 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex)
+void get_param_size(auto &func_set, auto &sargs_set, std::uint32_t &retval, const expression &e)
 {
-    std::uint32_t retval = 0;
+    const auto vfunc = [&retval](const expression &ex) {
+        if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
+            const auto tmp = static_cast<std::uint32_t>(par_ptr->idx() + boost::safe_numerics::safe<std::uint32_t>(1));
+            retval = std::max(retval, tmp);
+        }
+    };
 
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&retval, &func_set]<typename T>(const T &v) {
-            if constexpr (std::same_as<T, param>) {
-                retval = v.idx() + boost::safe_numerics::safe<std::uint32_t>(1);
-            } else if constexpr (std::same_as<T, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (func_set.contains(f_id)) {
-                    // We already computed the number of params for the current
-                    // function, exit.
-                    // NOTE: we will be end up returning 0 as retval. This is ok
-                    // because the number of params for the current function was
-                    // already considered in the calculation.
-                    return;
-                }
-
-                // Recursively fetch the number of params from the function arguments.
-                for (const auto &a : v.args()) {
-                    retval = std::max(get_param_size(func_set, a), retval);
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            }
-        },
-        ex.value());
-
-    return retval;
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -962,19 +1029,25 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
 
-    return detail::get_param_size(func_set, ex);
+    std::uint32_t retval = 0;
+
+    detail::get_param_size(func_set, sargs_set, retval, ex);
+
+    return retval;
 }
 
 std::uint32_t get_param_size(const std::vector<expression> &v_ex)
 {
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
+
     std::uint32_t retval = 0;
 
-    detail::funcptr_set func_set;
-
     for (const auto &ex : v_ex) {
-        retval = std::max(retval, detail::get_param_size(func_set, ex));
+        detail::get_param_size(func_set, sargs_set, retval, ex);
     }
 
     return retval;
@@ -986,35 +1059,15 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
+void get_params(auto &func_set, auto &sargs_set, auto &idx_set, const expression &e)
 {
-    std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
+    const auto vfunc = [&idx_set](const expression &ex) {
+        if (const auto *par_ptr = std::get_if<param>(&ex.value())) {
+            idx_set.insert(par_ptr->idx());
+        }
+    };
 
-            if constexpr (std::is_same_v<type, param>) {
-                idx_set.insert(v.idx());
-            } else if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                if (auto it = func_set.find(f_id); it != func_set.end()) {
-                    // We already got the params for the current function, exit.
-                    return;
-                }
-
-                for (const auto &a : v.args()) {
-                    get_params(idx_set, func_set, a);
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-            }
-        },
-        ex.value());
+    ex_traverse_visit_leaves(func_set, sargs_set, e, vfunc);
 }
 
 } // namespace
@@ -1026,46 +1079,45 @@ void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set 
 // expressions sorted according to the indices.
 std::vector<expression> get_params(const expression &ex)
 {
-    std::unordered_set<std::uint32_t> idx_set;
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
 
-    // Write the indices of all parameters appearing in ex
-    // into idx_set.
-    detail::get_params(idx_set, func_set, ex);
+    boost::unordered_flat_set<std::uint32_t> idx_set;
 
-    // Transform idx_set into a sorted vector.
-    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::ranges::sort(idx_vec);
+    // Write the indices of all parameters appearing in ex into idx_set.
+    detail::get_params(func_set, sargs_set, idx_set, ex);
 
-    // Transform the sorted indices into a vector of
-    // sorted parameter expressions.
+    // Transform idx_set into a sorted vector of parameter expressions.
     std::vector<expression> retval;
-    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    retval.reserve(idx_set.size());
+    std::ranges::transform(idx_set, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::sort(retval, [](const auto &e1, const auto &e2) {
+        return std::get<param>(e1.value()).idx() < std::get<param>(e2.value()).idx();
+    });
 
     return retval;
 }
 
 std::vector<expression> get_params(const std::vector<expression> &v_ex)
 {
-    std::unordered_set<std::uint32_t> idx_set;
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
+
+    boost::unordered_flat_set<std::uint32_t> idx_set;
 
     // Write the indices of all parameters appearing in v_ex
     // into idx_set.
     for (const auto &e : v_ex) {
-        detail::get_params(idx_set, func_set, e);
+        detail::get_params(func_set, sargs_set, idx_set, e);
     }
 
-    // Transform idx_set into a sorted vector.
-    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
-    std::ranges::sort(idx_vec);
-
-    // Transform the sorted indices into a vector of
-    // sorted parameter expressions.
+    // Transform idx_set into a sorted vector of parameter expressions.
     std::vector<expression> retval;
-    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-    std::ranges::transform(idx_vec, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    retval.reserve(idx_set.size());
+    std::ranges::transform(idx_set, std::back_inserter(retval), [](auto idx) { return par[idx]; });
+    std::ranges::sort(retval, [](const auto &e1, const auto &e2) {
+        return std::get<param>(e1.value()).idx() < std::get<param>(e2.value()).idx();
+    });
 
     return retval;
 }
@@ -1076,51 +1128,18 @@ namespace detail
 namespace
 {
 
-// NOLINTNEXTLINE(misc-no-recursion)
-bool is_time_dependent(funcptr_set &func_set, const expression &ex)
+bool is_time_dependent(auto &func_set, auto &sargs_set, const expression &e)
 {
-    // - If ex is a function, check if it is time-dependent, or
-    //   if any of its arguments is time-dependent,
-    // - otherwise, return false.
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_set](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
+    const auto pred = [](const expression &ex) {
+        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+            return fptr->is_time_dependent();
+        } else {
+            // NOTE: non-function expressions cannot be time-dependent.
+            return false;
+        }
+    };
 
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = v.get_ptr();
-
-                // Did we already determine that v is *not* time-dependent?
-                if (const auto it = func_set.find(f_id); it != func_set.end()) {
-                    return false;
-                }
-
-                // Check if the function is intrinsically time-dependent.
-                if (v.is_time_dependent()) {
-                    return true;
-                }
-
-                // The function does *not* intrinsically depend on time.
-                // Check its arguments.
-                for (const auto &a : v.args()) {
-                    if (is_time_dependent(func_set, a)) {
-                        // A time-dependent argument was found, return true.
-                        return true;
-                    }
-                }
-
-                // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_set.emplace(f_id);
-
-                // An expression cannot contain itself.
-                assert(flag);
-
-                return false;
-            } else {
-                return false;
-            }
-        },
-        ex.value());
+    return ex_traverse_test_any(func_set, sargs_set, e, pred);
 }
 
 } // namespace
@@ -1130,19 +1149,21 @@ bool is_time_dependent(funcptr_set &func_set, const expression &ex)
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    // NOTE: this will contain pointers to (sub)expressions
-    // which are *not* time-dependent.
-    detail::funcptr_set func_set;
+    // NOTE: these sets will contain pointers to functions and
+    // arguments sets which are *not* time-dependent.
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
 
-    return detail::is_time_dependent(func_set, ex);
+    return detail::is_time_dependent(func_set, sargs_set, ex);
 }
 
 bool is_time_dependent(const std::vector<expression> &v_ex)
 {
-    detail::funcptr_set func_set;
+    detail::void_ptr_set func_set;
+    detail::sargs_ptr_set sargs_set;
 
     for (const auto &ex : v_ex) {
-        if (detail::is_time_dependent(func_set, ex)) {
+        if (detail::is_time_dependent(func_set, sargs_set, ex)) {
             return true;
         }
     }
@@ -1153,186 +1174,58 @@ bool is_time_dependent(const std::vector<expression> &v_ex)
 namespace detail
 {
 
-namespace
-{
-
-// NOTE: the default split value is a power of two so that the
-// internal pairwise sums are rounded up exactly.
-constexpr std::uint32_t decompose_split = 8u;
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already split sums on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Split sums on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(split_sums_for_decompose(func_map, orig_arg));
-                }
-
-                // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // After having taken care of the arguments, split
-                // v itself.
-                auto ret = sum_split(expression{std::move(f_copy)}, decompose_split);
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ret;
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
-
 std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    const auto tfunc = [](const expression &ex) {
+        // NOTE: split on a power of two so that the internal pairwise sums are rounded up exactly.
+        constexpr std::uint32_t decompose_split = 8;
+
+        return sum_split(ex, decompose_split);
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(split_sums_for_decompose(func_map, e));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
 }
-
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map, &ex, split](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already split prods on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Split prods on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(split_prods_for_decompose(func_map, orig_arg, split));
-                }
-
-                // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // After having taken care of the arguments, split
-                // v itself.
-                auto ret = prod_split(expression{std::move(f_copy)}, split);
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ret;
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
 
 std::vector<expression> split_prods_for_decompose(const std::vector<expression> &v_ex, std::uint32_t split)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    const auto tfunc = [split](const expression &ex) { return prod_split(ex, split); };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(split_prods_for_decompose(func_map, e, split));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
 }
-
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &v) {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already converted sums to sum_sqs on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Convert sums to sum_sqs on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(sums_to_sum_sqs_for_decompose(func_map, orig_arg));
-                }
-
-                // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(std::move(new_args));
-
-                // After having taken care of the arguments, convert
-                // v itself.
-                auto ret = sum_to_sum_sq(expression{std::move(f_copy)});
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return ret;
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
-} // namespace
 
 // Replace sum({square(x), square(y), ...}) with sum_sq({x, y, ...}).
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    const auto tfunc = [](const expression &ex) { return sum_to_sum_sq(ex); };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(sums_to_sum_sqs_for_decompose(func_map, e));
+        retval.push_back(ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;

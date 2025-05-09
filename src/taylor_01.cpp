@@ -10,14 +10,15 @@
 #include <cassert>
 #include <concepts>
 #include <cstdint>
-#include <deque>
 #include <exception>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <numeric>
-#include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -25,6 +26,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -48,7 +50,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -58,6 +60,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
@@ -150,7 +153,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
             [&](const auto &v) -> llvm::Type * {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, number>) {
+                if constexpr (std::same_as<type, number>) {
                     // For numbers, the argument is passed as a scalar
                     // floating-point value.
                     return val_t->getScalarType();
@@ -307,12 +310,11 @@ void taylor_c_store_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *diff_arr
 namespace
 {
 
-// Simplify a Taylor decomposition by removing
-// common subexpressions.
-// NOTE: the hidden deps are not considered for CSE
-// purposes, only the actual subexpressions.
-taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &sv_funcs_dc,
-                                 taylor_dc_t::size_type n_eq)
+// Simplify a Taylor decomposition by removing common subexpressions.
+//
+// NOTE: the hidden deps are not considered for CSE purposes, only the actual subexpressions.
+auto taylor_decompose_cse(const taylor_dc_t &v_ex, const std::vector<std::uint32_t> &sv_funcs_dc,
+                          const taylor_dc_t::size_type n_eq)
 {
     using idx_t = taylor_dc_t::size_type;
 
@@ -322,24 +324,28 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // Cache the original size for logging later.
     const auto orig_size = v_ex.size();
 
-    // A Taylor decomposition is supposed
-    // to have n_eq variables at the beginning,
-    // n_eq variables at the end and possibly
-    // extra variables in the middle.
+    // A Taylor decomposition is supposed to have n_eq variables at the beginning, n_eq variables at the end and
+    // possibly extra variables in the middle.
     assert(v_ex.size() >= n_eq * 2u);
 
-    // Init the return value.
-    taylor_dc_t retval;
+    // Init the new decomposition.
+    taylor_dc_t new_dc;
 
-    // expression -> idx map. This will end up containing
-    // all the unique expressions from v_ex, and it will
-    // map them to their indices in retval (which will
-    // in general differ from their indices in v_ex).
-    std::unordered_map<expression, idx_t> ex_map;
+    // expression -> idx map. This will end up containing all the unique expressions from v_ex, and it will
+    // map them to their indices in new_dc (which will in general differ from their indices in v_ex).
+    //
+    // NOTE: use std::map (rather than an unordered map) for the usual reason that comparison-based
+    // containers can perform better than hashing on account of the fact that comparison does not
+    // need to traverse the entire expression.
+    std::map<expression, idx_t> ex_map;
 
     // Map for the renaming of u variables
     // in the expressions.
     std::unordered_map<std::string, std::string> uvars_rename;
+
+    // NOTE: these are caches used in the renaming of the expressions in v_ex.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     // The first n_eq definitions are just renaming
     // of the state variables into u variables.
@@ -347,42 +353,44 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         assert(std::holds_alternative<variable>(v_ex[i].first.value()));
         // NOTE: no hidden deps allowed here.
         assert(v_ex[i].second.empty());
-        retval.push_back(std::move(v_ex[i]));
+        new_dc.push_back(v_ex[i]);
 
-        // NOTE: the u vars that correspond to state
-        // variables are never simplified,
-        // thus map them onto themselves.
+        // NOTE: the u vars that correspond to state variables are never simplified, thus they do not need remapping.
+        // However, we need them to show up in uvars_rename in case an sv func is identical to a state variable (because
+        // uvars rename will be used to remap the indices in sv_funcs_dc).
         [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
         assert(res.second);
     }
 
     // Handle the u variables which do not correspond to state variables.
     for (auto i = n_eq; i < v_ex.size() - n_eq; ++i) {
-        auto &[ex, deps] = v_ex[i];
+        const auto &[orig_ex, orig_deps] = v_ex[i];
 
-        // Rename the u variables in ex.
-        ex = rename_variables(ex, uvars_rename);
+        // Rename the u variables in orig_ex.
+        // NOTE: the point of using rename_variables_impl() with the caches, rather than rename_variables(), is that we
+        // want to avoid creating multiple copies of shared arguments.
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        if (auto it = ex_map.find(ex); it == ex_map.end()) {
-            // This is the first occurrence of ex in the
-            // decomposition. Add it to retval.
-            retval.emplace_back(ex, std::move(deps));
+        if (const auto it = ex_map.find(new_ex); it == ex_map.end()) {
+            // This is the first occurrence of new_ex in the
+            // decomposition. Add it to new_dc.
+            new_dc.emplace_back(new_ex, orig_deps);
 
-            // Add ex to ex_map, mapping it to
-            // the index it corresponds to in retval
+            // Add new_ex to ex_map, mapping it to
+            // the index it corresponds to in new_dc
             // (let's call it j).
-            ex_map.emplace(std::move(ex), retval.size() - 1u);
+            ex_map.emplace(std::move(new_ex), new_dc.size() - 1u);
 
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
             // elements of v_ex will be renamed to 'u_j'.
             [[maybe_unused]] const auto res
-                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", new_dc.size() - 1u));
             assert(res.second);
         } else {
-            // ex is redundant. This means
-            // that it already appears in retval at index
-            // it->second. Don't add anything to retval,
+            // new_ex is redundant. This means
+            // that it already appears in new_dc at index
+            // it->second. Don't add anything to new_dc,
             // and remap the variable name 'u_i' to
             // 'u_{it->second}'.
             [[maybe_unused]] const auto res
@@ -396,61 +404,59 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // the u variables in their definitions are renamed with
     // the new indices.
     for (auto i = v_ex.size() - n_eq; i < v_ex.size(); ++i) {
-        auto &[ex, deps] = v_ex[i];
+        const auto &[orig_ex, orig_deps] = v_ex[i];
 
-        // NOTE: here we expect only vars, numbers or params,
-        // and no hidden dependencies.
-        assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-               || std::holds_alternative<param>(ex.value()));
-        assert(deps.empty());
+        // NOTE: here we expect only non-func expressions and no hidden dependencies.
+        assert(!std::holds_alternative<func>(orig_ex.value()));
+        assert(orig_deps.empty());
 
-        ex = rename_variables(ex, uvars_rename);
+        auto new_ex = rename_variables_impl(func_map, sargs_map, orig_ex, uvars_rename);
 
-        retval.emplace_back(std::move(ex), std::move(deps));
+        // The new expression must not show up in ex_map.
+        assert(!ex_map.contains(new_ex));
+
+        new_dc.emplace_back(std::move(new_ex), orig_deps);
     }
 
     // Re-adjust all indices in the hidden dependencies in order to account
     // for the renaming of the uvars.
-    for (auto &[_, deps] : retval) {
+    for (auto &[_, deps] : new_dc) {
         for (auto &idx : deps) {
-            auto it = uvars_rename.find(fmt::format("u_{}", idx));
+            const auto it = uvars_rename.find(fmt::format("u_{}", idx));
             assert(it != uvars_rename.end());
             idx = uname_to_index(it->second);
         }
     }
 
     // Same for the indices in sv_funcs_dc.
-    for (auto &idx : sv_funcs_dc) {
-        auto it = uvars_rename.find(fmt::format("u_{}", idx));
+    std::vector<std::uint32_t> new_sv_funcs_dc;
+    new_sv_funcs_dc.reserve(sv_funcs_dc.size());
+    for (const auto idx : sv_funcs_dc) {
+        const auto it = uvars_rename.find(fmt::format("u_{}", idx));
         assert(it != uvars_rename.end());
-        idx = uname_to_index(it->second);
+        new_sv_funcs_dc.push_back(uname_to_index(it->second));
     }
 
-    get_logger()->debug("Taylor CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->debug("Taylor CSE reduced decomposition size from {} to {}", orig_size, new_dc.size());
     get_logger()->trace("Taylor CSE runtime: {}", sw);
 
-    return retval;
+    return std::make_pair(std::move(new_dc), std::move(new_sv_funcs_dc));
 }
 
-// Perform a topological sort on a graph representation
-// of a Taylor decomposition. This can improve performance
-// by grouping together operations that can be performed in parallel,
-// and it also makes compact mode much more effective by creating
-// clusters of subexpressions whose derivatives can be computed in
-// parallel.
-// NOTE: the original decomposition dc is already topologically sorted,
-// in the sense that the definitions of the u variables are already
-// ordered according to dependency. However, because the original decomposition
-// comes from a depth-first search, it has the tendency to group together
-// expressions which are dependent on each other. By doing another topological
-// sort, this time based on breadth-first search, we determine another valid
-// sorting in which independent operations tend to be clustered together.
-auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, taylor_dc_t::size_type n_eq)
+// Perform a topological sort on a graph representation of a Taylor decomposition. This can improve performance by
+// grouping together operations that can be performed in parallel, and it also makes compact mode much more effective by
+// creating clusters of subexpressions whose derivatives can be computed in parallel.
+//
+// NOTE: the original decomposition dc is already topologically sorted, in the sense that the definitions of the u
+// variables are already ordered according to dependency. However, because the original decomposition comes from a
+// depth-first search, it has the tendency to group together expressions which are dependent on each other. By doing
+// another topological sort, this time based on breadth-first search, we determine another valid sorting in which
+// independent operations tend to be clustered together.
+auto taylor_sort_dc(const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc,
+                    const taylor_dc_t::size_type n_eq)
 {
-    // A Taylor decomposition is supposed
-    // to have n_eq variables at the beginning,
-    // n_eq variables at the end and possibly
-    // extra variables in the middle
+    // A Taylor decomposition is supposed to have n_eq variables at the beginning, n_eq variables at the end and
+    // possibly extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
 
     // Log runtime in trace mode.
@@ -473,18 +479,24 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     const auto root_v = boost::add_vertex(g);
 
     // Add the nodes corresponding to the state variables.
-    for (decltype(n_eq) i = 0; i < n_eq; ++i) {
-        auto v = boost::add_vertex(g);
+    for (taylor_dc_t::size_type i = 0; i < n_eq; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Add a dependency on the root node.
         boost::add_edge(root_v, v, g);
     }
 
     // Add the rest of the u variables.
-    for (decltype(n_eq) i = n_eq; i < dc.size() - n_eq; ++i) {
-        auto v = boost::add_vertex(g);
+    for (taylor_dc_t::size_type i = n_eq; i < dc.size() - n_eq; ++i) {
+        const auto v = boost::add_vertex(g);
 
         // Fetch the list of variables in the current expression.
+        //
+        // NOTE: performance with large shared arguments sets here will be quite poor, as we will keep on creating new
+        // deep copies of the same set of arguments over and over. This is not currently a practical concern because
+        // taylor_sort_dc() is at the moment called only in Taylor integrators, which are not supported by dfun (which
+        // is the only use of shared arguments we have thus far). If this becomes an issue in the future, we will have
+        // to think of an alternative API that avoids the explosion in complexity.
         const auto vars = get_variables(dc[i].first);
 
         if (vars.empty()) {
@@ -522,7 +534,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
 
     // The set of all nodes with no incoming edge.
-    std::deque<decltype(dc.size())> tmp;
+    boost::container::deque<decltype(dc.size())> tmp;
     // The root node has no incoming edge.
     tmp.push_back(0);
 
@@ -568,9 +580,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     assert(v_idx.size() == boost::num_vertices(g));
     assert(boost::num_edges(g) == 0u);
 
-    // Adjust v_idx: remove the index of the root node,
-    // decrease by one all other indices, insert the final
-    // n_eq indices.
+    // Adjust v_idx: remove the index of the root node decrease by one all other indices, insert the final n_eq indices.
     for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
         v_idx[i] = v_idx[i + 1u] - 1u;
     }
@@ -579,10 +589,9 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
 
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
-    // NOTE: the u vars that correspond to state
-    // variables were inserted into v_idx in the original
-    // order, thus they are not re-sorted and they do not
-    // need renaming.
+    // NOTE: the u vars that correspond to state variables were inserted into v_idx in the original order, thus they are
+    // not re-sorted and they do not need renaming. However, we need them to show up in 'remap' because sv funcs might
+    // be state variables, and when remapping sv funcs below we are relying on them showing up in 'remap'.
     for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
         assert(v_idx[i] == i);
         [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
@@ -595,33 +604,43 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         assert(res.second);
     }
 
-    // Do the remap for the definitions of the u variables, the
-    // derivatives and the hidden deps.
-    for (auto *it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
-        // Remap the expression.
-        it->first = rename_variables(it->first, remap);
+    // NOTE: these are caches used in the renaming of the expressions in dc.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-        // Remap the hidden dependencies.
-        for (auto &idx : it->second) {
-            auto it_remap = remap.find(fmt::format("u_{}", idx));
-            assert(it_remap != remap.end());
-            idx = uname_to_index(it_remap->second);
-        }
-    }
+    // Do the reordering and remapping of the decomposition.
+    auto dc_transform_view = v_idx | std::views::transform([&dc](auto idx) -> const auto & { return dc[idx]; })
+                             | std::views::transform([&func_map, &sargs_map, &remap](const auto &p) {
+                                   const auto &[ex, deps] = p;
+
+                                   // Remap the expression.
+                                   // NOTE: the point of using rename_variables_impl() with the caches, rather than
+                                   // rename_variables(), is that we want to avoid creating multiple copies of shared
+                                   // arguments.
+                                   auto new_ex = rename_variables_impl(func_map, sargs_map, ex, remap);
+
+                                   // Remap the hidden deps.
+                                   std::vector<std::uint32_t> new_deps;
+                                   new_deps.reserve(deps.size());
+                                   for (const auto idx : deps) {
+                                       const auto it_remap = remap.find(fmt::format("u_{}", idx));
+                                       assert(it_remap != remap.end());
+                                       new_deps.push_back(uname_to_index(it_remap->second));
+                                   }
+
+                                   return std::make_pair(std::move(new_ex), std::move(new_deps));
+                               });
 
     // Do the remap for sv_funcs.
-    for (auto &idx : sv_funcs_dc) {
-        auto it_remap = remap.find(fmt::format("u_{}", idx));
-        assert(it_remap != remap.end());
-        idx = uname_to_index(it_remap->second);
-    }
+    auto sv_funcs_dc_transform_view = sv_funcs_dc | std::views::transform([&remap](auto idx) {
+                                          const auto it_remap = remap.find(fmt::format("u_{}", idx));
+                                          assert(it_remap != remap.end());
+                                          return uname_to_index(it_remap->second);
+                                      });
 
-    // Reorder the decomposition.
-    taylor_dc_t retval;
-    retval.reserve(v_idx.size());
-    for (auto idx : v_idx) {
-        retval.push_back(std::move(dc[idx]));
-    }
+    auto retval = std::make_pair(
+        std::vector(std::ranges::begin(dc_transform_view), std::ranges::end(dc_transform_view)),
+        std::vector(std::ranges::begin(sv_funcs_dc_transform_view), std::ranges::end(sv_funcs_dc_transform_view)));
 
     get_logger()->trace("Taylor topological sort runtime: {}", sw);
 
@@ -776,69 +795,38 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
     }
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
-expression pow_to_explog(funcptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&]<typename T>(const T &v) {
-            if constexpr (std::same_as<T, func>) {
-                const auto *f_id = v.get_ptr();
-
-                // Check if we already performed the transformation on ex.
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Perform the transformation on the function arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(v.args().size());
-                for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(pow_to_explog(func_map, orig_arg));
-                }
-
-                // Prepare the return value.
-                std::optional<expression> retval;
-
-                if (v.template extract<detail::pow_impl>() != nullptr
-                    && !std::holds_alternative<number>(new_args[1].value())) {
-                    // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
-                    //
-                    // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
-                    // is a number. For instance, if we have pow(2_dbl, par[0]), then we would end up computing
-                    // log(2) in double precision. This would result in an inaccurate result if the fp type
-                    // or precision in use during integration is higher than double.
-                    // NOTE: because the exponent is not a number, no other constant folding should take
-                    // place here.
-                    retval.emplace(exp(new_args[1] * expression{func{detail::log_impl(new_args[0])}}));
-                } else {
-                    // Create a copy of v with the new arguments.
-                    retval.emplace(v.copy(std::move(new_args)));
-                }
-
-                // Put the return value into the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
-                // NOTE: an expression cannot contain itself.
-                assert(flag); // LCOV_EXCL_LINE
-
-                return std::move(*retval);
-            } else {
-                return ex;
-            }
-        },
-        ex.value());
-}
-
 // Helper to transform x**y -> exp(y*log(x)), if y is not a number.
 std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+
+    const auto tfunc = [](const expression &ex) {
+        const auto &f = std::get<func>(ex.value());
+        const auto &args = f.args();
+
+        if (f.extract<detail::pow_impl>() != nullptr && !std::holds_alternative<number>(args[1].value())) {
+            // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
+            //
+            // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
+            // is a number. For instance, if we have pow(2_dbl, par[0]), then we would end up computing
+            // log(2) in double precision. This would result in an inaccurate result if the fp type
+            // or precision in use during integration is higher than double.
+            // NOTE: because the exponent is not a number, no other constant folding should take
+            // place here.
+            return exp(args[1] * expression{func{detail::log_impl(args[0])}});
+        } else {
+            // The function is not a pow(), or it is a pow() whose exponent is a number. Return
+            // it unchanged.
+            return ex;
+        }
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(pow_to_explog(func_map, e));
+        retval.push_back(detail::ex_traverse_transform_nodes(func_map, sargs_map, e, {}, tfunc));
     }
 
     return retval;
@@ -920,12 +908,13 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     spdlog::stopwatch sw;
 
     // Run the decomposition on the equations.
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
+    detail::void_ptr_map<const taylor_dc_t::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (std::vector<expression>::size_type i = 0; i < n_eq; ++i) {
         const auto &ex = all_ex[i];
 
         // Decompose the current equation.
-        if (const auto dres = detail::taylor_decompose(func_map, ex, u_vars_defs)) {
+        if (const auto dres = detail::taylor_decompose(func_map, sargs_map, ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.
@@ -933,11 +922,10 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            outs.emplace_back(fmt::format("u_{}", dres), std::vector<std::uint32_t>{});
+            assert(std::holds_alternative<func>(ex.value()));
+            outs.emplace_back(fmt::format("u_{}", *dres), std::vector<std::uint32_t>{});
         } else {
-            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-                   || std::holds_alternative<param>(ex.value()));
-
+            assert(!std::holds_alternative<func>(ex.value()));
             outs.emplace_back(ex, std::vector<std::uint32_t>{});
         }
     }
@@ -952,12 +940,14 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
         if (const auto *const var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = detail::taylor_decompose(func_map, sv_ex, u_vars_defs)) {
+        } else if (const auto dres = detail::taylor_decompose(func_map, sargs_map, sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
-            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(dres));
-        } else {
+            assert(std::holds_alternative<func>(sv_ex.value()));
+            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(*dres));
+        } else [[unlikely]] {                                     // LCOV_EXCL_LINE
+            assert(!std::holds_alternative<func>(sv_ex.value())); // LCOV_EXCL_LINE
             // The sv_func was not decomposed, meaning it's a const/param.
             throw std::invalid_argument(
                 "The extra functions in a Taylor decomposition cannot be constants or parameters");
@@ -979,7 +969,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     // Simplify the decomposition.
     // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
     // the size of the Taylor decomposition is always > n_eq anyway.
-    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
+    std::tie(u_vars_defs, sv_funcs_dc) = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
@@ -990,7 +980,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     // Run the breadth-first topological sort on the decomposition.
     // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
     // the size of the Taylor decomposition is always > n_eq anyway.
-    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
+    std::tie(u_vars_defs, sv_funcs_dc) = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.

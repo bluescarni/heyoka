@@ -24,11 +24,12 @@
 #include <llvm/IR/IRBuilder.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -79,11 +80,10 @@ TEST_CASE("func minimal")
 
     auto *fp_t = s.builder().getDoubleTy();
 
-    detail::funcptr_map<expression> func_map;
-    REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(diff(expression{f}, ""), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
-    REQUIRE_THROWS_MATCHES(f.diff(func_map, std::get<param>(par[0].value())), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(diff(expression{f}, std::get<param>(par[0].value())), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
@@ -141,11 +141,6 @@ TEST_CASE("func minimal")
         Message("Zero number of u variables detected in func::taylor_c_diff_func() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func(s, fp_t, 2, 1, false), not_implemented_error,
                            Message("Taylor diff in compact mode is not implemented for the function 'f'"));
-
-    taylor_dc_t dec{{"x"_var, {}}};
-    f = func{func_00{{"x"_var, "y"_var}}};
-    detail::funcptr_map<taylor_dc_t::size_type> func_map2;
-    f.taylor_decompose(func_map2, dec);
 
     // A few tests for shared arguments semantics.
     {
@@ -235,8 +230,7 @@ TEST_CASE("func diff")
 {
     using Catch::Matchers::Message;
 
-    detail::funcptr_map<expression> func_map;
-    REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(diff(expression{func{func_05a{{"x"_var}}}}, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
 }
@@ -281,26 +275,29 @@ TEST_CASE("func taylor_decompose")
 {
     using Catch::Matchers::Message;
 
-    auto f = func(func_10{{"x"_var}});
+    auto f = expression{func(func_10{{"x"_var}})};
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
-    REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
+    detail::void_ptr_map<const taylor_dc_t::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+    REQUIRE(detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
     func_map = {};
-
-    f = func(func_10a{{"x"_var}});
+    sargs_map = {};
+    f = expression{func(func_10a{{"x"_var}})};
 
     REQUIRE_THROWS_MATCHES(
-        f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
-        Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
+        detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs), std::invalid_argument,
+        Message("Invalid value returned by the Taylor decomposition of a function: "
                 "the return value is 3, which is not less than the current size of the decomposition "
                 "(3)"));
 
-    f = func(func_10b{{"x"_var}});
+    func_map = {};
+    sargs_map = {};
+    f = expression{func(func_10b{{"x"_var}})};
 
-    REQUIRE_THROWS_MATCHES(f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(detail::taylor_decompose(func_map, sargs_map, f, u_vars_defs), std::invalid_argument,
                            Message("The return value for the Taylor decomposition of a function can never be zero"));
 }
 
@@ -387,16 +384,6 @@ TEST_CASE("func ostream")
     REQUIRE(oss.str() == "f(y)");
 }
 
-TEST_CASE("func hash")
-{
-    auto f1 = func(func_10{{"x"_var, "y"_var}});
-
-    detail::funcptr_map<std::size_t> tmp;
-    REQUIRE_NOTHROW(f1.hash(tmp));
-
-    std::cout << "Hash value for f1: " << f1.hash(tmp) << '\n';
-}
-
 struct func_14 : func_base {
     func_14(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
     {
@@ -408,11 +395,10 @@ TEST_CASE("func eq ineq")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
-    detail::funcptr_map<std::size_t> tmp;
+    detail::void_ptr_map<std::size_t> tmp;
 
     REQUIRE(f1 == f1);
     REQUIRE(!(f1 != f1));
-    REQUIRE(f1.hash(tmp) == f1.hash(tmp));
 
     // Differing arguments.
     auto f2 = func(func_10{{"y"_var, "x"_var}});
@@ -660,7 +646,7 @@ TEST_CASE("ref semantics")
     REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 }
 
-TEST_CASE("copy")
+TEST_CASE("make_copy_with_new_args value")
 {
     using Catch::Matchers::Message;
 
@@ -669,16 +655,16 @@ TEST_CASE("copy")
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
 
     // Error mode.
-    REQUIRE_THROWS_MATCHES(
-        expression{std::get<func>(foo.value()).copy({x})}, std::invalid_argument,
-        Message("The set of new arguments passed to func::copy() has a size of 1, but the number of arguments "
-                "of the original function is 2 (the two sizes must be equal)"));
+    REQUIRE_THROWS_MATCHES(expression{std::get<func>(foo.value()).make_copy_with_new_args({x})}, std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() has a size of "
+                                   "1, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
 
     std::vector new_args = {x, y};
 
     auto new_args_ptr = new_args.data();
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy(std::move(new_args))};
+    auto foo_copy = expression{std::get<func>(foo.value()).make_copy_with_new_args(std::move(new_args))};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
@@ -686,17 +672,26 @@ TEST_CASE("copy")
     // Check the new arguments.
     REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
     REQUIRE(std::get<func>(foo_copy.value()).args().data() == new_args_ptr);
+
+    // Check that we cannot use the value overload of make_copy_with_new_args() with a shared-args func.
+    func f_s(func_00_s{{"y"_var, "x"_var}});
+    REQUIRE_THROWS_MATCHES(
+        expression{f_s.make_copy_with_new_args(std::vector{"y"_var, "x"_var})}, std::invalid_argument,
+        Message("Cannot invoke func::make_copy_with_new_args() with a non-shared arguments set if the "
+                "function manages its arguments via a shared reference"));
 }
 
-TEST_CASE("shared_func_base copy")
+TEST_CASE("make_copy_with_new_args shared")
 {
+    using Catch::Matchers::Message;
+
     func f_s(func_00_s{{"y"_var, "x"_var}});
 
     std::vector new_args = {"x"_var, "y"_var};
 
-    auto new_args_ptr = new_args.data();
+    const auto *new_args_ptr = new_args.data();
 
-    auto foo_copy = f_s.copy(std::move(new_args));
+    auto foo_copy = f_s.make_copy_with_new_args(std::make_shared<const std::vector<expression>>(std::move(new_args)));
 
     // Check that copy creates a new obejct.
     REQUIRE(foo_copy.get_ptr() != f_s.get_ptr());
@@ -704,6 +699,30 @@ TEST_CASE("shared_func_base copy")
     // Check the new arguments.
     REQUIRE(foo_copy.args() == std::vector{"x"_var, "y"_var});
     REQUIRE(foo_copy.args().data() == new_args_ptr);
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(f_s.make_copy_with_new_args(func_args::shared_args_t{}), std::invalid_argument,
+                           Message("Cannot invoke func::make_copy_with_new_args() with a null pointer argument"));
+    REQUIRE_THROWS_MATCHES(f_s.make_copy_with_new_args(
+                               std::make_shared<const std::vector<expression>>(std::vector{"x"_var, "y"_var, "z"_var})),
+                           std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() "
+                                   "has a size of 3, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    REQUIRE_THROWS_MATCHES(
+        std::get<func>(foo.value())
+            .make_copy_with_new_args(std::make_shared<const std::vector<expression>>(std::vector{"y"_var, "x"_var})),
+        std::invalid_argument,
+        Message("Cannot invoke func::make_copy_with_new_args() with a shared arguments set if the "
+                "function does not manage its arguments via a shared reference"));
+    REQUIRE_THROWS_MATCHES(std::get<func>(foo.value()).make_copy_with_new_args(std::vector{"y"_var}),
+                           std::invalid_argument,
+                           Message("The set of new arguments passed to func::make_copy_with_new_args() "
+                                   "has a size of 1, but the number of arguments "
+                                   "of the original function is 2 (the two sizes must be equal)"));
 }
 
 // Bug: a default-constructed function is not serialisable.
@@ -794,7 +813,7 @@ TEST_CASE("func lt")
     REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
 }
 
-TEST_CASE("shared_func_base cmp")
+TEST_CASE("shared args cmp")
 {
     using Catch::Matchers::Message;
 

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -28,6 +29,8 @@
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -36,8 +39,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dtens_impl.hpp>
-#include <heyoka/detail/fast_unordered.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -54,100 +56,224 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-expression diff(funcptr_map<expression> &func_map, const expression &e, const std::string &s)
+namespace
 {
-    return std::visit(
-        [&func_map, &s](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
 
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
-                    arg.value());
-            } else if constexpr (std::is_same_v<type, param>) {
-                return 0_dbl;
-            } else if constexpr (std::is_same_v<type, variable>) {
-                if (s == arg.name()) {
+// Implementation of expression diff wrt a variable or a parameter.
+//
+// NOTE: this is quite similar to ex_traverse_transform_nodes(), but unfortunately we need access to the original
+// arguments of the function in order to compute derivatives via the chain rule, and ex_traverse_transform_nodes()
+// instead applies the branch node transformation function *after* the arguments have already been replaced with their
+// derivatives. Hence, we have a custom implementation of this traversal. Perhaps in the future we can try to generalise
+// ex_traverse_transform_nodes() for this use case.
+template <typename T>
+    requires std::same_as<T, std::string> || std::same_as<T, param>
+expression diff_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<const func_args::shared_args_t> &sargs_map,
+                     const expression &e, const T &diff_arg)
+{
+    // The leaf transformation function.
+    const auto leaf_tfunc = [&diff_arg](const expression &e) {
+        if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+            // The leaf is a number, its derivative is always zero. Make sure to create the zero with the correct type.
+            return std::visit([]<typename U>(const U &) { return expression{number{static_cast<U>(0)}}; },
+                              num_ptr->value());
+        } else if (const auto *par_ptr = std::get_if<param>(&e.value())) {
+            // The leaf is a param.
+            if constexpr (std::same_as<T, param>) {
+                // We are differentiating wrt a param.
+                if (par_ptr->idx() == diff_arg.idx()) {
                     return 1_dbl;
                 } else {
                     return 0_dbl;
                 }
             } else {
-                const auto f_id = arg.get_ptr();
-
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed diff on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
-                }
-
-                auto ret = arg.diff(func_map, s);
-
-                // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
+                // We are differentiating wrt a variable.
+                return 0_dbl;
             }
-        },
-        e.value());
-}
+        } else {
+            // The leaf is a variable.
+            const auto &var = std::get<variable>(e.value());
 
-expression diff(funcptr_map<expression> &func_map, const expression &e, const param &p)
-{
-    return std::visit(
-        [&func_map, &p](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
-                    arg.value());
-            } else if constexpr (std::is_same_v<type, param>) {
-                if (p.idx() == arg.idx()) {
+            if constexpr (std::same_as<T, param>) {
+                // We are differentiating wrt a param.
+                return 0_dbl;
+            } else {
+                // We are differentiating wrt a variable.
+                if (var.name() == diff_arg) {
                     return 1_dbl;
                 } else {
                     return 0_dbl;
                 }
-            } else if constexpr (std::is_same_v<type, variable>) {
-                return 0_dbl;
-            } else {
-                const auto f_id = arg.get_ptr();
+            }
+        }
+    };
 
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    // We already performed diff on the current function,
-                    // fetch the result from the cache.
-                    return it->second;
+    traverse_stack stack;
+    return_stack<expression> out_stack;
+
+    // Seed the stack.
+    stack.emplace_back(&e, false);
+
+    while (!stack.empty()) {
+        // Pop the traversal stack.
+        const auto [cur_ex, visited] = stack.back();
+        stack.pop_back();
+
+        if (const auto *f_ptr = std::get_if<func>(&cur_ex->value())) {
+            // Function (i.e., internal) node.
+            const auto &f = *f_ptr;
+
+            // Fetch the function id.
+            const auto *f_id = f.get_ptr();
+
+            if (visited) {
+                // NOTE: if this is the second visit, we know that the the function cannot possibly be in the cache,
+                // and thus we can avoid an unnecessary lookup.
+                assert(!func_map.contains(f_id));
+            } else if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already differentiated the current function. Fetch the result from the cache and add it to
+                // out_stack.
+                out_stack.emplace_back(it->second);
+                continue;
+            }
+
+            // Check if the function manages its arguments via a shared reference.
+            const auto shared_args = f.shared_args();
+
+            if (visited) {
+                // We have now visited and differentiated all the children of the function node (i.e., the function
+                // arguments). The results are at the tail end of out_stack. We will be popping them from out_stack and
+                // use them to differentiate the function.
+
+                // Build the set of differentiated arguments.
+                std::vector<expression> diff_args;
+                const auto n_args = f.args().size();
+                diff_args.reserve(n_args);
+                for (decltype(diff_args.size()) i = 0; i < n_args; ++i) {
+                    // NOTE: out_stack must not be empty and its last element also cannot be empty.
+                    assert(!out_stack.empty());
+                    assert(out_stack.back());
+
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    diff_args.push_back(std::move(*out_stack.back()));
+                    out_stack.pop_back();
                 }
 
-                auto ret = arg.diff(func_map, p);
+                // Compute the gradient of the function wrt the original arguments.
+                const auto grad = f.gradient();
 
-                // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
+                // Build the arguments for the sum of derivatives (i.e., the total derivative).
+                std::vector<expression> sum_args;
+                sum_args.reserve(n_args);
+                for (decltype(sum_args.size()) i = 0; i < n_args; ++i) {
+                    sum_args.push_back(grad[i] * diff_args[i]);
+                }
 
-                return ret;
+                if (shared_args) {
+                    // NOTE: if the function manages its arguments via a shared reference, we must make
+                    // sure to record the differentiated arguments in sargs_map, so that when we run again into the
+                    // same shared reference we re-use the cached result.
+                    auto new_sargs = std::make_shared<const std::vector<expression>>(std::move(diff_args));
+
+                    assert(!sargs_map.contains(&*shared_args)); // LCOV_EXCL_LINE
+                    sargs_map.emplace(&*shared_args, new_sargs);
+                }
+
+                // Create the derivative of the function.
+                auto ex_diff = sum(std::move(sum_args));
+
+                // Add it to the cache.
+                func_map.emplace(f_id, ex_diff);
+
+                // Add it to out_stack.
+                // NOTE: out_stack must not be empty and its last element must be empty (it is supposed to be
+                // the empty function we pushed the first time we visited).
+                assert(!out_stack.empty());
+                assert(!out_stack.back());
+                out_stack.back().emplace(std::move(ex_diff));
+            } else {
+                // It is the first time we visit this function.
+                if (shared_args) {
+                    // The function manages its arguments via a shared reference. Check if we already differentiated the
+                    // arguments before.
+                    if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
+                        // The arguments have been differentiated before. Fetch them from the cache and
+                        // use them to compute the derivative of the function.
+                        const auto &diff_args = *it->second;
+                        const auto n_args = diff_args.size();
+
+                        // Compute the gradient of the function wrt the original arguments.
+                        const auto grad = f.gradient();
+                        assert(n_args == grad.size()); // LCOV_EXCL_LINE
+
+                        // Build the arguments for the sum of derivatives (i.e., the total derivative).
+                        std::vector<expression> sum_args;
+                        sum_args.reserve(n_args);
+                        for (decltype(sum_args.size()) i = 0; i < n_args; ++i) {
+                            sum_args.push_back(grad[i] * diff_args[i]);
+                        }
+
+                        // Create the derivative of the function.
+                        auto ex_diff = sum(std::move(sum_args));
+
+                        // Add the new function to the cache and to out_stack.
+                        func_map.emplace(f_id, ex_diff);
+                        out_stack.emplace_back(std::move(ex_diff));
+
+                        continue;
+                    }
+
+                    // NOTE: if we arrive here, it means that the shared arguments of the function have never
+                    // been differentiated before. We thus fall through the usual visitation process.
+                    ;
+                }
+
+                // Re-add the function to the stack with visited=true, and add all of its
+                // arguments to the stack as well.
+                stack.emplace_back(cur_ex, true);
+
+                for (const auto &ex : f.args()) {
+                    stack.emplace_back(&ex, false);
+                }
+
+                // Add an empty expression to out_stack. We will create its derivative once we have differentiated all
+                // arguments.
+                out_stack.emplace_back();
             }
-        },
-        e.value());
+        } else {
+            // Non-function (i.e., leaf) node.
+            assert(!visited);
+
+            // Differentiate the leaf node and add the result to out_stack.
+            out_stack.emplace_back(leaf_tfunc(*cur_ex));
+        }
+    }
+
+    assert(out_stack.size() == 1u);
+    assert(out_stack.back());
+
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    return std::move(*out_stack.back());
 }
+
+} // namespace
 
 } // namespace detail
 
 expression diff(const expression &e, const std::string &s)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::diff(func_map, e, s);
+    return detail::diff_impl(func_map, sargs_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    detail::funcptr_map<expression> func_map;
+    detail::void_ptr_map<const expression> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
-    return detail::diff(func_map, e, p);
+    return detail::diff_impl(func_map, sargs_map, e, p);
 }
 
 namespace detail
@@ -158,13 +284,14 @@ namespace
 
 std::vector<expression> diff_vec_impl(const std::vector<expression> &v_ex, const auto &x)
 {
-    funcptr_map<expression> func_map;
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &ex : v_ex) {
-        retval.push_back(diff(func_map, ex, x));
+        retval.push_back(diff_impl(func_map, sargs_map, ex, x));
     }
 
     return retval;
@@ -291,10 +418,11 @@ diff_decompose(const std::vector<expression> &v_ex_)
     spdlog::stopwatch sw;
 
     // Run the decomposition.
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    detail::void_ptr_map<const std::vector<expression>::size_type> func_map;
+    detail::sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (const auto &ex : v_ex) {
         // Decompose the current component.
-        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+        if (const auto dres = detail::decompose(func_map, sargs_map, ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
             // then the output is a u variable.
@@ -342,18 +470,8 @@ diff_decompose(const std::vector<expression> &v_ex_)
 
 #endif
 
-    // Run the breadth-first topological sort on the decomposition.
-    // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars + npars items.
-    ret = function_sort_dc(ret, nvars + npars, nouts);
-
-#if !defined(NDEBUG)
-
-    // Verify the decomposition.
-    verify_function_dec(v_ex_verify, ret, nvars + npars, true);
-
-#endif
-
+    // NOTE: we do not run here the topological sorting like we do in cfuncs and Taylor integrators, as I do not see at
+    // this time any benefit in doing so.
     return {std::move(ret), nvars + npars};
 }
 
@@ -377,7 +495,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // Do an initial pass to create the adjoints, the
     // vectors of direct and reverse dependencies,
     // and the substitution map.
-    std::vector<fast_umap<std::uint32_t, expression>> adj;
+    std::vector<boost::unordered_flat_map<std::uint32_t, expression>> adj;
     adj.resize(boost::numeric_cast<decltype(adj.size())>(dc.size()));
 
     std::vector<std::vector<std::uint32_t>> dep;
@@ -393,7 +511,6 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         // The initial definitions must all consist of
         // variables or parameters.
         assert(std::holds_alternative<variable>(dc[i].value()) || std::holds_alternative<param>(dc[i].value()));
-        assert(subs(dc[i], subs_map) == dc[i]);
 
         // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions,
         // we only need to fill in subs_map.
@@ -405,8 +522,12 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // NOTE: as usual, use a sorted map (instead of a hash map) in order
     // to avoid non-deterministic ordering of operations.
     // NOTE: if this turns out to be a bottleneck, we can always
-    // re-implement in terms of fast_umap and manually sort after construction.
+    // re-implement in terms of boost::unordered_flat_map and manually sort after construction.
     std::map<std::string, std::vector<expression>> grad_map;
+
+    // NOTE: these are caches used in the construction of subs_map.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
 
     // Elementary subexpressions.
     for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
@@ -462,7 +583,10 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         }
 
         assert(!subs_map.contains(fmt::format("u_{}", i)));
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+        subs_map.emplace(fmt::format("u_{}", i),
+                         // NOTE: the point of using subs_impl() with the caches, rather than subs(), is that we want
+                         // to avoid creating multiple copies of shared arguments.
+                         subs_impl(func_map, sargs_map, dc[i], subs_map));
     }
 
     // Outputs.
@@ -578,7 +702,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
 // This is an alternative version of dtens_sv_idx_t that uses a dictionary
 // for storing the index/order pairs instead of a sorted vector. Using a dictionary
 // allows for faster/easier manipulation.
-using dtens_ss_idx_t = std::pair<std::uint32_t, fast_umap<std::uint32_t, std::uint32_t>>;
+using dtens_ss_idx_t = std::pair<std::uint32_t, boost::unordered_flat_map<std::uint32_t, std::uint32_t>>;
 
 // Helper to turn a dtens_sv_idx_t into a dtens_ss_idx_t.
 void vidx_v2s(dtens_ss_idx_t &output, const dtens_sv_idx_t &input)
@@ -677,7 +801,7 @@ void diff_tensors_forward_impl(
     // in the decomposition. This is used to locate diff arguments
     // in the decomposition.
     const auto input_idx_map = [&]() {
-        fast_umap<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
+        boost::unordered_flat_map<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
 
         for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
             const auto &cur_in = dc[i];
@@ -696,7 +820,7 @@ void diff_tensors_forward_impl(
     // to prevent duplicates. For order-1 derivatives, no duplicate
     // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
-    using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
+    using diff_map_t = boost::unordered_flat_map<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
     using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
     auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
@@ -714,7 +838,7 @@ void diff_tensors_forward_impl(
     // to avoid iterating over those subexpressions which do not depend on
     // an input. We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    fast_uset<std::uint32_t> in_deps;
+    boost::unordered_flat_set<std::uint32_t> in_deps;
     std::vector<std::uint32_t> sorted_in_deps;
 
     // A stack to be used when filling up in_deps/sorted_in_deps.
@@ -915,7 +1039,7 @@ void diff_tensors_reverse_impl(
     // to prevent duplicates. For order-1 derivatives, no duplicate
     // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
-    using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
+    using diff_map_t = boost::unordered_flat_map<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
     using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
     auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
@@ -940,7 +1064,7 @@ void diff_tensors_reverse_impl(
     // does not depend (recall that the decomposition contains the subexpressions
     // for ALL outputs). We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    fast_uset<std::uint32_t> out_deps;
+    boost::unordered_flat_set<std::uint32_t> out_deps;
     std::vector<std::uint32_t> sorted_out_deps;
 
     // A stack to be used when filling up out_deps/sorted_out_deps.
@@ -1049,7 +1173,7 @@ void diff_tensors_reverse_impl(
         // to fetch from diffs only the derivatives we are interested in
         // (since there may be vars/params in the decomposition wrt which
         // the derivatives are not requested).
-        fast_umap<expression, expression, std::hash<expression>> dmap;
+        boost::unordered_flat_map<expression, expression, std::hash<expression>> dmap;
         for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
             [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
             assert(flag);
@@ -1276,6 +1400,30 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // Do the substitution.
         subs_ret = subs(subs_ret, subs_map);
 
+        // NOTE: the substitution we just performed results in deep copies of shared arguments. The reason is as
+        // follows.
+        //
+        // subs_map maps "u_i" strings to expressions containing the original variables/parameters. subs_ret, instead,
+        // is expressed in terms of the u_i variables, representing the result of the differentiation process. The
+        // purpose of the substitution is to express the result of the differentiation process in terms of the original
+        // variables/parameters (rather than in terms of u_i variables).
+        //
+        // If the expressions that were differentiated originally contained shared arguments, these sets of shared
+        // arguments are transformed from the original variables/parameters into u_i variables for the purpose of
+        // differentiation. Thus, for instance, if originally we had a dfun of (p0, p1, p2), subs_ret will contain
+        // a dfun of (u_0, u_1, u_2) instead.
+        //
+        // The issue is then that, during the substitution, the (u_0, u_1, u_2) set of shared arguments in subs_ret is
+        // transformed back into (p0, p1, p2), but we have no way of knowing that this is the exact same set of
+        // arguments that shows up in subs_map. Hence, the unnecessary duplication.
+        //
+        // At this time it does not seem like this duplication is detrimental to performance, at least in tests
+        // involving first-order derivatives of neural networks (which is the primary use case for shared arguments). If
+        // this becomes a problem, we can consider doing a transformation pass on subs_ret that consolidates identical
+        // deep copies of shared arguments in a single shared instance. This would be a bit of a kludge and it should
+        // probably be limited to shared arguments containing only non-function expressions (due to the potentially very
+        // expensive cost of comparing large expressions trees). This needs to be investigated more.
+
         // Replace the original expressions in diff_map.
         decltype(subs_ret.size()) i = 0;
         for (auto *it = cur_begin; i < subs_ret.size(); ++i, ++it) {
@@ -1361,7 +1509,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
     }
 
     // Check if there are repeated entries in args.
-    const fast_uset<expression, std::hash<expression>> args_set(args.begin(), args.end());
+    const boost::unordered_flat_set<expression, std::hash<expression>> args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
         throw std::invalid_argument(
             fmt::format("Duplicate entries detected in the list of variables/parameters with respect to which the "

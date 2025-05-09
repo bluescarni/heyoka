@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -22,7 +21,6 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/container_hash/hash.hpp>
 
 #include <fmt/core.h>
 
@@ -38,18 +36,18 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
-#include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/func_args.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
@@ -58,81 +56,6 @@
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-void func_args::save(boost::archive::binary_oarchive &ar, unsigned) const
-{
-    ar << m_args;
-}
-
-void func_args::load(boost::archive::binary_iarchive &ar, unsigned)
-{
-    ar >> m_args;
-}
-
-func_args::func_args() = default;
-
-namespace detail
-{
-
-namespace
-{
-
-// Implementation of the func_args constructor from a list of arguments.
-auto func_args_ctor_impl(std::vector<expression> args, bool shared)
-{
-    using ret_t = std::variant<std::vector<expression>, func_args::shared_args_t>;
-
-    if (shared) {
-        return ret_t(std::make_shared<const std::vector<expression>>(std::move(args)));
-    } else {
-        return ret_t(std::move(args));
-    }
-}
-
-} // namespace
-
-} // namespace detail
-
-func_args::func_args(std::vector<expression> args, bool shared)
-    : m_args(detail::func_args_ctor_impl(std::move(args), shared))
-{
-}
-
-func_args::func_args(shared_args_t args)
-    : m_args(args ? std::move(args)
-                  : throw std::invalid_argument("Cannot initialise a func_args instance from a null pointer"))
-{
-}
-
-func_args::func_args(const func_args &) = default;
-
-func_args::func_args(func_args &&) noexcept = default;
-
-func_args &func_args::operator=(const func_args &) = default;
-
-func_args &func_args::operator=(func_args &&) noexcept = default;
-
-func_args::~func_args() = default;
-
-const std::vector<expression> &func_args::get_args() const noexcept
-{
-    if (const auto *args_ptr = std::get_if<std::vector<expression>>(&m_args)) {
-        return *args_ptr;
-    } else {
-        assert(std::get<1>(m_args));
-        return *std::get<1>(m_args);
-    }
-}
-
-func_args::shared_args_t func_args::get_shared_args() const noexcept
-{
-    if (const auto *shared_args_ptr = std::get_if<shared_args_t>(&m_args)) {
-        assert(*shared_args_ptr);
-        return *shared_args_ptr;
-    } else {
-        return {};
-    }
-}
 
 namespace detail
 {
@@ -213,19 +136,23 @@ func_args::shared_args_t func_base::shared_args() const noexcept
     return m_args.get_shared_args();
 }
 
+// NOTE: here we are enforcing that the two overloads are called consistently with how the function stores its
+// arguments. The idea is that the way the function stores its arguments is an invariant property of the function.
+//
+// NOTE: we use assertions here instead of throws because the checks are already done in make_copy_with_new_args().
 void func_base::replace_args(std::vector<expression> new_args)
 {
-    // LCOV_EXCL_START
-    if (new_args.size() != args().size()) [[unlikely]] {
-        throw std::invalid_argument(fmt::format("func_base::replace_args() was invoked with a new_args argument of "
-                                                "size {}, but the current argument size is {}",
-                                                new_args.size(), args().size()));
-    }
-    // LCOV_EXCL_STOP
+    assert(!shared_args());
 
-    // NOTE: the idea here is that if we are storing the arguments via shared pointer,
-    // we want to make sure that the new arguments are also stored via shared pointer.
-    m_args = func_args(std::move(new_args), static_cast<bool>(shared_args()));
+    m_args = func_args(std::move(new_args));
+}
+
+void func_base::replace_args(func_args::shared_args_t new_args)
+{
+    assert(shared_args());
+    assert(new_args);
+
+    m_args = func_args(std::move(new_args));
 }
 
 namespace detail
@@ -269,70 +196,6 @@ void null_func::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> boost::serialization::base_object<func_base>(*this);
 }
-
-namespace
-{
-
-// Helper to invoke the copy() function via ADL.
-auto make_adl_copy(const auto &x)
-{
-    return copy(x);
-}
-
-// Perform the Taylor decomposition of the arguments of a function. This function
-// will return a vector of arguments in which each element will be either:
-// - a variable,
-// - a number,
-// - a param.
-std::vector<expression> func_td_args(const auto &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
-{
-    std::vector<expression> retval;
-    retval.reserve(fb.args().size());
-
-    for (const auto &arg : fb.args()) {
-        const auto dres = taylor_decompose(func_map, arg, dc);
-
-        if (dres == 0u) {
-            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
-                   || std::holds_alternative<param>(arg.value()));
-
-            retval.push_back(arg);
-        } else {
-            retval.emplace_back(fmt::format("u_{}", dres));
-        }
-    }
-
-    return retval;
-} // LCOV_EXCL_LINE
-
-// Perform the decomposition of the arguments of a function. This function
-// will return a vector of arguments in which each element will be either:
-// - a variable,
-// - a number,
-// - a param.
-std::vector<expression> func_d_args(const auto &fb, funcptr_map<std::vector<expression>::size_type> &func_map,
-                                    std::vector<expression> &dc)
-{
-    std::vector<expression> retval;
-    retval.reserve(fb.args().size());
-
-    for (const auto &arg : fb.args()) {
-        const auto dres = decompose(func_map, arg, dc);
-
-        if (dres) {
-            retval.emplace_back(fmt::format("u_{}", *dres));
-        } else {
-            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
-                   || std::holds_alternative<param>(arg.value()));
-
-            retval.push_back(arg);
-        }
-    }
-
-    return retval;
-} // LCOV_EXCL_LINE
-
-} // namespace
 
 } // namespace detail
 
@@ -379,34 +242,57 @@ func_args::shared_args_t func::shared_args() const noexcept
     return m_func->shared_args();
 }
 
-func func::copy(std::vector<expression> new_args) const
+func func::make_copy_with_new_args(std::vector<expression> new_args) const
 {
+    if (shared_args()) [[unlikely]] {
+        throw std::invalid_argument(
+            "Cannot invoke func::make_copy_with_new_args() with a non-shared arguments set if the "
+            "function manages its arguments via a shared reference");
+    }
+
     const auto orig_size = args().size();
 
-    if (new_args.size() != orig_size) {
-        throw std::invalid_argument(
-            fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
-                        "of the original function is {} (the two sizes must be equal)",
-                        new_args.size(), orig_size));
+    if (new_args.size() != orig_size) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The set of new arguments passed to func::make_copy_with_new_args() "
+                                                "has a size of {}, but the number of arguments "
+                                                "of the original function is {} (the two sizes must be equal)",
+                                                new_args.size(), orig_size));
     }
 
     // NOTE: this will end up invoking the copy constructor
     // of the internal user-defined function.
-    // NOTE: need to go through the make_adl_copy() wrapper
-    // in order to avoid ambiguities.
     func ret;
-    ret.m_func = detail::make_adl_copy(m_func);
+    ret.m_func = copy(m_func);
 
-    // NOTE: a user-defined function might have a funky
-    // implementation of the copy constructor which, e.g.,
-    // changes the arity.
-    // LCOV_EXCL_START
-    if (ret.args().size() != orig_size) {
-        throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
-                                                "from {} to {} - this is not allowed",
-                                                orig_size, ret.args().size()));
+    // Replace the arguments.
+    ret.m_func->replace_args(std::move(new_args));
+
+    return ret;
+} // LCOV_EXCL_LINE
+
+func func::make_copy_with_new_args(func_args::shared_args_t new_args) const
+{
+    if (!new_args) [[unlikely]] {
+        throw std::invalid_argument("Cannot invoke func::make_copy_with_new_args() with a null pointer argument");
     }
-    // LCOV_EXCL_STOP
+    if (!shared_args()) [[unlikely]] {
+        throw std::invalid_argument("Cannot invoke func::make_copy_with_new_args() with a shared arguments set if the "
+                                    "function does not manage its arguments via a shared reference");
+    }
+
+    const auto orig_size = args().size();
+
+    if (new_args->size() != orig_size) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The set of new arguments passed to func::make_copy_with_new_args() "
+                                                "has a size of {}, but the number of arguments "
+                                                "of the original function is {} (the two sizes must be equal)",
+                                                new_args->size(), orig_size));
+    }
+
+    // NOTE: this will end up invoking the copy constructor
+    // of the internal user-defined function.
+    func ret;
+    ret.m_func = copy(m_func);
 
     // Replace the arguments.
     ret.m_func->replace_args(std::move(new_args));
@@ -442,62 +328,6 @@ std::vector<expression> func::gradient() const
     return grad;
 }
 
-template <typename T>
-expression func::diff_impl(detail::funcptr_map<expression> &func_map, const T &arg) const
-{
-    const auto arity = args().size();
-
-    // Fetch the gradient.
-    auto grad = gradient();
-
-    // Compute the total derivative.
-    std::vector<expression> prod;
-    prod.reserve(arity);
-    for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], arg));
-    }
-
-    return sum(std::move(prod));
-}
-
-expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
-{
-    return this->diff_impl(func_map, s);
-}
-
-expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
-{
-    return this->diff_impl(func_map, p);
-}
-
-std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
-                                                   std::vector<expression> &dc) const
-{
-    const auto *const f_id = get_ptr();
-
-    if (auto it = func_map.find(f_id); it != func_map.end()) {
-        // We already decomposed the current function, fetch the result
-        // from the cache.
-        return it->second;
-    }
-
-    // Compute the decomposed arguments.
-    const auto new_args = detail::func_d_args(*this, func_map, dc);
-
-    // Make a copy of this containing the new arguments.
-    auto f_copy = copy(new_args);
-
-    // Append f_copy and return the index at which it was appended.
-    const auto ret = dc.size();
-    dc.emplace_back(std::move(f_copy));
-
-    // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-    assert(flag);
-
-    return ret;
-}
-
 // NOTE: time dependency here means **intrinsic** time
 // dependence of the function. That is, we are not concerned
 // with the arguments' time dependence and, e.g., cos(time)
@@ -530,53 +360,47 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uin
     return m_func->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 }
 
-taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &func_map,
-                                              taylor_dc_t &dc) const
+namespace detail
 {
-    const auto *const f_id = get_ptr();
 
-    if (auto it = func_map.find(f_id); it != func_map.end()) {
-        // We already decomposed the current function, fetch the result
-        // from the cache.
-        return it->second;
-    }
+// NOTE: this is a small helper to perform the Taylor decomposition of the input function fn (which will be consumed by
+// the operation) into the decomposition dc. The decomposition will be performed either by invoking the custom
+// taylor_decompose() member function from the UDF (if available) or by just appending fn to dc (the default behaviour).
+// It is assumed that the arguments of fn have already been decomposed.
+//
+// We implement this as a separate external (friend) function (rather than, e.g., a member function) because we do not
+// want to have mutating functions in the public API of func.
+taylor_dc_t::size_type func_taylor_decompose_impl(func &&fn, taylor_dc_t &dc)
+{
+    assert(std::ranges::none_of(fn.args(), [](const auto &ex) { return std::holds_alternative<func>(ex.value()); }));
 
-    // Compute the decomposed arguments.
-    const auto new_args = detail::func_td_args(*this, func_map, dc);
-
-    // Make a copy of this containing the new arguments.
-    auto f_copy = copy(new_args);
-
-    // Run the decomposition.
     taylor_dc_t::size_type ret = 0;
-    if (f_copy.m_func->has_taylor_decompose()) {
+    if (fn.m_func->has_taylor_decompose()) {
         // Custom implementation.
-        ret = std::move(*f_copy.m_func).taylor_decompose(dc);
+        ret = std::move(*fn.m_func).taylor_decompose(dc);
     } else {
-        // Default implementation: append f_copy and return the index
+        // Default implementation: append fn and return the index
         // at which it was appended.
         ret = dc.size();
-        dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
+        dc.emplace_back(std::move(fn), std::vector<std::uint32_t>{});
     }
 
-    if (ret == 0u) {
+    // Checks on the return value.
+    if (ret == 0u) [[unlikely]] {
         throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
     }
 
-    if (ret >= dc.size()) {
+    if (ret >= dc.size()) [[unlikely]] {
         throw std::invalid_argument(
-            fmt::format("Invalid value returned by the Taylor decomposition function for the function '{}': "
-                        "the return value is {}, which is not less than the current size of the decomposition "
-                        "({})",
-                        get_name(), ret, dc.size()));
+            fmt::format("Invalid value returned by the Taylor decomposition of a function: the return value is {}, "
+                        "which is not less than the current size of the decomposition ({})",
+                        ret, dc.size()));
     }
-
-    // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-    assert(flag);
 
     return ret;
 }
+
+} // namespace detail
 
 llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
@@ -651,23 +475,6 @@ void swap(func &a, func &b) noexcept
 {
     using std::swap;
     swap(a.m_func, b.m_func);
-}
-
-// NOTE: it is very important that the implementation here is kept exactly in sync
-// with the implementation of expression hashing for non-recursive expressions. If one
-// changes, the other must as well.
-std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
-{
-    // NOTE: the hash value is computed by combining the hash values of:
-    // - the function name,
-    // - the arguments' hashes.
-    std::size_t seed = std::hash<std::string>{}(get_name());
-
-    for (const auto &arg : args()) {
-        boost::hash_combine(seed, detail::hash(func_map, arg));
-    }
-
-    return seed;
 }
 
 bool operator==(const func &a, const func &b) noexcept
