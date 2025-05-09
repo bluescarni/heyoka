@@ -185,6 +185,12 @@ TEST_CASE("diff shared args")
 
     auto bar_diff = diff(bar, {x});
 
+    REQUIRE(bar_diff
+            == std::vector{dfun("f1", sargs, {{0, 1}}) + dfun("f2", sargs, {{0, 1}}), dfun("f1", sargs, {{0, 1}}),
+                           dfun("f2", sargs, {{0, 1}}),
+                           dfun("f2", sargs, {}) * dfun("f1", sargs, {{0, 1}})
+                               + dfun("f1", sargs, {}) * dfun("f2", sargs, {{0, 1}})});
+
     // Check the functions' identity.
     REQUIRE(std::get<func>(std::get<func>(bar_diff[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(bar_diff[1].value()).get_ptr());
