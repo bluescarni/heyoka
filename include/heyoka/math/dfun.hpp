@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_DFUN_HPP
 
 #include <cstdint>
-#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
