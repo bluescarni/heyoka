@@ -19,6 +19,12 @@ Changes
   (`#485 <https://github.com/bluescarni/heyoka/pull/485>`__). One visibile and important outcome
   is a drastic performance increase in the formulation of the variational equations for neural ODEs.
 
+Fix
+~~~
+
+- Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
+  (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
+
 7.3.0 (2025-04-21)
 ------------------
 
