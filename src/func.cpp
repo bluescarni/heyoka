@@ -126,6 +126,11 @@ const std::string &func_base::get_name() const noexcept
     return m_name;
 }
 
+const func_args &func_base::get_func_args() const noexcept
+{
+    return m_args;
+}
+
 const std::vector<expression> &func_base::args() const noexcept
 {
     return m_args.get_args();
@@ -337,9 +342,14 @@ bool func::is_time_dependent() const
     return m_func->is_time_dependent();
 }
 
-const std::string &func::get_name() const
+const std::string &func::get_name() const noexcept
 {
     return m_func->get_name();
+}
+
+const func_args &func::get_func_args() const noexcept
+{
+    return m_func->get_func_args();
 }
 
 void func::to_stream(std::ostringstream &oss) const

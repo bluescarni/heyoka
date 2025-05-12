@@ -7,8 +7,7 @@ Changelog
 New
 ~~~
 
-- New ``func_args`` class for the management of function arguments in the expression
-  system
+- New ``func_args`` class for the management of function arguments in the expression system
   (`#489 <https://github.com/bluescarni/heyoka/pull/489>`__).
 
 Changes

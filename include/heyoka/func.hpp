@@ -71,6 +71,7 @@ public:
     ~func_base();
 
     [[nodiscard]] const std::string &get_name() const noexcept;
+    [[nodiscard]] const func_args &get_func_args() const noexcept;
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
 
@@ -106,12 +107,19 @@ concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
 template <typename Base, typename Holder, typename T>
     requires is_udf<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
-    [[nodiscard]] const std::string &get_name() const final
+    [[nodiscard]] const std::string &get_name() const noexcept final
     {
         // NOTE: make sure we are invoking the member function from func_base,
         // as in principle there could be a get_name() function in the derived
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).get_name();
+    }
+    [[nodiscard]] const func_args &get_func_args() const noexcept final
+    {
+        // NOTE: make sure we are invoking the member function from func_base,
+        // as in principle there could be a get_func_args() function in the derived
+        // function class that hides it.
+        return static_cast<const func_base &>(getval<Holder>(this)).get_func_args();
     }
 
     void to_stream(std::ostringstream &oss) const final
@@ -254,7 +262,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
 // The function interface.
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
-    [[nodiscard]] virtual const std::string &get_name() const = 0;
+    [[nodiscard]] virtual const std::string &get_name() const noexcept = 0;
+    [[nodiscard]] virtual const func_args &get_func_args() const noexcept = 0;
 
     virtual void to_stream(std::ostringstream &) const = 0;
 
@@ -381,7 +390,9 @@ public:
 
     [[nodiscard]] bool is_time_dependent() const;
 
-    [[nodiscard]] const std::string &get_name() const;
+    [[nodiscard]] const std::string &get_name() const noexcept;
+
+    [[nodiscard]] const func_args &get_func_args() const noexcept;
 
     [[nodiscard]] std::type_index get_type_index() const;
 
