@@ -52,6 +52,26 @@ TEST_CASE("error handling")
                       std::invalid_argument);
 }
 
+// Test case for a bug in which we did not immediately check the function arguments in the cartesian
+// implementations, leading to out-of-bounds access.
+TEST_CASE("cart bug arg check")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(0, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 0 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(10, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 10 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(0, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 0 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(10, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 10 instead"));
+}
+
 TEST_CASE("mercury")
 {
     std::cout << "Testing Mercury..." << std::endl;
