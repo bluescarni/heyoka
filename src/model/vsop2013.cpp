@@ -177,19 +177,19 @@ auto build_vsop2103_data()
 expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, expression t_expr, double thresh)
 {
     // Check the input values.
-    if (pl_idx < 1u || pl_idx > 9u) {
+    if (pl_idx < 1u || pl_idx > 9u) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid planet index passed to vsop2013_elliptic(): "
                                                 "the index must be in the [1, 9] range, but it is {} instead",
                                                 pl_idx));
     }
 
-    if (var_idx < 1u || var_idx > 6u) {
+    if (var_idx < 1u || var_idx > 6u) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid variable index passed to vsop2013_elliptic(): "
                                                 "the index must be in the [1, 6] range, but it is {} instead",
                                                 var_idx));
     }
 
-    if (!std::isfinite(thresh) || thresh < 0.) {
+    if (!std::isfinite(thresh) || thresh < 0.) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid threshold value passed to vsop2013_elliptic(): "
                                                 "the value must be finite and non-negative, but it is {} instead",
                                                 thresh));
@@ -332,11 +332,9 @@ constexpr double vsop2013_gm_sun = 2.9591220836841438269e-04;
 // are referred to the Dynamical Frame J2000.
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
-    // Compute the gravitational parameter for pl_idx.
-    assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
-    const auto mu = vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u];
-
     // Get the elliptic orbital elements.
+    // NOTE: it is important that we invoke vsop2013_elliptic_impl() first things first as this will also run the checks
+    // on the input arguments.
     expression a, lam, k, h, q_, p_;
 
     oneapi::tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
@@ -345,6 +343,10 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
                                  [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
                                  [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
                                  [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
+
+    // Compute the gravitational parameter for pl_idx.
+    assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
+    const auto mu = vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u];
 
     // NOTE: we follow the procedure described here to convert the equinoctial elements
     // to Cartesian coordinates:
@@ -409,6 +411,8 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
 std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
     // Compute the Cartesian coordinates in the Dynamical Frame J2000.
+    // NOTE: it is important that we invoke vsop2013_cartesian_impl() first things first as this will also run the
+    // checks on the input arguments.
     const auto cart_dfj2000 = vsop2013_cartesian_impl(pl_idx, std::move(t_expr), thresh);
 
     // The two rotation angles for the transition Dynamical Frame J2000 -> ICRF.
