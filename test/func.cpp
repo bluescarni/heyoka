@@ -161,6 +161,18 @@ TEST_CASE("func minimal")
 
     REQUIRE_THROWS_MATCHES(func(func_00_s{"f", nullptr}), std::invalid_argument,
                            Message("Cannot initialise a func_args instance from a null pointer"));
+
+    // A couple of tests for the func_args getter.
+    {
+        const auto fa = func_args({"x"_var, "y"_var}, true);
+        func f_s(func_00_s{"f", fa});
+        REQUIRE(fa.get_args().data() == f_s.get_func_args().get_args().data());
+    }
+    {
+        const auto fa = func_args({"x"_var, "y"_var}, false);
+        func f_ns(func_00_s{"f", fa});
+        REQUIRE(fa.get_args().data() != f_ns.get_func_args().get_args().data());
+    }
 }
 
 TEST_CASE("shared func copy move")
