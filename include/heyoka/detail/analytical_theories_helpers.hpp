@@ -10,9 +10,12 @@
 #define HEYOKA_DETAIL_ANALYTICAL_THEORIES_HELPERS_HPP
 
 #include <array>
-#include <cstddef>
+#include <concepts>
 #include <cstdint>
+#include <initializer_list>
 #include <map>
+#include <ranges>
+#include <type_traits>
 #include <vector>
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -30,19 +33,28 @@ namespace detail
 
 // Create the expression for the evaluation of the polynomial with coefficients
 // stored (in dense form) in cfs according to Horner's scheme.
-template <typename T, std::size_t N>
-expression horner_eval(const std::array<T, N> &cfs, const expression &x)
+template <typename R>
+    requires std::ranges::contiguous_range<R> && std::ranges::sized_range<R>
+             && (std::same_as<expression, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+                 || std::same_as<double, std::remove_cvref_t<std::ranges::range_reference_t<R>>>)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+expression horner_eval(R &&cfs, const expression &x)
 {
-    static_assert(N > 0u);
+    const auto sz = std::ranges::size(cfs);
+    if (sz == 0) {
+        return 0_dbl;
+    }
 
-    auto ret = expression(cfs[N - 1u]);
-
-    for (std::size_t i = 1; i < N; ++i) {
-        ret = cfs[N - i - 1u] + ret * x;
+    const auto *ptr = std::ranges::data(cfs);
+    auto ret = expression(ptr[sz - 1]);
+    for (std::ranges::range_size_t<R> i = 1; i < sz; ++i) {
+        ret = ptr[sz - i - 1] + ret * x;
     }
 
     return ret;
 } // LCOV_EXCL_LINE
+
+expression horner_eval(std::initializer_list<expression>, const expression &);
 
 std::array<expression, 2> ex_cmul(const std::array<expression, 2> &, const std::array<expression, 2> &);
 std::array<expression, 2> ex_cinv(const std::array<expression, 2> &);

@@ -89,7 +89,7 @@ std::array<expression, 3> iau2006_impl(const expression &tm, double thresh)
     using heyoka::detail::pairwise_cmul;
     using heyoka::detail::trig_eval_dict_t;
 
-    if (!std::isfinite(thresh) || thresh < 0.) {
+    if (!std::isfinite(thresh) || thresh < 0.) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid threshold value passed to iau2006(): the value must be finite "
                                                 "and non-negative, but it is {} instead",
                                                 thresh));

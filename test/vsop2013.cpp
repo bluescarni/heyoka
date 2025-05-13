@@ -72,6 +72,23 @@ TEST_CASE("cart bug arg check")
                                    "the index must be in the [1, 9] range, but it is 10 instead"));
 }
 
+// Test case for a bug in which the use of pow() in the implementation would lead to nans when
+// the time coordinate is exactly zero in a Taylor integrator.
+TEST_CASE("pow bug zero t check")
+{
+    auto x = "x"_var;
+    // NOTE: it is important to use a non-par expression for the time here: if we used only par[0], we would never end
+    // up computing the Taylor derivative of pow().
+    auto merc_a = vsop2013_elliptic(1, 1, kw::time_expr = par[0] / (86400. * 365250), kw::thresh = 1e-12);
+    auto ta = taylor_adaptive<double>{{prime(x) = merc_a}, {0.}, kw::compact_mode = true};
+
+    ta.set_time(0.0);
+    ta.get_state_data()[0] = 0.0;
+    ta.get_pars_data()[0] = 0.00;
+    REQUIRE(std::get<0>(ta.propagate_until(1)) == taylor_outcome::time_limit);
+    REQUIRE(!std::isnan(ta.get_state()[0]));
+}
+
 TEST_CASE("mercury")
 {
     std::cout << "Testing Mercury..." << std::endl;
@@ -654,7 +671,7 @@ TEST_CASE("cartesian")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 2137);
+        REQUIRE(ta.get_decomposition().size() == 2145);
 
         const std::vector x_values
             = {0.3493879042, -0.3953232516, 0.2950960732,  -0.3676232510, 0.2077238852, -0.2846205582,
@@ -731,7 +748,7 @@ TEST_CASE("cartesian icrf")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 2150);
+        REQUIRE(ta.get_decomposition().size() == 2158);
 
         const std::vector x_values
             = {0.3493878714, -0.3953232726, 0.2950960118,  -0.3676232407, 0.2077238019, -0.2846205184,
