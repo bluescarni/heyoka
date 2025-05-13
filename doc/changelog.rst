@@ -24,6 +24,9 @@ Fix
 
 - Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
   (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
+- Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
+  in numerical integrations
+  (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).
 
 7.3.0 (2025-04-21)
 ------------------
