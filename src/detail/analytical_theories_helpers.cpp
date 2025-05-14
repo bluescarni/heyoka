@@ -9,7 +9,9 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <ranges>
 #include <stdexcept>
 #include <vector>
 
@@ -22,6 +24,11 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
+
+expression horner_eval(std::initializer_list<expression> ilist, const expression &x)
+{
+    return horner_eval(std::ranges::subrange(ilist.begin(), ilist.end()), x);
+}
 
 // Complex multiplication.
 std::array<expression, 2> ex_cmul(const std::array<expression, 2> &c1, const std::array<expression, 2> &c2)

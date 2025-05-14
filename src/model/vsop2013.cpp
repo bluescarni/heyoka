@@ -31,6 +31,7 @@
 #include <fmt/format.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/analytical_theories_helpers.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_1.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_2.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_3.hpp>
@@ -306,13 +307,13 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             // Erase the skipped terms.
             cur.erase(new_end, cur.end());
 
-            // Sum the terms in the chunk and multiply them by t**alpha.
-            parts[alpha] = pow(t_expr, static_cast<double>(boost::numeric_cast<std::uint32_t>(alpha))) * sum(cur);
+            // Sum the terms in the chunk and assign the result to parts.
+            parts[alpha] = sum(cur);
         }
     });
 
-    // Sum the chunks and return them.
-    return sum(parts);
+    // Return the result of Horner evaluation on parts.
+    return heyoka::detail::horner_eval(parts, t_expr);
 }
 
 namespace

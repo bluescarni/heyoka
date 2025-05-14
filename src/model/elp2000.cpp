@@ -102,7 +102,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     using heyoka::detail::trig_eval_dict_t;
     using heyoka::detail::uncvref_t;
 
-    if (!std::isfinite(thresh) || thresh < 0.) {
+    if (!std::isfinite(thresh) || thresh < 0.) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid threshold value passed to elp2000_spherical(): "
                                                 "the value must be finite and non-negative, but it is {} instead",
                                                 thresh));
@@ -1258,21 +1258,21 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     oneapi::tbb::parallel_invoke(
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); },
-                                         [&]() { c = pow(tm, 2_dbl) * sum(r_terms_t2); });
-            retval[0] = sum({a, b, c});
+            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = sum(r_terms_t1); },
+                                         [&]() { c = sum(r_terms_t2); });
+            retval[0] = horner_eval({a, b, c}, tm);
         },
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); },
-                                         [&]() { c = pow(tm, 2_dbl) * sum(U_terms_t2); });
-            retval[1] = sum({a, b, c});
+            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = sum(U_terms_t1); },
+                                         [&]() { c = sum(U_terms_t2); });
+            retval[1] = horner_eval({a, b, c}, tm);
         },
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); },
-                                         [&]() { c = pow(tm, 2_dbl) * sum(V_terms_t2); });
-            retval[2] = sum({a, b, c});
+            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = sum(V_terms_t1); },
+                                         [&]() { c = sum(V_terms_t2); });
+            retval[2] = horner_eval({a, b, c}, tm);
         });
 
     return retval;
