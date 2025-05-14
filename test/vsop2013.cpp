@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include <heyoka/detail/analytical_theories_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -70,6 +71,12 @@ TEST_CASE("cart bug arg check")
     REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(10, 1), std::invalid_argument,
                            Message("Invalid planet index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 9] range, but it is 10 instead"));
+}
+
+// A simple test to trigger the zero-size path in the Horner evaluation scheme.
+TEST_CASE("horner eval empty")
+{
+    REQUIRE(heyoka::detail::horner_eval(std::vector<expression>{}, "x"_var) == 0_dbl);
 }
 
 // Test case for a bug in which the use of pow() in the implementation would lead to nans when
