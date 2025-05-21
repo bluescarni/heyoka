@@ -6,6 +6,9 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <vector>
+
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
@@ -34,7 +37,7 @@ int main(int, char *[])
     const auto [acc_x, acc_y, acc_z] = model::egm2008_acc({x, y, z}, n, m);
 
     // Initial conditions in LEO.
-    const auto ic_leo = {6740440.0, 0.0, 0.0, 0.0, 6725.973853066024, 3883.2537950295855};
+    const auto ic_leo = std::vector{6740440.0, 0.0, 0.0, 0.0, 6725.973853066024, 3883.2537950295855};
 
     // Init the integrator.
     auto ta = taylor_adaptive({{x, vx}, {y, vy}, {z, vz}, {vx, acc_x}, {vy, acc_y}, {vz, acc_z}}, ic_leo,
@@ -42,10 +45,12 @@ int main(int, char *[])
 
     logger->trace("Decomposition size: {}", ta.get_decomposition().size());
 
-    spdlog::stopwatch sw;
-
     // Propagate.
-    ta.propagate_until(86400.);
-
-    logger->trace("Total runtime: {}s", sw);
+    for (auto i = 0; i < 1000; ++i) {
+        spdlog::stopwatch sw;
+        ta.set_time(0.);
+        std::ranges::copy(ic_leo, ta.get_state_data());
+        ta.propagate_until(86400.);
+        logger->trace("Total runtime: {}s", sw);
+    }
 }
