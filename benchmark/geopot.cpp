@@ -28,7 +28,7 @@ int main(int, char *[])
     auto logger = spdlog::get("heyoka");
 
     // Maximum degree/order for the geopotential.
-    const auto n = 10u, m = 10u;
+    const auto n = 20u, m = 20u;
 
     // State variables.
     const auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
@@ -44,6 +44,10 @@ int main(int, char *[])
                               kw::compact_mode = true, kw::tol = 1e-15);
 
     logger->trace("Decomposition size: {}", ta.get_decomposition().size());
+
+    // for (const auto &ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+    //     std::cout << ir << "\n\n\n\n\n\n";
+    // }
 
     // Propagate.
     for (auto i = 0; i < 1000; ++i) {
