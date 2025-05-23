@@ -125,7 +125,7 @@ HEYOKA_DLL_PUBLIC void llvm_switch_u32(llvm_state &, llvm::Value *, const std::f
 
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
-void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
+HEYOKA_DLL_PUBLIC void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
 
 // Math helpers.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Value *);
