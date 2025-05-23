@@ -220,8 +220,9 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, unsigned nargs)
 {
+    // NOTE: we used to have an assert(types.size() <= nargs), but as it turns out there are sometimes overloaded
+    // intrinsics with no input arguments.
     assert(boost::starts_with(name, "llvm."));
-    assert(types.size() <= nargs);
 
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID =

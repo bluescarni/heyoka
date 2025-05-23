@@ -383,14 +383,12 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
     return std::move(*jtmb);
 }
 
-// Helper to optimise the input module M. Implemented here for re-use.
-// NOTE: this may end up being invoked concurrently from multiple threads.
-// If that is the case, we make sure before invocation to construct a different
-// TargetMachine per thread, so that we are sure no data races are possible.
-void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
-                     bool slp_vectorize)
+// This is a helper that will iterate over the functions of a module, decorating them with optimisation attributes
+// inferred from the capabilities of the host cpu. This is used in optimise_module().
+void optimise_module_annotate_cpu_features(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level,
+                                           bool force_avx512)
 {
-    // NOTE: don't run any optimisation pass at O0.
+    // NOTE: don't set up any CPU feature at O0.
     if (opt_level == 0u) {
         return;
     }
@@ -399,9 +397,8 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
     // the implementation of the 'opt' tool. See:
     // https://github.com/llvm/llvm-project/blob/release/10.x/llvm/tools/opt/opt.cpp
 
-    // For every function in the module, setup its attributes
-    // so that the codegen uses all the features available on
-    // the host CPU.
+    // For every function in the module, setup its attributes so that the codegen uses all the features available on the
+    // host CPU.
     const auto cpu = tm.getTargetCPU().str();
     const auto features = tm.getTargetFeatureString().str();
 
@@ -462,6 +459,17 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
 
 #endif
     }
+}
+
+// Helper to optimise the input module M. Implemented here for re-use.
+//
+// NOTE: this may end up being invoked concurrently from multiple threads. If that is the case, we make sure before
+// invocation to construct a different TargetMachine per thread, so that we are sure no data races are possible.
+void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
+                     bool slp_vectorize)
+{
+    // Setup the CPU features on the module's functions.
+    optimise_module_annotate_cpu_features(M, tm, opt_level, force_avx512);
 
     // NOTE: adapted from here:
     // https://llvm.org/docs/NewPassManager.html
@@ -506,6 +514,10 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
     llvm::OptimizationLevel ol{};
 
     switch (opt_level) {
+        case 0u:
+            // NOTE: O0 disables most (but not all) optimisations.
+            ol = llvm::OptimizationLevel::O0;
+            break;
         case 1u:
             ol = llvm::OptimizationLevel::O1;
             break;
