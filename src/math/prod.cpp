@@ -21,6 +21,7 @@
 #include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -678,55 +679,79 @@ llvm::Function *prod_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, co
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the vector floating-point type.
-    auto *val_t = make_vector_type(fp_t, batch_size);
-
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "prod", n_uvars, batch_size, {var0, var1});
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, "prod", n_uvars, batch_size, {var0, var1}, 0, true);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);
 
-    if (f == nullptr) {
-        // The function was not created before, do it now.
+    if (f != nullptr) {
+        // We already created the function, return it.
+        return f;
+    }
 
-        // Fetch the current insertion block.
-        auto *orig_bb = builder.GetInsertBlock();
+    // The function was not created before, do it now.
 
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
+    // Fetch several types.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+    auto *i32_t = builder.getInt32Ty();
+    auto *ptr_t = builder.getPtrTy();
 
-        // Fetch the necessary function arguments.
-        auto *ord = f->args().begin();
-        auto *diff_ptr = f->args().begin() + 2;
-        auto *idx0 = f->args().begin() + 5;
-        auto *idx1 = f->args().begin() + 6;
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
 
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+    // The return type is int32.
+    auto *ft = llvm::FunctionType::get(i32_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
 
-        // Create the accumulator.
-        auto *acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
+    // Fetch the necessary function arguments.
+    auto *ord = f->getArg(0);
+    auto *diff_ptr = f->getArg(2);
+    auto *idx0 = f->getArg(5);
+    auto *idx1 = f->getArg(6);
+    auto *acc_ptr = f->getArg(7);
+    auto *iter_idx = f->getArg(8);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-            auto *b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
-            auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, idx1);
-            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, b_nj, cj)), acc);
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Fetch the null pointer constant.
+    auto *nullp = llvm::ConstantPointerNull::get(ptr_t);
+
+    // Prepare the storage for the return value.
+    auto *ret_alloca = builder.CreateAlloca(i32_t);
+
+    // We need to branch on the accumulator pointer: if it is null, we just need to return the
+    // number of iterations. Otherwise, we perform one step of the iteration.
+    llvm_if_then_else(
+        s, builder.CreateICmpEQ(acc_ptr, nullp),
+        [&]() {
+            // Store in ret_alloca the total number of iterations (order + 1).
+            builder.CreateStore(builder.CreateAdd(ord, builder.getInt32(1)), ret_alloca);
+        },
+        [&]() {
+            // Store 0 in ret_alloca (this will not be used).
+            builder.CreateStore(builder.getInt32(0), ret_alloca);
+
+            // Compute the term of the series for the current iteration.
+            auto *b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, iter_idx), idx0);
+            auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, iter_idx, idx1);
+            auto *term = llvm_fmul(s, b_nj, cj);
+
+            // Add the term to the accumulator.
+            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc_ptr), term), acc_ptr);
         });
 
-        // Create the return value.
-        builder.CreateRet(builder.CreateLoad(val_t, acc));
+    // Create the return value.
+    builder.CreateRet(builder.CreateLoad(i32_t, ret_alloca));
 
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    }
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
 
     return f;
 }

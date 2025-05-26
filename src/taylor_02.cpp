@@ -550,24 +550,12 @@ llvm::Function *taylor_cm_make_driver_proto(llvm_state &s, unsigned cur_idx)
     return f;
 }
 
-// Helper to codegen the computation of the Taylor derivatives for a block.
-//
-// s is the llvm state in which we are operating, func is the LLVM function for the computation of the Taylor
-// derivative in the block, ncalls the number of times it must be called, gens the generators for the
-// function arguments, tape/par/time_ptr the pointers to the tape/parameter value(s)/time value(s),
-// cur_order the order of the derivative, fp_vec_type the internal vector type used for computations,
-// n_uvars the total number of u variables.
-void taylor_cm_codegen_block_diff(llvm_state &s, llvm::Function *func, std::uint32_t ncalls, const auto &gens,
-                                  llvm::Value *tape_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                  llvm::Value *cur_order, llvm::Type *fp_vec_type, std::uint32_t n_uvars)
+// Non-iterative implementation of taylor_cm_codegen_block_diff() (see below).
+void taylor_cm_codegen_block_diff_non_iterative(llvm_state &s, llvm::Function *func, const std::uint32_t ncalls,
+                                                const auto &gens, llvm::Value *tape_ptr, llvm::Value *par_ptr,
+                                                llvm::Value *time_ptr, llvm::Value *cur_order, llvm::Type *fp_vec_type,
+                                                const std::uint32_t n_uvars)
 {
-    // LCOV_EXCL_START
-    assert(ncalls > 0u);
-    assert(!gens.empty());
-    assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
-    // LCOV_EXCL_STOP
-
-    // Fetch the builder for the current state.
     auto &bld = s.builder();
 
     // We will be manually unrolling loops if ncalls is small enough.
@@ -610,6 +598,132 @@ void taylor_cm_codegen_block_diff(llvm_state &s, llvm::Function *func, std::uint
 
             taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, bld.CreateCall(func, args));
         }
+    }
+}
+
+// Iterative implementation of taylor_cm_codegen_block_diff() (see below).
+void taylor_cm_codegen_block_diff_iterative(llvm_state &s, llvm::Function *func, const std::uint32_t ncalls,
+                                            const auto &gens, llvm::Value *tape_ptr, llvm::Value *par_ptr,
+                                            llvm::Value *time_ptr, llvm::Value *cur_order, llvm::Type *fp_vec_type,
+                                            const std::uint32_t n_uvars)
+{
+    auto &bld = s.builder();
+
+    // Fetch the null pointer constant.
+    auto *ptr_t = bld.getPtrTy();
+    auto *nullp = llvm::ConstantPointerNull::get(ptr_t);
+
+    // Construct the array of accumulators, initialising it with zeroes.
+    auto *acc_arr_t = llvm::ArrayType::get(fp_vec_type, ncalls);
+    auto *acc_arr_alloca = bld.CreateAlloca(acc_arr_t);
+    llvm_loop_u32(s, bld.getInt32(0), bld.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+        auto *cur_acc_ptr = bld.CreateInBoundsGEP(acc_arr_t, acc_arr_alloca, {bld.getInt32(0), cur_call_idx});
+        bld.CreateStore(llvm_codegen(s, fp_vec_type, number{0.}), cur_acc_ptr);
+    });
+
+    // In order to determine the total number of iterations, we will be calling func once with a null accumulator
+    // pointer.
+    llvm::Value *tot_n_iter = nullptr;
+    {
+        // NOTE: we will be using the first set of arguments.
+        auto *zero_u32 = bld.getInt32(0);
+
+        // Create the u variable index from the first generator.
+        auto *u_idx = gens[0](zero_u32);
+
+        // Initialise the vector of arguments with which func must be called. The following
+        // initial arguments are always present:
+        // - current Taylor order,
+        // - u index of the variable,
+        // - tape of derivatives,
+        // - pointer to the param values,
+        // - pointer to the time value(s).
+        std::vector<llvm::Value *> zero_call_args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
+
+        // Create the other arguments via the generators.
+        for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+            zero_call_args.push_back(gens[i](zero_u32));
+        }
+
+        // Add the null accumulator pointer and the (ininfluential) iteration index argument.
+        zero_call_args.push_back(nullp);
+        zero_call_args.push_back(zero_u32);
+
+        tot_n_iter = bld.CreateCall(func, zero_call_args);
+    }
+
+    llvm_loop_u32(s, bld.getInt32(0), tot_n_iter, [&](llvm::Value *cur_iter_idx) {
+        llvm_loop_u32(s, bld.getInt32(0), bld.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Fetch the current accumulator pointer.
+            auto *cur_acc_ptr = bld.CreateInBoundsGEP(acc_arr_t, acc_arr_alloca, {bld.getInt32(0), cur_call_idx});
+
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u index of the variable,
+            // - tape of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{cur_order, u_idx, tape_ptr, par_ptr, time_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Add the accumulator pointer and the iteration index.
+            args.push_back(cur_acc_ptr);
+            args.push_back(cur_iter_idx);
+
+            // Invoke the function.
+            bld.CreateCall(func, args);
+        });
+    });
+
+    llvm_loop_u32(s, bld.getInt32(0), bld.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+        // Create the u variable index from the first generator.
+        auto u_idx = gens[0](cur_call_idx);
+
+        // Fetch the current accumulator pointer.
+        auto *cur_acc_ptr = bld.CreateInBoundsGEP(acc_arr_t, acc_arr_alloca, {bld.getInt32(0), cur_call_idx});
+
+        // Load the accumulator value.
+        auto *cur_acc = bld.CreateLoad(fp_vec_type, cur_acc_ptr);
+
+        // Store it into the tape.
+        taylor_c_store_diff(s, fp_vec_type, tape_ptr, n_uvars, cur_order, u_idx, cur_acc);
+    });
+}
+
+// Helper to codegen the computation of the Taylor derivatives for a block.
+//
+// s is the llvm state in which we are operating, func is the LLVM function for the computation of the Taylor
+// derivative in the block, ncalls the number of times it must be called, gens the generators for the
+// function arguments, tape/par/time_ptr the pointers to the tape/parameter value(s)/time value(s),
+// cur_order the order of the derivative, fp_vec_type the internal vector type used for computations,
+// n_uvars the total number of u variables.
+void taylor_cm_codegen_block_diff(llvm_state &s, llvm::Function *func, const std::uint32_t ncalls, const auto &gens,
+                                  llvm::Value *tape_ptr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                  llvm::Value *cur_order, llvm::Type *fp_vec_type, const std::uint32_t n_uvars)
+{
+    // LCOV_EXCL_START
+    assert(ncalls > 0u);
+    assert(!gens.empty());
+    assert(std::ranges::all_of(gens, [](const auto &f) { return static_cast<bool>(f); }));
+    // LCOV_EXCL_STOP
+
+    // Fetch the builder for the current state.
+    auto &bld = s.builder();
+
+    if (func->getReturnType() == bld.getInt32Ty()) {
+        taylor_cm_codegen_block_diff_iterative(s, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order,
+                                               fp_vec_type, n_uvars);
+    } else {
+        taylor_cm_codegen_block_diff_non_iterative(s, func, ncalls, gens, tape_ptr, par_ptr, time_ptr, cur_order,
+                                                   fp_vec_type, n_uvars);
     }
 }
 

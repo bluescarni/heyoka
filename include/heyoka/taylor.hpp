@@ -119,7 +119,8 @@ taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llv
 
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t, std::uint32_t,
-                             const std::vector<std::variant<variable, number, param>> &, std::uint32_t = 0);
+                             const std::vector<std::variant<variable, number, param>> &, std::uint32_t = 0,
+                             bool = false);
 
 // Add a function for computing the dense output
 // via polynomial evaluation.

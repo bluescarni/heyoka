@@ -93,7 +93,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
                              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                              std::uint32_t n_uvars, std::uint32_t batch_size,
                              const std::vector<std::variant<variable, number, param>> &args,
-                             std::uint32_t n_hidden_deps)
+                             std::uint32_t n_hidden_deps, bool iterative)
 {
     assert(fp_t != nullptr);
     assert(n_uvars > 0u);
@@ -114,8 +114,11 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
+    // Fetch the pointer type.
+    auto *ptr_t = llvm::PointerType::getUnqual(context);
+
+    // Fetch the int32 type.
+    auto *i32_t = llvm::Type::getInt32Ty(context);
 
     // Init the name.
     auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);
@@ -126,9 +129,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // - diff array (pointer to val_t),
     // - par ptr (pointer to external scalar),
     // - time ptr (pointer to external scalar).
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(ext_fp_t),
-                                    llvm::PointerType::getUnqual(ext_fp_t)};
+    std::vector<llvm::Type *> fargs{i32_t, i32_t, ptr_t, ptr_t, ptr_t};
 
     // Add the mangling and LLVM arg types for the argument types. Also, detect if
     // we have variables in the arguments.
@@ -160,7 +161,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
                 } else if constexpr (std::is_same_v<type, variable> || std::is_same_v<type, param>) {
                     // For vars and params, the argument is an index
                     // in an array.
-                    return llvm::Type::getInt32Ty(context);
+                    return i32_t;
                 } else {
                     // LCOV_EXCL_START
                     assert(false);
@@ -193,8 +194,14 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     fname += llvm_mangle_type(val_t);
 
     // Fill in the hidden dependency arguments. These are all indices.
-    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_hidden_deps),
-                 llvm::Type::getInt32Ty(context));
+    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_hidden_deps), i32_t);
+
+    // If this is an iterative implementation, we need to pass in as well the accumulator pointer and the current
+    // iteration index.
+    if (iterative) {
+        fargs.push_back(ptr_t);
+        fargs.push_back(i32_t);
+    }
 
     return std::make_pair(std::move(fname), std::move(fargs));
 }

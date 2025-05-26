@@ -18,6 +18,8 @@
 #include <heyoka/model/egm2008.hpp>
 #include <heyoka/taylor.hpp>
 
+#include <fmt/ranges.h>
+
 using namespace heyoka;
 
 int main(int, char *[])
@@ -28,7 +30,7 @@ int main(int, char *[])
     auto logger = spdlog::get("heyoka");
 
     // Maximum degree/order for the geopotential.
-    const auto n = 10u, m = 10u;
+    const auto n = 20u, m = 20u;
 
     // State variables.
     const auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
@@ -43,6 +45,14 @@ int main(int, char *[])
     auto ta = taylor_adaptive({{x, vx}, {y, vy}, {z, vz}, {vx, acc_x}, {vy, acc_y}, {vz, acc_z}}, ic_leo,
                               kw::compact_mode = true, kw::tol = 1e-15);
 
+    // for (const auto &ir : std::get<1>(ta.get_llvm_state()).get_ir()) {
+    //     std::cout << ir << "\n\n\n\n";
+    // }
+
+    // for (const auto &p : ta.get_decomposition()) {
+    //     fmt::println("{}\n", p);
+    // }
+
     logger->trace("Decomposition size: {}", ta.get_decomposition().size());
 
     // Propagate.
@@ -52,5 +62,6 @@ int main(int, char *[])
         std::ranges::copy(ic_leo, ta.get_state_data());
         ta.propagate_until(86400.);
         logger->trace("Total runtime: {}s", sw);
+        std::cout << ta << '\n';
     }
 }
