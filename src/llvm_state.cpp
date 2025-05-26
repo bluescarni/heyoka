@@ -391,6 +391,9 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
                      bool slp_vectorize)
 {
     // NOTE: don't run any optimisation pass at O0.
+    // NOTE: it is important to note that this is different from using llvm::OptimizationLevel::O0, which still runs
+    // some optimisation passes. For instance, llvm coroutines do not work out of the box with the current approach,
+    // while they do work with llvm::OptimizationLevel::O0.
     if (opt_level == 0u) {
         return;
     }
