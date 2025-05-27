@@ -29,7 +29,10 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace model
+{
+
+namespace detail
 {
 
 namespace
@@ -293,6 +296,18 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     return {mu_a2 * sum(std::move(x_terms)), mu_a2 * sum(std::move(y_terms)), mu_a2 * sum(std::move(z_terms))};
 }
 
-} // namespace model::detail
+} // namespace detail
+
+double get_egm2008_mu()
+{
+    return detail::egm2008_default_mu;
+}
+
+double get_egm2008_a()
+{
+    return detail::egm2008_default_a;
+}
+
+} // namespace model
 
 HEYOKA_END_NAMESPACE

@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -249,13 +250,27 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
         }
     }
 
+    // NOTE: if we end up here, we are in the general case in which we need to generate a global array of indices.
     auto &md = s.module();
+
+    // As a first step, we determine the integral type to be used to codegen the indices. At most we need 32-bit ints,
+    // but if we can get away with 16 or even 8 bits, this can help reduce memory pressure.
+    auto *i32_t = builder.getInt32Ty();
+    auto *idx_t = i32_t;
+    if (std::ranges::all_of(ind, [](const auto idx) { return idx <= std::numeric_limits<std::uint8_t>::max(); })) {
+        // All the indices fit into 8-bits unsigned ints.
+        idx_t = builder.getInt8Ty();
+    } else if (std::ranges::all_of(ind,
+                                   [](const auto idx) { return idx <= std::numeric_limits<std::uint16_t>::max(); })) {
+        // All the indices fit into 16-bits unsigned ints.
+        idx_t = builder.getInt16Ty();
+    }
 
     // Generate the array of indices as llvm constants.
     std::vector<llvm::Constant *> tmp_c_vec;
     tmp_c_vec.reserve(ind.size());
     for (const auto &val : ind) {
-        tmp_c_vec.push_back(builder.getInt32(val));
+        tmp_c_vec.push_back(llvm::ConstantInt::get(idx_t, val));
     }
 
     // Create the array type.
@@ -271,9 +286,20 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
         = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::PrivateLinkage, const_arr);
 
     // Return the generator.
-    return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
-        return builder.CreateLoad(builder.getInt32Ty(),
-                                  builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
+    return [&builder, gvar, arr_type, idx_t, i32_t](llvm::Value *cur_call_idx) {
+        // Fetch the pointer in the array of indices.
+        auto *ptr = builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx});
+
+        // Load the index value.
+        llvm::Value *ret = builder.CreateLoad(idx_t, ptr);
+
+        // Extend it to a 32-bit int, if necessary.
+        if (idx_t != i32_t) {
+            ret = builder.CreateZExt(ret, i32_t);
+        }
+
+        // Return it.
+        return ret;
     };
 }
 

@@ -83,6 +83,10 @@ inline constexpr auto egm2008_acc = []<typename... KwArgs>
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
 };
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu();
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a();
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE

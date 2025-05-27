@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add getters for the gravitational parameter and reference Earth radius in the EGM2008 model
+  (`#493 <https://github.com/bluescarni/heyoka/pull/493>`__).
 - New ``func_args`` class for the management of function arguments in the expression system
   (`#489 <https://github.com/bluescarni/heyoka/pull/489>`__).
 
