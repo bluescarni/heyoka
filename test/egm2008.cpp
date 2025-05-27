@@ -26,6 +26,11 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+TEST_CASE("mu/a getters")
+{
+    REQUIRE(model::get_egm2008_a() != model::get_egm2008_mu());
+}
+
 TEST_CASE("error handling")
 {
     using Catch::Matchers::Message;
