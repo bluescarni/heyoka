@@ -19,7 +19,7 @@ namespace detail
 
 extern const char *const builtin_sw_data_ts;
 
-extern const sw_data_row builtin_sw_data[24713];
+extern const sw_data_row builtin_sw_data[24755];
 
 } // namespace detail
 
