@@ -221,6 +221,10 @@ std::array<expression, 3> rot_cirs_icrs(const std::array<expression, 3> &xyz, co
 // See also:
 //
 // https://hpiers.obspm.fr/iers/bul/bulb/explanatory.html
+//
+// NOTE: here the input time_expr is expected the measure time in TT Julian centuries since J2000. This time expression
+// is passed as-is to the IAU2006 PN theory, even though the PN theory expects the input time in TDB centuries (and not
+// TT). The error introduced by this discrepancy should be quite small, hence we ignore it for the time being.
 std::array<expression, 3> rot_itrs_icrs_impl(const std::array<expression, 3> &xyz, const expression &time_expr,
                                              double thresh, const eop_data &data)
 {
