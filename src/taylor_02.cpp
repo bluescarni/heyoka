@@ -1294,24 +1294,22 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 
 } // namespace
 
-// Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
-// is the number of equations/variables in the ODE sys, dc its Taylor decomposition,
-// n_uvars the total number of u variables in the decomposition.
-// order is the max derivative order desired, batch_size the batch size.
-// order0 is a pointer to an array of (at least) n_eq * batch_size scalar elements
-// containing the derivatives of order 0. par_ptr is a pointer to an array containing
-// the numerical values of the parameters, time_ptr a pointer to the time value(s),
-// tape_ptr a pointer to the tape of derivatives (only in compact mode, otherwise
-// a null value). sv_funcs are the indices, in the decomposition, of the functions of state
-// variables.
+// Helper function to compute the jet of Taylor derivatives up to a given order.
+//
+// n_eq is the number of equations/variables in the ODE sys, dc its Taylor decomposition, n_uvars the total number of u
+// variables in the decomposition. order is the max derivative order desired, batch_size the batch size. order0 is a
+// pointer to an array of (at least) n_eq * batch_size scalar elements containing the derivatives of order 0. par_ptr is
+// a pointer to an array containing the numerical values of the parameters, time_ptr a pointer to the time value(s),
+// tape_ptr a pointer to the tape of derivatives (only in compact mode, otherwise a null value). sv_funcs are the
+// indices, in the decomposition, of the functions of state variables.
 //
 // order0, par_ptr and time_ptr are all external pointers.
 //
 // The return value is a variant containing either:
-// - in compact mode, the size/alignment requirements for the tape of derivatives
-//   and the list of states in which the driver functions are implemented, or
-// - the jet of derivatives of the state variables and sv_funcs
-//   up to order 'order'.
+//
+// - in compact mode, the size/alignment requirements for the tape of derivatives and the list of states in which the
+//   driver functions are implemented, or
+// - the jet of derivatives of the state variables and sv_funcs up to order 'order'.
 std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    llvm::Value *tape_ptr, const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc,
