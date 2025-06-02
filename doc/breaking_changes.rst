@@ -11,7 +11,8 @@ Breaking changes
 General
 ~~~~~~~
 
-heyoka is now a C++23 project.
+- heyoka is now a C++23 project.
+- heyoka now depends on CMake >= 3.20 when building from source.
 
 .. _bchanges_7_0_0:
 
@@ -41,7 +42,7 @@ if its size was less than the correct one.
 General
 ~~~~~~~
 
-- Support for LLVM<15 has been dropped.
+Support for LLVM<15 has been dropped.
 
 .. _bchanges_4_0_0:
 
