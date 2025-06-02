@@ -3,6 +3,16 @@
 Breaking changes
 ================
 
+.. _bchanges_8_0_0:
+
+8.0.0
+-----
+
+General
+~~~~~~~
+
+heyoka is now a C++23 project.
+
 .. _bchanges_7_0_0:
 
 7.0.0
