@@ -9,9 +9,12 @@
 #ifndef HEYOKA_DETAIL_SAFE_INTEGER_HPP
 #define HEYOKA_DETAIL_SAFE_INTEGER_HPP
 
-// NOTE: this is a small header that wraps the inclusion of Boost's safe numerics while enforcing the inclusion of
-// <exception> *beforehand*. This is due to an issue in the safe numerics library where std::terminate() is used while
-// not including the <exception> header which leads to compilation error on some platforms.
+// NOTE: this is a small header that wraps the inclusion of Boost's safe numerics library while enforcing the inclusion
+// of <exception> *beforehand*. This is necessary because of an issue in the safe numerics library where
+// std::terminate() is used without including the <exception> header, which leads to compilation errors on some
+// platforms. See:
+//
+// https://github.com/boostorg/safe_numerics/issues/139
 
 #include <exception>
 
