@@ -32,7 +32,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -78,6 +77,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>

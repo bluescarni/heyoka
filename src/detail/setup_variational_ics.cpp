@@ -18,7 +18,6 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
@@ -34,6 +33,7 @@
 
 #endif
 
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>

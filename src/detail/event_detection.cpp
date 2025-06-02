@@ -26,7 +26,6 @@
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -64,6 +63,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>

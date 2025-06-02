@@ -27,7 +27,6 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -44,6 +43,7 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>

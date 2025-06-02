@@ -20,13 +20,13 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dtens_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/s11n.hpp>
 

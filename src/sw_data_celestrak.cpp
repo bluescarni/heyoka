@@ -16,8 +16,6 @@
 #include <system_error>
 #include <utility>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #include <boost/charconv.hpp>
 
 #include <fmt/core.h>
@@ -25,6 +23,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/http_download.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/sw_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
