@@ -27,7 +27,6 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
@@ -52,6 +51,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>

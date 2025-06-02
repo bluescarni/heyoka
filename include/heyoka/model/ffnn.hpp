@@ -16,10 +16,10 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>

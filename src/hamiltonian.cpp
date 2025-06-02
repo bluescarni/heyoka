@@ -12,11 +12,10 @@
 #include <variant>
 #include <vector>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/hamiltonian.hpp>
 #include <heyoka/kw.hpp>

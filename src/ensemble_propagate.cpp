@@ -18,7 +18,6 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
@@ -36,6 +35,7 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/kw.hpp>

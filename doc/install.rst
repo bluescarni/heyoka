@@ -7,7 +7,7 @@ Introduction
 ------------
 
 heyoka is written in modern C++, and it requires a compiler able to understand
-at least C++20. Specifically, heyoka currently targets GCC>=10, clang>=14 and MSVC>=2022.
+at least C++23. Specifically, heyoka currently targets GCC>=13, clang>=18 and MSVC>=17.4.
 The library is regularly tested on a continuous integration pipeline
 which includes several operating systems (Linux, OSX, Windows)
 and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
@@ -37,7 +37,7 @@ Additionally, heyoka has the following **optional** dependencies:
   libraries (used in the tests and benchmarks, xtensor>=0.26 is required).
 
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
-installing from source (the minimum required version is 3.18).
+installing from source (the minimum required version is 3.20).
 
 .. warning::
 
@@ -256,8 +256,8 @@ may look like this:
 
 .. code-block:: cmake
 
-   # heyoka requires at least CMake 3.18.
-   cmake_minimum_required(VERSION 3.18.0)
+   # heyoka requires at least CMake 3.20.
+   cmake_minimum_required(VERSION 3.20.0)
 
    # The name of our project.
    project(sample_project)

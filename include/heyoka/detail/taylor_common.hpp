@@ -29,11 +29,9 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
@@ -54,6 +52,7 @@
 
 #include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>

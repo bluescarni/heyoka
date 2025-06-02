@@ -31,7 +31,6 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constant.h>
@@ -63,6 +62,7 @@
 #include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>

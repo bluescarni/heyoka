@@ -21,10 +21,10 @@
 
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 #include <boost/unordered_map.hpp>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/llvm_state.hpp>
 
 // This in-memory cache maps the bitcode

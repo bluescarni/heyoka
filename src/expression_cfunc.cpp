@@ -32,7 +32,6 @@
 #include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -73,6 +72,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -2261,14 +2261,9 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
 
     get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
 
-    // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
-    // the custom transform:
-    //
-    // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
-    return std::make_tuple(
-        llvm_multi_state(states_lists[0] | std::views::transform([](auto &s) -> auto && { return std::move(s); }),
-                         parjit),
-        std::move(dc), std::move(tape_size_align));
+    // Build the return value.
+    return std::make_tuple(llvm_multi_state(states_lists[0] | std::views::as_rvalue, parjit), std::move(dc),
+                           std::move(tape_size_align));
 }
 
 } // namespace

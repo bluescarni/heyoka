@@ -18,8 +18,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -34,6 +32,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>

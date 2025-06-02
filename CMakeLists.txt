@@ -1,6 +1,5 @@
-# NOTE: the 3.18 requirement comes from here:
-# https://cmake.org/cmake/help/latest/module/CheckLinkerFlag.html
-cmake_minimum_required(VERSION 3.18.0)
+# NOTE: C++23 recognised since 3.20.0.
+cmake_minimum_required(VERSION 3.20.0)
 
 # Set default build type to "Release".
 # NOTE: this should be done before the project command since the latter can set
@@ -381,8 +380,8 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Ensure that C++20 is employed when both compiling and consuming heyoka.
-target_compile_features(heyoka PUBLIC cxx_std_20)
+# Ensure that C++23 is employed when both compiling and consuming heyoka.
+target_compile_features(heyoka PUBLIC cxx_std_23)
 # Enforce vanilla C++ when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
 

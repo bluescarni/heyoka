@@ -28,7 +28,6 @@
 #include <boost/container/container_fwd.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -41,6 +40,7 @@
 #include <heyoka/detail/dtens_impl.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>

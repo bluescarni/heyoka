@@ -26,7 +26,6 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -65,6 +64,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/rng_to_vec.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -967,14 +967,13 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
     return seg_map;
 }
 
-// Helper to codegen the computation of the Taylor derivatives in compact mode via
-// driver functions implemented across multiple LLVM states. main_state is the state in which the stepper is defined,
-// main_fp_t the internal scalar floating-point type as defined in the main state,
-// main_par/main_time/main_tape_ptr the parameters/time/tape pointers as defined in the
-// main state, dc the Taylor decomposition, s_dc its segmented counterpart, n_eq the number
-// of equations/state variables, order the Taylor order, batch_size the batch size,
-// high_accuracy the high accuracy flag, parallel_mode the parallel mode flag, max_svf_idx
-// the maximum index in the decomposition of the sv funcs (or zero if there are no sv funcs).
+// Helper to codegen the computation of the Taylor derivatives in compact mode via driver functions implemented across
+// multiple LLVM states. main_state is the state in which the stepper is defined, main_fp_t the internal scalar
+// floating-point type as defined in the main state, main_par/main_time/main_tape_ptr the parameters/time/tape pointers
+// as defined in the main state, dc the Taylor decomposition, s_dc its segmented counterpart, n_eq the number of
+// equations/state variables, order the Taylor order, batch_size the batch size, high_accuracy the high accuracy flag,
+// parallel_mode the parallel mode flag, max_svf_idx the maximum index in the decomposition of the sv funcs (or zero if
+// there are no sv funcs).
 //
 // The return value is a list of states in which the driver functions have been defined.
 std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::Type *main_fp_t,
@@ -986,17 +985,16 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
                                                  bool high_accuracy, bool parallel_mode, std::uint32_t max_svf_idx)
 {
     // Init the list of states.
-    // NOTE: we use lists here because it is convenient to have
-    // pointer/reference stability when iteratively constructing
-    // the set of states.
+    //
+    // NOTE: we use lists here because it is convenient to have pointer/reference stability when iteratively
+    // constructing the set of states.
     std::list<llvm_state> states;
 
     // Push back a new state and use it as initial current state.
-    // NOTE: like this, we always end up creating at least one driver
-    // function and a state, even in the degenerate case of an empty decomposition,
-    // which is suboptimal peformance-wise.
-    // I do not think however that it is worth it to complicate the code to avoid
-    // this corner-case pessimisation.
+    //
+    // NOTE: like this, we always end up creating at least one driver function and a state, even in the degenerate case
+    // of an empty decomposition, which is suboptimal peformance-wise. I do not think however that it is worth it to
+    // complicate the code to avoid this corner-case pessimisation.
     states.push_back(main_state.make_similar());
     auto *cur_state = &states.back();
 
@@ -1004,9 +1002,8 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // of the state variables in the main state.
     const auto svd_gl = taylor_c_make_sv_diff_globals(main_state, main_fp_t, dc, n_uvars);
 
-    // Structure used to log, in trace mode, the breakdown of each segment.
-    // For each segment, this structure contains the number of invocations
-    // of each function in the segment. It will be unused if we are not tracing.
+    // Structure used to log, in trace mode, the breakdown of each segment. For each segment, this structure contains
+    // the number of invocations of each function in the segment. It will be unused if we are not tracing.
     std::vector<std::vector<std::uint32_t>> segment_bd;
 
     // Are we tracing?
@@ -1018,30 +1015,25 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // Index of the state we are currently operating on.
     boost::safe_numerics::safe<unsigned> cur_state_idx = 0;
 
-    // NOTE: unlike in compiled functions, we cannot at the same time
-    // declare and invoke the drivers from the main module as the invocation
-    // happens from within an LLVM loop. Thus, we first define the drivers
-    // in the states and add their declarations in the main state, and only
-    // at a later stage we perform the invocation of the drivers in the
-    // main state.
+    // NOTE: unlike in compiled functions, we cannot at the same time declare and invoke the drivers from the main
+    // module as the invocation happens from within an LLVM loop. Thus, we first define the drivers in the states and
+    // add their declarations in the main state, and only at a later stage we perform the invocation of the drivers in
+    // the main state.
 
     // Declarations of the drivers in the main state.
     std::vector<llvm::Function *> main_driver_decls;
     // Add the declaration for the first driver.
     main_driver_decls.push_back(taylor_cm_make_driver_proto(main_state, cur_state_idx));
 
-    // The driver function for the evaluation of the segment
-    // containing max_svf_idx. Will remain null if we do not need
+    // The driver function for the evaluation of the segment containing max_svf_idx. Will remain null if we do not need
     // to compute the last-order derivatives for the sv funcs.
     llvm::Function *max_svf_driver = nullptr;
 
-    // Add the driver declaration to the current state,
-    // and start insertion into the driver.
+    // Add the driver declaration to the current state, and start insertion into the driver.
     cur_state->builder().SetInsertPoint(llvm::BasicBlock::Create(
         cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
 
-    // Variable to keep track of how many evaluation functions have
-    // been invoked in the current state.
+    // Variable to keep track of how many evaluation functions have been invoked in the current state.
     boost::safe_numerics::safe<std::size_t> n_evalf = 0;
 
     // Limit of function evaluations per state.
@@ -1053,8 +1045,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // an AD formula).
     constexpr auto max_n_evalf = 20u;
 
-    // Variable to keep track of the index of the first u variable
-    // in a segment.
+    // Variable to keep track of the index of the first u variable in a segment.
     auto start_u_idx = n_eq;
 
     // Helper to finalise the current driver function and create a new one.
@@ -1079,8 +1070,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
             cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
     };
 
-    // Iterate over the segments in s_dc and codegen the code for the
-    // computation of Taylor derivatives.
+    // Iterate over the segments in s_dc and codegen the code for the computation of Taylor derivatives.
     for (const auto &seg : s_dc) {
         // Cache the number of expressions in the segment.
         const auto seg_n_ex = static_cast<std::uint32_t>(seg.size());
@@ -1090,14 +1080,13 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         // - we need to compute the last-order derivatives of the sv funcs,
         // - max_svf_idx is somewhere within this segment.
         //
-        // In such a case, we create a driver specifically for this segment, which we will
-        // invoke again at the end of this function to compute the last-order derivatives
-        // of the sv funcs.
+        // In such a case, we create a driver specifically for this segment, which we will invoke again at the end of
+        // this function to compute the last-order derivatives of the sv funcs.
         const auto is_svf_seg = need_svf_lo && max_svf_idx >= start_u_idx && max_svf_idx < (start_u_idx + seg_n_ex);
 
         if (n_evalf > max_n_evalf || is_svf_seg) {
-            // Either we have codegenned enough blocks for this state, or we are
-            // in the max_svf_idx state. Finalise the current driver and start the new one.
+            // Either we have codegenned enough blocks for this state, or we are in the max_svf_idx state. Finalise the
+            // current driver and start the new one.
             start_new_driver();
 
             // Assign max_svf_driver if needed.
@@ -1121,10 +1110,9 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         // Update start_u_idx.
         start_u_idx += seg_n_ex;
 
-        // If we codegenned the max_svf_idx driver, start immediately a new driver.
-        // We want the max_svf_idx driver to contain the codegen for a single segment
-        // and nothing more, otherwise we end up doing unnecessary work when computing
-        // the last-order derivatives of the sv funcs.
+        // If we codegenned the max_svf_idx driver, start immediately a new driver. We want the max_svf_idx driver to
+        // contain the codegen for a single segment and nothing more, otherwise we end up doing unnecessary work when
+        // computing the last-order derivatives of the sv funcs.
         if (is_svf_seg) {
             start_new_driver();
         }
@@ -1151,8 +1139,8 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     }
     // LCOV_EXCL_STOP
 
-    // Back in the main state, we begin by invoking all the drivers with order zero.
-    // That is, we are computing the initial values of the u variables.
+    // Back in the main state, we begin by invoking all the drivers with order zero. That is, we are computing the
+    // initial values of the u variables.
     auto &main_bld = main_state.builder();
     for (auto *cur_driver_f : main_driver_decls) {
         main_bld.CreateCall(cur_driver_f, {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(0)});
@@ -1174,15 +1162,14 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     taylor_c_compute_sv_diffs(main_state, main_fp_t, svd_gl, main_tape_ptr, main_par_ptr, n_uvars,
                               main_bld.getInt32(order), batch_size);
 
-    // Finally, we compute the last-order derivatives for the sv_funcs, if needed. Because the sv funcs
-    // correspond to u variables somewhere in the decomposition, we will have to compute the
-    // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
-    // have been properly computed.
+    // Finally, we compute the last-order derivatives for the sv_funcs, if needed. Because the sv funcs correspond to u
+    // variables somewhere in the decomposition, we will have to compute the last-order derivatives of the u variables
+    // until we are sure all sv_funcs derivatives have been properly computed.
     if (need_svf_lo) {
         assert(max_svf_driver != nullptr);
 
-        // What we do here is to iterate over all the drivers, invoke them one by one,
-        // and break out when we have detected max_svf_driver.
+        // What we do here is to iterate over all the drivers, invoke them one by one, and break out when we have
+        // detected max_svf_driver.
         for (auto *cur_driver_f : main_driver_decls) {
             main_bld.CreateCall(cur_driver_f, {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(order)});
 
@@ -1193,17 +1180,12 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     }
 
     // Return the states.
-    // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
-    // the custom transform:
-    //
-    // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
-    return rng_to_vec(states | std::views::transform([](llvm_state &s) -> llvm_state && { return std::move(s); }));
+    return rng_to_vec(states | std::views::as_rvalue);
 }
 
-// Helper for the computation of a jet of derivatives in compact mode,
-// used in taylor_compute_jet(). The return values are the size/alignment
-// requirements for the tape of derivatives and the list of states in which
-// the drivers are implemented. All LLVM values and types passed to this function are defined in the main state.
+// Helper for the computation of a jet of derivatives in compact mode, used in taylor_compute_jet(). The return values
+// are the size/alignment requirements for the tape of derivatives and the list of states in which the drivers are
+// implemented. All LLVM values and types passed to this function are defined in the main state.
 std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_jet_compact_mode(
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     llvm_state &main_state, llvm::Type *main_fp_t, llvm::Value *order0, llvm::Value *main_par_ptr,
@@ -1228,16 +1210,14 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     const auto max_svf_idx
         = sv_funcs_dc.empty() ? static_cast<std::uint32_t>(0) : *std::ranges::max_element(sv_funcs_dc);
 
-    // Determine the total number of elements to be stored in the tape of derivatives.
-    // We will be storing all the derivatives of the u variables
-    // up to order 'order - 1', the derivatives of order
-    // 'order' of the state variables and the derivatives
-    // of order 'order' of the sv_funcs.
-    // NOTE: if sv_funcs_dc is empty, or if all its indices are not greater
-    // than the indices of the state variables, then we don't need additional
-    // slots after the sv derivatives. If we need additional slots, allocate
-    // another full column of derivatives, as it is complicated at this stage
-    // to know exactly how many slots we will need.
+    // Determine the total number of elements to be stored in the tape of derivatives. We will be storing all the
+    // derivatives of the u variables up to order 'order - 1', the derivatives of order 'order' of the state variables
+    // and the derivatives of order 'order' of the sv_funcs.
+    //
+    // NOTE: if sv_funcs_dc is empty, or if all its indices are not greater than the indices of the state variables,
+    // then we don't need additional slots after the sv derivatives. If we need additional slots, allocate another full
+    // column of derivatives, as it is complicated at this stage to know exactly how many slots we will need.
+    //
     // NOTE: overflow checking for this computation has been performed externally.
     const auto tot_tape_N = (max_svf_idx < n_eq) ? ((n_uvars * order) + n_eq) : (n_uvars * (order + 1u));
 
@@ -1250,15 +1230,12 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
-    // NOTE: tape_ptr is used as temporary storage for the current function,
-    // but it is provided externally from dynamically-allocated memory in order to avoid stack overflow.
-    // This creates a situation in which LLVM cannot elide stores into tape_ptr
-    // (even if it figures out a way to avoid storing intermediate results into
-    // it) because LLVM must assume that some other function may
-    // use these stored values later. Thus, we declare via an intrinsic that the
-    // lifetime of tape_ptr begins here and ends at the end of the function,
-    // so that LLVM can assume that any value stored in it cannot be possibly
-    // used outside this function.
+    // NOTE: tape_ptr is used as temporary storage for the current function, but it is provided externally from
+    // dynamically-allocated memory in order to avoid stack overflow. This creates a situation in which LLVM cannot
+    // elide stores into tape_ptr (even if it figures out a way to avoid storing intermediate results into it) because
+    // LLVM must assume that some other function may use these stored values later. Thus, we declare via an intrinsic
+    // that the lifetime of tape_ptr begins here and ends at the end of the function, so that LLVM can assume that any
+    // value stored in it cannot be possibly used outside this function.
     main_bld.CreateLifetimeStart(main_tape_ptr, main_bld.getInt64(tape_sz));
 
     // Copy the order-0 derivatives of the state variables into the tape.
@@ -1313,24 +1290,22 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 
 } // namespace
 
-// Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
-// is the number of equations/variables in the ODE sys, dc its Taylor decomposition,
-// n_uvars the total number of u variables in the decomposition.
-// order is the max derivative order desired, batch_size the batch size.
-// order0 is a pointer to an array of (at least) n_eq * batch_size scalar elements
-// containing the derivatives of order 0. par_ptr is a pointer to an array containing
-// the numerical values of the parameters, time_ptr a pointer to the time value(s),
-// tape_ptr a pointer to the tape of derivatives (only in compact mode, otherwise
-// a null value). sv_funcs are the indices, in the decomposition, of the functions of state
-// variables.
+// Helper function to compute the jet of Taylor derivatives up to a given order.
+//
+// n_eq is the number of equations/variables in the ODE sys, dc its Taylor decomposition, n_uvars the total number of u
+// variables in the decomposition. order is the max derivative order desired, batch_size the batch size. order0 is a
+// pointer to an array of (at least) n_eq * batch_size scalar elements containing the derivatives of order 0. par_ptr is
+// a pointer to an array containing the numerical values of the parameters, time_ptr a pointer to the time value(s),
+// tape_ptr a pointer to the tape of derivatives (only in compact mode, otherwise a null value). sv_funcs are the
+// indices, in the decomposition, of the functions of state variables.
 //
 // order0, par_ptr and time_ptr are all external pointers.
 //
 // The return value is a variant containing either:
-// - in compact mode, the size/alignment requirements for the tape of derivatives
-//   and the list of states in which the driver functions are implemented, or
-// - the jet of derivatives of the state variables and sv_funcs
-//   up to order 'order'.
+//
+// - in compact mode, the size/alignment requirements for the tape of derivatives and the list of states in which the
+//   driver functions are implemented, or
+// - the jet of derivatives of the state variables and sv_funcs up to order 'order'.
 std::variant<std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    llvm::Value *tape_ptr, const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc,
@@ -1344,19 +1319,18 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
     assert((tape_ptr != nullptr) == compact_mode);
     // LCOV_EXCL_STOP
 
-    // Make sure we can represent n_uvars * (order + 1) as a 32-bit
-    // unsigned integer. This is the maximum total number of derivatives we will have to compute
-    // and store, with the +1 taking into account the extra slots that might be needed by sv_funcs_dc.
-    // If sv_funcs_dc is empty, we need only n_uvars * order + n_eq derivatives.
-    // LCOV_EXCL_START
-    if (order == std::numeric_limits<std::uint32_t>::max()
-        || n_uvars > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
-        throw std::overflow_error(
-            "An overflow condition was detected in the computation of a jet of Taylor derivatives");
-    }
+    // Overflow checks.
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+    try {
+        // We must be able to represent n_uvars * (order + 1) as a 32-bit unsigned integer. This is the maximum total
+        // number of derivatives we will have to compute and store, with the +1 taking into account the extra slots that
+        // might be needed by sv_funcs_dc. If sv_funcs_dc is empty, we need only n_uvars * order + n_eq derivatives.
+        static_cast<void>(static_cast<std::uint32_t>(n_uvars * (safe_u32_t(order) + 1u)));
 
-    // We also need to be able to index up to n_eq * batch_size in order0.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        // We also need to be able to index up to n_eq * batch_size in order0.
+        static_cast<void>(static_cast<std::uint32_t>(safe_u32_t(n_eq) * batch_size));
+        // LCOV_EXCL_START
+    } catch (...) {
         throw std::overflow_error(
             "An overflow condition was detected in the computation of a jet of Taylor derivatives");
     }
