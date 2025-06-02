@@ -1045,8 +1045,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     // an AD formula).
     constexpr auto max_n_evalf = 20u;
 
-    // Variable to keep track of the index of the first u variable
-    // in a segment.
+    // Variable to keep track of the index of the first u variable in a segment.
     auto start_u_idx = n_eq;
 
     // Helper to finalise the current driver function and create a new one.
@@ -1071,8 +1070,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
             cur_state->context(), "entry", taylor_cm_make_driver_proto(*cur_state, cur_state_idx)));
     };
 
-    // Iterate over the segments in s_dc and codegen the code for the
-    // computation of Taylor derivatives.
+    // Iterate over the segments in s_dc and codegen the code for the computation of Taylor derivatives.
     for (const auto &seg : s_dc) {
         // Cache the number of expressions in the segment.
         const auto seg_n_ex = static_cast<std::uint32_t>(seg.size());
@@ -1082,14 +1080,13 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         // - we need to compute the last-order derivatives of the sv funcs,
         // - max_svf_idx is somewhere within this segment.
         //
-        // In such a case, we create a driver specifically for this segment, which we will
-        // invoke again at the end of this function to compute the last-order derivatives
-        // of the sv funcs.
+        // In such a case, we create a driver specifically for this segment, which we will invoke again at the end of
+        // this function to compute the last-order derivatives of the sv funcs.
         const auto is_svf_seg = need_svf_lo && max_svf_idx >= start_u_idx && max_svf_idx < (start_u_idx + seg_n_ex);
 
         if (n_evalf > max_n_evalf || is_svf_seg) {
-            // Either we have codegenned enough blocks for this state, or we are
-            // in the max_svf_idx state. Finalise the current driver and start the new one.
+            // Either we have codegenned enough blocks for this state, or we are in the max_svf_idx state. Finalise the
+            // current driver and start the new one.
             start_new_driver();
 
             // Assign max_svf_driver if needed.
@@ -1113,10 +1110,9 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
         // Update start_u_idx.
         start_u_idx += seg_n_ex;
 
-        // If we codegenned the max_svf_idx driver, start immediately a new driver.
-        // We want the max_svf_idx driver to contain the codegen for a single segment
-        // and nothing more, otherwise we end up doing unnecessary work when computing
-        // the last-order derivatives of the sv funcs.
+        // If we codegenned the max_svf_idx driver, start immediately a new driver. We want the max_svf_idx driver to
+        // contain the codegen for a single segment and nothing more, otherwise we end up doing unnecessary work when
+        // computing the last-order derivatives of the sv funcs.
         if (is_svf_seg) {
             start_new_driver();
         }
@@ -1143,8 +1139,8 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     }
     // LCOV_EXCL_STOP
 
-    // Back in the main state, we begin by invoking all the drivers with order zero.
-    // That is, we are computing the initial values of the u variables.
+    // Back in the main state, we begin by invoking all the drivers with order zero. That is, we are computing the
+    // initial values of the u variables.
     auto &main_bld = main_state.builder();
     for (auto *cur_driver_f : main_driver_decls) {
         main_bld.CreateCall(cur_driver_f, {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(0)});
@@ -1166,15 +1162,14 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     taylor_c_compute_sv_diffs(main_state, main_fp_t, svd_gl, main_tape_ptr, main_par_ptr, n_uvars,
                               main_bld.getInt32(order), batch_size);
 
-    // Finally, we compute the last-order derivatives for the sv_funcs, if needed. Because the sv funcs
-    // correspond to u variables somewhere in the decomposition, we will have to compute the
-    // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
-    // have been properly computed.
+    // Finally, we compute the last-order derivatives for the sv_funcs, if needed. Because the sv funcs correspond to u
+    // variables somewhere in the decomposition, we will have to compute the last-order derivatives of the u variables
+    // until we are sure all sv_funcs derivatives have been properly computed.
     if (need_svf_lo) {
         assert(max_svf_driver != nullptr);
 
-        // What we do here is to iterate over all the drivers, invoke them one by one,
-        // and break out when we have detected max_svf_driver.
+        // What we do here is to iterate over all the drivers, invoke them one by one, and break out when we have
+        // detected max_svf_driver.
         for (auto *cur_driver_f : main_driver_decls) {
             main_bld.CreateCall(cur_driver_f, {main_tape_ptr, main_par_ptr, main_time_ptr, main_bld.getInt32(order)});
 
