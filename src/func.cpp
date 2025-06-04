@@ -40,6 +40,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -476,6 +477,66 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
     if (retval == nullptr) {
         throw std::invalid_argument(
             fmt::format("Null return value detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    return retval;
+}
+
+std::vector<std::pair<std::uint32_t, std::uint32_t>> func::taylor_c_diff_get_n_iters(std::uint32_t order) const
+{
+    // Compute the return value.
+    auto retval = m_func->taylor_c_diff_get_n_iters(order);
+
+    // The size of retval must be order + 1.
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto expected_size = static_cast<std::uint32_t>(safe_u32_t(order) + 1u);
+    if (retval.size() != expected_size) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid value returned by taylor_c_diff_get_n_iters() for the "
+                                                "function '{}': the expected size is {} but the actual size is {}",
+                                                get_name(), expected_size, retval.size()));
+    }
+
+    // We must be able to represent as std::uint32_t the total number of iterations for every order.
+    for (const auto &[n_uiter, n_oiter] : retval) {
+        try {
+            static_cast<void>(static_cast<std::uint32_t>(safe_u32_t(n_uiter) + n_oiter));
+        } catch (...) {
+            throw std::overflow_error(fmt::format(
+                "Overflow detected in the return value of taylor_c_diff_get_n_iters() for the function '{}'",
+                get_name()));
+        }
+    }
+
+    return retval;
+}
+
+llvm::Function *func::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                         std::uint32_t batch_size, bool high_accuracy) const
+{
+    if (fp_t == nullptr) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Null floating-point type detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
+    }
+
+    if (batch_size == 0u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Zero batch size detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+                        get_name()));
+    }
+
+    if (n_uvars == 0u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Zero number of u variables detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
+    }
+
+    auto *retval = m_func->taylor_c_diff_get_single_iter_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+
+    if (retval == nullptr) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Null return value detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
     }
 
     return retval;

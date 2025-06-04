@@ -20,6 +20,7 @@
 #include <numeric>
 #include <ranges>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -967,6 +968,177 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
     return seg_map;
 }
 
+// Data structure representing a single partition in a partitioned decomposition.
+//
+// A partitioned decomposition is the central part of a Taylor decomposition reorganised into a set of partitions. Each
+// partition contains all expressions in the decomposition sharing the same formula for the calculation of the Taylor
+// derivatives. Thus, for instance, one partition may contain all expressions of type variable * variable, another
+// partition may contain all expressions of type par * variable, another partition may contain all expressions of type
+// cos(variable), and so on.
+//
+// Typically, the Taylor derivatives formulae consist of summations in which only a couple of terms involve the
+// current-order derivatives of the arguments. The rest of the terms in the summations involve only previous-orders
+// derivatives. Thus, a large fraction of the computation can be performed concurrently (i.e., coroutine-style) across
+// multiple expressions of the same type while disregarding data dependencies between expressions. For instance, if a
+// partition consists of two variable * variable subexpressions, we begin with the first iteration for the computation
+// of the Taylor derivative of the first expression and then we move to perform the first iteration for the second
+// expression. Then we move to the second iterations, first for the first expression and then for the second expression.
+// And so on. This allows us to employ a cache-friendly memory access pattern to the tape of derivatives in which we are
+// accessing the previous-orders derivatives order-by-order. This also reduces the number of branch instructions because
+// we are using a single loop to compute multiple Taylor derivatives at the same time (instead of using one loop per
+// derivative).
+struct dc_partition {
+    // The LLVM function used to perform a single iteration in the computation of the Taylor derivatives of the
+    // expressions in the partition.
+    llvm::Function *f = nullptr;
+    // The vector containing the number of unordered iterations for each differentiation order. The unordered iterations
+    // are those that can be performed concurrently.
+    std::vector<std::uint32_t> n_uiters;
+    // The actual content of the partition:
+    //
+    // - the index of the subexpression in the original (i.e., pre-partition) decomposition,
+    // - the subexpression itself,
+    // - the vector of hidden dependencies.
+    std::vector<std::tuple<std::uint32_t, expression, std::vector<std::uint32_t>>> v_ex;
+    // The LLVM counterpart of n_uiters, codegenned as a global read-only constant.
+    llvm::GlobalVariable *n_uiters_gv = nullptr;
+};
+
+// Helper to build the partitioned counterpart of the input segmented decomposition.
+//
+// This function will codegen into s all the single-iteration functions used for the computation of the Taylor
+// derivatives in compact mode. It will also codegen global arrays containing the number of unordered/ordered iterations
+// for each partition (i.e., one array of size order + 1 per partition) and an array containing the max number of
+// unordered iterations (calculated across the partitions) for each differentiation order.
+//
+// s is the llvm_state in which we are operating, functions and global variables will be added to it. fp_t is the
+// floating-point type to be used in the computation of the Taylor derivatives. s_dc is the segmented decomposition.
+// n_eq is the number of differential equations. n_uvars is the total number of u variables in the decomposition. order
+// is the Taylor order used in the computation. batch_size is the batch size. high_accuracy the high accuracy flag.
+//
+// The two return values are the paritioned decomposition and the array of max number of unordered iterations.
+[[maybe_unused]] std::pair<std::vector<dc_partition>, llvm::GlobalVariable *>
+build_partitioned_dc(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_dc_t> &s_dc,
+                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                     const std::uint32_t n_eq, const std::uint32_t n_uvars, const std::uint32_t order,
+                     const std::uint32_t batch_size, const bool high_accuracy)
+{
+    auto &bld = s.builder();
+    auto &md = s.module();
+
+    // Fetch the 32-bit integer type.
+    auto *i32_t = bld.getInt32Ty();
+
+    // Initialise the flattened version of the partitioned decomposition, containing, for each expression ex in s_dc:
+    //
+    // - the LLVM function for the computation of a single iteration of the Taylor derivative of ex,
+    // - the index of ex in the original decomposition,
+    // - ex itself,
+    // - the vector of hidden dependencies.
+    std::vector<std::tuple<llvm::Function *, std::uint32_t, expression, std::vector<std::uint32_t>>> flat_pdc;
+    // NOTE: the segmented decomposition s_dc represents the central part of the original decomposition. Thus, the index
+    // of its first subexpression is n_eq.
+    std::uint32_t cur_idx = n_eq;
+    for (const auto &[ex, deps] : s_dc | std::views::join) {
+        assert(std::holds_alternative<func>(ex.value()));
+        flat_pdc.emplace_back(
+            std::get<func>(ex.value()).taylor_c_diff_get_single_iter_func(s, fp_t, n_uvars, batch_size, high_accuracy),
+            // NOTE: cur_idx++ here is safe thanks to the overflow checks in taylor_compute_jet().
+            cur_idx++, ex, deps);
+    }
+
+    // Sort flat_pdc according to the name of the LLVM function.
+    // NOTE: use stable_sort() because within each partition we want to maintain the relative order from the segmented
+    // decomposition.
+    std::ranges::stable_sort(flat_pdc, [](const auto &t1, const auto &t2) {
+        return llvm_func_name_compare{}(std::get<0>(t1), std::get<0>(t2));
+    });
+
+    // Create a view for transforming flat_pdc into a std::vector<dc_partition>.
+    auto tview
+        = flat_pdc |
+          // Step 1: split flat_pdc into groups based on the LLVM function name.
+          std::views::chunk_by(
+              [](const auto &t1, const auto &t2) { return std::get<0>(t1)->getName() == std::get<0>(t2)->getName(); })
+          |
+          // Step 2: transform each group into a dc_partition.
+          std::views::transform([order, &bld, &md, i32_t](std::ranges::forward_range auto &&r) {
+              assert(!std::ranges::empty(r));
+
+              // Fetch a reference to the first element in the group.
+              const auto &front = *std::ranges::begin(r);
+
+              // Fetch the first LLVM function in the group (all the items in the group contain the same
+              // function).
+              auto *f = std::get<0>(front);
+
+              // Construct the n_uiters vector.
+              const auto &ex = std::get<2>(front);
+              assert(std::holds_alternative<func>(ex.value()));
+              auto n_uiters_view = std::get<func>(ex.value()).taylor_c_diff_get_n_iters(order)
+                                   | std::views::transform([](const auto &p) { return p.first; });
+              auto n_uiters = std::vector(std::ranges::begin(n_uiters_view), std::ranges::end(n_uiters_view));
+
+              // Setup the LLVM counterpart of n_uiters.
+              auto *n_uiters_arr_t = llvm::ArrayType::get(i32_t, boost::numeric_cast<std::uint64_t>(n_uiters.size()));
+              std::vector<llvm::Constant *> n_uiters_arr_const;
+              n_uiters_arr_const.reserve(n_uiters.size());
+              for (const auto n : n_uiters) {
+                  n_uiters_arr_const.push_back(bld.getInt32(n));
+              }
+              auto *n_uiters_arr = llvm::ConstantArray::get(n_uiters_arr_t, n_uiters_arr_const);
+              // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+              auto *gv_n_uiters_arr = new llvm::GlobalVariable(md, n_uiters_arr->getType(), true,
+                                                               llvm::GlobalVariable::PrivateLinkage, n_uiters_arr);
+
+              // View for extracting index, expression and hidden deps vector from each element of the group.
+              auto eview = r | std::views::transform([](const auto &t) {
+                               return std::make_tuple(std::get<1>(t), std::get<2>(t), std::get<3>(t));
+                           });
+
+              // Build and return the dc_partition.
+              return dc_partition{.f = f,
+                                  .n_uiters = std::move(n_uiters),
+                                  .v_ex = std::vector(std::ranges::begin(eview), std::ranges::end(eview)),
+                                  .n_uiters_gv = gv_n_uiters_arr};
+          });
+
+    // Create the partitioned decomposition.
+    auto ret = std::vector(std::ranges::begin(tview), std::ranges::end(tview));
+
+    // For each differentiation order, compute the maximum number of unordered iterations across the partitions, and
+    // collect the results into a global LLVM array.
+    std::vector<llvm::Constant *> max_n_uiters_arr_const;
+    max_n_uiters_arr_const.reserve(order + 1u);
+    for (std::uint32_t i = 0; i <= order; ++i) {
+        // NOTE: special case if we have an empty decomposition.
+        if (ret.empty()) {
+            max_n_uiters_arr_const.push_back(bld.getInt32(0));
+            continue;
+        }
+
+        // View to extract the number of unordered iterations at differentiation order i for each partition.
+        auto n_uiters_view = ret | std::views::transform([i](const auto &part) {
+                                 assert(i < part.n_uiters.size());
+                                 return part.n_uiters[i];
+                             });
+
+        // Compute the max number of unordered iterations at differentiation order i across all the partitions.
+        const auto max_val = *std::ranges::max_element(n_uiters_view);
+
+        // Add it to the array.
+        max_n_uiters_arr_const.push_back(bld.getInt32(max_val));
+    }
+    auto *max_n_uiters_arr_t = llvm::ArrayType::get(i32_t, order + 1u);
+    auto *max_n_uiters_arr = llvm::ConstantArray::get(max_n_uiters_arr_t, max_n_uiters_arr_const);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    auto *gv_max_n_uiters_arr = new llvm::GlobalVariable(md, max_n_uiters_arr->getType(), true,
+                                                         llvm::GlobalVariable::PrivateLinkage, max_n_uiters_arr);
+
+    // Assemble the return value.
+    return std::make_pair(std::move(ret), gv_max_n_uiters_arr);
+}
+
 // Helper to codegen the computation of the Taylor derivatives in compact mode via driver functions implemented across
 // multiple LLVM states. main_state is the state in which the stepper is defined, main_fp_t the internal scalar
 // floating-point type as defined in the main state, main_par/main_time/main_tape_ptr the parameters/time/tape pointers
@@ -1037,12 +1209,8 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     boost::safe_numerics::safe<std::size_t> n_evalf = 0;
 
     // Limit of function evaluations per state.
-    // NOTE: this has not been really properly tuned,
-    // needs more investigation. In any case, this should
-    // be smaller than the corresponding limit in cfunc
-    // because here we are typically more work for function
-    // evaluation (as each function evaluation implements
-    // an AD formula).
+    //
+    // NOTE: this has not been really properly tuned, needs more investigation.
     constexpr auto max_n_evalf = 20u;
 
     // Variable to keep track of the index of the first u variable in a segment.
