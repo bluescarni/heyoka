@@ -1011,7 +1011,7 @@ struct dc_partition {
 // for each partition (i.e., one array of size order + 1 per partition) and an array containing the max number of
 // unordered iterations (calculated across the partitions) for each differentiation order.
 //
-// s is the llvm_state in which we are operating, functions and global variables will be added to it. fp_t is the
+// s is the llvm_state in which we are operating, functions and global variables will be added to it. fp_t is the scalar
 // floating-point type to be used in the computation of the Taylor derivatives. s_dc is the segmented decomposition.
 // n_eq is the number of differential equations. n_uvars is the total number of u variables in the decomposition. order
 // is the Taylor order used in the computation. batch_size is the batch size. high_accuracy the high accuracy flag.
