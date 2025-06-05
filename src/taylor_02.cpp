@@ -976,7 +976,7 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
 // partition may contain all expressions of type par * variable, another partition may contain all expressions of type
 // cos(variable), and so on.
 //
-// Typically, the Taylor derivatives formulae consist of summations in which only a couple of terms involve the
+// Typically, the Taylor derivatives formulae consist of summations in which only one or two terms involve the
 // current-order derivatives of the arguments. The rest of the terms in the summations involve only previous-orders
 // derivatives. Thus, a large fraction of the computation can be performed concurrently (i.e., coroutine-style) across
 // multiple expressions of the same type while disregarding data dependencies between expressions. For instance, if a
@@ -1007,14 +1007,14 @@ struct dc_partition {
 // Helper to build the partitioned counterpart of the input segmented decomposition.
 //
 // This function will codegen into s all the single-iteration functions used for the computation of the Taylor
-// derivatives in compact mode. It will also codegen global arrays containing the number of unordered/ordered iterations
-// for each partition (i.e., one array of size order + 1 per partition) and an array containing the max number of
-// unordered iterations (calculated across the partitions) for each differentiation order.
+// derivatives in compact mode. It will also codegen global arrays containing the number of unordered iterations for
+// each partition (i.e., one array of size order + 1 per partition) and an array containing the max number of unordered
+// iterations (calculated across the partitions) for each differentiation order.
 //
-// s is the llvm_state in which we are operating, functions and global variables will be added to it. fp_t is the scalar
-// floating-point type to be used in the computation of the Taylor derivatives. s_dc is the segmented decomposition.
-// n_eq is the number of differential equations. n_uvars is the total number of u variables in the decomposition. order
-// is the Taylor order used in the computation. batch_size is the batch size. high_accuracy the high accuracy flag.
+// s is the llvm_state in which we are operating and to which functions and global variables will be added. fp_t is the
+// scalar floating-point type to be used in the computation of the Taylor derivatives. s_dc is the segmented
+// decomposition. n_eq is the number of differential equations. n_uvars is the total number of u variables in the
+// decomposition. order is the maximum Taylor order. batch_size is the batch size. high_accuracy the high accuracy flag.
 //
 // The two return values are the paritioned decomposition and the array of max number of unordered iterations.
 [[maybe_unused]] std::pair<std::vector<dc_partition>, llvm::GlobalVariable *>
