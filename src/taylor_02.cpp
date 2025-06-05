@@ -1016,8 +1016,9 @@ struct dc_partition {
 // decomposition. n_eq is the number of differential equations. n_uvars is the total number of u variables in the
 // decomposition. order is the maximum Taylor order. batch_size is the batch size. high_accuracy the high accuracy flag.
 //
-// The two return values are the paritioned decomposition and the array of max number of unordered iterations.
-[[maybe_unused]] std::pair<std::vector<dc_partition>, llvm::GlobalVariable *>
+// The two return values are the paritioned decomposition and a pointer to the beginning of the array of max number of
+// unordered iterations.
+std::pair<std::vector<dc_partition>, llvm::Value *>
 build_partitioned_dc(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_dc_t> &s_dc,
                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                      const std::uint32_t n_eq, const std::uint32_t n_uvars, const std::uint32_t order,
@@ -1135,8 +1136,12 @@ build_partitioned_dc(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_d
     auto *gv_max_n_uiters_arr = new llvm::GlobalVariable(md, max_n_uiters_arr->getType(), true,
                                                          llvm::GlobalVariable::PrivateLinkage, max_n_uiters_arr);
 
+    // Fetch a pointer to the beginning of the array.
+    llvm::Value *max_n_uiters_arr_ptr
+        = bld.CreateInBoundsGEP(max_n_uiters_arr_t, gv_max_n_uiters_arr, {bld.getInt32(0), bld.getInt32(0)});
+
     // Assemble the return value.
-    return std::make_pair(std::move(ret), gv_max_n_uiters_arr);
+    return std::make_pair(std::move(ret), max_n_uiters_arr_ptr);
 }
 
 // Helper to codegen the computation of the Taylor derivatives in compact mode via driver functions implemented across
