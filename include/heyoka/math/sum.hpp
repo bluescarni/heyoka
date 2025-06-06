@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -52,6 +53,10 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>> taylor_c_diff_get_n_iters(std::uint32_t) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                     std::uint32_t, bool) const;
 };
 
 HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
