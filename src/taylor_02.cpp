@@ -1000,8 +1000,9 @@ struct dc_partition {
     // - the subexpression itself,
     // - the vector of hidden dependencies.
     std::vector<std::tuple<std::uint32_t, expression, std::vector<std::uint32_t>>> v_ex;
-    // The LLVM counterpart of n_uiters, codegenned as a global read-only constant.
-    llvm::GlobalVariable *n_uiters_gv = nullptr;
+    // A pointer to the beginning of the LLVM counterpart of n_uiters (which is codegenned as a global read-only
+    // constant array).
+    llvm::Value *n_uiters_ptr = nullptr;
 };
 
 // Helper to build the partitioned counterpart of the input segmented decomposition.
@@ -1092,6 +1093,10 @@ build_partitioned_dc(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_d
               auto *gv_n_uiters_arr = new llvm::GlobalVariable(md, n_uiters_arr->getType(), true,
                                                                llvm::GlobalVariable::PrivateLinkage, n_uiters_arr);
 
+              // Fetch a pointer to the first element of the array.
+              auto *n_uiters_ptr
+                  = bld.CreateInBoundsGEP(n_uiters_arr_t, gv_n_uiters_arr, {bld.getInt32(0), bld.getInt32(0)});
+
               // View for extracting index, expression and hidden deps vector from each element of the group.
               auto eview = r | std::views::transform([](const auto &t) {
                                return std::make_tuple(std::get<1>(t), std::get<2>(t), std::get<3>(t));
@@ -1101,7 +1106,7 @@ build_partitioned_dc(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_d
               return dc_partition{.f = f,
                                   .n_uiters = std::move(n_uiters),
                                   .v_ex = std::vector(std::ranges::begin(eview), std::ranges::end(eview)),
-                                  .n_uiters_gv = gv_n_uiters_arr};
+                                  .n_uiters_ptr = n_uiters_ptr};
           });
 
     // Create the partitioned decomposition.
