@@ -507,9 +507,34 @@ std::vector<std::pair<std::uint32_t, std::uint32_t>> func::taylor_c_diff_get_n_i
         }
     }
 
+    // The first element in retval must be (0, 1).
+    //
+    // NOTE: this has to always be the case for "normal" functions, in the sense that the first and only iteration at
+    // differentiation order 0 corresponds to the evaluation of the function, which normally requires the function
+    // arguments to be evaluated first (and thus this has to be an ordered iteration).
+    //
+    // The exception is nullary functions such as heyoka::time and constants with adaptive precision (e.g., pi). For
+    // these, in theory we could have only unordered iterations for all differentiation orders.
+    //
+    // However, in the Taylor integrator at order 0 we are using exclusively ordered evaluations to initialise the u
+    // variables, while skipping unordered iterations altogether. Thus we enforce the single ordered iteration to be
+    // present at order 0.
+    if (retval[0] != std::pair<std::uint32_t, std::uint32_t>{0, 1}) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The first element of the return value of taylor_c_diff_get_n_iters() "
+                                                "for the function '{}' must be (0, 1), but it is ({}, {}) instead",
+                                                get_name(), retval[0].first, retval[0].second));
+    }
+
     return retval;
 }
 
+// NOTE: the LLVM function returned by this function needs to take into account that:
+//
+// - at differentiation order zero, it must never read from the accumulator, only write into it. This is because we
+//   assume that the order-0 iteration is used only to initialise the u variables, thus we can avoid initing the order-0
+//   section of the tape with zeroes that would be immediately overwritten anyway;
+// - at differentiation orders > 0, it can assume that, at the first iteration, the accumulator has been
+//   zero-initialised.
 llvm::Function *func::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
                                                          std::uint32_t batch_size, bool high_accuracy) const
 {
