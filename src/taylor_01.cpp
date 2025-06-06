@@ -199,6 +199,121 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     return std::make_pair(std::move(fname), std::move(fargs));
 }
 
+// NOTE: this function will return a pair containing:
+//
+// - the mangled name and
+// - the list of LLVM argument types
+//
+// for the function implementing a single iteration of the computation of the Taylor derivative in compact mode of the
+// mathematical function called "name". The mangled name is assembled from "name", the types of the arguments args, the
+// number of uvars and the scalar or vector floating-point type in use (which depends on fp_t and batch_size).
+//
+// NOTE: the values in args are inconsequential, only the types matter.
+std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_single_iter_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const std::string &name,
+                                         // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                         std::uint32_t n_uvars, std::uint32_t batch_size,
+                                         const std::vector<std::variant<variable, number, param>> &args,
+                                         std::uint32_t n_hidden_deps)
+{
+    assert(fp_t != nullptr);
+    assert(n_uvars > 0u);
+
+    // LCOV_EXCL_START
+
+    // Check that 'name' does not contain periods ".". Periods are used to separate fields in the mangled name.
+    if (boost::contains(name, ".")) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot generate a mangled name for the compact mode Taylor derivative of the mathematical "
+                        "function '{}': the function name cannot contain '.' characters",
+                        name));
+    }
+
+    // LCOV_EXCL_STOP
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the pointer type.
+    auto *ptr_t = llvm::PointerType::getUnqual(context);
+
+    // Fetch the int32 type.
+    auto *i32_t = llvm::Type::getInt32Ty(context);
+
+    // Init the name.
+    auto fname = fmt::format("heyoka.taylor_c_diff_single_iter.{}.", name);
+
+    // Init the vector of arguments:
+    //
+    // - diff order,
+    // - idx of the u variable whose diff is being computed,
+    // - diff array (pointer),
+    // - par ptr (pointer),
+    // - time ptr (pointer).
+    std::vector<llvm::Type *> fargs{i32_t, i32_t, ptr_t, ptr_t, ptr_t};
+
+    // Add the mangling and LLVM arg types for the argument types. Also, detect if we have variables in the arguments.
+    bool with_var = false;
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        // Detect variable.
+        if (std::holds_alternative<variable>(args[i])) {
+            with_var = true;
+        }
+
+        // Name mangling.
+        fname += std::visit([](const auto &v) { return cm_mangle(v); }, args[i]);
+
+        // Add the arguments separator, if we are not at the last argument.
+        if (i != args.size() - 1u) {
+            fname += '_';
+        }
+
+        // Add the LLVM function argument type.
+        fargs.push_back(std::visit(
+            [&]<typename T>(const T &) -> llvm::Type * {
+                if constexpr (std::same_as<T, number>) {
+                    // For numbers, the argument is passed as a scalar floating-point value.
+                    return val_t->getScalarType();
+                } else if constexpr (std::is_same_v<T, variable> || std::is_same_v<T, param>) {
+                    // For vars and params, the argument is an index in an array.
+                    return i32_t;
+                } else {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
+                }
+            },
+            args[i]));
+    }
+
+    // Close the argument list with a ".".
+    // NOTE: this will result in a ".." in the name if the function has zero arguments.
+    fname += '.';
+
+    // If we have variables in the arguments, add mangling for n_uvars.
+    if (with_var) {
+        fname += fmt::format("n_uvars_{}.", n_uvars);
+    } else {
+        // NOTE: make sure we put something in this field even if we do not have variables in the arguments. This
+        // ensures that a mangled function name has a fixed number of fields, and that n_uvars_{} cannot possibly be
+        // interpreted as the mangled name of a floating-point type.
+        fname += "no_uvars.";
+    }
+
+    // Finally, add the mangling for the floating-point type.
+    fname += llvm_mangle_type(val_t);
+
+    // Fill in the hidden dependency arguments. These are all indices.
+    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_hidden_deps), i32_t);
+
+    // Add the accumulator pointer and the current iteration index.
+    fargs.push_back(ptr_t);
+    fargs.push_back(i32_t);
+
+    return std::make_pair(std::move(fname), std::move(fargs));
+}
+
 llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const number &num, llvm::Value *,
                                      std::uint32_t batch_size)
 {
