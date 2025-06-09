@@ -1049,7 +1049,7 @@ TEST_CASE("taylor mul")
             (taylor_adaptive_batch{
                 {prime("x"_var) = expression{func{detail::prod_impl()}}}, {0., 0., 0.}, 3, kw::compact_mode = true}),
             std::invalid_argument,
-            Message("The Taylor derivative of a product in compact mode can be computed only for products "
+            Message("The Taylor derivative of a product can be computed only for products "
                     "of 2 terms, but the current product has 0 term(s) instead"));
     }
     {
@@ -1060,13 +1060,12 @@ TEST_CASE("taylor mul")
                     "of 2 terms, but the current product has 1 term(s) instead"));
     }
     {
-        REQUIRE_THROWS_MATCHES(
-            (taylor_adaptive_batch{{prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}},
-                                   {0., 0., 0.},
-                                   3,
-                                   kw::compact_mode = true}),
-            std::invalid_argument,
-            Message("The Taylor derivative of a product in compact mode can be computed only for products "
-                    "of 2 terms, but the current product has 1 term(s) instead"));
+        REQUIRE_THROWS_MATCHES((taylor_adaptive_batch{{prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}},
+                                                      {0., 0., 0.},
+                                                      3,
+                                                      kw::compact_mode = true}),
+                               std::invalid_argument,
+                               Message("The Taylor derivative of a product can be computed only for products "
+                                       "of 2 terms, but the current product has 1 term(s) instead"));
     }
 }
