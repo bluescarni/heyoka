@@ -300,7 +300,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
-    // of the sum() function.
+    // of the sum_sq() function.
     assert(!sf.args().empty());
 
     auto &md = s.module();

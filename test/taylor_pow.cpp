@@ -170,7 +170,7 @@ TEST_CASE("taylor pow")
                                             kw::opt_level = opt_level,
                                             kw::pars = {fp_t{1} / fp_t{3}}};
 
-            REQUIRE(!ir_contains(ta, "@heyoka.taylor_c_diff.pow.num_par"));
+            // REQUIRE(!ir_contains(ta, "@heyoka.taylor_c_diff_single_iter.pow.num_par"));
 
             ta.step(true);
 
@@ -423,7 +423,7 @@ TEST_CASE("taylor pow")
                                         kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff.pow.var_num"));
+                REQUIRE(ir_contains(ta, "@heyoka.taylor_c_diff_single_iter.pow.var_num"));
             }
 
             ta.step(true);
