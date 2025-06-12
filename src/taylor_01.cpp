@@ -920,7 +920,7 @@ std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
         const auto &f = std::get<func>(ex.value());
         const auto &args = f.args();
 
-        if (f.extract<detail::pow_impl>() != nullptr && !std::holds_alternative<number>(args[1].value())) {
+        if (f.extract<detail::pow_impl>() != nullptr && !std::holds_alternative<number>(args[1].value()) && false) {
             // The function is a pow() and the exponent is not a number: transform x**y -> exp(y*log(x)).
             //
             // NOTE: do not call directly log(new_args[0]) in order to avoid constant folding when the base
@@ -986,7 +986,7 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     all_ex = detail::split_sums_for_decompose(all_ex);
 
     // Transform sums into sum_sqs if possible.
-    all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
+    // all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
 
     // Transform prods into divs.
     all_ex = detail::prod_to_div_taylor_diff(all_ex);

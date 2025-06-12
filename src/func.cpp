@@ -484,6 +484,13 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
 
 std::vector<std::pair<std::uint32_t, std::uint32_t>> func::taylor_c_diff_get_n_iters(std::uint32_t order) const
 {
+    // Require order >= 2.
+    if (order < 2u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "The order passed to taylor_c_diff_get_n_iters() must be at least 2, but a value of {} was passed instead",
+            order));
+    }
+
     // Compute the return value.
     auto retval = m_func->taylor_c_diff_get_n_iters(order);
 

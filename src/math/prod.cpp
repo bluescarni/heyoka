@@ -769,15 +769,6 @@ std::vector<std::pair<std::uint32_t, std::uint32_t>> prod_impl::taylor_c_diff_ge
 {
     taylor_check_binary();
 
-    // LCOV_EXCL_START
-    if (order_ < 2u) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("The minimum supported order for the computation of the Taylor derivatives of prod() in "
-                        "compact mode is 2, but an order of {} was provided instead",
-                        order_));
-    }
-    // LCOV_EXCL_STOP
-
     // Prepare the return value.
     using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
     const auto order = safe_u32_t(order_);
