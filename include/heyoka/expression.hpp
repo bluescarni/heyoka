@@ -507,30 +507,27 @@ struct formatter<heyoka::dtens> : fmt::ostream_formatter {
 HEYOKA_BEGIN_NAMESPACE
 
 template <typename... KwArgs>
+    requires igor::validate<
+        igor::config<
+            igor::descr<kw::diff_order, []<typename T>() { return std::integral<std::remove_cvref_t<T>>; }>{}>{},
+        KwArgs...>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "diff_tensors() accepts only named arguments in the variadic pack.");
-
     // Order of derivatives. Defaults to 1.
     std::uint32_t order = 1;
     if constexpr (p.has(kw::diff_order)) {
-        if constexpr (std::is_integral_v<detail::uncvref_t<decltype(p(kw::diff_order))>>) {
-            order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
-        } else {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The diff_order keyword argument must be of integral type.");
-        }
+        order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
     }
 
     return detail::diff_tensors(v_ex, d_args, order);
 }
 
 template <typename... KwArgs>
-dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
-                   const KwArgs &...kw_args)
+auto diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
+                  const KwArgs &...kw_args) -> decltype(diff_tensors(v_ex, std::vector(d_args), kw_args...))
 {
     return diff_tensors(v_ex, std::vector(d_args), kw_args...);
 }

@@ -69,27 +69,25 @@ private:
 
     void finalise_ctor(callback_t, T, event_direction);
 
+    // Configuration for the keyword arguments.
+    static constexpr auto kw_cfg = igor::config<
+        igor::descr<kw::callback, []<typename U>() { return std::convertible_to<U, callback_t>; }>{},
+        igor::descr<kw::cooldown, []<typename U>() { return std::convertible_to<U, T>; }>{},
+        igor::descr<kw::direction, []<typename U>() { return std::convertible_to<U, event_direction>; }>{}>{};
+
 public:
     t_event_impl();
 
     template <typename... KwArgs>
+        requires igor::validate<kw_cfg, KwArgs...>
     explicit t_event_impl(expression e, const KwArgs &...kw_args) : eq(std::move(e))
     {
         igor::parser p{kw_args...};
 
-        static_assert(!p.has_unnamed_arguments(),
-                      "The variadic arguments in the construction of a terminal event contain "
-                      "unnamed arguments.");
-
         // Callback (defaults to empty).
         auto cb = [&p]() -> callback_t {
             if constexpr (p.has(kw::callback)) {
-                if constexpr (std::convertible_to<decltype(p(kw::callback)), callback_t>) {
-                    return p(kw::callback);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'callback' keyword argument.");
-                }
+                return p(kw::callback);
             } else {
                 return {};
             }
@@ -98,12 +96,7 @@ public:
         // Cooldown (defaults to -1).
         auto cd = [&p]() -> T {
             if constexpr (p.has(kw::cooldown)) {
-                if constexpr (std::convertible_to<decltype(p(kw::cooldown)), T>) {
-                    return p(kw::cooldown);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'cooldown' keyword argument.");
-                }
+                return p(kw::cooldown);
             } else {
                 return T(-1);
             }
@@ -112,12 +105,7 @@ public:
         // Direction (defaults to any).
         auto d = [&p]() -> event_direction {
             if constexpr (p.has(kw::direction)) {
-                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
-                    return p(kw::direction);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'direction' keyword argument.");
-                }
+                return p(kw::direction);
             } else {
                 return event_direction::any;
             }
@@ -186,28 +174,24 @@ private:
 
     void finalise_ctor(event_direction);
 
+    // Configuration for the keyword arguments.
+    static constexpr auto kw_cfg = igor::config<
+        igor::descr<kw::direction, []<typename U>() { return std::convertible_to<U, event_direction>; }>{}>{};
+
 public:
     nt_event_impl();
 
     template <typename... KwArgs>
+        requires igor::validate<kw_cfg, KwArgs...>
     explicit nt_event_impl(expression e, callback_t cb, const KwArgs &...kw_args)
         : eq(std::move(e)), callback(std::move(cb))
     {
         igor::parser p{kw_args...};
 
-        static_assert(!p.has_unnamed_arguments(),
-                      "The variadic arguments in the construction of a non-terminal event contain "
-                      "unnamed arguments.");
-
         // Direction (defaults to any).
         auto d = [&p]() -> event_direction {
             if constexpr (p.has(kw::direction)) {
-                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
-                    return p(kw::direction);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'direction' keyword argument.");
-                }
+                return p(kw::direction);
             } else {
                 return event_direction::any;
             }

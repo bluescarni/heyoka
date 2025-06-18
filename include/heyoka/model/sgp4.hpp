@@ -124,14 +124,14 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
             [&]() {
-                // NOTE: it is important here to use as_const_kwarg() so that we don't end up with moved-from
+                // NOTE: it is important here to use igor::as_const() so that we don't end up with moved-from
                 // keyword arguments the second time we use kw_args.
-                cf_init = cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second),
-                                   igor::as_const_kwarg(kw_args)...);
+                cf_init
+                    = cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), igor::as_const(kw_args)...);
             },
             [&]() {
-                cf_prop = cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second),
-                                   igor::as_const_kwarg(kw_args)...);
+                cf_prop
+                    = cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), igor::as_const(kw_args)...);
             });
 
         return std::make_tuple(std::move(sat_buffer), std::move(cf_init), std::move(cf_prop), std::move(funcs.dt));

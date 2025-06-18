@@ -1,4 +1,4 @@
-// Copyright 2018-2020 Francesco Biscani
+// Copyright 2018-2025 Francesco Biscani
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,96 +21,138 @@
 #ifndef IGOR_IGOR_HPP
 #define IGOR_IGOR_HPP
 
+#include <concepts>
 #include <cstddef>
 #include <initializer_list>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
+#define IGOR_VERSION_STRING "1.0.0"
+#define IGOR_VERSION_MAJOR 1
+#define IGOR_VERSION_MINOR 0
+#define IGOR_VERSION_PATCH 0
+
+#if defined(__GNUC__) || defined(__clang__)
+
+#define IGOR_ABI_TAG_ATTR __attribute__((abi_tag))
+
+#else
+
+#define IGOR_ABI_TAG_ATTR
+
+#endif
+
 namespace igor
+{
+
+inline namespace v1 IGOR_ABI_TAG_ATTR
 {
 
 namespace detail
 {
 
-// Handy alias.
-template <typename T>
-using uncvref_t = ::std::remove_cv_t<::std::remove_reference_t<T>>;
-
-// The value returned by named_argument's assignment operator.
-// T will always be a reference of some kind.
+// This is the class used to store a reference to a function argument. An object of this type is returned by
+// named_argument's assignment operator.
+//
+// NOTE: the Tag type is is used to establish a correspondence between the tagged reference and the named argument that
+// created it.
 template <typename Tag, typename T>
-struct tagged_container {
-    static_assert(::std::is_reference_v<T>, "T must always be a reference.");
-    using tag_type = Tag;
+    requires(std::is_reference_v<T>)
+struct tagged_ref {
     T value;
+
+    using tag_type = Tag;
+    using value_type = T;
 };
 
 } // namespace detail
 
-// Helper to turn a tagged container into another tagged container
-// containing a const reference to the original reference.
+// Helper to turn a tagged reference into another tagged reference containing a const reference to the original
+// reference. This is useful in order to enforce const reference access semantics to an argument (in the same spirit as
+// std::as_const()).
 template <typename Tag, typename T>
-auto as_const_kwarg(const detail::tagged_container<Tag, T> &tc)
+auto as_const(const detail::tagged_ref<Tag, T> &tc)
 {
-    return detail::tagged_container<Tag, decltype(std::as_const(tc.value))>{std::as_const(tc.value)};
+    return detail::tagged_ref<Tag, decltype(std::as_const(tc.value))>{std::as_const(tc.value)};
 }
 
 // Class to represent a named argument.
-template <typename Tag, typename ExplicitType = void, typename VoidCondition = void>
+template <typename Tag, typename ExplicitType = void>
 struct named_argument {
+    using tag_type = Tag;
+
     // NOTE: make sure this does not interfere with the copy/move assignment operators.
-    template <typename T, ::std::enable_if_t<!::std::is_same_v<named_argument, detail::uncvref_t<T>>, int> = 0>
+    template <typename T>
+        requires(!std::same_as<named_argument, std::remove_cvref_t<T>>)
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
     constexpr auto operator=(T &&x) const
     {
-        return detail::tagged_container<Tag, T &&>{::std::forward<T>(x)};
+        return detail::tagged_ref<Tag, T &&>{std::forward<T>(x)};
     }
 
     // Add overloads for std::initializer_list as well.
     template <typename T>
-    constexpr auto operator=(const ::std::initializer_list<T> &l) const
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
+    constexpr auto operator=(const std::initializer_list<T> &l) const
     {
-        return detail::tagged_container<Tag, const ::std::initializer_list<T> &>{l};
+        return detail::tagged_ref<Tag, const std::initializer_list<T> &>{l};
     }
     template <typename T>
-    constexpr auto operator=(::std::initializer_list<T> &l) const
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
+    constexpr auto operator=(std::initializer_list<T> &l) const
     {
-        return detail::tagged_container<Tag, ::std::initializer_list<T> &>{l};
+        return detail::tagged_ref<Tag, std::initializer_list<T> &>{l};
     }
     template <typename T>
-    constexpr auto operator=(::std::initializer_list<T> &&l) const
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
+    constexpr auto operator=(std::initializer_list<T> &&l) const
     {
-        return detail::tagged_container<Tag, ::std::initializer_list<T> &&>{::std::move(l)};
+        return detail::tagged_ref<Tag, std::initializer_list<T> &&>{std::move(l)};
     }
     template <typename T>
-    constexpr auto operator=(const ::std::initializer_list<T> &&l) const
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
+    constexpr auto operator=(const std::initializer_list<T> &&l) const
     {
-        return detail::tagged_container<Tag, const ::std::initializer_list<T> &&>{::std::move(l)};
+        return detail::tagged_ref<Tag, const std::initializer_list<T> &&>{std::move(l)};
     }
 };
 
 template <typename Tag, typename ExplicitType>
-struct named_argument<Tag, ExplicitType, std::enable_if_t<!std::is_same_v<ExplicitType, void>>> {
-    static_assert(::std::is_reference_v<ExplicitType>, "ExplicitType must always be a reference.");
+    requires(std::is_reference_v<ExplicitType>)
+struct named_argument<Tag, ExplicitType> {
+    using tag_type = Tag;
     using value_type = ExplicitType;
 
     // NOTE: disable implicit conversion, deduced type needs to be the same as explicit type.
-    template <typename T, ::std::enable_if_t<::std::is_same_v<T &&, ExplicitType>, int> = 0>
+    template <typename T>
+        requires std::same_as<T &&, ExplicitType>
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
     constexpr auto operator=(T &&x) const
     {
-        return detail::tagged_container<Tag, ExplicitType>{::std::forward<T>(x)};
+        return detail::tagged_ref<Tag, ExplicitType>{std::forward<T>(x)};
     }
 
-    // NOTE: enable implicit conversion with curly braces
-    // and copy-list/aggregate initialization with double curly braces.
-    constexpr auto operator=(detail::tagged_container<Tag, ExplicitType> &&tc) const
+    // NOTE: enable implicit conversion with curly braces and copy-list/aggregate initialization with double curly
+    // braces.
+    //
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator, cppcoreguidelines-c-copy-assignment-signature)
+    constexpr auto operator=(detail::tagged_ref<Tag, ExplicitType> &&tc) const
     {
         return std::move(tc);
     }
 
-    template <typename T, ::std::enable_if_t<!::std::is_same_v<T &&, ExplicitType>, int> = 0>
+    template <typename T>
+        requires(!std::same_as<T &&, ExplicitType>)
     auto operator=(T &&) const = delete; // please use {...} to typed argument implicit conversion
 };
+
+// Equality comparison: return true when comparing named arguments with identical tags, false otherwise.
+template <typename Tag1, typename ExplicitType1, typename Tag2, typename ExplicitType2>
+consteval bool operator==(named_argument<Tag1, ExplicitType1>, named_argument<Tag2, ExplicitType2>)
+{
+    return std::same_as<Tag1, Tag2>;
+}
 
 // Type representing a named argument which
 // was not provided in a function call.
@@ -124,82 +166,333 @@ inline constexpr not_provided_t not_provided;
 namespace detail
 {
 
-// Type trait to detect if T is a tagged container with tag Tag (and any type as second parameter).
+// Type trait to detect if T is a tagged reference with tag Tag (and any type as second parameter).
 template <typename Tag, typename T>
-struct is_tagged_container : ::std::false_type {
+struct is_tagged_ref : std::false_type {
 };
 
 template <typename Tag, typename T>
-struct is_tagged_container<Tag, tagged_container<Tag, T>> : ::std::true_type {
+struct is_tagged_ref<Tag, tagged_ref<Tag, T>> : std::true_type {
 };
 
-// Type trait to detect if T is a tagged container (regardless of the tag type or the type
-// of the second parameter).
+// Type trait/concept to detect if T is a tagged reference (regardless of the tag type or the type of the second
+// parameter).
 template <typename T>
-struct is_tagged_container_any : ::std::false_type {
+struct is_tagged_ref_any : std::false_type {
 };
 
 template <typename Tag, typename T>
-struct is_tagged_container_any<tagged_container<Tag, T>> : ::std::true_type {
+struct is_tagged_ref_any<tagged_ref<Tag, T>> : std::true_type {
 };
 
-// Implementation of parsers' constructor.
-// This function will take a set of input arguments
-// (as const ref) and will filter out the named arguments
-// (which are returned as a tuple of const references).
-template <typename... Args>
-constexpr inline auto build_parser_tuple(const Args &...args)
+template <typename T>
+concept any_tagged_ref = is_tagged_ref_any<T>::value;
+
+// Type trait to detect named arguments.
+template <typename>
+struct is_any_named_argument : std::false_type {
+};
+
+template <typename Tag, typename ExplicitType>
+struct is_any_named_argument<named_argument<Tag, ExplicitType>> : std::true_type {
+};
+
+} // namespace detail
+
+// Concept to detect cv-qualified named arguments.
+template <auto NA>
+concept any_named_argument_cv = detail::is_any_named_argument<std::remove_cv_t<decltype(NA)>>::value;
+
+namespace detail
 {
-    [[maybe_unused]] auto filter_na = [](const auto &x) {
-        if constexpr (is_tagged_container_any<uncvref_t<decltype(x)>>::value) {
-            return ::std::forward_as_tuple(x);
-        } else {
-            return ::std::tuple{};
-        }
+
+// An always-true concept for use below.
+template <bool>
+concept always_true = true;
+
+} // namespace detail
+
+// Concept to check if V is usable as a validator for the type T.
+template <auto V, typename T>
+concept valid_descr_validator = requires {
+    { V.template operator()<T>() } -> std::same_as<bool>;
+    // NOTE: this part checks that the call operator of V is usable at compile-time.
+    requires detail::always_true<V.template operator()<T>()>;
+};
+
+template <auto NA, auto Validator = []<typename>() { return true; }>
+    requires any_named_argument_cv<NA>
+struct descr {
+    // Configuration options.
+    bool required = false;
+
+    // Store a copy of the named argument for later use.
+    static constexpr auto na = NA;
+
+    template <typename T>
+        requires valid_descr_validator<Validator, T>
+    static consteval bool validate()
+    {
+        return Validator.template operator()<T>();
+    }
+};
+
+namespace detail
+{
+
+// Type trait to detect descriptors.
+template <typename>
+struct is_any_descr : std::false_type {
+};
+
+template <auto NA, auto Validator>
+struct is_any_descr<descr<NA, Validator>> : std::true_type {
+};
+
+} // namespace detail
+
+// Concept to detect cv-qualified descriptors.
+template <auto Descr>
+concept any_descr_cv = detail::is_any_descr<std::remove_cv_t<decltype(Descr)>>::value;
+
+namespace detail
+{
+
+// Function to check that there are no duplicates in the pack of descriptors Descrs.
+//
+// NOTE: descriptors are compared via their named arguments.
+consteval bool no_duplicate_descrs_impl(auto... Descrs)
+{
+    // Helper to compare one descriptor to all Descrs.
+    constexpr auto check_one = [](auto cur_descr, auto... all_descrs) {
+        return (static_cast<std::size_t>(0) + ... + static_cast<std::size_t>(cur_descr.na == all_descrs.na)) == 1u;
     };
 
-    return ::std::tuple_cat(filter_na(args)...);
+    return (... && check_one(Descrs, Descrs...));
 }
 
 } // namespace detail
 
-// NOTE: implement some of the parser functionality as free functions,
-// which will then be wrapped by static constexpr member functions in
-// the parser class. These free functions can be used where a parser
-// object is not available (e.g., in a requires clause).
+// Concept to check that there are no duplicates in the pack of descriptors Descrs.
+template <auto... Descrs>
+concept no_duplicate_descrs = detail::no_duplicate_descrs_impl(Descrs...);
+
+// Configuration structure for named arguments validation.
+template <auto... Descrs>
+    requires(sizeof...(Descrs) > 0u) && (... && any_descr_cv<Descrs>) && no_duplicate_descrs<Descrs...>
+struct config {
+    // Config options.
+    bool allow_unnamed = false;
+    bool allow_extra = false;
+};
+
+namespace detail
+{
+
+// Type trait to detect an instance of the config class.
+template <typename>
+struct is_any_config : std::false_type {
+};
+
+template <auto... Descrs>
+struct is_any_config<config<Descrs...>> : std::true_type {
+};
+
+// Concept to detect a cv qualified instance of the config class.
+template <auto Cfg>
+concept any_config_cv = is_any_config<std::remove_cv_t<decltype(Cfg)>>::value;
+
+template <auto Cfg, typename... Args>
+concept validate_unnamed_arguments = (Cfg.allow_unnamed) || (any_tagged_ref<std::remove_cvref_t<Args>> && ...);
+
+template <typename Arg, typename... Args>
+consteval bool check_one_unique_named_argument()
+{
+    using arg_u = std::remove_cvref_t<Arg>;
+
+    if constexpr (any_tagged_ref<arg_u>) {
+        return (static_cast<std::size_t>(0) + ...
+                + static_cast<std::size_t>(std::same_as<arg_u, std::remove_cvref_t<Args>>))
+               == 1u;
+    } else {
+        return true;
+    }
+}
+
+template <typename Arg, typename... Args>
+concept unique_named_argument = check_one_unique_named_argument<Arg, Args...>();
+
+template <typename... Args>
+concept validate_no_repeated_named_arguments = (unique_named_argument<Args, Args...> && ...);
+
+template <typename Arg>
+consteval bool arg_has_descriptor(auto... descrs)
+{
+    using arg_u = std::remove_cvref_t<Arg>;
+
+    if constexpr (any_tagged_ref<arg_u>) {
+        return (... || std::same_as<typename arg_u::tag_type, typename decltype(descrs.na)::tag_type>);
+    } else {
+        return true;
+    }
+}
+
+template <typename>
+struct all_args_have_descriptors;
+
+template <auto... Descrs>
+struct all_args_have_descriptors<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr bool value = (... && arg_has_descriptor<Args>(Descrs...));
+};
+
+template <typename... Args>
+consteval bool check_one_descr_present(auto descr)
+{
+    if (descr.required) {
+        using tag_type = typename decltype(descr.na)::tag_type;
+
+        [[maybe_unused]] constexpr auto tags_match = []<typename Arg>() {
+            using arg_u = std::remove_cvref_t<Arg>;
+
+            if constexpr (any_tagged_ref<arg_u>) {
+                return std::same_as<typename arg_u::tag_type, tag_type>;
+            } else {
+                return false;
+            }
+        };
+
+        return (... || tags_match.template operator()<Args>());
+    } else {
+        return true;
+    }
+}
+
+template <typename>
+struct all_required_arguments_are_present;
+
+template <auto... Descrs>
+struct all_required_arguments_are_present<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr bool value = (... && check_one_descr_present<Args...>(Descrs));
+};
+
+template <typename... Args>
+consteval bool validate_one_validator([[maybe_unused]] auto descr)
+{
+    [[maybe_unused]] constexpr auto check_single_arg = []<typename Arg>(auto d) {
+        using arg_u = std::remove_cvref_t<Arg>;
+
+        if constexpr (any_tagged_ref<arg_u>) {
+            if constexpr (std::same_as<typename arg_u::tag_type, typename decltype(d.na)::tag_type>) {
+                // NOTE: here we are checking if the validator is properly implemented.
+                return requires { d.template validate<typename arg_u::value_type>(); };
+            } else {
+                return true;
+            }
+        } else {
+            return true;
+        }
+    };
+
+    return (... && check_single_arg.template operator()<Args>(descr));
+}
+
+template <typename>
+struct validate_validators;
+
+template <auto... Descrs>
+struct validate_validators<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr bool value = (... && validate_one_validator<Args...>(Descrs));
+};
+
+template <typename Arg>
+consteval bool validate_one_named_argument(auto... descrs)
+{
+    using arg_u = std::remove_cvref_t<Arg>;
+
+    if constexpr (any_tagged_ref<arg_u>) {
+        constexpr auto check_single_descr = [](auto d) {
+            if constexpr (std::same_as<typename arg_u::tag_type, typename decltype(d.na)::tag_type>) {
+                return d.template validate<typename arg_u::value_type>();
+            } else {
+                return true;
+            }
+        };
+
+        return (... && check_single_descr(descrs));
+    } else {
+        return true;
+    }
+}
+
+template <typename>
+struct validate_named_arguments;
+
+template <auto... Descrs>
+struct validate_named_arguments<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr bool value = (... && validate_one_named_argument<Args>(Descrs...));
+};
+
+} // namespace detail
+
+template <auto Cfg, typename... Args>
+concept validate = requires {
+    // Step 0: check that Cfg is a config instance.
+    requires detail::any_config_cv<Cfg>;
+    // Step 1: validate the unnamed arguments.
+    requires detail::validate_unnamed_arguments<Cfg, Args...>;
+    // Step 2: check that there are no duplicate named arguments in Args.
+    requires detail::validate_no_repeated_named_arguments<Args...>;
+    // Step 3: validate extra named arguments (i.e., those not present in Cfg).
+    requires(Cfg.allow_extra)
+                || (detail::all_args_have_descriptors<std::remove_cv_t<decltype(Cfg)>>::template value<Args...>);
+    // Step 4: check the presence of the required named arguments.
+    requires(detail::all_required_arguments_are_present<std::remove_cv_t<decltype(Cfg)>>::template value<Args...>);
+    // Step 5: check the validators.
+    requires(detail::validate_validators<std::remove_cv_t<decltype(Cfg)>>::template value<Args...>);
+    // Step 6: run the validators.
+    requires(detail::validate_named_arguments<std::remove_cv_t<decltype(Cfg)>>::template value<Args...>);
+};
+
+// NOTE: implement some of the parser functionality as free functions, which will then be wrapped by static constexpr
+// member functions in the parser class. These free functions can be used where a parser object is not available (e.g.,
+// in a requires clause).
 template <typename... Args, typename Tag, typename ExplicitType>
-constexpr bool has([[maybe_unused]] const named_argument<Tag, ExplicitType> &narg)
+consteval bool has([[maybe_unused]] const named_argument<Tag, ExplicitType> &narg)
 {
-    return (... || detail::is_tagged_container<Tag, detail::uncvref_t<Args>>::value);
+    return (... || detail::is_tagged_ref<Tag, std::remove_cvref_t<Args>>::value);
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
+consteval bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
-    return (... && ::igor::has<Args...>(nargs));
+    return (... && igor::has<Args...>(nargs));
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
+consteval bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
-    return (... || ::igor::has<Args...>(nargs));
+    return (... || igor::has<Args...>(nargs));
 }
 
 template <typename... Args>
-constexpr bool has_unnamed_arguments()
+consteval bool has_unnamed_arguments()
 {
-    return (... || !detail::is_tagged_container_any<detail::uncvref_t<Args>>::value);
+    return (... || !detail::any_tagged_ref<std::remove_cvref_t<Args>>);
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
+consteval bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
     // NOTE: the first fold expression will return how many of the nargs
     // are in the pack. The second fold expression will return the total number
     // of named arguments in the pack.
-    return (::std::size_t(0) + ... + static_cast<::std::size_t>(::igor::has<Args...>(nargs)))
-           < (::std::size_t(0) + ...
-              + static_cast<::std::size_t>(detail::is_tagged_container_any<detail::uncvref_t<Args>>::value));
+    return (static_cast<std::size_t>(0) + ... + static_cast<std::size_t>(igor::has<Args...>(nargs)))
+           < (static_cast<std::size_t>(0) + ...
+              + static_cast<std::size_t>(detail::any_tagged_ref<std::remove_cvref_t<Args>>));
 }
 
 namespace detail
@@ -207,10 +500,13 @@ namespace detail
 
 // Check if T is a named argument which appears more than once in Args.
 template <typename T, typename... Args>
-constexpr bool is_repeated_named_argument()
+consteval bool is_repeated_named_argument()
 {
-    if constexpr (is_tagged_container_any<uncvref_t<T>>::value) {
-        return (::std::size_t(0) + ... + static_cast<::std::size_t>(::std::is_same_v<uncvref_t<T>, uncvref_t<Args>>))
+    using Tu = std::remove_cvref_t<T>;
+
+    if constexpr (any_tagged_ref<Tu>) {
+        return (static_cast<std::size_t>(0) + ...
+                + static_cast<std::size_t>(std::same_as<Tu, std::remove_cvref_t<Args>>))
                > 1u;
     } else {
         return false;
@@ -220,35 +516,86 @@ constexpr bool is_repeated_named_argument()
 } // namespace detail
 
 template <typename... Args>
-constexpr bool has_duplicates()
+consteval bool has_duplicates()
 {
     return (... || detail::is_repeated_named_argument<Args, Args...>());
 }
+
+// Remove from the set of variadic arguments args the named arguments NArgs.
+//
+// The result is returned as a tuple of perfectly-forwarded references.
+template <auto... NArgs, typename... Args>
+    requires(any_named_argument_cv<NArgs> && ...)
+constexpr auto pop_named_arguments(Args &&...args)
+{
+    [[maybe_unused]] constexpr auto filter = []<typename T>(T &&x) {
+        using Tu = std::remove_cvref_t<T>;
+
+        if constexpr (detail::any_tagged_ref<Tu>) {
+            if constexpr ((... || std::same_as<typename decltype(NArgs)::tag_type, typename Tu::tag_type>)) {
+                return std::tuple{};
+            } else {
+                return std::forward_as_tuple(std::forward<T>(x));
+            }
+        } else {
+            return std::forward_as_tuple(std::forward<T>(x));
+        }
+    };
+
+    return std::tuple_cat(filter(std::forward<Args>(args))...);
+}
+
+namespace detail
+{
+
+// Implementation of parsers' constructor.
+//
+// This function will examine all input arguments and return a tuple of references to the tagged reference arguments.
+// All other arguments will be discarded.
+constexpr auto parser_ctor_impl(const auto &...args)
+{
+    [[maybe_unused]] constexpr auto filter_na = []<typename T>(const T &x) {
+        if constexpr (any_tagged_ref<T>) {
+            return std::forward_as_tuple(x);
+        } else {
+            return std::tuple{};
+        }
+    };
+
+    return std::tuple_cat(filter_na(args)...);
+}
+
+} // namespace detail
 
 // Parser for named arguments in a function call.
 template <typename... ParseArgs>
 class parser
 {
-    using tuple_t = decltype(detail::build_parser_tuple(::std::declval<const ParseArgs &>()...));
+    using tuple_t = decltype(detail::parser_ctor_impl(std::declval<const ParseArgs &>()...));
+
+    tuple_t m_nargs;
 
 public:
-    constexpr explicit parser(const ParseArgs &...parse_args) : m_nargs(detail::build_parser_tuple(parse_args...)) {}
+    constexpr explicit parser(const ParseArgs &...parse_args) : m_nargs(detail::parser_ctor_impl(parse_args...)) {}
 
 private:
     // Fetch the value associated to the input named
     // argument narg. If narg is not present, this will
     // return a const ref to a global not_provided_t object.
-    template <::std::size_t I, typename Tag, typename ExplicitType>
+    template <std::size_t I, typename Tag, typename ExplicitType>
     constexpr decltype(auto) fetch_one_impl([[maybe_unused]] const named_argument<Tag, ExplicitType> &narg) const
     {
-        if constexpr (I == ::std::tuple_size_v<tuple_t>) {
+        if constexpr (I == std::tuple_size_v<tuple_t>) {
+            // NOTE: clang-tidy is wrong here, we do need the cast to const ref otherwise we return a copy of the
+            // not_provided object.
+            // NOLINTNEXTLINE(readability-redundant-casting)
             return static_cast<const not_provided_t &>(not_provided);
-        } else if constexpr (::std::is_same_v<typename detail::uncvref_t<::std::tuple_element_t<I, tuple_t>>::tag_type,
-                                              Tag>) {
-            if constexpr (::std::is_rvalue_reference_v<decltype(::std::get<I>(m_nargs).value)>) {
-                return ::std::move(::std::get<I>(m_nargs).value);
+        } else if constexpr (std::same_as<typename std::remove_cvref_t<std::tuple_element_t<I, tuple_t>>::tag_type,
+                                          Tag>) {
+            if constexpr (std::is_rvalue_reference_v<decltype(std::get<I>(m_nargs).value)>) {
+                return std::move(std::get<I>(m_nargs).value);
             } else {
-                return ::std::get<I>(m_nargs).value;
+                return std::get<I>(m_nargs).value;
             }
         } else {
             return fetch_one_impl<I + 1u>(narg);
@@ -265,53 +612,59 @@ public:
         } else if constexpr (sizeof...(Tags) == 1u) {
             return this->fetch_one_impl<0>(nargs...);
         } else {
-            return ::std::forward_as_tuple(this->fetch_one_impl<0>(nargs)...);
+            return std::forward_as_tuple(this->fetch_one_impl<0>(nargs)...);
         }
     }
     // Check if the input named argument na is present in the parser.
     template <typename Tag, typename ExplicitType>
-    static constexpr bool has(const named_argument<Tag, ExplicitType> &narg)
+    static consteval bool has(const named_argument<Tag, ExplicitType> &narg)
     {
-        return ::igor::has<ParseArgs...>(narg);
+        return igor::has<ParseArgs...>(narg);
     }
     // Check if all the input named arguments nargs are present in the parser.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
+    static consteval bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
-        return ::igor::has_all<ParseArgs...>(nargs...);
+        return igor::has_all<ParseArgs...>(nargs...);
     }
     // Check if at least one of the input named arguments nargs is present in the parser.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
+    static consteval bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
-        return ::igor::has_any<ParseArgs...>(nargs...);
+        return igor::has_any<ParseArgs...>(nargs...);
     }
     // Detect the presence of unnamed arguments.
-    static constexpr bool has_unnamed_arguments()
+    static consteval bool has_unnamed_arguments()
     {
-        return ::igor::has_unnamed_arguments<ParseArgs...>();
+        return igor::has_unnamed_arguments<ParseArgs...>();
     }
     // Check if the parser contains named arguments other than nargs.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
+    static consteval bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
-        return ::igor::has_other_than<ParseArgs...>(nargs...);
+        return igor::has_other_than<ParseArgs...>(nargs...);
     }
     // Check if the parser contains duplicate named arguments (that is, check
     // if at least one named argument appears more than once).
-    static constexpr bool has_duplicates()
+    static consteval bool has_duplicates()
     {
-        return ::igor::has_duplicates<ParseArgs...>();
+        return igor::has_duplicates<ParseArgs...>();
     }
-
-private:
-    tuple_t m_nargs;
 };
+
+template <typename ExplicitType = void, typename T = decltype([] {})>
+    requires std::same_as<ExplicitType, void> || (std::is_reference_v<ExplicitType>)
+consteval auto make_named_argument()
+{
+    return named_argument<T, ExplicitType>{};
+}
+
+} // namespace v1 IGOR_ABI_TAG_ATTR
 
 } // namespace igor
 
-// Handy macro (ew) for the definition of a named argument.
-#define IGOR_MAKE_NAMED_ARGUMENT(name)                                                                                 \
-    inline constexpr auto name = ::igor::named_argument<struct name##_tag> {}
+#define IGOR_MAKE_NAMED_ARGUMENT(arg) inline constexpr auto arg = igor::make_named_argument()
+
+#undef IGOR_ABI_TAG_ATTR
 
 #endif
