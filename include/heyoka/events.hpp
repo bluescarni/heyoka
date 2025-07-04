@@ -70,17 +70,23 @@ private:
     void finalise_ctor(callback_t, T, event_direction);
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg = igor::config<
-        igor::descr<kw::callback, []<typename U>() { return std::convertible_to<U, callback_t>; }>{},
-        igor::descr<kw::cooldown, []<typename U>() { return std::convertible_to<U, T>; }>{},
-        igor::descr<kw::direction, []<typename U>() { return std::convertible_to<U, event_direction>; }>{}>{};
+    static constexpr auto kw_cfg
+        = igor::config<igor::descr<kw::callback, []<typename U>() { return std::convertible_to<U, callback_t>; }>{},
+                       igor::descr<kw::cooldown, []<typename U>() { return std::convertible_to<U, T>; }>{},
+                       igor::descr<kw::direction, []<typename U>() {
+                           return std::same_as<std::remove_cvref_t<U>, event_direction>;
+                       }>{}>{};
 
 public:
     t_event_impl();
 
     template <typename... KwArgs>
         requires igor::validate<kw_cfg, KwArgs...>
-    explicit t_event_impl(expression e, const KwArgs &...kw_args) : eq(std::move(e))
+    // NOTE: accept forwarding references here to highlight that kw_args may in general be moved and that thus it is not
+    // safe to re-use them.
+    //
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
         igor::parser p{kw_args...};
 
@@ -103,7 +109,7 @@ public:
         }();
 
         // Direction (defaults to any).
-        auto d = [&p]() -> event_direction {
+        const auto d = [&p]() {
             if constexpr (p.has(kw::direction)) {
                 return p(kw::direction);
             } else {
@@ -111,7 +117,7 @@ public:
             }
         }();
 
-        finalise_ctor(std::move(cb), cd, d);
+        finalise_ctor(std::move(cb), std::move(cd), d);
     }
 
     t_event_impl(const t_event_impl &);
@@ -175,8 +181,9 @@ private:
     void finalise_ctor(event_direction);
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg = igor::config<
-        igor::descr<kw::direction, []<typename U>() { return std::convertible_to<U, event_direction>; }>{}>{};
+    static constexpr auto kw_cfg = igor::config<igor::descr<kw::direction, []<typename U>() {
+        return std::same_as<std::remove_cvref_t<U>, event_direction>;
+    }>{}>{};
 
 public:
     nt_event_impl();
@@ -189,7 +196,7 @@ public:
         igor::parser p{kw_args...};
 
         // Direction (defaults to any).
-        auto d = [&p]() -> event_direction {
+        const auto d = [&p]() {
             if constexpr (p.has(kw::direction)) {
                 return p(kw::direction);
             } else {

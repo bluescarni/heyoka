@@ -147,7 +147,7 @@ double get_fp_unit_cost();
 // Concept to detect (a subset of) string-like types.
 template <typename T>
 concept string_like = std::same_as<T, std::string> || std::same_as<T, std::string_view> || std::same_as<T, const char *>
-                      || std::same_as<T, char *>;
+                      || std::same_as<T, char *> || (std::is_array_v<T> && std::same_as<char, std::remove_extent_t<T>>);
 
 } // namespace detail
 

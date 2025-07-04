@@ -642,40 +642,38 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 
 #undef HEYOKA_CFUNC_EXTERN_INST
 
-// Common options for the cfunc constructor and add_cfunc().
+// kwargs configuration for the common options of cfunc.
+//
+// NOTE: here we are making sure that we accept only builtin types for the kw_args. This makes the set of kw_args
+// re-usable across several invocations.
+inline constexpr auto cfunc_common_opts_kw_cfg = igor::config<
+    igor::descr<kw::high_accuracy, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::compact_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::parallel_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::prec, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+
+// Common options for add_cfunc() and the cfunc constructor.
 template <typename T, typename... KwArgs>
 auto cfunc_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(),
-                  "Unnamed arguments cannot be passed in the variadic pack for this function.");
-
     // High accuracy mode (defaults to false).
-    const auto high_accuracy = [&p]() -> bool {
+    const auto high_accuracy = [&p]() {
         if constexpr (p.has(kw::high_accuracy)) {
-            if constexpr (std::convertible_to<decltype(p(kw::high_accuracy)), bool>) {
-                return static_cast<bool>(p(kw::high_accuracy));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'high_accuracy' keyword argument.");
-            }
+            return p(kw::high_accuracy);
         } else {
             return false;
         }
     }();
 
-    // Compact mode (defaults to false, except for real where
-    // it defaults to true).
-    const auto compact_mode = [&p]() -> bool {
+    // Compact mode (defaults to false, except for real where it defaults to true).
+    const auto compact_mode = [&p]() {
         if constexpr (p.has(kw::compact_mode)) {
-            if constexpr (std::convertible_to<decltype(p(kw::compact_mode)), bool>) {
-                return static_cast<bool>(p(kw::compact_mode));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'compact_mode' keyword argument.");
-            }
+            return p(kw::compact_mode);
         } else {
 #if defined(HEYOKA_HAVE_REAL)
-            return std::is_same_v<T, mppp::real>;
+            return std::same_as<T, mppp::real>;
 #else
             return false;
 
@@ -684,28 +682,20 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     }();
 
     // Parallel mode (defaults to false).
-    const auto parallel_mode = [&p]() -> bool {
+    const auto parallel_mode = [&p]() {
         if constexpr (p.has(kw::parallel_mode)) {
-            if constexpr (std::convertible_to<decltype(p(kw::parallel_mode)), bool>) {
-                return static_cast<bool>(p(kw::parallel_mode));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'parallel_mode' keyword argument.");
-            }
+            return p(kw::parallel_mode);
         } else {
             return false;
         }
     }();
 
     // Precision (defaults to zero).
-    const auto prec = [&p]() -> long long {
+    const auto prec = [&p]() {
         if constexpr (p.has(kw::prec)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::prec))>>) {
-                return boost::numeric_cast<long long>(p(kw::prec));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'prec' keyword argument.");
-            }
+            return boost::numeric_cast<long long>(p(kw::prec));
         } else {
-            return 0;
+            return 0ll;
         }
     }();
 
@@ -717,44 +707,44 @@ std::tuple<llvm_multi_state, std::vector<expression>, std::vector<std::array<std
 make_multi_cfunc(llvm_state, const std::string &, const std::vector<expression> &, const std::vector<expression> &,
                  std::uint32_t, bool, bool, long long, bool);
 
+// kwargs configuration for add_cfunc().
+inline constexpr auto add_cfunc_kw_cfg
+    = cfunc_common_opts_kw_cfg
+      | igor::config<
+          igor::descr<kw::batch_size, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
+          igor::descr<kw::strided, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
+    requires igor::validate<detail::add_cfunc_kw_cfg, KwArgs...>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
                                   const std::vector<expression> &vars, const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
-
     // Batch size (defaults to 1).
     const auto batch_size = [&]() -> std::uint32_t {
         if constexpr (p.has(kw::batch_size)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
-                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
-            }
+            return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
         } else {
             return 1;
         }
     }();
 
     // Strided mode (defaults to false).
-    const auto strided = [&p]() -> bool {
+    const auto strided = [&p]() {
         if constexpr (p.has(kw::strided)) {
-            if constexpr (std::convertible_to<decltype(p(kw::strided)), bool>) {
-                return static_cast<bool>(p(kw::strided));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'strided' keyword argument.");
-            }
+            return p(kw::strided);
         } else {
             return false;
         }
     }();
 
     // Common options.
-    const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+    const auto [high_accuracy, compact_mode, parallel_mode, prec]
+        = std::apply([](const auto &...args) { return detail::cfunc_common_opts<T>(args...); },
+                     igor::filter_named_arguments<detail::cfunc_common_opts_kw_cfg>(kw_args...));
 
     return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
                                 strided);
@@ -804,51 +794,42 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
         igor::parser p{kw_args...};
 
         // Common options.
-        const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+        const auto [high_accuracy, compact_mode, parallel_mode, prec]
+            = std::apply([](const auto &...args) { return detail::cfunc_common_opts<T>(args...); },
+                         igor::filter_named_arguments<detail::cfunc_common_opts_kw_cfg>(kw_args...));
 
         // Batch size: defaults to undefined.
         // NOTE: we want to handle this slightly different from add_cfunc(), thus it does
         // not go in common options.
         const auto batch_size = [&]() -> std::optional<std::uint32_t> {
             if constexpr (p.has(kw::batch_size)) {
-                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
-                    return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
-                } else {
-                    static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
-                }
+                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
             } else {
                 return {};
             }
         }();
 
         // Precision checking for mppp::real. Defaults to true.
-        const auto check_prec = [&p]() -> bool {
+        const auto check_prec = [&p]() {
             if constexpr (p.has(kw::check_prec)) {
-                if constexpr (std::convertible_to<decltype(p(kw::check_prec)), bool>) {
-                    return static_cast<bool>(p(kw::check_prec));
-                } else {
-                    static_assert(detail::always_false_v<T>, "Invalid type for the 'check_prec' keyword argument.");
-                }
+                return p(kw::check_prec);
             } else {
                 return true;
             }
         }();
 
         // Parallel JIT compilation.
-        auto parjit = [&p]() -> bool {
+        const auto parjit = [&p]() {
             if constexpr (p.has(kw::parjit)) {
-                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::parjit))>>) {
-                    return static_cast<bool>(p(kw::parjit));
-                } else {
-                    static_assert(detail::always_false_v<T>, "Invalid type for the 'parjit' keyword argument.");
-                }
+                return p(kw::parjit);
             } else {
                 return detail::default_parjit;
             }
         }();
 
         // Build the template llvm_state from the keyword arguments.
-        llvm_state s(kw_args...);
+        auto s = std::apply([](const auto &...args) { return llvm_state(args...); },
+                            igor::filter_named_arguments<llvm_state::kw_cfg>(kw_args...));
 
         return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec,
                                parjit);
@@ -868,17 +849,26 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 
 public:
     cfunc() noexcept;
+    // kwargs configuration for the constructor.
+    //
+    // NOTE: the constraints on the keyword arguments ensure we can use them in multiple invocations.
+    static constexpr auto ctor_kw_cfg
+        = detail::cfunc_common_opts_kw_cfg | llvm_state::kw_cfg
+          | igor::config<
+              igor::descr<kw::batch_size, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
+              igor::descr<kw::check_prec, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+              igor::descr<kw::parjit, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
     explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
         : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
     {
     }
     template <typename R1, typename R2, typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>()) && std::ranges::input_range<R1>
-                && std::constructible_from<expression, std::ranges::range_reference_t<R1>>
-                && std::ranges::input_range<R2>
-                && std::constructible_from<expression, std::ranges::range_reference_t<R2>>
+        requires igor::validate<ctor_kw_cfg, KwArgs...> && std::ranges::input_range<R1>
+                 && std::constructible_from<expression, std::ranges::range_reference_t<R1>>
+                 && std::ranges::input_range<R2>
+                 && std::constructible_from<expression, std::ranges::range_reference_t<R2>>
     explicit cfunc(R1 &&rng1, R2 &&rng2, const KwArgs &...kw_args)
         : cfunc(rng_to_vecex(std::forward<R1>(rng1)), rng_to_vecex(std::forward<R2>(rng2)), kw_args...)
     {
@@ -918,10 +908,10 @@ private:
     void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>);
 
 public:
-    // NOTE: it is important to document properly the non-overlapping
-    // memory requirement for the input arguments.
-    // NOTE: if/when we add overloads with user-provided tape pointers,
-    // then we must document the non-overlapping requirement for them too.
+    // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
+    //
+    // NOTE: if/when we add overloads with user-provided tape pointers, then we must document the non-overlapping
+    // requirement for them too.
     template <typename Out, typename In, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
                 && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)

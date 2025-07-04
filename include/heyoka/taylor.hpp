@@ -415,6 +415,16 @@ template <typename T>
 void setup_variational_ics_t0(const llvm_state &, std::vector<T> &, const std::vector<T> &, const T *,
                               const var_ode_sys &, std::uint32_t, bool, bool);
 
+// Helper to build an llvm_state from a set of keyword arguments.
+//
+// The non-llvm_state keyword arguments will be filtered out.
+template <typename... KwArgs>
+auto taylor_adaptive_build_llvm_state(const KwArgs &...kw_args)
+{
+    return std::apply([](const auto &...args) { return llvm_state(args...); },
+                      igor::filter_named_arguments<llvm_state::kw_cfg>(kw_args...));
+}
+
 } // namespace detail
 
 template <typename T>
@@ -537,7 +547,7 @@ public:
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                              const KwArgs &...kw_args)
-        : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
+        : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
@@ -550,7 +560,7 @@ public:
     template <typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, const KwArgs &...kw_args)
-        : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
+        : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
@@ -949,7 +959,7 @@ public:
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                                    std::uint32_t batch_size, const KwArgs &...kw_args)
-        : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
+        : taylor_adaptive_batch(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
@@ -964,7 +974,7 @@ public:
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
                                    const KwArgs &...kw_args)
-        : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
+        : taylor_adaptive_batch(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }

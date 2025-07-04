@@ -107,31 +107,34 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         // Differentiation order (defaults to zero, no derivatives).
         std::uint32_t order = 0;
         if constexpr (p.has(kw::diff_order)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::diff_order))>>) {
-                order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
-            } else {
-                static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                              "The diff_order keyword argument must be of integral type.");
-            }
+            order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
         }
 
         // Build the functions to be compiled.
         auto funcs = detail::sgp4_build_funcs(order);
 
         // Compile them.
-        // NOTE: in order to perform parallel compilation, we need to use the sgp4_compile_funcs() helper
-        // because we want to avoid having TBB in the public interface.
+        //
+        // NOTE: in order to perform parallel compilation, we need to use the sgp4_compile_funcs() helper because we
+        // want to avoid having TBB in the public interface.
+        //
+        // NOTE: thanks to the checks in llvm_state and cfunc, we know that the keyword arguments are safe for multiple
+        // and concurrent usages.
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
             [&]() {
-                // NOTE: it is important here to use igor::as_const() so that we don't end up with moved-from
-                // keyword arguments the second time we use kw_args.
-                cf_init
-                    = cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), igor::as_const(kw_args)...);
+                cf_init = std::apply(
+                    [&](const auto &...args) {
+                        return cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), args...);
+                    },
+                    igor::filter_named_arguments<cfunc<T>::ctor_kw_cfg>(kw_args...));
             },
             [&]() {
-                cf_prop
-                    = cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), igor::as_const(kw_args)...);
+                cf_prop = std::apply(
+                    [&](const auto &...args) {
+                        return cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), args...);
+                    },
+                    igor::filter_named_arguments<cfunc<T>::ctor_kw_cfg>(kw_args...));
             });
 
         return std::make_tuple(std::move(sat_buffer), std::move(cf_init), std::move(cf_prop), std::move(funcs.dt));
@@ -150,6 +153,13 @@ public:
     };
 
     sgp4_propagator() noexcept;
+
+    // kwargs configuration for the constructor.
+    static constexpr auto ctor_kw_cfg
+        = cfunc<T>::ctor_kw_cfg
+          | igor::config<
+              igor::descr<kw::diff_order, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+
     // NOTE: the GPE data is expected as a 9 x n span, where n is the number of satellites
     // and the rows represent:
     //
@@ -166,7 +176,7 @@ public:
     // Julian dates are to be provided in the UTC scale of time. Internal conversion
     // to TAI will ensure correct propagation across leap seconds.
     template <typename LayoutPolicy, typename AccessorPolicy, typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
     explicit sgp4_propagator(
         mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>, LayoutPolicy, AccessorPolicy> sat_list,
         const KwArgs &...kw_args)
