@@ -43,6 +43,16 @@
 
 #endif
 
+// NOTE: currently we are employing several quadratic compile-time algorithms, e.g., when it comes to check for
+// uniqueness in a set of named arguments. Something like compile-time sorting or (perfect?) hashing would of course
+// perform better asymptotically, however at this time they seem to be really difficult to implement for types.
+//
+// Pointer-based approaches won't work at compile time because comparing pointers with '<' is well-defined only within
+// an array (and std::less does not help here because it has a special exception for compile-time behaviour). Hashing
+// has similar problems. Name-based approaches are fragile and compiler-specific (e.g., MSVC gives the same "name" to
+// all lambdas used as NTTP). Perhaps reflection (or constexpr-friendly typeid(), if we ever get it) could eventually
+// help here.
+
 namespace igor
 {
 
@@ -264,7 +274,7 @@ namespace detail
 consteval bool no_duplicate_descrs_impl(auto... Descrs)
 {
     // Helper to compare one descriptor to all Descrs.
-    constexpr auto check_one = [](auto cur_descr, auto... all_descrs) {
+    auto check_one = [](auto cur_descr, auto... all_descrs) {
         return (static_cast<std::size_t>(0) + ... + static_cast<std::size_t>(cur_descr.na == all_descrs.na)) == 1u;
     };
 
@@ -352,7 +362,7 @@ consteval bool check_one_descr_present(auto descr)
     if (descr.required) {
         using tag_type = typename decltype(descr.na)::tag_type;
 
-        [[maybe_unused]] constexpr auto tags_match = []<typename Arg>() {
+        [[maybe_unused]] auto tags_match = []<typename Arg>() {
             using arg_u = std::remove_cvref_t<Arg>;
 
             if constexpr (any_tagged_ref<arg_u>) {
@@ -380,7 +390,7 @@ struct all_required_arguments_are_present<config<Descrs...>> {
 template <typename... Args>
 consteval bool validate_one_validator([[maybe_unused]] auto descr)
 {
-    [[maybe_unused]] constexpr auto check_single_arg = []<typename Arg>(auto d) {
+    [[maybe_unused]] auto check_single_arg = []<typename Arg>(auto d) {
         using arg_u = std::remove_cvref_t<Arg>;
 
         if constexpr (any_tagged_ref<arg_u>) {
@@ -413,7 +423,7 @@ consteval bool validate_one_named_argument(auto... descrs)
     using arg_u = std::remove_cvref_t<Arg>;
 
     if constexpr (any_tagged_ref<arg_u>) {
-        constexpr auto check_single_descr = [](auto d) {
+        auto check_single_descr = [](auto d) {
             if constexpr (std::same_as<typename arg_u::tag_type, typename decltype(d.na)::tag_type>) {
                 return d.template validate<typename arg_u::value_type>();
             } else {
@@ -456,6 +466,36 @@ concept validate = requires {
     // Step 6: run the validators.
     requires(detail::validate_named_arguments<std::remove_cv_t<decltype(Cfg)>>::template value<Args...>);
 };
+
+namespace detail
+{
+
+// Helper to check that two config instances have no common named arguments.
+template <auto... Descrs1, auto... Descrs2>
+consteval bool no_common_named_arguments(config<Descrs1...>, config<Descrs2...>)
+{
+    auto check_one = [](auto cur_descr1, auto... all_descrs2) {
+        return (static_cast<std::size_t>(0) + ... + static_cast<std::size_t>(cur_descr1.na == all_descrs2.na)) == 0u;
+    };
+
+    return (... && check_one(Descrs1, Descrs2...));
+}
+
+} // namespace detail
+
+// Implementation of binary configuration merging.
+template <auto... Descrs1, auto... Descrs2>
+    requires(
+        // NOTE: we need to construct config instances on-the-fly from the descriptors in order to run
+        // no_common_named_arguments(). A bit yucky, but correct.
+        detail::no_common_named_arguments(config<Descrs1...>{}, config<Descrs2...>{}))
+consteval auto operator|(config<Descrs1...> c1, config<Descrs2...> c2)
+{
+    // NOTE: here we are allowing merging between configurations with different settings. The merged config will adopt
+    // the most permissive settings.
+    return config<Descrs1..., Descrs2...>{.allow_unnamed = c1.allow_unnamed || c2.allow_unnamed,
+                                          .allow_extra = c1.allow_extra || c2.allow_extra};
+}
 
 // NOTE: implement some of the parser functionality as free functions, which will then be wrapped by static constexpr
 // member functions in the parser class. These free functions can be used where a parser object is not available (e.g.,
@@ -526,9 +566,9 @@ consteval bool has_duplicates()
 // The result is returned as a tuple of perfectly-forwarded references.
 template <auto... NArgs, typename... Args>
     requires(any_named_argument_cv<NArgs> && ...)
-constexpr auto pop_named_arguments(Args &&...args)
+constexpr auto reject_named_arguments(Args &&...args)
 {
-    [[maybe_unused]] constexpr auto filter = []<typename T>(T &&x) {
+    [[maybe_unused]] auto filter = []<typename T>(T &&x) {
         using Tu = std::remove_cvref_t<T>;
 
         if constexpr (detail::any_tagged_ref<Tu>) {
@@ -548,13 +588,91 @@ constexpr auto pop_named_arguments(Args &&...args)
 namespace detail
 {
 
+template <typename>
+struct reject_na_from_cfg;
+
+template <auto... Descrs>
+struct reject_na_from_cfg<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr auto run_reject_named_arguments(Args &&...args)
+    {
+        return reject_named_arguments<Descrs.na...>(std::forward<Args>(args)...);
+    }
+};
+
+} // namespace detail
+
+// Same as the previous overload, except that the named arguments to reject are deduced from the input config.
+template <auto Cfg, typename... Args>
+    requires(detail::any_config_cv<Cfg>)
+constexpr auto reject_named_arguments(Args &&...args)
+{
+    // Need to go through an auxiliary struct in order to recover the pack of descriptors.
+    return detail::reject_na_from_cfg<std::remove_cv_t<decltype(Cfg)>>::run_reject_named_arguments(
+        std::forward<Args>(args)...);
+}
+
+// Remove from the set of variadic arguments args the named arguments *other than* NArgs.
+//
+// The result is returned as a tuple of perfectly-forwarded references.
+template <auto... NArgs, typename... Args>
+    requires(any_named_argument_cv<NArgs> && ...)
+constexpr auto filter_named_arguments(Args &&...args)
+{
+    [[maybe_unused]] auto filter = []<typename T>(T &&x) {
+        using Tu = std::remove_cvref_t<T>;
+
+        if constexpr (detail::any_tagged_ref<Tu>) {
+            if constexpr ((... || std::same_as<typename decltype(NArgs)::tag_type, typename Tu::tag_type>)) {
+                return std::forward_as_tuple(std::forward<T>(x));
+            } else {
+                return std::tuple{};
+            }
+        } else {
+            return std::forward_as_tuple(std::forward<T>(x));
+        }
+    };
+
+    return std::tuple_cat(filter(std::forward<Args>(args))...);
+}
+
+namespace detail
+{
+
+template <typename>
+struct filter_na_from_cfg;
+
+template <auto... Descrs>
+struct filter_na_from_cfg<config<Descrs...>> {
+    template <typename... Args>
+    static constexpr auto run_filter_named_arguments(Args &&...args)
+    {
+        return filter_named_arguments<Descrs.na...>(std::forward<Args>(args)...);
+    }
+};
+
+} // namespace detail
+
+// Same as the previous overload, except that the named arguments to filter are deduced from the input config.
+template <auto Cfg, typename... Args>
+    requires(detail::any_config_cv<Cfg>)
+constexpr auto filter_named_arguments(Args &&...args)
+{
+    // Need to go through an auxiliary struct in order to recover the pack of descriptors.
+    return detail::filter_na_from_cfg<std::remove_cv_t<decltype(Cfg)>>::run_filter_named_arguments(
+        std::forward<Args>(args)...);
+}
+
+namespace detail
+{
+
 // Implementation of parsers' constructor.
 //
 // This function will examine all input arguments and return a tuple of references to the tagged reference arguments.
 // All other arguments will be discarded.
 constexpr auto parser_ctor_impl(const auto &...args)
 {
-    [[maybe_unused]] constexpr auto filter_na = []<typename T>(const T &x) {
+    [[maybe_unused]] auto filter_na = []<typename T>(const T &x) {
         if constexpr (any_tagged_ref<T>) {
             return std::forward_as_tuple(x);
         } else {
