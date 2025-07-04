@@ -12,6 +12,8 @@
 #include <heyoka/config.hpp>
 
 #include <limits>
+#include <string>
+#include <string_view>
 #include <type_traits>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -141,6 +143,11 @@ inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
 
 template <typename T>
 double get_fp_unit_cost();
+
+// Concept to detect (a subset of) string-like types.
+template <typename T>
+concept string_like = std::same_as<T, std::string> || std::same_as<T, std::string_view> || std::same_as<T, const char *>
+                      || std::same_as<T, char *>;
 
 } // namespace detail
 
