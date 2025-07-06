@@ -907,17 +907,29 @@ public:
 private:
     void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>);
 
+    // kwargs configuration for the call operator, single evaluation overload.
+    static constexpr auto single_eval_kw_cfg
+        = igor::config<igor::descr<kw::pars,
+                                   []<typename U>() {
+                                       return std::same_as<in_1d, std::remove_cvref_t<U>>
+                                              || detail::cfunc_in_range_1d<T, U>;
+                                   }>{},
+                       igor::descr<kw::time, []<typename U>() { return std::convertible_to<U, T>; }>{}>{};
+
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
     //
     // NOTE: if/when we add overloads with user-provided tape pointers, then we must document the non-overlapping
     // requirement for them too.
     template <typename Out, typename In, typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-                && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
-                && (detail::cfunc_in_range_1d<T, In> || std::same_as<in_1d, std::remove_cvref_t<In>>)
+        requires igor::validate<single_eval_kw_cfg, KwArgs...>
+                 && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
+                 && (detail::cfunc_in_range_1d<T, In> || std::same_as<in_1d, std::remove_cvref_t<In>>)
+    // NOTE: accept forwarding references here to highlight that kw_args may in general be moved and that thus it is not
+    // safe to re-use them.
+    //
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(Out &&out, In &&in, const KwArgs &...kw_args)
+    void operator()(Out &&out, In &&in, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -943,14 +955,12 @@ public:
 
                 if constexpr (std::same_as<in_1d, std::remove_cvref_t<pars_t>>) {
                     return p(kw::pars);
-                } else if constexpr (detail::cfunc_in_range_1d<T, pars_t>) {
+                } else {
                     // NOTE: as usual, we don't want to perfectly forward ranges, hence,
                     // turn it into an lvalue.
                     auto &&pars = p(kw::pars);
 
                     return in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))};
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
                 }
             } else {
                 return {};
@@ -959,11 +969,7 @@ public:
 
         auto tm = [&]() -> std::optional<T> {
             if constexpr (p.has(kw::time)) {
-                if constexpr (std::convertible_to<decltype(p(kw::time)), T>) {
-                    return static_cast<T>(p(kw::time));
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
-                }
+                return static_cast<T>(p(kw::time));
             } else {
                 return {};
             }
@@ -980,22 +986,26 @@ private:
     HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
     void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
 
+    // kwargs configuration for the call operator, multi evaluation overload.
+    static constexpr auto multi_eval_kw_cfg = igor::config<
+        igor::descr<kw::pars, []<typename U>() { return std::same_as<in_2d, std::remove_cvref_t<U>>; }>{},
+        igor::descr<kw::time, []<typename U>() { return std::same_as<in_1d, std::remove_cvref_t<U>>; }>{}>{};
+
 public:
-    // NOTE: it is important to document properly the non-overlapping
-    // memory requirement for the input arguments.
+    // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-    void operator()(out_2d out, in_2d in, const KwArgs &...kw_args)
+        requires igor::validate<multi_eval_kw_cfg, KwArgs...>
+    // NOTE: accept forwarding references here to highlight that kw_args may in general be moved and that thus it is not
+    // safe to re-use them.
+    //
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    void operator()(out_2d out, in_2d in, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
         auto pars = [&]() -> std::optional<in_2d> {
             if constexpr (p.has(kw::pars)) {
-                if constexpr (std::same_as<in_2d, std::remove_cvref_t<decltype(p(kw::pars))>>) {
-                    return p(kw::pars);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
-                }
+                return p(kw::pars);
             } else {
                 return {};
             }
@@ -1003,11 +1013,7 @@ public:
 
         auto tm = [&]() -> std::optional<in_1d> {
             if constexpr (p.has(kw::time)) {
-                if constexpr (std::same_as<in_1d, std::remove_cvref_t<decltype(p(kw::time))>>) {
-                    return p(kw::time);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
-                }
+                return p(kw::time);
             } else {
                 return {};
             }
