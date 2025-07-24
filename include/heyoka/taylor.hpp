@@ -542,9 +542,9 @@ public:
                              KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        std::apply(
-            [this, &sys, &state](const auto &...args) { finalise_ctor(std::move(sys), std::move(state), args...); },
-            igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
+        std::apply([this, &sys,
+                    &state](const auto &...args) { this->finalise_ctor(std::move(sys), std::move(state), args...); },
+                   igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
     }
     template <typename... KwArgs>
         requires igor::validate<ctor_kw_cfg, KwArgs...>
@@ -559,9 +559,9 @@ public:
     explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        std::apply(
-            [this, &sys, &state](const auto &...args) { finalise_ctor(std::move(sys), std::move(state), args...); },
-            igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
+        std::apply([this, &sys,
+                    &state](const auto &...args) { this->finalise_ctor(std::move(sys), std::move(state), args...); },
+                   igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
     }
     template <typename... KwArgs>
         requires igor::validate<ctor_kw_cfg, KwArgs...>
