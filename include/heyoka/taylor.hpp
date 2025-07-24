@@ -53,6 +53,7 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/events.hpp>
@@ -171,6 +172,20 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Concept to detect if R is an input range from whose reference type instances of T can be constructed.
+template <typename R, typename T>
+concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
+
+// kwargs configuration for the common options of Taylor integrators.
+template <typename T>
+inline constexpr auto ta_common_kw_cfg = igor::config<
+    igor::descr<kw::high_accuracy, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::tol, []<typename U>() { return std::convertible_to<U, T>; }>{},
+    igor::descr<kw::compact_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::pars, []<typename U>() { return input_rangeT<U, T>; }>{},
+    igor::descr<kw::parallel_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::parjit, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+
 // Helper for parsing common options when constructing Taylor integrators.
 template <typename T, typename... KwArgs>
 auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
@@ -178,7 +193,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     igor::parser p{kw_args...};
 
     // High accuracy mode (defaults to false).
-    auto high_accuracy = [&p]() -> bool {
+    const auto high_accuracy = [&p]() {
         if constexpr (p.has(kw::high_accuracy)) {
             return p(kw::high_accuracy);
         } else {
@@ -186,8 +201,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
         }
     }();
 
-    // tol (defaults to undefined). Zero tolerance is considered
-    // the same as undefined.
+    // tol (defaults to undefined). Zero tolerance is considered the same as undefined.
     auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
             auto retval = static_cast<T>(p(kw::tol));
@@ -195,22 +209,19 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
                 // NOTE: this covers the NaN case as well.
                 return retval;
             }
-            // NOTE: zero tolerance will be interpreted
-            // as undefined by falling through
-            // the code below.
+            // NOTE: zero tolerance will be interpreted as undefined by falling through the code below.
         }
 
         return {};
     }();
 
-    // Compact mode (defaults to false, except for real where
-    // it defaults to true).
-    auto compact_mode = [&p]() -> bool {
+    // Compact mode (defaults to false, except for real where it defaults to true).
+    const auto compact_mode = [&p]() {
         if constexpr (p.has(kw::compact_mode)) {
             return p(kw::compact_mode);
         } else {
 #if defined(HEYOKA_HAVE_REAL)
-            return std::is_same_v<T, mppp::real>;
+            return std::same_as<T, mppp::real>;
 #else
             return false;
 
@@ -221,14 +232,14 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // Vector of parameters (defaults to empty vector).
     auto pars = [&p]() -> std::vector<T> {
         if constexpr (p.has(kw::pars)) {
-            return p(kw::pars);
+            return ranges_to<std::vector<T>>(p(kw::pars));
         } else {
             return {};
         }
     }();
 
     // Parallel mode (defaults to false).
-    auto parallel_mode = [&p]() -> bool {
+    const auto parallel_mode = [&p]() {
         if constexpr (p.has(kw::parallel_mode)) {
             return p(kw::parallel_mode);
         } else {
@@ -237,13 +248,9 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     }();
 
     // Parallel JIT compilation.
-    auto parjit = [&p]() -> bool {
+    const auto parjit = [&p]() {
         if constexpr (p.has(kw::parjit)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::parjit))>>) {
-                return static_cast<bool>(p(kw::parjit));
-            } else {
-                static_assert(always_false_v<T>, "Invalid type for the 'parjit' keyword argument.");
-            }
+            return p(kw::parjit);
         } else {
             return default_parjit;
         }
@@ -252,23 +259,17 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode, parjit};
 }
 
-// Small helper to construct a default value for the max_delta_t
-// keyword argument.
+// Small helper to construct a default value for the max_delta_t keyword argument.
 template <typename T>
 HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 
-// Concept to detect if R is an input range from whose reference type
-// instances of T can be constructed.
-template <typename R, typename T>
-concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
-
 // Logic for parsing a step callback argument in a propagate_*() function.
-// The default return value is an empty callback. If an object that can be used to construct
-// a Callback is provided, then use it. Otherwise, if a range of objects
-// that can be used to construct a Callback is provided, use them to assemble
-// a CallbackSet. Otherwise, the call is malformed.
-// NOTE: in any case, we end up creating a new object either by copying
-// or moving the input argument(s).
+//
+// The default return value is an empty callback. If an object that can be used to construct a Callback is provided,
+// then use it. Otherwise, if a range of objects that can be used to construct a Callback is provided, use them to
+// assemble a CallbackSet. Otherwise, the call is malformed.
+//
+// NOTE: in any case, we end up creating a new object either by copying or moving the input argument(s).
 template <typename Callback, typename CallbackSet, typename Parser>
 Callback parse_propagate_cb(const Parser &p)
 {
@@ -278,12 +279,7 @@ Callback parse_propagate_cb(const Parser &p)
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
             return p(kw::callback);
         } else if constexpr (input_rangeT<cb_arg_t, Callback>) {
-            std::vector<Callback> cb_vec;
-            for (auto &&cb : p(kw::callback)) {
-                cb_vec.emplace_back(std::forward<decltype(cb)>(cb));
-            }
-
-            return CallbackSet(std::move(cb_vec));
+            return CallbackSet(ranges_to<std::vector<Callback>>(p(kw::callback)));
         } else {
             // LCOV_EXCL_START
             static_assert(detail::always_false_v<CallbackSet>,
@@ -297,86 +293,75 @@ Callback parse_propagate_cb(const Parser &p)
     }
 }
 
+// kwargs configuration for the common options of Taylor integrators.
+template <typename T>
+inline constexpr auto ta_propagate_common_kw_cfg
+    = igor::config<igor::descr<kw::max_steps, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
+                   igor::descr<kw::max_delta_t, []<typename U>() { return std::convertible_to<U, T>; }>{},
+                   igor::descr<kw::callback, []<typename U>() {
+                       return std::convertible_to<U, step_callback<T>> || input_rangeT<U, step_callback<T>>;
+                   }>{}>{};
+
+// kwargs configuration specific to propagate_for/until().
+inline constexpr auto ta_propagate_for_until_kw_cfg = igor::config<
+    igor::descr<kw::write_tc, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
+    igor::descr<kw::c_output, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
 auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    if constexpr (p.has_unnamed_arguments()) {
-        // LCOV_EXCL_START
-        static_assert(detail::always_false_v<KwArgs...>,
-                      "The variadic arguments to a propagate_*() function in an "
-                      "adaptive Taylor integrator cannot contain unnamed arguments.");
-        throw;
-        // LCOV_EXCL_STOP
+    // Max number of steps (defaults to zero).
+    const auto max_steps = [&p]() {
+        if constexpr (p.has(kw::max_steps)) {
+            return boost::numeric_cast<std::size_t>(p(kw::max_steps));
+        } else {
+            return 0uz;
+        }
+    }();
+
+    // Max delta_t (defaults to positive infinity).
+    auto max_delta_t = [&p]() -> T {
+        if constexpr (p.has(kw::max_delta_t)) {
+            return p(kw::max_delta_t);
+        } else {
+            return taylor_default_max_delta_t<T>();
+        }
+    }();
+
+    // Parse the callback argument.
+    auto cb = parse_propagate_cb<step_callback<T>, step_callback_set<T>>(p);
+
+    if constexpr (Grid) {
+        return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
     } else {
-        // Max number of steps (defaults to zero).
-        auto max_steps = [&p]() -> std::size_t {
-            if constexpr (p.has(kw::max_steps)) {
-                static_assert(std::integral<std::remove_cvref_t<decltype(p(kw::max_steps))>>,
-                              "The 'max_steps' keyword argument to a propagate_*() function must be of integral type.");
-
-                return boost::numeric_cast<std::size_t>(p(kw::max_steps));
-            } else {
-                return 0;
-            }
-        }();
-
-        // Max delta_t (defaults to positive infinity).
-        auto max_delta_t = [&p]() -> T {
-            if constexpr (p.has(kw::max_delta_t)) {
-                static_assert(
-                    std::convertible_to<decltype(p(kw::max_delta_t)), T>,
-                    "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
-
-                return p(kw::max_delta_t);
-            } else {
-                return taylor_default_max_delta_t<T>();
-            }
-        }();
-
-        // Parse the callback argument.
-        auto cb = parse_propagate_cb<step_callback<T>, step_callback_set<T>>(p);
-
         // Write the Taylor coefficients (defaults to false).
-        // NOTE: this won't be used in propagate_grid().
-        auto write_tc = [&p]() -> bool {
+        const auto write_tc = [&p]() {
             if constexpr (p.has(kw::write_tc)) {
-                static_assert(
-                    std::convertible_to<decltype(p(kw::write_tc)), bool>,
-                    "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
-
                 return p(kw::write_tc);
             } else {
                 return false;
             }
         }();
 
-        if constexpr (Grid) {
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
-        } else {
-            // Continuous output (defaults to false).
-            auto with_c_out = [&p]() -> bool {
-                if constexpr (p.has(kw::c_output)) {
-                    static_assert(
-                        std::convertible_to<decltype(p(kw::c_output)), bool>,
-                        "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
+        // Continuous output (defaults to false).
+        const auto with_c_out = [&p]() {
+            if constexpr (p.has(kw::c_output)) {
+                return p(kw::c_output);
+            } else {
+                return false;
+            }
+        }();
 
-                    return p(kw::c_output);
-                } else {
-                    return false;
-                }
-            }();
-
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
-        }
+        return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
     }
 }
 
-// Base class to contain data specific to integrators of type
-// T. By default this is just an empty class.
+// Base class to contain data specific to integrators of type T. By default this is just an empty class.
 template <typename T, typename Derived>
+// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility)
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
 {
     // Serialisation.
@@ -465,6 +450,15 @@ private:
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
+
+    // kwargs configuration for finalise_ctor().
+    static constexpr auto finalise_ctor_kw_cfg
+        = detail::ta_common_kw_cfg<T>
+          | igor::config<igor::descr<kw::time, []<typename U>() { return std::convertible_to<U, T>; }>{},
+                         igor::descr<kw::t_events, []<typename U>() { return detail::input_rangeT<U, t_event_t>; }>{},
+                         igor::descr<kw::nt_events, []<typename U>() { return detail::input_rangeT<U, nt_event_t>; }>{},
+                         igor::descr<kw::prec, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
                             std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>, bool);
@@ -473,58 +467,51 @@ private:
     {
         igor::parser p{kw_args...};
 
-        if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The variadic arguments in the construction of an adaptive Taylor integrator contain "
-                          "unnamed arguments.");
-        } else {
-            // Initial time (defaults to undefined).
-            auto tm = [&p]() -> std::optional<T> {
-                if constexpr (p.has(kw::time)) {
-                    return p(kw::time);
-                } else {
-                    return {};
-                }
-            }();
+        // Parse the common options.
+        auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
+            = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
-                = detail::taylor_adaptive_common_ops<T>(kw_args...);
-
-            // Extract the terminal events, if any.
-            auto tes = [&p]() -> std::vector<t_event_t> {
-                if constexpr (p.has(kw::t_events)) {
-                    return p(kw::t_events);
-                } else {
-                    return {};
-                }
-            }();
-
-            // Extract the non-terminal events, if any.
-            auto ntes = [&p]() -> std::vector<nt_event_t> {
-                if constexpr (p.has(kw::nt_events)) {
-                    return p(kw::nt_events);
-                } else {
-                    return {};
-                }
-            }();
-
-            // Fetch the precision, if provided. Zero precision
-            // is considered the same as undefined.
-            auto prec = [&p]() -> std::optional<long long> {
-                if constexpr (p.has(kw::prec)) {
-                    auto ret = static_cast<long long>(p(kw::prec));
-                    if (ret != 0) {
-                        return ret;
-                    }
-                }
-
+        // Initial time (defaults to undefined).
+        auto tm = [&p]() -> std::optional<T> {
+            if constexpr (p.has(kw::time)) {
+                return static_cast<T>(p(kw::time));
+            } else {
                 return {};
-            }();
+            }
+        }();
 
-            finalise_ctor_impl(std::move(sys), std::move(state), std::move(tm), std::move(tol), high_accuracy,
-                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode,
-                               std::move(prec), parjit);
-        }
+        // Extract the terminal events, if any.
+        auto tes = [&p]() -> std::vector<t_event_t> {
+            if constexpr (p.has(kw::t_events)) {
+                return detail::ranges_to<std::vector<t_event_t>>(p(kw::t_events));
+            } else {
+                return {};
+            }
+        }();
+
+        // Extract the non-terminal events, if any.
+        auto ntes = [&p]() -> std::vector<nt_event_t> {
+            if constexpr (p.has(kw::nt_events)) {
+                return detail::ranges_to<std::vector<nt_event_t>>(p(kw::nt_events));
+            } else {
+                return {};
+            }
+        }();
+
+        // Fetch the precision, if provided. Zero precision is considered the same as undefined.
+        auto prec = [&p]() -> std::optional<long long> {
+            if constexpr (p.has(kw::prec)) {
+                auto ret = boost::numeric_cast<long long>(p(kw::prec));
+                if (ret != 0) {
+                    return ret;
+                }
+            }
+
+            return {};
+        }();
+
+        finalise_ctor_impl(std::move(sys), std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
+                           std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec), parjit);
     }
 
     // NOTE: we need to go through a private non-template constructor
@@ -541,32 +528,45 @@ private:
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
+    // kwargs configuration for the constructors.
+    static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
+
     taylor_adaptive();
 
+    // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
+    // be reused in other invocations.
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                             const KwArgs &...kw_args)
+                             // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                             KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        finalise_ctor(std::move(sys), std::move(state), kw_args...);
+        std::apply(
+            [this, &sys, &state](const auto &...args) { finalise_ctor(std::move(sys), std::move(state), args...); },
+            igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, const KwArgs &...kw_args)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, KwArgs &&...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
     {
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-    explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, const KwArgs &...kw_args)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        finalise_ctor(std::move(sys), std::move(state), kw_args...);
+        std::apply(
+            [this, &sys, &state](const auto &...args) { finalise_ctor(std::move(sys), std::move(state), args...); },
+            igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-    explicit taylor_adaptive(var_ode_sys sys, const KwArgs &...kw_args)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit taylor_adaptive(var_ode_sys sys, KwArgs &&...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
     {
     }
@@ -634,6 +634,7 @@ public:
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
                  && std::integral<std::ranges::range_size_t<R>>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
@@ -658,29 +659,37 @@ private:
     propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
 
 public:
+    // kwargs configuration for the propagate_*() functions.
+    static constexpr auto propagate_grid_kw_cfg = detail::ta_propagate_common_kw_cfg<T>;
+    static constexpr auto propagate_for_until_kw_cfg
+        = detail::ta_propagate_common_kw_cfg<T> | detail::ta_propagate_for_until_kw_cfg;
+
     // NOTE: return values:
+    //
     // - outcome,
     // - min abs(timestep),
     // - max abs(timestep),
-    // - total number of nonzero steps
-    //   successfully undertaken,
+    // - total number of nonzero steps successfully undertaken,
     // - continuous output, if requested (only for propagate_for/until()),
     // - step callback, if provided,
     // - grid of state vectors (only for propagate_grid()).
-    // NOTE: the min/max timesteps are well-defined
-    // only if at least 1-2 steps were taken successfully.
-    // NOTE: the propagate_*() functions are not guaranteed to bring
-    // the integrator time *exactly* to the requested final time. This
-    // ultimately stems from the fact that in floating-point arithmetics
-    // in general a + (b - a) != b, and this happens regardless of the
-    // use of a double-length time representation. This occurrence however
-    // seems to be pretty rare in practice, so for the time being we leave
-    // this as it is and just document the corner-case behaviour. Perhaps
-    // in the future we can offer a stronger guarantee, which however will
-    // result in a more complicated logic.
+    //
+    // NOTE: the min/max timesteps are well-defined only if at least 1-2 steps were taken successfully.
+    //
+    // NOTE: the propagate_*() functions are not guaranteed to bring the integrator time *exactly* to the requested
+    // final time. This ultimately stems from the fact that in floating-point arithmetics in general a + (b - a) != b,
+    // and this happens regardless of the use of a double-length time representation. This occurrence however seems to
+    // be pretty rare in practice, so for the time being we leave this as it is and just document the corner-case
+    // behaviour. Perhaps in the future we can offer a stronger guarantee, which however will result in a more
+    // complicated logic.
+    //
+    // NOTE: we accept the keyword arguments as universal references in order to highlight that they cannot be reused in
+    // other invocations.
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
-    propagate_until(T t, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(kw_args...);
@@ -689,8 +698,10 @@ public:
                                     write_tc, with_c_out);
     }
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
-    propagate_for(T delta_t, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(kw_args...);
@@ -699,8 +710,10 @@ public:
                                   with_c_out);
     }
     template <typename... KwArgs>
+        requires igor::validate<propagate_grid_kw_cfg, KwArgs...>
     std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
-    propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
@@ -710,12 +723,12 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
+    requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, const KwArgs &...)
     -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
+    requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, const KwArgs &...) -> taylor_adaptive<T>;
 
 // Prevent implicit instantiations.
