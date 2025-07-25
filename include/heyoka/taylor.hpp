@@ -176,12 +176,16 @@ namespace detail
 template <typename R, typename T>
 concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
 
+// Descriptor to validate named arguments which must satisfy input_rangeT.
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto input_rangeT_descr = igor::descr<NArg, []<typename U>() { return input_rangeT<U, T>; }>{};
+
 // kwargs configuration for the common options of Taylor integrators.
 template <typename T>
 inline constexpr auto ta_common_kw_cfg
     = igor::config<kw::descr::boolean<kw::high_accuracy>, kw::descr::convertible_to<kw::tol, T>,
-                   kw::descr::boolean<kw::compact_mode>,
-                   igor::descr<kw::pars, []<typename U>() { return input_rangeT<U, T>; }>{},
+                   kw::descr::boolean<kw::compact_mode>, input_rangeT_descr<kw::pars, T>,
                    kw::descr::boolean<kw::parallel_mode>, kw::descr::boolean<kw::parjit>>{};
 
 // Helper for parsing common options when constructing Taylor integrators.
@@ -402,10 +406,8 @@ private:
     // kwargs configuration for finalise_ctor().
     static constexpr auto finalise_ctor_kw_cfg
         = detail::ta_common_kw_cfg<T>
-          | igor::config<kw::descr::convertible_to<kw::time, T>,
-                         igor::descr<kw::t_events, []<typename U>() { return detail::input_rangeT<U, t_event_t>; }>{},
-                         igor::descr<kw::nt_events, []<typename U>() { return detail::input_rangeT<U, nt_event_t>; }>{},
-                         kw::descr::integral<kw::prec>>{};
+          | igor::config<kw::descr::convertible_to<kw::time, T>, detail::input_rangeT_descr<kw::t_events, t_event_t>,
+                         detail::input_rangeT_descr<kw::nt_events, nt_event_t>, kw::descr::integral<kw::prec>>{};
 
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
