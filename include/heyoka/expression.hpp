@@ -54,7 +54,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/rng_to_vec.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
@@ -779,14 +779,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 
     HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 
-    // Small helper to turn an input range into a vector of expressions.
-    template <typename R>
-    static auto rng_to_vecex(R &&r)
-    {
-        return detail::rng_to_vec(
-            r | std::views::transform([]<typename U>(U &&x) { return expression{std::forward<U>(x)}; }));
-    }
-
 public:
     cfunc() noexcept;
     // kwargs configuration for the constructor.
@@ -808,7 +800,8 @@ public:
                  && std::ranges::input_range<R2>
                  && std::constructible_from<expression, std::ranges::range_reference_t<R2>>
     explicit cfunc(R1 &&rng1, R2 &&rng2, const KwArgs &...kw_args)
-        : cfunc(rng_to_vecex(std::forward<R1>(rng1)), rng_to_vecex(std::forward<R2>(rng2)), kw_args...)
+        : cfunc(detail::ranges_to<std::vector<expression>>(std::forward<R1>(rng1)),
+                detail::ranges_to<std::vector<expression>>(std::forward<R2>(rng2)), kw_args...)
     {
     }
     cfunc(const cfunc &);
