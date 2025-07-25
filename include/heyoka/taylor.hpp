@@ -668,12 +668,12 @@ public:
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
-explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, const KwArgs &...)
+explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, KwArgs &&...)
     -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
-explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, const KwArgs &...) -> taylor_adaptive<T>;
+explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, KwArgs &&...) -> taylor_adaptive<T>;
 
 // Prevent implicit instantiations.
 // NOLINTBEGIN
