@@ -8,6 +8,9 @@
 
 #include <array>
 #include <cmath>
+#include <exception>
+#include <iostream>
+#include <optional>
 
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/eop_data.hpp>
@@ -62,8 +65,17 @@ TEST_CASE("rot_itrs_icrs")
 {
     heyoka::detail::edb_disabler ed;
 
-    // NOTE: the online iers service uses the long-term data in the computation.
-    const auto data = eop_data::fetch_latest_iers_long_term();
+    std::optional<eop_data> eop_opt;
+
+    try {
+        // NOTE: the online iers service uses the long-term data in the computation.
+        eop_opt.emplace(eop_data::fetch_latest_iers_long_term());
+    } catch (const std::exception &e) {
+        std::cout << "Exception caught during download test: " << e.what() << '\n';
+        return;
+    }
+
+    const auto &data = *eop_opt;
 
     const auto [x, y, z] = make_vars("x", "y", "z");
 

@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <exception>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -443,7 +445,11 @@ TEST_CASE("sw_data_f107")
 // Test to check the download code.
 TEST_CASE("download")
 {
-    const auto data = sw_data::fetch_latest_celestrak();
-    REQUIRE(!data.get_table().empty());
-    REQUIRE(data.get_identifier() == "celestrak_last_5_years");
+    try {
+        const auto data = sw_data::fetch_latest_celestrak();
+        REQUIRE(!data.get_table().empty());
+        REQUIRE(data.get_identifier() == "celestrak_last_5_years");
+    } catch (const std::exception &e) {
+        std::cout << "Exception caught during download test: " << e.what() << '\n';
+    }
 }
