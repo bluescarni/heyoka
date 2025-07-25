@@ -42,8 +42,8 @@ TEST_CASE("pendulum")
     const auto sys1 = hamiltonian(H, {x}, {p});
     const auto sys2 = model::pendulum(kw::length = l, kw::gconst = g);
 
-    auto ics1 = {0.1, m * lval * lval * 0.2};
-    auto ics2 = {0.1, 0.2};
+    auto ics1 = std::vector{0.1, m * lval * lval * 0.2};
+    auto ics2 = std::vector{0.1, 0.2};
     auto par_vals = std::vector{lval, 3.4};
 
     auto ta1 = taylor_adaptive{sys1, ics1, kw::pars = par_vals};
