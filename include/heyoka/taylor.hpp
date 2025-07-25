@@ -272,7 +272,7 @@ Callback parse_propagate_cb(const Parser &p)
     }
 }
 
-// kwargs configuration for the common options of Taylor integrators.
+// kwargs configuration for the common options of the propagate_*() functions of Taylor integrators.
 template <typename T>
 inline constexpr auto ta_propagate_common_kw_cfg
     = igor::config<kw::descr::integral<kw::max_steps>, kw::descr::convertible_to<kw::max_delta_t, T>,
