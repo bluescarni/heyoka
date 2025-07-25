@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <concepts>
 #include <cstdint>
 #include <ostream>
 #include <type_traits>

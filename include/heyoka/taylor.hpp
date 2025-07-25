@@ -619,8 +619,7 @@ private:
 public:
     // kwargs configuration for the propagate_*() functions.
     static constexpr auto propagate_grid_kw_cfg = detail::ta_propagate_common_kw_cfg<T>;
-    static constexpr auto propagate_for_until_kw_cfg
-        = detail::ta_propagate_common_kw_cfg<T> | detail::ta_propagate_for_until_kw_cfg;
+    static constexpr auto propagate_for_until_kw_cfg = propagate_grid_kw_cfg | detail::ta_propagate_for_until_kw_cfg;
 
     // NOTE: return values:
     //
