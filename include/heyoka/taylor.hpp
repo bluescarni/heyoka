@@ -720,6 +720,21 @@ HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real)
 namespace detail
 {
 
+// kwargs configuration for the common options of the propagate_*() functions of Taylor batch integrators.
+//
+// NOTE: the ForceScalarMaxDeltaT establishes if the max_delta_t kwarg must be a scalar (if false, max_delta_t can also
+// be a range). It is used in ensemble propagations.
+template <typename T, bool ForceScalarMaxDeltaT>
+inline constexpr auto tab_propagate_common_kw_cfg
+    = igor::config<kw::descr::integral<kw::max_steps>,
+                   igor::descr<kw::max_delta_t,
+                               []<typename U>() {
+                                   return std::convertible_to<U, T> || (!ForceScalarMaxDeltaT && input_rangeT<U, T>);
+                               }>{},
+                   igor::descr<kw::callback, []<typename U>() {
+                       return std::convertible_to<U, step_callback_batch<T>> || input_rangeT<U, step_callback_batch<T>>;
+                   }>{}>{};
+
 // Parser for the common kwargs options for the propagate_*() functions
 // for the batch integrator.
 template <typename T, bool Grid, bool ForceScalarMaxDeltaT, typename... KwArgs>
@@ -729,98 +744,41 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
 
     const igor::parser p{kw_args...};
 
-    if constexpr (p.has_unnamed_arguments()) {
-        static_assert(always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
-                                                 "adaptive Taylor integrator in batch mode contain unnamed arguments.");
-        throw;
-    } else {
-        // Max number of steps (defaults to zero).
-        auto max_steps = [&p]() -> std::size_t {
-            if constexpr (p.has(kw::max_steps)) {
-                static_assert(std::integral<std::remove_cvref_t<decltype(p(kw::max_steps))>>,
-                              "The 'max_steps' keyword argument to a propagate_*() function must be of integral type.");
+    // Max number of steps (defaults to zero).
+    const auto max_steps = boost::numeric_cast<std::size_t>(p(kw::max_steps, 0));
 
-                return boost::numeric_cast<std::size_t>(p(kw::max_steps));
+    // Max delta_t (defaults to empty vector).
+    //
+    // NOTE: we want an explicit copy here because in the implementations of the propagate_*() functions we keep on
+    // checking on max_delta_t before invoking the single step function. Hence, we want to avoid any risk of aliasing.
+    auto max_delta_t = [&]() -> std::vector<T> {
+        if constexpr (p.has(kw::max_delta_t)) {
+            if constexpr (input_rangeT<decltype(p(kw::max_delta_t)), T>) {
+                static_assert(!ForceScalarMaxDeltaT);
+                return ranges_to<std::vector<T>>(p(kw::max_delta_t));
             } else {
-                return 0;
+                // Interpret as a scalar to be splatted.
+                return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(batch_size),
+                                      T(p(kw::max_delta_t)));
             }
-        }();
-
-        // Max delta_t (defaults to empty vector).
-        // NOTE: we want an explicit copy here because
-        // in the implementations of the propagate_*() functions
-        // we keep on checking on max_delta_t before invoking
-        // the single step function. Hence, we want to avoid
-        // any risk of aliasing.
-        auto max_delta_t = [&]() -> std::vector<T> {
-            if constexpr (p.has(kw::max_delta_t)) {
-                using type = decltype(p(kw::max_delta_t));
-
-                if constexpr (input_rangeT<type, T>) {
-                    if constexpr (ForceScalarMaxDeltaT) {
-                        // LCOV_EXCL_START
-                        static_assert(always_false_v<T>,
-                                      "In ensemble integrations, max_delta_t must always be passed as a scalar.");
-
-                        throw;
-                        // LCOV_EXCL_STOP
-                    } else {
-                        std::vector<T> retval;
-                        for (auto &&x : p(kw::max_delta_t)) {
-                            retval.emplace_back(std::forward<decltype(x)>(x));
-                        }
-
-                        return retval;
-                    }
-                } else {
-                    // Interpret as a scalar to be splatted.
-                    static_assert(
-                        std::convertible_to<type, T>,
-                        "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
-
-                    return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(batch_size),
-                                          p(kw::max_delta_t));
-                }
-            } else {
-                return {};
-            }
-        }();
-
-        // Parse the callback argument.
-        auto cb = parse_propagate_cb<step_callback_batch<T>, step_callback_batch_set<T>>(p);
-
-        // Write the Taylor coefficients (defaults to false).
-        // NOTE: this won't be used in propagate_grid().
-        auto write_tc = [&p]() -> bool {
-            if constexpr (p.has(kw::write_tc)) {
-                static_assert(
-                    std::convertible_to<decltype(p(kw::write_tc)), bool>,
-                    "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
-
-                return p(kw::write_tc);
-            } else {
-                return false;
-            }
-        }();
-
-        if constexpr (Grid) {
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
         } else {
-            // Continuous output (defaults to false).
-            auto with_c_out = [&p]() -> bool {
-                if constexpr (p.has(kw::c_output)) {
-                    static_assert(
-                        std::convertible_to<decltype(p(kw::c_output)), bool>,
-                        "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
-
-                    return p(kw::c_output);
-                } else {
-                    return false;
-                }
-            }();
-
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
+            return {};
         }
+    }();
+
+    // Parse the callback argument.
+    auto cb = parse_propagate_cb<step_callback_batch<T>, step_callback_batch_set<T>>(p);
+
+    if constexpr (Grid) {
+        return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
+    } else {
+        // Write the Taylor coefficients (defaults to false).
+        const auto write_tc = p(kw::write_tc, false);
+
+        // Continuous output (defaults to false).
+        const auto with_c_out = p(kw::c_output, false);
+
+        return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
     }
 }
 
@@ -862,6 +820,16 @@ private:
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
+
+    // kwargs configuration for finalise_ctor().
+    static constexpr auto finalise_ctor_kw_cfg
+        = detail::ta_common_kw_cfg<T>
+          | igor::config<
+              igor::descr<kw::time,
+                          []<typename U>() { return std::convertible_to<U, T> || detail::input_rangeT<U, T>; }>{},
+              detail::input_rangeT_descr<kw::t_events, t_event_t>,
+              detail::input_rangeT_descr<kw::nt_events, nt_event_t>>{};
+
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
                             std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, bool);
@@ -870,47 +838,49 @@ private:
     {
         const igor::parser p{kw_args...};
 
-        if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The variadic arguments in the construction of an adaptive batch Taylor integrator contain "
-                          "unnamed arguments.");
-        } else {
-            // Initial times (defaults to a vector of zeroes).
-            auto tm = [&p, batch_size]() -> std::vector<T> {
-                if constexpr (p.has(kw::time)) {
-                    // NOTE: silence clang warning.
-                    (void)batch_size;
-                    return p(kw::time);
+        // Parse the common options.
+        auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
+            = detail::taylor_adaptive_common_ops<T>(kw_args...);
+
+        // Initial times (defaults to a vector of zeroes).
+        auto tm = [&p, batch_size]() -> std::vector<T> {
+            if constexpr (p.has(kw::time)) {
+                // NOTE: silence clang warning.
+                (void)batch_size;
+
+                if constexpr (detail::input_rangeT<decltype(p(kw::time)), T>) {
+                    // The input time is a range, convert it into a vector.
+                    return detail::ranges_to<std::vector<T>>(p(kw::time));
                 } else {
-                    return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
+                    // The input time is a scalar, splat it out.
+                    return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(p(kw::time)));
                 }
-            }();
+            } else {
+                // The input time was not provided, return a vector of zeroes.
+                return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
+            }
+        }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
-                = detail::taylor_adaptive_common_ops<T>(kw_args...);
+        // Extract the terminal events, if any.
+        auto tes = [&p]() -> std::vector<t_event_t> {
+            if constexpr (p.has(kw::t_events)) {
+                return detail::ranges_to<std::vector<t_event_t>>(p(kw::t_events));
+            } else {
+                return {};
+            }
+        }();
 
-            // Extract the terminal events, if any.
-            auto tes = [&p]() -> std::vector<t_event_t> {
-                if constexpr (p.has(kw::t_events)) {
-                    return p(kw::t_events);
-                } else {
-                    return {};
-                }
-            }();
+        // Extract the non-terminal events, if any.
+        auto ntes = [&p]() -> std::vector<nt_event_t> {
+            if constexpr (p.has(kw::nt_events)) {
+                return detail::ranges_to<std::vector<nt_event_t>>(p(kw::nt_events));
+            } else {
+                return {};
+            }
+        }();
 
-            // Extract the non-terminal events, if any.
-            auto ntes = [&p]() -> std::vector<nt_event_t> {
-                if constexpr (p.has(kw::nt_events)) {
-                    return p(kw::nt_events);
-                } else {
-                    return {};
-                }
-            }();
-
-            finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(tm), std::move(tol),
-                               high_accuracy, compact_mode, std::move(pars), std::move(tes), std::move(ntes),
-                               parallel_mode, parjit);
-        }
+        finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(tm), std::move(tol), high_accuracy,
+                           compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode, parjit);
     }
 
     // NOTE: we need to go through a private non-template constructor
@@ -927,34 +897,55 @@ private:
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
+    // kwargs configuration for the constructors.
+    static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
+
     taylor_adaptive_batch();
 
+    // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
+    // be reused in other invocations.
+    //
+    // NOTE: it looks like there is an MSVC bug when CTAD and concepts interact - the compiler complains that the
+    // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
+    // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+#if !defined(_MSC_VER) || defined(__clang__)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                                   std::uint32_t batch_size, const KwArgs &...kw_args)
+                                   // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                                   std::uint32_t batch_size, KwArgs &&...kw_args)
         : taylor_adaptive_batch(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+#if !defined(_MSC_VER) || defined(__clang__)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::uint32_t batch_size,
-                                   const KwArgs &...kw_args)
+                                   // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                                   KwArgs &&...kw_args)
         : taylor_adaptive_batch(std::move(sys), std::vector<T>{}, batch_size, kw_args...)
     {
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+#if !defined(_MSC_VER) || defined(__clang__)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
-                                   const KwArgs &...kw_args)
+                                   // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                                   KwArgs &&...kw_args)
         : taylor_adaptive_batch(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-    explicit taylor_adaptive_batch(var_ode_sys sys, std::uint32_t batch_size, const KwArgs &...kw_args)
+#if !defined(_MSC_VER) || defined(__clang__)
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::uint32_t batch_size, KwArgs &&...kw_args)
         : taylor_adaptive_batch(std::move(sys), std::vector<T>{}, batch_size, kw_args...)
     {
     }
@@ -1030,6 +1021,7 @@ public:
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
                  && std::integral<std::ranges::range_size_t<R>>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
@@ -1048,11 +1040,12 @@ private:
     // Implementations of the propagate_*() functions.
 
     // NOTE: the argument to the propagate_until_impl() function can be one of these:
+    //
     // - single scalar value,
     // - vector of values,
     // - vector of double-length values.
-    // NOTE: the third case can occur only if propagate_until() is being called
-    // from propagate_for().
+    //
+    // NOTE: the third case can occur only if propagate_until() is being called from propagate_for().
     using puntil_arg_t = std::variant<T, std::reference_wrapper<const std::vector<T>>,
                                       std::reference_wrapper<const std::vector<detail::dfloat<T>>>>;
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
@@ -1069,12 +1062,18 @@ private:
     propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>);
 
 public:
+    // kwargs configuration for the propagate_*() functions.
+    static constexpr auto propagate_grid_kw_cfg = detail::tab_propagate_common_kw_cfg<T, false>;
+    static constexpr auto propagate_for_until_kw_cfg = propagate_grid_kw_cfg | detail::ta_propagate_for_until_kw_cfg;
+
     // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always
     // only and immediately used to set up the internal m_pfor_ts member (which is not visible
     // from outside). Hence, even if 'ts' aliases some public integrator data, it does not matter.
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_until(const std::vector<T> &ts, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
@@ -1082,8 +1081,10 @@ public:
         return propagate_until_impl(ts, max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_until(T t, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
@@ -1091,8 +1092,10 @@ public:
         return propagate_until_impl(std::move(t), max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_for(const std::vector<T> &delta_ts, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
@@ -1100,8 +1103,10 @@ public:
         return propagate_for_impl(delta_ts, max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
+        requires igor::validate<propagate_for_until_kw_cfg, KwArgs...>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_for(T delta_t, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
@@ -1111,7 +1116,9 @@ public:
     // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
     // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
-    std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
+        requires igor::validate<propagate_grid_kw_cfg, KwArgs...>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb]
             = detail::taylor_propagate_common_ops_batch<T, true, false>(get_batch_size(), kw_args...);
@@ -1125,11 +1132,11 @@ public:
 template <typename T, typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
 explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, std::uint32_t,
-                               const KwArgs &...) -> taylor_adaptive_batch<T>;
+                               KwArgs &&...) -> taylor_adaptive_batch<T>;
 
 template <typename T, typename... KwArgs>
     requires(!igor::has_unnamed_arguments<KwArgs...>())
-explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, const KwArgs &...)
+explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, KwArgs &&...)
     -> taylor_adaptive_batch<T>;
 
 // Prevent implicit instantiations.
