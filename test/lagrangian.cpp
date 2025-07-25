@@ -126,8 +126,8 @@ TEST_CASE("two body problem")
                    + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
 
     const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
-    auto ics1 = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
-    auto ics2 = {-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
+    auto ics1 = std::vector{-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
+    auto ics2 = std::vector{-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
 
     auto ta1 = taylor_adaptive{sys1, ics1};
     auto ta2 = taylor_adaptive{model::nbody(2), ics2};
