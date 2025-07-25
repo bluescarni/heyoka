@@ -118,7 +118,7 @@ TEST_CASE("two body problem")
                    + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
 
     const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
-    auto ics = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
+    auto ics = std::vector{-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
 
     auto H = px0 * px0 + py0 * py0 + pz0 * pz0 + px1 * px1 + py1 * py1 + pz1 * pz1
              - subs(L, {{vx0, px0}, {vy0, py0}, {vz0, pz0}, {vx1, px1}, {vy1, py1}, {vz1, pz1}});
