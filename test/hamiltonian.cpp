@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/hamiltonian.hpp>
@@ -43,7 +44,7 @@ TEST_CASE("pendulum")
 
     auto ics1 = {0.1, m * lval * lval * 0.2};
     auto ics2 = {0.1, 0.2};
-    auto par_vals = {lval, 3.4};
+    auto par_vals = std::vector{lval, 3.4};
 
     auto ta1 = taylor_adaptive{sys1, ics1, kw::pars = par_vals};
     auto ta2 = taylor_adaptive{sys2, ics2, kw::pars = par_vals};
@@ -75,7 +76,7 @@ TEST_CASE("driven pendulum")
     const auto L = 0.5 * M * b * b * v * v + M * b * v * a * om * cos(x) * cos(om * heyoka::time)
                    + 0.5 * M * a * a * om * om * cos(om * heyoka::time) * cos(om * heyoka::time) + M * g * b * cos(x);
 
-    const auto par_vals = {Mval, bval, aval, omval, .5};
+    const auto par_vals = std::vector{Mval, bval, aval, omval, .5};
 
     const auto sys1 = lagrangian(L, {x}, {v});
 

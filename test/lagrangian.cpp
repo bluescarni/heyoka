@@ -11,6 +11,7 @@
 #include <numeric>
 #include <ranges>
 #include <stdexcept>
+#include <vector>
 
 #include <boost/math/constants/constants.hpp>
 
@@ -71,7 +72,7 @@ TEST_CASE("driven pendulum")
     const auto L = 0.5 * M * b * b * v * v + M * b * v * a * om * cos(x) * cos(om * heyoka::time)
                    + 0.5 * M * a * a * om * om * cos(om * heyoka::time) * cos(om * heyoka::time) + M * g * b * cos(x);
 
-    const auto par_vals = {.1, .2, .3, .4, .5};
+    const auto par_vals = std::vector{.1, .2, .3, .4, .5};
 
     const auto sys1 = lagrangian(L, {x}, {v});
     auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
@@ -100,7 +101,7 @@ TEST_CASE("damped oscillator")
     const auto L = 0.5 * m * v * v - 0.5 * k * x * x;
     const auto D = 0.5 * b * v * v;
 
-    const auto par_vals = {.1, .2, .3};
+    const auto par_vals = std::vector{.1, .2, .3};
 
     const auto sys1 = lagrangian(L, {x}, {v}, D);
     auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
