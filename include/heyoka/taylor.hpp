@@ -483,8 +483,14 @@ public:
 
     // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
     // be reused in other invocations.
+    //
+    // NOTE: it looks like there is an MSVC bug when CTAD and concepts interact - the compiler complains that the
+    // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
+    // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
         requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                              // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
                              KwArgs &&...kw_args)
@@ -493,14 +499,18 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
         requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, KwArgs &&...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
     {
     }
     template <typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
         requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
@@ -508,7 +518,9 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
         requires igor::validate<ctor_kw_cfg, KwArgs...>
+#endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     explicit taylor_adaptive(var_ode_sys sys, KwArgs &&...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>{}, kw_args...)
@@ -667,12 +679,16 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
+#endif
 explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, KwArgs &&...)
     -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
+#if !defined(_MSC_VER) || defined(__clang__)
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
+#endif
 explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, KwArgs &&...) -> taylor_adaptive<T>;
 
 // Prevent implicit instantiations.
