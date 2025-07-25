@@ -56,7 +56,7 @@ rot_icrs_itrs_impl(const std::array<expression, 3> &, const expression &, double
 template <typename... KwArgs>
 auto itrs_icrs_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() -> expression {

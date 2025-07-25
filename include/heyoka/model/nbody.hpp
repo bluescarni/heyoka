@@ -32,7 +32,7 @@ namespace detail
 template <typename... KwArgs>
 auto nbody_common_opts(std::uint32_t n, const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(),
                   "Unnamed arguments cannot be passed in the variadic pack to this function.");

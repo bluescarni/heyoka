@@ -141,7 +141,7 @@ llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, c
 template <typename... KwArgs>
 auto eop_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
 

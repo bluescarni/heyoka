@@ -38,7 +38,7 @@ inline constexpr double egm2008_default_a = 6378136.3;
 template <typename... KwArgs>
 auto egm2008_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Gravitational parameter.
     auto mu = [&p]() -> expression {

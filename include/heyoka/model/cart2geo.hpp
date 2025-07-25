@@ -37,7 +37,7 @@ inline constexpr auto b_earth = 6356752.314245;
 template <bool WithNIters, typename... KwArgs>
 auto cart2geo_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
 

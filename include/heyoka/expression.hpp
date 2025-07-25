@@ -512,7 +512,7 @@ template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Order of derivatives. Defaults to 1.
     const auto order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order, 1));
@@ -650,7 +650,7 @@ inline constexpr auto cfunc_common_opts_kw_cfg
 template <typename T, typename... KwArgs>
 auto cfunc_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // High accuracy mode (defaults to false).
     const auto high_accuracy = p(kw::high_accuracy, false);
@@ -689,7 +689,7 @@ template <typename T, typename... KwArgs>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
                                   const std::vector<expression> &vars, const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Batch size (defaults to 1).
     const auto batch_size = boost::numeric_cast<std::uint32_t>(p(kw::batch_size, 1));
@@ -745,7 +745,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
     template <typename... KwArgs>
     static auto parse_ctor_opts(const KwArgs &...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Common options.
         const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
@@ -862,7 +862,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void operator()(Out &&out, In &&in, KwArgs &&...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         out_1d oput = [&]() {
             if constexpr (std::same_as<out_1d, std::remove_cvref_t<Out>>) {
@@ -930,7 +930,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void operator()(out_2d out, in_2d in, KwArgs &&...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         auto pars = [&]() -> std::optional<in_2d> {
             if constexpr (p.has(kw::pars)) {

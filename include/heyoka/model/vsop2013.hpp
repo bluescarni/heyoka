@@ -33,7 +33,7 @@ namespace detail
 template <typename... KwArgs>
 auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() -> expression {

@@ -188,7 +188,7 @@ inline constexpr auto ta_common_kw_cfg
 template <typename T, typename... KwArgs>
 auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // High accuracy mode (defaults to false).
     const auto high_accuracy = p(kw::high_accuracy, false);
@@ -284,7 +284,7 @@ inline constexpr auto ta_propagate_for_until_kw_cfg
 template <typename T, bool Grid, typename... KwArgs>
 auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Max number of steps (defaults to zero).
     const auto max_steps = boost::numeric_cast<std::size_t>(p(kw::max_steps, 0));
@@ -413,7 +413,7 @@ private:
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, const KwArgs &...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Parse the common options.
         auto [high_accuracy, tol, compact_mode, pars, parallel_mode, parjit]
@@ -726,7 +726,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
         static_assert(always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
@@ -867,7 +867,7 @@ private:
     template <typename... KwArgs>
     void finalise_ctor(sys_t sys, std::vector<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         if constexpr (p.has_unnamed_arguments()) {
             static_assert(detail::always_false_v<KwArgs...>,

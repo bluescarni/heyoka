@@ -35,7 +35,7 @@ namespace detail
 template <typename... KwArgs>
 auto ffnn_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
 

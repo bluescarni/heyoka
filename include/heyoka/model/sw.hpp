@@ -86,7 +86,7 @@ llvm_get_sw_func(llvm_state &, llvm::Type *, std::uint32_t, const sw_data &, con
 template <typename... KwArgs>
 auto sw_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() {

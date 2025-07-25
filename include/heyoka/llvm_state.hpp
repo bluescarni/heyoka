@@ -184,7 +184,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename... KwArgs>
     static auto kw_args_ctor_impl(const KwArgs &...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Module name (defaults to empty string).
         auto mod_name = [&p]() -> std::string {

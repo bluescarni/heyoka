@@ -101,7 +101,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
             }
         }
 
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Differentiation order (defaults to zero, no derivatives).
         const auto order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order, 0));

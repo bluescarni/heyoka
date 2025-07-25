@@ -87,7 +87,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Callback (defaults to empty).
         callback_t cb = p(kw::callback, callback_t{});
@@ -172,7 +172,7 @@ public:
     explicit nt_event_impl(expression e, callback_t cb, const KwArgs &...kw_args)
         : eq(std::move(e)), callback(std::move(cb))
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Direction (defaults to any).
         const auto d = p(kw::direction, event_direction::any);
