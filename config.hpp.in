@@ -113,4 +113,18 @@
 
 #endif
 
+// Setup of the "no dangling" attribute. We use this to quench false positives in GCC. See:
+//
+// https://gcc.gnu.org/onlinedocs/gcc-14.1.0/gcc/C_002b_002b-Attributes.html#index-no_005fdangling-type-attribute
+
+#if __GNUC__ >= 14
+
+#define HEYOKA_NO_DANGLING [[gnu::no_dangling]]
+
+#else
+
+#define HEYOKA_NO_DANGLING
+
+#endif
+
 #endif
