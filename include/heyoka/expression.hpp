@@ -373,6 +373,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::map<expression, expression> &);
 
+// NOLINTNEXTLINE(performance-enum-size)
 enum class diff_args { vars, params, all };
 
 // Fwd declaration.
@@ -507,27 +508,22 @@ struct formatter<heyoka::dtens> : fmt::ostream_formatter {
 HEYOKA_BEGIN_NAMESPACE
 
 template <typename... KwArgs>
-    requires igor::validate<
-        igor::config<
-            igor::descr<kw::diff_order, []<typename T>() { return std::integral<std::remove_cvref_t<T>>; }>{}>{},
-        KwArgs...>
+    requires igor::validate<igor::config<kw::descr::integral<kw::diff_order>>{}, KwArgs...>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     // Order of derivatives. Defaults to 1.
-    std::uint32_t order = 1;
-    if constexpr (p.has(kw::diff_order)) {
-        order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
-    }
+    const auto order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order, 1));
 
     return detail::diff_tensors(v_ex, d_args, order);
 }
 
 template <typename... KwArgs>
-auto diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
-                  const KwArgs &...kw_args) -> decltype(diff_tensors(v_ex, std::vector(d_args), kw_args...))
+    requires igor::validate<igor::config<kw::descr::integral<kw::diff_order>>{}, KwArgs...>
+dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
+                   const KwArgs &...kw_args)
 {
     return diff_tensors(v_ex, std::vector(d_args), kw_args...);
 }
@@ -646,11 +642,9 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 //
 // NOTE: here we are making sure that we accept only builtin types for the kw_args. This makes the set of kw_args
 // re-usable across several invocations.
-inline constexpr auto cfunc_common_opts_kw_cfg = igor::config<
-    igor::descr<kw::high_accuracy, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::compact_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::parallel_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::prec, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+inline constexpr auto cfunc_common_opts_kw_cfg
+    = igor::config<kw::descr::boolean<kw::high_accuracy>, kw::descr::boolean<kw::compact_mode>,
+                   kw::descr::boolean<kw::parallel_mode>, kw::descr::integral<kw::prec>>{};
 
 // Common options for add_cfunc() and the cfunc constructor.
 template <typename T, typename... KwArgs>
@@ -659,45 +653,22 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     igor::parser p{kw_args...};
 
     // High accuracy mode (defaults to false).
-    const auto high_accuracy = [&p]() {
-        if constexpr (p.has(kw::high_accuracy)) {
-            return p(kw::high_accuracy);
-        } else {
-            return false;
-        }
-    }();
+    const auto high_accuracy = p(kw::high_accuracy, false);
 
     // Compact mode (defaults to false, except for real where it defaults to true).
-    const auto compact_mode = [&p]() {
-        if constexpr (p.has(kw::compact_mode)) {
-            return p(kw::compact_mode);
-        } else {
+    const auto compact_mode = p(kw::compact_mode,
 #if defined(HEYOKA_HAVE_REAL)
-            return std::same_as<T, mppp::real>;
+                                std::same_as<T, mppp::real>
 #else
-            return false;
-
+                                false
 #endif
-        }
-    }();
+    );
 
     // Parallel mode (defaults to false).
-    const auto parallel_mode = [&p]() {
-        if constexpr (p.has(kw::parallel_mode)) {
-            return p(kw::parallel_mode);
-        } else {
-            return false;
-        }
-    }();
+    const auto parallel_mode = p(kw::parallel_mode, false);
 
     // Precision (defaults to zero).
-    const auto prec = [&p]() {
-        if constexpr (p.has(kw::prec)) {
-            return boost::numeric_cast<long long>(p(kw::prec));
-        } else {
-            return 0ll;
-        }
-    }();
+    const auto prec = boost::numeric_cast<long long>(p(kw::prec, 0));
 
     return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
 }
@@ -709,10 +680,7 @@ make_multi_cfunc(llvm_state, const std::string &, const std::vector<expression> 
 
 // kwargs configuration for add_cfunc().
 inline constexpr auto add_cfunc_kw_cfg
-    = cfunc_common_opts_kw_cfg
-      | igor::config<
-          igor::descr<kw::batch_size, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
-          igor::descr<kw::strided, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+    = cfunc_common_opts_kw_cfg | igor::config<kw::descr::integral<kw::batch_size>, kw::descr::boolean<kw::strided>>{};
 
 } // namespace detail
 
@@ -724,27 +692,13 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
     igor::parser p{kw_args...};
 
     // Batch size (defaults to 1).
-    const auto batch_size = [&]() -> std::uint32_t {
-        if constexpr (p.has(kw::batch_size)) {
-            return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
-        } else {
-            return 1;
-        }
-    }();
+    const auto batch_size = boost::numeric_cast<std::uint32_t>(p(kw::batch_size, 1));
 
     // Strided mode (defaults to false).
-    const auto strided = [&p]() {
-        if constexpr (p.has(kw::strided)) {
-            return p(kw::strided);
-        } else {
-            return false;
-        }
-    }();
+    const auto strided = p(kw::strided, false);
 
     // Common options.
-    const auto [high_accuracy, compact_mode, parallel_mode, prec]
-        = std::apply([](const auto &...args) { return detail::cfunc_common_opts<T>(args...); },
-                     igor::filter_named_arguments<detail::cfunc_common_opts_kw_cfg>(kw_args...));
+    const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
 
     return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
                                 strided);
@@ -794,13 +748,11 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
         igor::parser p{kw_args...};
 
         // Common options.
-        const auto [high_accuracy, compact_mode, parallel_mode, prec]
-            = std::apply([](const auto &...args) { return detail::cfunc_common_opts<T>(args...); },
-                         igor::filter_named_arguments<detail::cfunc_common_opts_kw_cfg>(kw_args...));
+        const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
 
         // Batch size: defaults to undefined.
-        // NOTE: we want to handle this slightly different from add_cfunc(), thus it does
-        // not go in common options.
+        //
+        // NOTE: we want to handle this slightly different from add_cfunc(), thus it does not go in common options.
         const auto batch_size = [&]() -> std::optional<std::uint32_t> {
             if constexpr (p.has(kw::batch_size)) {
                 return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
@@ -810,26 +762,14 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
         }();
 
         // Precision checking for mppp::real. Defaults to true.
-        const auto check_prec = [&p]() {
-            if constexpr (p.has(kw::check_prec)) {
-                return p(kw::check_prec);
-            } else {
-                return true;
-            }
-        }();
+        const auto check_prec = p(kw::check_prec, true);
 
         // Parallel JIT compilation.
-        const auto parjit = [&p]() {
-            if constexpr (p.has(kw::parjit)) {
-                return p(kw::parjit);
-            } else {
-                return detail::default_parjit;
-            }
-        }();
+        const auto parjit = p(kw::parjit, detail::default_parjit);
 
         // Build the template llvm_state from the keyword arguments.
-        auto s = std::apply([](const auto &...args) { return llvm_state(args...); },
-                            igor::filter_named_arguments<llvm_state::kw_cfg>(kw_args...));
+        auto s = igor::filter_invoke<llvm_state::kw_cfg>([](const auto &...args) { return llvm_state(args...); },
+                                                         kw_args...);
 
         return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec,
                                parjit);
@@ -854,10 +794,8 @@ public:
     // NOTE: the constraints on the keyword arguments ensure we can use them in multiple invocations.
     static constexpr auto ctor_kw_cfg
         = detail::cfunc_common_opts_kw_cfg | llvm_state::kw_cfg
-          | igor::config<
-              igor::descr<kw::batch_size, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
-              igor::descr<kw::check_prec, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-              igor::descr<kw::parjit, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+          | igor::config<kw::descr::integral<kw::batch_size>, kw::descr::boolean<kw::check_prec>,
+                         kw::descr::boolean<kw::parjit>>{};
     template <typename... KwArgs>
         requires igor::validate<ctor_kw_cfg, KwArgs...>
     explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
@@ -914,7 +852,7 @@ private:
                                        return std::same_as<in_1d, std::remove_cvref_t<U>>
                                               || detail::cfunc_in_range_1d<T, U>;
                                    }>{},
-                       igor::descr<kw::time, []<typename U>() { return std::convertible_to<U, T>; }>{}>{};
+                       kw::descr::convertible_to<kw::time, T>>{};
 
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
@@ -956,8 +894,7 @@ public:
                 if constexpr (std::same_as<in_1d, std::remove_cvref_t<pars_t>>) {
                     return p(kw::pars);
                 } else {
-                    // NOTE: as usual, we don't want to perfectly forward ranges, hence,
-                    // turn it into an lvalue.
+                    // NOTE: as usual, we don't want to perfectly forward ranges, hence, turn it into an lvalue.
                     auto &&pars = p(kw::pars);
 
                     return in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))};
@@ -987,9 +924,8 @@ private:
     void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
 
     // kwargs configuration for the call operator, multi evaluation overload.
-    static constexpr auto multi_eval_kw_cfg = igor::config<
-        igor::descr<kw::pars, []<typename U>() { return std::same_as<in_2d, std::remove_cvref_t<U>>; }>{},
-        igor::descr<kw::time, []<typename U>() { return std::same_as<in_1d, std::remove_cvref_t<U>>; }>{}>{};
+    static constexpr auto multi_eval_kw_cfg
+        = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>>{};
 
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.

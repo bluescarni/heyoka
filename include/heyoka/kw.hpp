@@ -9,6 +9,9 @@
 #ifndef HEYOKA_KW_HPP
 #define HEYOKA_KW_HPP
 
+#include <concepts>
+#include <type_traits>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 
@@ -109,6 +112,30 @@ IGOR_MAKE_NAMED_ARGUMENT(thresh);
 IGOR_MAKE_NAMED_ARGUMENT(eop_data);
 IGOR_MAKE_NAMED_ARGUMENT(sw_data);
 IGOR_MAKE_NAMED_ARGUMENT(a);
+
+// NOTE: this namespace contains several commonly-used descriptors.
+namespace descr
+{
+
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto same_as
+    = igor::descr<NArg, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, T>; }>{};
+
+template <auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto boolean = same_as<NArg, bool>;
+
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto convertible_to = igor::descr<NArg, []<typename U>() { return std::convertible_to<U, T>; }>{};
+
+template <auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto integral
+    = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{};
+
+} // namespace descr
 
 } // namespace kw
 

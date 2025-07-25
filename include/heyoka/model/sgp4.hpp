@@ -18,7 +18,6 @@
 #include <span>
 #include <stdexcept>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -105,10 +104,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         igor::parser p{kw_args...};
 
         // Differentiation order (defaults to zero, no derivatives).
-        std::uint32_t order = 0;
-        if constexpr (p.has(kw::diff_order)) {
-            order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
-        }
+        const auto order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order, 0));
 
         // Build the functions to be compiled.
         auto funcs = detail::sgp4_build_funcs(order);
@@ -122,19 +118,19 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         // and concurrent usages.
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
-            [&]() {
-                cf_init = std::apply(
-                    [&](const auto &...args) {
+            [&cf_init, &funcs, &kw_args...]() {
+                cf_init = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
+                    [&funcs](const auto &...args) {
                         return cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), args...);
                     },
-                    igor::filter_named_arguments<cfunc<T>::ctor_kw_cfg>(kw_args...));
+                    kw_args...);
             },
-            [&]() {
-                cf_prop = std::apply(
-                    [&](const auto &...args) {
+            [&cf_prop, &funcs, &kw_args...]() {
+                cf_prop = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
+                    [&funcs](const auto &...args) {
                         return cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), args...);
                     },
-                    igor::filter_named_arguments<cfunc<T>::ctor_kw_cfg>(kw_args...));
+                    kw_args...);
             });
 
         return std::make_tuple(std::move(sat_buffer), std::move(cf_init), std::move(cf_prop), std::move(funcs.dt));
@@ -155,10 +151,7 @@ public:
     sgp4_propagator() noexcept;
 
     // kwargs configuration for the constructor.
-    static constexpr auto ctor_kw_cfg
-        = cfunc<T>::ctor_kw_cfg
-          | igor::config<
-              igor::descr<kw::diff_order, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+    static constexpr auto ctor_kw_cfg = cfunc<T>::ctor_kw_cfg | igor::config<kw::descr::integral<kw::diff_order>>{};
 
     // NOTE: the GPE data is expected as a 9 x n span, where n is the number of satellites
     // and the rows represent:

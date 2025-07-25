@@ -209,9 +209,9 @@ struct is_any_named_argument<named_argument<Tag, ExplicitType>> : std::true_type
 
 } // namespace detail
 
-// Concept to detect cv-qualified named arguments.
+// Concept to detect (const) named arguments.
 template <auto NA>
-concept any_named_argument_cv = detail::is_any_named_argument<std::remove_const_t<decltype(NA)>>::value;
+concept any_named_argument = detail::is_any_named_argument<std::remove_const_t<decltype(NA)>>::value;
 
 namespace detail
 {
@@ -231,7 +231,7 @@ concept valid_descr_validator = requires {
 };
 
 template <auto NA, auto Validator = []<typename>() { return true; }>
-    requires any_named_argument_cv<NA>
+    requires any_named_argument<NA>
 struct descr {
     // Configuration options.
     bool required = false;
@@ -261,9 +261,9 @@ struct is_any_descr<descr<NA, Validator>> : std::true_type {
 
 } // namespace detail
 
-// Concept to detect cv-qualified descriptors.
+// Concept to detect (const) descriptors.
 template <auto Descr>
-concept any_descr_cv = detail::is_any_descr<std::remove_const_t<decltype(Descr)>>::value;
+concept any_descr = detail::is_any_descr<std::remove_const_t<decltype(Descr)>>::value;
 
 namespace detail
 {
@@ -289,7 +289,7 @@ concept no_duplicate_descrs = detail::no_duplicate_descrs_impl(Descrs...);
 
 // Configuration structure for named arguments validation.
 template <auto... Descrs>
-    requires(sizeof...(Descrs) > 0u) && (... && any_descr_cv<Descrs>) && no_duplicate_descrs<Descrs...>
+    requires(sizeof...(Descrs) > 0u) && (... && any_descr<Descrs>) && no_duplicate_descrs<Descrs...>
 struct config {
     // Config options.
     bool allow_unnamed = false;
@@ -308,9 +308,9 @@ template <auto... Descrs>
 struct is_any_config<config<Descrs...>> : std::true_type {
 };
 
-// Concept to detect a cv qualified instance of the config class.
+// Concept to detect (const) instances of the config class.
 template <auto Cfg>
-concept any_config_cv = is_any_config<std::remove_const_t<decltype(Cfg)>>::value;
+concept any_config = is_any_config<std::remove_const_t<decltype(Cfg)>>::value;
 
 template <auto Cfg, typename... Args>
 concept validate_unnamed_arguments = (Cfg.allow_unnamed) || (any_tagged_ref<std::remove_cvref_t<Args>> && ...);
@@ -451,7 +451,7 @@ struct validate_named_arguments<config<Descrs...>> {
 template <auto Cfg, typename... Args>
 concept validate = requires {
     // Step 0: check that Cfg is a config instance.
-    requires detail::any_config_cv<Cfg>;
+    requires detail::any_config<Cfg>;
     // Step 1: validate the unnamed arguments.
     requires detail::validate_unnamed_arguments<Cfg, Args...>;
     // Step 2: check that there are no duplicate named arguments in Args.
@@ -565,8 +565,8 @@ consteval bool has_duplicates()
 //
 // The result is returned as a tuple of perfectly-forwarded references.
 template <auto... NArgs, typename... Args>
-    requires(any_named_argument_cv<NArgs> && ...)
-constexpr auto reject_named_arguments(Args &&...args)
+    requires(any_named_argument<NArgs> && ...)
+constexpr auto reject(Args &&...args)
 {
     [[maybe_unused]] auto filter = []<typename T>(T &&x) {
         using Tu = std::remove_cvref_t<T>;
@@ -594,9 +594,9 @@ struct reject_na_from_cfg;
 template <auto... Descrs>
 struct reject_na_from_cfg<config<Descrs...>> {
     template <typename... Args>
-    static constexpr auto run_reject_named_arguments(Args &&...args)
+    static constexpr auto run_reject(Args &&...args)
     {
-        return reject_named_arguments<Descrs.na...>(std::forward<Args>(args)...);
+        return reject<Descrs.na...>(std::forward<Args>(args)...);
     }
 };
 
@@ -604,20 +604,19 @@ struct reject_na_from_cfg<config<Descrs...>> {
 
 // Same as the previous overload, except that the named arguments to reject are deduced from the input config.
 template <auto Cfg, typename... Args>
-    requires(detail::any_config_cv<Cfg>)
-constexpr auto reject_named_arguments(Args &&...args)
+    requires(detail::any_config<Cfg>)
+constexpr auto reject(Args &&...args)
 {
     // Need to go through an auxiliary struct in order to recover the pack of descriptors.
-    return detail::reject_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_reject_named_arguments(
-        std::forward<Args>(args)...);
+    return detail::reject_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_reject(std::forward<Args>(args)...);
 }
 
 // Remove from the set of variadic arguments args the named arguments *other than* NArgs.
 //
 // The result is returned as a tuple of perfectly-forwarded references.
 template <auto... NArgs, typename... Args>
-    requires(any_named_argument_cv<NArgs> && ...)
-constexpr auto filter_named_arguments(Args &&...args)
+    requires(any_named_argument<NArgs> && ...)
+constexpr auto filter(Args &&...args)
 {
     [[maybe_unused]] auto filter = []<typename T>(T &&x) {
         using Tu = std::remove_cvref_t<T>;
@@ -645,9 +644,9 @@ struct filter_na_from_cfg;
 template <auto... Descrs>
 struct filter_na_from_cfg<config<Descrs...>> {
     template <typename... Args>
-    static constexpr auto run_filter_named_arguments(Args &&...args)
+    static constexpr auto run_filter(Args &&...args)
     {
-        return filter_named_arguments<Descrs.na...>(std::forward<Args>(args)...);
+        return filter<Descrs.na...>(std::forward<Args>(args)...);
     }
 };
 
@@ -655,12 +654,46 @@ struct filter_na_from_cfg<config<Descrs...>> {
 
 // Same as the previous overload, except that the named arguments to filter are deduced from the input config.
 template <auto Cfg, typename... Args>
-    requires(detail::any_config_cv<Cfg>)
-constexpr auto filter_named_arguments(Args &&...args)
+    requires(detail::any_config<Cfg>)
+constexpr auto filter(Args &&...args)
 {
     // Need to go through an auxiliary struct in order to recover the pack of descriptors.
-    return detail::filter_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_filter_named_arguments(
-        std::forward<Args>(args)...);
+    return detail::filter_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_filter(std::forward<Args>(args)...);
+}
+
+namespace detail
+{
+
+// Type trait to detect if a function object can be invoked with the elements of a tuple as arguments.
+template <typename, typename>
+struct tuple_invocable;
+
+template <typename F, typename... Args>
+struct tuple_invocable<F, std::tuple<Args...>> : std::is_invocable<F, Args...> {
+};
+
+} // namespace detail
+
+// Reject named arguments from the set of variadic arguments args and invoke F on the result.
+template <auto... CfgOrNArgs, typename F, typename... Args>
+    requires requires {
+        reject<CfgOrNArgs...>(std::declval<Args>()...);
+        requires detail::tuple_invocable<F, decltype(reject<CfgOrNArgs...>(std::declval<Args>()...))>::value;
+    }
+constexpr decltype(auto) reject_invoke(F &&f, Args &&...args)
+{
+    return std::apply(std::forward<F>(f), reject<CfgOrNArgs...>(std::forward<Args>(args)...));
+}
+
+// Filter named arguments from the set of variadic arguments args and invoke F on the result.
+template <auto... CfgOrNArgs, typename F, typename... Args>
+    requires requires {
+        filter<CfgOrNArgs...>(std::declval<Args>()...);
+        requires detail::tuple_invocable<F, decltype(filter<CfgOrNArgs...>(std::declval<Args>()...))>::value;
+    }
+constexpr decltype(auto) filter_invoke(F &&f, Args &&...args)
+{
+    return std::apply(std::forward<F>(f), filter<CfgOrNArgs...>(std::forward<Args>(args)...));
 }
 
 namespace detail
@@ -686,7 +719,11 @@ constexpr auto parser_ctor_impl(const auto &...args)
 } // namespace detail
 
 // Parser for named arguments in a function call.
+//
+// NOTE: the template arguments are intended to always be deduced via the constructor and never explicitly passed. Thus,
+// they should never end up being cvref-qualified.
 template <typename... ParseArgs>
+    requires(std::same_as<ParseArgs, std::remove_cvref_t<ParseArgs>> && ...)
 class parser
 {
     using tuple_t = decltype(detail::parser_ctor_impl(std::declval<const ParseArgs &>()...));
@@ -731,6 +768,22 @@ public:
             return this->fetch_one_impl<0>(nargs...);
         } else {
             return std::forward_as_tuple(this->fetch_one_impl<0>(nargs)...);
+        }
+    }
+    // Get a reference to the value associated to the input named argument, if present, otherwise return a default
+    // value. The default value is returned as a new object constructed from perfectly forwarding 'def'.
+    //
+    // NOTE: T cannot be a named argument, otherwise this will be an ambiguous overload with the other call operator.
+    template <typename Tag, typename ExplicitType, typename T>
+        requires(!detail::is_any_named_argument<std::remove_cvref_t<T>>::value)
+                && std::constructible_from<std::remove_cvref_t<T>, T &&>
+    constexpr decltype(auto) operator()(const named_argument<Tag, ExplicitType> &narg, T &&def) const
+    {
+        // NOTE: this condition is equivalent to invoking has().
+        if constexpr ((... || detail::is_tagged_ref<Tag, ParseArgs>::value)) {
+            return this->fetch_one_impl<0>(narg);
+        } else {
+            return std::remove_cvref_t<T>(std::forward<T>(def));
         }
     }
     // Check if the input named argument na is present in the parser.

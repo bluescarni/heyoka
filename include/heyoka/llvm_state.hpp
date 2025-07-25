@@ -204,49 +204,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
         }();
 
         // Optimisation level (defaults to 3).
-        const auto opt_level = clamp_opt_level([&p]() {
-            if constexpr (p.has(kw::opt_level)) {
-                return boost::numeric_cast<unsigned>(p(kw::opt_level));
-            } else {
-                return 3u;
-            }
-        }());
+        const auto opt_level = clamp_opt_level(boost::numeric_cast<unsigned>(p(kw::opt_level, 3)));
 
         // Fast math flag (defaults to false).
-        const auto fmath = [&p]() {
-            if constexpr (p.has(kw::fast_math)) {
-                return p(kw::fast_math);
-            } else {
-                return false;
-            }
-        }();
+        const auto fmath = p(kw::fast_math, false);
 
         // Force usage of AVX512 registers (defaults to false).
-        const auto force_avx512 = [&p]() {
-            if constexpr (p.has(kw::force_avx512)) {
-                return p(kw::force_avx512);
-            } else {
-                return false;
-            }
-        }();
+        const auto force_avx512 = p(kw::force_avx512, false);
 
         // Enable SLP vectorization (defaults to false).
-        const auto slp_vectorize = [&p]() {
-            if constexpr (p.has(kw::slp_vectorize)) {
-                return p(kw::slp_vectorize);
-            } else {
-                return false;
-            }
-        }();
+        const auto slp_vectorize = p(kw::slp_vectorize, false);
 
         // Code model (defaults to small).
-        const auto c_model = [&p]() {
-            if constexpr (p.has(kw::code_model)) {
-                return p(kw::code_model);
-            } else {
-                return code_model::small;
-            }
-        }();
+        const auto c_model = p(kw::code_model, code_model::small);
         validate_code_model(c_model);
 
         return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize, c_model};
@@ -269,11 +239,8 @@ public:
     // the set of kw_args across multiple invocations.
     static constexpr auto kw_cfg = igor::config<
         igor::descr<kw::mname, []<typename U>() { return detail::string_like<std::remove_cvref_t<U>>; }>{},
-        igor::descr<kw::opt_level, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
-        igor::descr<kw::fast_math, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-        igor::descr<kw::force_avx512, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-        igor::descr<kw::slp_vectorize, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-        igor::descr<kw::code_model, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, code_model>; }>{}>{};
+        kw::descr::integral<kw::opt_level>, kw::descr::boolean<kw::fast_math>, kw::descr::boolean<kw::force_avx512>,
+        kw::descr::boolean<kw::slp_vectorize>, kw::descr::same_as<kw::code_model, code_model>>{};
 
     llvm_state();
     // NOTE: we require at least 1 kwarg in order to avoid competition with the default ctor.

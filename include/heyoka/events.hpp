@@ -46,6 +46,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Common descriptor used in the validation of keyword arguments for both terminal and non-terminal events.
+inline constexpr auto event_direction_descr = kw::descr::same_as<kw::direction, event_direction>;
+
 template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl
 {
@@ -70,12 +73,8 @@ private:
     void finalise_ctor(callback_t, T, event_direction);
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg
-        = igor::config<igor::descr<kw::callback, []<typename U>() { return std::convertible_to<U, callback_t>; }>{},
-                       igor::descr<kw::cooldown, []<typename U>() { return std::convertible_to<U, T>; }>{},
-                       igor::descr<kw::direction, []<typename U>() {
-                           return std::same_as<std::remove_cvref_t<U>, event_direction>;
-                       }>{}>{};
+    static constexpr auto kw_cfg = igor::config<kw::descr::convertible_to<kw::callback, callback_t>,
+                                                kw::descr::convertible_to<kw::cooldown, T>, event_direction_descr>{};
 
 public:
     t_event_impl();
@@ -91,31 +90,13 @@ public:
         igor::parser p{kw_args...};
 
         // Callback (defaults to empty).
-        auto cb = [&p]() -> callback_t {
-            if constexpr (p.has(kw::callback)) {
-                return p(kw::callback);
-            } else {
-                return {};
-            }
-        }();
+        callback_t cb = p(kw::callback, callback_t{});
 
         // Cooldown (defaults to -1).
-        auto cd = [&p]() -> T {
-            if constexpr (p.has(kw::cooldown)) {
-                return p(kw::cooldown);
-            } else {
-                return T(-1);
-            }
-        }();
+        T cd = p(kw::cooldown, -1);
 
         // Direction (defaults to any).
-        const auto d = [&p]() {
-            if constexpr (p.has(kw::direction)) {
-                return p(kw::direction);
-            } else {
-                return event_direction::any;
-            }
-        }();
+        const auto d = p(kw::direction, event_direction::any);
 
         finalise_ctor(std::move(cb), std::move(cd), d);
     }
@@ -181,9 +162,7 @@ private:
     void finalise_ctor(event_direction);
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg = igor::config<igor::descr<kw::direction, []<typename U>() {
-        return std::same_as<std::remove_cvref_t<U>, event_direction>;
-    }>{}>{};
+    static constexpr auto kw_cfg = igor::config<event_direction_descr>{};
 
 public:
     nt_event_impl();
@@ -196,13 +175,7 @@ public:
         igor::parser p{kw_args...};
 
         // Direction (defaults to any).
-        const auto d = [&p]() {
-            if constexpr (p.has(kw::direction)) {
-                return p(kw::direction);
-            } else {
-                return event_direction::any;
-            }
-        }();
+        const auto d = p(kw::direction, event_direction::any);
 
         finalise_ctor(d);
     }

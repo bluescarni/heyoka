@@ -178,13 +178,11 @@ concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T,
 
 // kwargs configuration for the common options of Taylor integrators.
 template <typename T>
-inline constexpr auto ta_common_kw_cfg = igor::config<
-    igor::descr<kw::high_accuracy, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::tol, []<typename U>() { return std::convertible_to<U, T>; }>{},
-    igor::descr<kw::compact_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::pars, []<typename U>() { return input_rangeT<U, T>; }>{},
-    igor::descr<kw::parallel_mode, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::parjit, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+inline constexpr auto ta_common_kw_cfg
+    = igor::config<kw::descr::boolean<kw::high_accuracy>, kw::descr::convertible_to<kw::tol, T>,
+                   kw::descr::boolean<kw::compact_mode>,
+                   igor::descr<kw::pars, []<typename U>() { return input_rangeT<U, T>; }>{},
+                   kw::descr::boolean<kw::parallel_mode>, kw::descr::boolean<kw::parjit>>{};
 
 // Helper for parsing common options when constructing Taylor integrators.
 template <typename T, typename... KwArgs>
@@ -193,13 +191,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     igor::parser p{kw_args...};
 
     // High accuracy mode (defaults to false).
-    const auto high_accuracy = [&p]() {
-        if constexpr (p.has(kw::high_accuracy)) {
-            return p(kw::high_accuracy);
-        } else {
-            return false;
-        }
-    }();
+    const auto high_accuracy = p(kw::high_accuracy, false);
 
     // tol (defaults to undefined). Zero tolerance is considered the same as undefined.
     auto tol = [&p]() -> std::optional<T> {
@@ -216,18 +208,13 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     }();
 
     // Compact mode (defaults to false, except for real where it defaults to true).
-    const auto compact_mode = [&p]() {
-        if constexpr (p.has(kw::compact_mode)) {
-            return p(kw::compact_mode);
-        } else {
+    const auto compact_mode = p(kw::compact_mode,
 #if defined(HEYOKA_HAVE_REAL)
-            return std::same_as<T, mppp::real>;
+                                std::same_as<T, mppp::real>
 #else
-            return false;
-
+                                false
 #endif
-        }
-    }();
+    );
 
     // Vector of parameters (defaults to empty vector).
     auto pars = [&p]() -> std::vector<T> {
@@ -239,22 +226,10 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     }();
 
     // Parallel mode (defaults to false).
-    const auto parallel_mode = [&p]() {
-        if constexpr (p.has(kw::parallel_mode)) {
-            return p(kw::parallel_mode);
-        } else {
-            return false;
-        }
-    }();
+    const auto parallel_mode = p(kw::parallel_mode, false);
 
     // Parallel JIT compilation.
-    const auto parjit = [&p]() {
-        if constexpr (p.has(kw::parjit)) {
-            return p(kw::parjit);
-        } else {
-            return default_parjit;
-        }
-    }();
+    const auto parjit = p(kw::parjit, default_parjit);
 
     return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode, parjit};
 }
@@ -296,16 +271,14 @@ Callback parse_propagate_cb(const Parser &p)
 // kwargs configuration for the common options of Taylor integrators.
 template <typename T>
 inline constexpr auto ta_propagate_common_kw_cfg
-    = igor::config<igor::descr<kw::max_steps, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{},
-                   igor::descr<kw::max_delta_t, []<typename U>() { return std::convertible_to<U, T>; }>{},
+    = igor::config<kw::descr::integral<kw::max_steps>, kw::descr::convertible_to<kw::max_delta_t, T>,
                    igor::descr<kw::callback, []<typename U>() {
                        return std::convertible_to<U, step_callback<T>> || input_rangeT<U, step_callback<T>>;
                    }>{}>{};
 
 // kwargs configuration specific to propagate_for/until().
-inline constexpr auto ta_propagate_for_until_kw_cfg = igor::config<
-    igor::descr<kw::write_tc, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{},
-    igor::descr<kw::c_output, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, bool>; }>{}>{};
+inline constexpr auto ta_propagate_for_until_kw_cfg
+    = igor::config<kw::descr::boolean<kw::write_tc>, kw::descr::boolean<kw::c_output>>{};
 
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
@@ -314,22 +287,10 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
     igor::parser p{kw_args...};
 
     // Max number of steps (defaults to zero).
-    const auto max_steps = [&p]() {
-        if constexpr (p.has(kw::max_steps)) {
-            return boost::numeric_cast<std::size_t>(p(kw::max_steps));
-        } else {
-            return 0uz;
-        }
-    }();
+    const auto max_steps = boost::numeric_cast<std::size_t>(p(kw::max_steps, 0));
 
     // Max delta_t (defaults to positive infinity).
-    auto max_delta_t = [&p]() -> T {
-        if constexpr (p.has(kw::max_delta_t)) {
-            return p(kw::max_delta_t);
-        } else {
-            return taylor_default_max_delta_t<T>();
-        }
-    }();
+    T max_delta_t = p(kw::max_delta_t, taylor_default_max_delta_t<T>());
 
     // Parse the callback argument.
     auto cb = parse_propagate_cb<step_callback<T>, step_callback_set<T>>(p);
@@ -338,22 +299,10 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
         return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
     } else {
         // Write the Taylor coefficients (defaults to false).
-        const auto write_tc = [&p]() {
-            if constexpr (p.has(kw::write_tc)) {
-                return p(kw::write_tc);
-            } else {
-                return false;
-            }
-        }();
+        const auto write_tc = p(kw::write_tc, false);
 
         // Continuous output (defaults to false).
-        const auto with_c_out = [&p]() {
-            if constexpr (p.has(kw::c_output)) {
-                return p(kw::c_output);
-            } else {
-                return false;
-            }
-        }();
+        const auto with_c_out = p(kw::c_output, false);
 
         return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
     }
@@ -406,8 +355,7 @@ void setup_variational_ics_t0(const llvm_state &, std::vector<T> &, const std::v
 template <typename... KwArgs>
 auto taylor_adaptive_build_llvm_state(const KwArgs &...kw_args)
 {
-    return std::apply([](const auto &...args) { return llvm_state(args...); },
-                      igor::filter_named_arguments<llvm_state::kw_cfg>(kw_args...));
+    return igor::filter_invoke<llvm_state::kw_cfg>([](const auto &...args) { return llvm_state(args...); }, kw_args...);
 }
 
 } // namespace detail
@@ -454,10 +402,10 @@ private:
     // kwargs configuration for finalise_ctor().
     static constexpr auto finalise_ctor_kw_cfg
         = detail::ta_common_kw_cfg<T>
-          | igor::config<igor::descr<kw::time, []<typename U>() { return std::convertible_to<U, T>; }>{},
+          | igor::config<kw::descr::convertible_to<kw::time, T>,
                          igor::descr<kw::t_events, []<typename U>() { return detail::input_rangeT<U, t_event_t>; }>{},
                          igor::descr<kw::nt_events, []<typename U>() { return detail::input_rangeT<U, nt_event_t>; }>{},
-                         igor::descr<kw::prec, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{}>{};
+                         kw::descr::integral<kw::prec>>{};
 
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
@@ -542,9 +490,7 @@ public:
                              KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        std::apply([this, &sys,
-                    &state](const auto &...args) { this->finalise_ctor(std::move(sys), std::move(state), args...); },
-                   igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
+        finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
         requires igor::validate<ctor_kw_cfg, KwArgs...>
@@ -559,9 +505,7 @@ public:
     explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, KwArgs &&...kw_args)
         : taylor_adaptive(private_ctor_t{}, detail::taylor_adaptive_build_llvm_state(kw_args...))
     {
-        std::apply([this, &sys,
-                    &state](const auto &...args) { this->finalise_ctor(std::move(sys), std::move(state), args...); },
-                   igor::filter_named_arguments<finalise_ctor_kw_cfg>(kw_args...));
+        finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
         requires igor::validate<ctor_kw_cfg, KwArgs...>
