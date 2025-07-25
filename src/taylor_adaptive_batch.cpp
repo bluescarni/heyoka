@@ -415,7 +415,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch()
-    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, 1u, kw::tol = static_cast<T>(1e-1))
+    : taylor_adaptive_batch(std::vector{prime("x"_var) = 0_dbl}, std::vector{static_cast<T>(0)}, 1u,
+                            kw::tol = static_cast<T>(1e-1))
 {
 }
 
