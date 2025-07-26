@@ -11,7 +11,9 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
 #include <limits>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -148,6 +150,11 @@ double get_fp_unit_cost();
 template <typename T>
 concept string_like = std::same_as<T, std::string> || std::same_as<T, std::string_view> || std::same_as<T, const char *>
                       || std::same_as<T, char *> || (std::is_array_v<T> && std::same_as<char, std::remove_extent_t<T>>);
+
+// Concept to detect if R is an input range from whose reference type instances of T can be constructed.
+template <typename R, typename T>
+concept constructible_input_range
+    = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
 
 } // namespace detail
 

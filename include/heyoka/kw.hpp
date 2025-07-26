@@ -14,6 +14,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
 
 // NOTE: all keyword arguments are gathered
 // in this file in order to make it easier to
@@ -139,6 +140,11 @@ template <auto NArg>
     requires igor::any_named_argument<NArg>
 inline constexpr auto integral
     = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{};
+
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto constructible_input_range
+    = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{};
 
 } // namespace descr
 

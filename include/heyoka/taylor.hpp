@@ -172,20 +172,11 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Concept to detect if R is an input range from whose reference type instances of T can be constructed.
-template <typename R, typename T>
-concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
-
-// Descriptor to validate named arguments which must satisfy input_rangeT.
-template <auto NArg, typename T>
-    requires igor::any_named_argument<NArg>
-inline constexpr auto input_rangeT_descr = igor::descr<NArg, []<typename U>() { return input_rangeT<U, T>; }>{};
-
 // kwargs configuration for the common options of Taylor integrators.
 template <typename T>
 inline constexpr auto ta_common_kw_cfg
     = igor::config<kw::descr::boolean<kw::high_accuracy>, kw::descr::convertible_to<kw::tol, T>,
-                   kw::descr::boolean<kw::compact_mode>, input_rangeT_descr<kw::pars, T>,
+                   kw::descr::boolean<kw::compact_mode>, kw::descr::constructible_input_range<kw::pars, T>,
                    kw::descr::boolean<kw::parallel_mode>, kw::descr::boolean<kw::parjit>>{};
 
 // Helper for parsing common options when constructing Taylor integrators.
@@ -257,7 +248,7 @@ Callback parse_propagate_cb(const Parser &p)
 
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
             return p(kw::callback);
-        } else if constexpr (input_rangeT<cb_arg_t, Callback>) {
+        } else if constexpr (constructible_input_range<cb_arg_t, Callback>) {
             return CallbackSet(ranges_to<std::vector<Callback>>(p(kw::callback)));
         } else {
             // LCOV_EXCL_START
@@ -277,7 +268,8 @@ template <typename T>
 inline constexpr auto ta_propagate_common_kw_cfg
     = igor::config<kw::descr::integral<kw::max_steps>, kw::descr::convertible_to<kw::max_delta_t, T>,
                    igor::descr<kw::callback, []<typename U>() {
-                       return std::convertible_to<U, step_callback<T>> || input_rangeT<U, step_callback<T>>;
+                       return std::convertible_to<U, step_callback<T>>
+                              || constructible_input_range<U, step_callback<T>>;
                    }>{}>{};
 
 // kwargs configuration specific to propagate_for/until().
@@ -406,8 +398,9 @@ private:
     // kwargs configuration for finalise_ctor().
     static constexpr auto finalise_ctor_kw_cfg
         = detail::ta_common_kw_cfg<T>
-          | igor::config<kw::descr::convertible_to<kw::time, T>, detail::input_rangeT_descr<kw::t_events, t_event_t>,
-                         detail::input_rangeT_descr<kw::nt_events, nt_event_t>, kw::descr::integral<kw::prec>>{};
+          | igor::config<
+              kw::descr::convertible_to<kw::time, T>, kw::descr::constructible_input_range<kw::t_events, t_event_t>,
+              kw::descr::constructible_input_range<kw::nt_events, nt_event_t>, kw::descr::integral<kw::prec>>{};
 
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
@@ -729,10 +722,12 @@ inline constexpr auto tab_propagate_common_kw_cfg
     = igor::config<kw::descr::integral<kw::max_steps>,
                    igor::descr<kw::max_delta_t,
                                []<typename U>() {
-                                   return std::convertible_to<U, T> || (!ForceScalarMaxDeltaT && input_rangeT<U, T>);
+                                   return std::convertible_to<U, T>
+                                          || (!ForceScalarMaxDeltaT && constructible_input_range<U, T>);
                                }>{},
                    igor::descr<kw::callback, []<typename U>() {
-                       return std::convertible_to<U, step_callback_batch<T>> || input_rangeT<U, step_callback_batch<T>>;
+                       return std::convertible_to<U, step_callback_batch<T>>
+                              || constructible_input_range<U, step_callback_batch<T>>;
                    }>{}>{};
 
 // Parser for the common kwargs options for the propagate_*() functions
@@ -753,7 +748,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
     // checking on max_delta_t before invoking the single step function. Hence, we want to avoid any risk of aliasing.
     auto max_delta_t = [&]() -> std::vector<T> {
         if constexpr (p.has(kw::max_delta_t)) {
-            if constexpr (input_rangeT<decltype(p(kw::max_delta_t)), T>) {
+            if constexpr (constructible_input_range<decltype(p(kw::max_delta_t)), T>) {
                 static_assert(!ForceScalarMaxDeltaT);
                 return ranges_to<std::vector<T>>(p(kw::max_delta_t));
             } else {
@@ -824,11 +819,12 @@ private:
     // kwargs configuration for finalise_ctor().
     static constexpr auto finalise_ctor_kw_cfg
         = detail::ta_common_kw_cfg<T>
-          | igor::config<
-              igor::descr<kw::time,
-                          []<typename U>() { return std::convertible_to<U, T> || detail::input_rangeT<U, T>; }>{},
-              detail::input_rangeT_descr<kw::t_events, t_event_t>,
-              detail::input_rangeT_descr<kw::nt_events, nt_event_t>>{};
+          | igor::config<igor::descr<kw::time,
+                                     []<typename U>() {
+                                         return std::convertible_to<U, T> || detail::constructible_input_range<U, T>;
+                                     }>{},
+                         kw::descr::constructible_input_range<kw::t_events, t_event_t>,
+                         kw::descr::constructible_input_range<kw::nt_events, nt_event_t>>{};
 
     using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
     void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
@@ -848,7 +844,7 @@ private:
                 // NOTE: silence clang warning.
                 (void)batch_size;
 
-                if constexpr (detail::input_rangeT<decltype(p(kw::time)), T>) {
+                if constexpr (detail::constructible_input_range<decltype(p(kw::time)), T>) {
                     // The input time is a range, convert it into a vector.
                     return detail::ranges_to<std::vector<T>>(p(kw::time));
                 } else {
