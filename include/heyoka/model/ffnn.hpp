@@ -129,15 +129,12 @@ auto ffnn_common_opts(const KwArgs &...kw_args)
                       std::move(nn_wb)};
 }
 
-// This c++ function returns the symbolic expressions of the `n_out` output neurons in a feed forward neural network,
-// as a function of the `n_in` input expressions.
+// This function returns the symbolic expressions of the `n_out` output neurons in a feed forward neural network, as a
+// function of the `n_in` input expressions.
 //
 // The expression will contain the weights and biases of the neural network flattened into `pars` with the following
-// conventions:
-//
-// from the left to right layer of parameters: [W01, W12,W23, ..., B1,B2,B3,....] where the weight matrices Wij are
-// to be considered as flattened (row first) and so are the bias vectors.
-//
+// conventions: from the left to right layer of parameters: [W01, W12,W23, ..., B1,B2,B3,....] where the weight matrices
+// Wij are to be considered as flattened (row first) and so are the bias vectors.
 HEYOKA_DLL_PUBLIC std::vector<expression> ffnn_impl(const std::vector<expression> &, const std::vector<std::uint32_t> &,
                                                     std::uint32_t,
                                                     const std::vector<std::function<expression(const expression &)>> &,
