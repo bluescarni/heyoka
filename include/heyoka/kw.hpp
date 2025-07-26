@@ -130,6 +130,11 @@ template <auto NArg, typename T>
     requires igor::any_named_argument<NArg>
 inline constexpr auto convertible_to = igor::descr<NArg, []<typename U>() { return std::convertible_to<U, T>; }>{};
 
+template <typename T, auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto constructible_from
+    = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{};
+
 template <auto NArg>
     requires igor::any_named_argument<NArg>
 inline constexpr auto integral

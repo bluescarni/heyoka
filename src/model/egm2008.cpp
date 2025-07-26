@@ -298,14 +298,17 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
 
 } // namespace detail
 
+// Default values of the gravitational parameter 'mu' and Earth radius 'a' for the egm2008_*() functions.
+//
+// NOTE: these are in SI units, taken from the official documentation of EGM2008.
 double get_egm2008_mu()
 {
-    return detail::egm2008_default_mu;
+    return 3986004.415e8;
 }
 
 double get_egm2008_a()
 {
-    return detail::egm2008_default_a;
+    return 6378136.3;
 }
 
 } // namespace model
