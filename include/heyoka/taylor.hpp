@@ -1126,12 +1126,16 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
+#if !defined(_MSC_VER) || defined(__clang__)
+    requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
+#endif
 explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, std::uint32_t,
                                KwArgs &&...) -> taylor_adaptive_batch<T>;
 
 template <typename T, typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
+#if !defined(_MSC_VER) || defined(__clang__)
+    requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
+#endif
 explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, KwArgs &&...)
     -> taylor_adaptive_batch<T>;
 
