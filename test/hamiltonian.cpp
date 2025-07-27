@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/hamiltonian.hpp>
@@ -41,9 +42,9 @@ TEST_CASE("pendulum")
     const auto sys1 = hamiltonian(H, {x}, {p});
     const auto sys2 = model::pendulum(kw::length = l, kw::gconst = g);
 
-    auto ics1 = {0.1, m * lval * lval * 0.2};
-    auto ics2 = {0.1, 0.2};
-    auto par_vals = {lval, 3.4};
+    auto ics1 = std::vector{0.1, m * lval * lval * 0.2};
+    auto ics2 = std::vector{0.1, 0.2};
+    auto par_vals = std::vector{lval, 3.4};
 
     auto ta1 = taylor_adaptive{sys1, ics1, kw::pars = par_vals};
     auto ta2 = taylor_adaptive{sys2, ics2, kw::pars = par_vals};
@@ -75,7 +76,7 @@ TEST_CASE("driven pendulum")
     const auto L = 0.5 * M * b * b * v * v + M * b * v * a * om * cos(x) * cos(om * heyoka::time)
                    + 0.5 * M * a * a * om * om * cos(om * heyoka::time) * cos(om * heyoka::time) + M * g * b * cos(x);
 
-    const auto par_vals = {Mval, bval, aval, omval, .5};
+    const auto par_vals = std::vector{Mval, bval, aval, omval, .5};
 
     const auto sys1 = lagrangian(L, {x}, {v});
 
@@ -117,7 +118,7 @@ TEST_CASE("two body problem")
                    + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
 
     const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
-    auto ics = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
+    auto ics = std::vector{-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
 
     auto H = px0 * px0 + py0 * py0 + pz0 * pz0 + px1 * px1 + py1 * py1 + pz1 * pz1
              - subs(L, {{vx0, px0}, {vy0, py0}, {vz0, pz0}, {vx1, px1}, {vy1, py1}, {vz1, pz1}});

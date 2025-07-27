@@ -65,7 +65,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
-#include <heyoka/detail/rng_to_vec.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -1395,7 +1395,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     }
 
     // Return the states.
-    return rng_to_vec(states | std::views::as_rvalue);
+    return ranges_to<std::vector<llvm_state>>(states | std::views::as_rvalue);
 }
 
 // Helper for the computation of a jet of derivatives in compact mode, used in taylor_compute_jet(). The return values

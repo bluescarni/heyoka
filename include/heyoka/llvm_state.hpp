@@ -40,8 +40,9 @@
 #endif
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/rng_to_vec.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/kw.hpp>
@@ -183,91 +184,39 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename... KwArgs>
     static auto kw_args_ctor_impl(const KwArgs &...kw_args)
     {
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Module name (defaults to empty string).
         auto mod_name = [&p]() -> std::string {
             if constexpr (p.has(kw::mname)) {
-                if constexpr (std::convertible_to<decltype(p(kw::mname)), std::string>) {
-                    return p(kw::mname);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'mname' keyword argument.");
-                }
+                // NOTE: we explicitly turn the keyword argument here into a const reference in order to fortify the
+                // constructor against multiple usages of the same set of keyword arguments. If we do not do this and
+                // mname is passed as, say, an rvalue std::string, then using the same keyword argument to initialise a
+                // second llvm_state would incur in use-after-move.
+                //
+                // NOTE: this also fortifies the constructor against concurrent usage of the same set of keyword
+                // arguments from multiple threads.
+                auto &&val = p(kw::mname);
+                return std::as_const(val);
             } else {
                 return {};
             }
         }();
 
         // Optimisation level (defaults to 3).
-        auto opt_level = [&p]() -> unsigned {
-            if constexpr (p.has(kw::opt_level)) {
-                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::opt_level))>>) {
-                    return boost::numeric_cast<unsigned>(p(kw::opt_level));
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'opt_level' keyword argument.");
-                }
-            } else {
-                return 3;
-            }
-        }();
-        opt_level = clamp_opt_level(opt_level);
+        const auto opt_level = clamp_opt_level(boost::numeric_cast<unsigned>(p(kw::opt_level, 3)));
 
         // Fast math flag (defaults to false).
-        auto fmath = [&p]() -> bool {
-            if constexpr (p.has(kw::fast_math)) {
-                if constexpr (std::convertible_to<decltype(p(kw::fast_math)), bool>) {
-                    return p(kw::fast_math);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'fast_math' keyword argument.");
-                }
-            } else {
-                return false;
-            }
-        }();
+        const auto fmath = p(kw::fast_math, false);
 
         // Force usage of AVX512 registers (defaults to false).
-        auto force_avx512 = [&p]() -> bool {
-            if constexpr (p.has(kw::force_avx512)) {
-                if constexpr (std::convertible_to<decltype(p(kw::force_avx512)), bool>) {
-                    return p(kw::force_avx512);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'force_avx512' keyword argument.");
-                }
-            } else {
-                return false;
-            }
-        }();
+        const auto force_avx512 = p(kw::force_avx512, false);
 
         // Enable SLP vectorization (defaults to false).
-        auto slp_vectorize = [&p]() -> bool {
-            if constexpr (p.has(kw::slp_vectorize)) {
-                if constexpr (std::convertible_to<decltype(p(kw::slp_vectorize)), bool>) {
-                    return p(kw::slp_vectorize);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'slp_vectorize' keyword argument.");
-                }
-            } else {
-                return false;
-            }
-        }();
+        const auto slp_vectorize = p(kw::slp_vectorize, false);
 
         // Code model (defaults to small).
-        auto c_model = [&p]() {
-            if constexpr (p.has(kw::code_model)) {
-                if constexpr (std::same_as<std::remove_cvref_t<decltype(p(kw::code_model))>, code_model>) {
-                    return p(kw::code_model);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'code_model' keyword argument.");
-                }
-            } else {
-                return code_model::small;
-            }
-        }();
+        const auto c_model = p(kw::code_model, code_model::small);
         validate_code_model(c_model);
 
         return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize, c_model};
@@ -284,13 +233,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void add_obj_trigger();
 
 public:
+    // kwargs configuration.
+    //
+    // NOTE: this configuration (paired with the internal use of std::as_const() for mname) ensures that we can re-use
+    // the set of kw_args across multiple invocations.
+    static constexpr auto kw_cfg = igor::config<
+        igor::descr<kw::mname, []<typename U>() { return detail::string_like<std::remove_cvref_t<U>>; }>{},
+        kw::descr::integral<kw::opt_level>, kw::descr::boolean<kw::fast_math>, kw::descr::boolean<kw::force_avx512>,
+        kw::descr::boolean<kw::slp_vectorize>, kw::descr::same_as<kw::code_model, code_model>>{};
+
     llvm_state();
-    // NOTE: the constructor is enabled if:
-    // - there is at least 1 argument (i.e., cannot act as a def ctor),
-    // - all KwArgs are named arguments (this also prevents interference
-    //   with the copy/move ctors).
+    // NOTE: we require at least 1 kwarg in order to avoid competition with the default ctor.
     template <typename... KwArgs>
-        requires(sizeof...(KwArgs) > 0u) && (!igor::has_unnamed_arguments<KwArgs...>())
+        requires(sizeof...(KwArgs) > 0u) && igor::validate<kw_cfg, KwArgs...>
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init, hicpp-member-init)
     explicit llvm_state(const KwArgs &...kw_args) : llvm_state(kw_args_ctor_impl(kw_args...))
     {
@@ -383,7 +338,7 @@ public:
         requires std::ranges::input_range<R>
                  && std::same_as<llvm_state, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
     explicit llvm_multi_state(R &&rng, bool parjit = detail::default_parjit)
-        : llvm_multi_state(detail::rng_to_vec(std::forward<R>(rng)), parjit)
+        : llvm_multi_state(detail::ranges_to<std::vector<llvm_state>>(std::forward<R>(rng)), parjit)
     {
     }
     llvm_multi_state(const llvm_multi_state &);

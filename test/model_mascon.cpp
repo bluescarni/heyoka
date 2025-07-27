@@ -127,7 +127,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
 {
     // 1 - Check input consistency
     // 2 - We parse the unnamed arguments
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
     if constexpr (p.has_unnamed_arguments()) {
         static_assert(detail::always_false_v<KwArgs...>,
                       "The variadic arguments in the construction of the mascon system contain "
@@ -197,7 +197,7 @@ expression energy_mascon_system(KwArgs &&...kw_args)
 // const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
 // double r, double G)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
     if constexpr (p.has_unnamed_arguments()) {
         static_assert(detail::always_false_v<KwArgs...>,
                       "The variadic arguments in the construction of the mascon system contain "

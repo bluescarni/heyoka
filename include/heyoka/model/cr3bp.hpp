@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -29,14 +30,10 @@ namespace detail
 template <typename... KwArgs>
 auto cr3bp_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
-
-    expression mu{1e-3};
-    if constexpr (p.has(kw::mu)) {
-        mu = expression{p(kw::mu)};
-    }
+    // mu parameter. Defaults to 1e-3.
+    auto mu = expression(p(kw::mu, 1e-3));
 
     return std::tuple{std::move(mu)};
 }
@@ -47,13 +44,24 @@ HEYOKA_DLL_PUBLIC expression cr3bp_jacobi_impl(const expression &);
 
 } // namespace detail
 
-// NOTE: non-dimensional c3bp dynamics in the usual rotating (synodic) reference frame.
-// Expressed in terms of canonical state variables.
-inline constexpr auto cr3bp = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+inline constexpr auto c3bp_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::mu>>{};
+
+// NOTE: non-dimensional c3bp dynamics in the usual rotating (synodic) reference frame. Expressed in terms of canonical
+// state variables.
+//
+// NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
+// be reused in other invocations.
+inline constexpr auto cr3bp = []<typename... KwArgs>
+    requires igor::validate<c3bp_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::cr3bp_impl, detail::cr3bp_common_opts(kw_args...));
 };
 
-inline constexpr auto cr3bp_jacobi = [](const auto &...kw_args) -> expression {
+inline constexpr auto cr3bp_jacobi = []<typename... KwArgs>
+    requires igor::validate<c3bp_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::cr3bp_jacobi_impl, detail::cr3bp_common_opts(kw_args...));
 };
 

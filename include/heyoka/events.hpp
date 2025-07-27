@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <concepts>
 #include <cstdint>
 #include <ostream>
 #include <type_traits>
@@ -46,6 +45,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Common descriptor used in the validation of keyword arguments for both terminal and non-terminal events.
+inline constexpr auto event_direction_descr = kw::descr::same_as<kw::direction, event_direction>;
+
 template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl
 {
@@ -69,61 +71,33 @@ private:
 
     void finalise_ctor(callback_t, T, event_direction);
 
+    // Configuration for the keyword arguments.
+    static constexpr auto kw_cfg = igor::config<kw::descr::convertible_to<kw::callback, callback_t>,
+                                                kw::descr::convertible_to<kw::cooldown, T>, event_direction_descr>{};
+
 public:
     t_event_impl();
 
     template <typename... KwArgs>
-    explicit t_event_impl(expression e, const KwArgs &...kw_args) : eq(std::move(e))
+        requires igor::validate<kw_cfg, KwArgs...>
+    // NOTE: accept forwarding references here to highlight that kw_args may in general be moved and that thus it is not
+    // safe to re-use them.
+    //
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
-        igor::parser p{kw_args...};
-
-        static_assert(!p.has_unnamed_arguments(),
-                      "The variadic arguments in the construction of a terminal event contain "
-                      "unnamed arguments.");
+        const igor::parser p{kw_args...};
 
         // Callback (defaults to empty).
-        auto cb = [&p]() -> callback_t {
-            if constexpr (p.has(kw::callback)) {
-                if constexpr (std::convertible_to<decltype(p(kw::callback)), callback_t>) {
-                    return p(kw::callback);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'callback' keyword argument.");
-                }
-            } else {
-                return {};
-            }
-        }();
+        callback_t cb = p(kw::callback, callback_t{});
 
         // Cooldown (defaults to -1).
-        auto cd = [&p]() -> T {
-            if constexpr (p.has(kw::cooldown)) {
-                if constexpr (std::convertible_to<decltype(p(kw::cooldown)), T>) {
-                    return p(kw::cooldown);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'cooldown' keyword argument.");
-                }
-            } else {
-                return T(-1);
-            }
-        }();
+        T cd = p(kw::cooldown, -1);
 
         // Direction (defaults to any).
-        auto d = [&p]() -> event_direction {
-            if constexpr (p.has(kw::direction)) {
-                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
-                    return p(kw::direction);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'direction' keyword argument.");
-                }
-            } else {
-                return event_direction::any;
-            }
-        }();
+        const auto d = p(kw::direction, event_direction::any);
 
-        finalise_ctor(std::move(cb), cd, d);
+        finalise_ctor(std::move(cb), std::move(cd), d);
     }
 
     t_event_impl(const t_event_impl &);
@@ -186,32 +160,21 @@ private:
 
     void finalise_ctor(event_direction);
 
+    // Configuration for the keyword arguments.
+    static constexpr auto kw_cfg = igor::config<event_direction_descr>{};
+
 public:
     nt_event_impl();
 
     template <typename... KwArgs>
+        requires igor::validate<kw_cfg, KwArgs...>
     explicit nt_event_impl(expression e, callback_t cb, const KwArgs &...kw_args)
         : eq(std::move(e)), callback(std::move(cb))
     {
-        igor::parser p{kw_args...};
-
-        static_assert(!p.has_unnamed_arguments(),
-                      "The variadic arguments in the construction of a non-terminal event contain "
-                      "unnamed arguments.");
+        const igor::parser p{kw_args...};
 
         // Direction (defaults to any).
-        auto d = [&p]() -> event_direction {
-            if constexpr (p.has(kw::direction)) {
-                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
-                    return p(kw::direction);
-                } else {
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "Invalid type for the 'direction' keyword argument.");
-                }
-            } else {
-                return event_direction::any;
-            }
-        }();
+        const auto d = p(kw::direction, event_direction::any);
 
         finalise_ctor(d);
     }

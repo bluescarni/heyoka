@@ -11,6 +11,7 @@
 #include <numeric>
 #include <ranges>
 #include <stdexcept>
+#include <vector>
 
 #include <boost/math/constants/constants.hpp>
 
@@ -71,7 +72,7 @@ TEST_CASE("driven pendulum")
     const auto L = 0.5 * M * b * b * v * v + M * b * v * a * om * cos(x) * cos(om * heyoka::time)
                    + 0.5 * M * a * a * om * om * cos(om * heyoka::time) * cos(om * heyoka::time) + M * g * b * cos(x);
 
-    const auto par_vals = {.1, .2, .3, .4, .5};
+    const auto par_vals = std::vector{.1, .2, .3, .4, .5};
 
     const auto sys1 = lagrangian(L, {x}, {v});
     auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
@@ -100,7 +101,7 @@ TEST_CASE("damped oscillator")
     const auto L = 0.5 * m * v * v - 0.5 * k * x * x;
     const auto D = 0.5 * b * v * v;
 
-    const auto par_vals = {.1, .2, .3};
+    const auto par_vals = std::vector{.1, .2, .3};
 
     const auto sys1 = lagrangian(L, {x}, {v}, D);
     auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
@@ -125,8 +126,8 @@ TEST_CASE("two body problem")
                    + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
 
     const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
-    auto ics1 = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
-    auto ics2 = {-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
+    auto ics1 = std::vector{-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
+    auto ics2 = std::vector{-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
 
     auto ta1 = taylor_adaptive{sys1, ics1};
     auto ta2 = taylor_adaptive{model::nbody(2), ics2};
@@ -224,20 +225,20 @@ TEST_CASE("damped wheel")
     auto sys = lagrangian(L, qs, qdots, D);
 
     // Init the integrator.
-    auto ics = {0.,
-                0.,
-                0.,
-                0.,
-                0.,
-                0.,
-                0.,
-                -0.4251330363293203,
-                0.05814973378505772,
-                0.4421418964987427,
-                0.3821135280593254,
-                0.4035319449465937,
-                0.473483299702404,
-                -0.32295977917610563};
+    auto ics = std::vector{0.,
+                           0.,
+                           0.,
+                           0.,
+                           0.,
+                           0.,
+                           0.,
+                           -0.4251330363293203,
+                           0.05814973378505772,
+                           0.4421418964987427,
+                           0.3821135280593254,
+                           0.4035319449465937,
+                           0.473483299702404,
+                           -0.32295977917610563};
     auto ta = taylor_adaptive(sys, ics, kw::compact_mode = true);
 
     // Set the values for the spring constant
