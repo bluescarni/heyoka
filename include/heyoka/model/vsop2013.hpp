@@ -36,22 +36,10 @@ auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
     const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
-    auto time_expr = [&p]() -> expression {
-        if constexpr (p.has(kw::time_expr)) {
-            return p(kw::time_expr);
-        } else {
-            return heyoka::time;
-        }
-    }();
+    auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // Threshold value.
-    auto thresh = [&]() -> double {
-        if constexpr (p.has(kw::thresh)) {
-            return p(kw::thresh);
-        } else {
-            return def_thresh;
-        }
-    }();
+    const auto thresh = static_cast<double>(p(kw::thresh, def_thresh));
 
     return std::tuple{std::move(time_expr), thresh};
 }
@@ -62,8 +50,13 @@ HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint
 
 } // namespace detail
 
+inline constexpr auto vsop2013_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
+                                                     kw::descr::convertible_to<kw::thresh, double>>{};
+
 template <typename... KwArgs>
-expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, const KwArgs &...kw_args)
+    requires igor::validate<vsop2013_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, KwArgs &&...kw_args)
 {
     auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 
@@ -71,7 +64,9 @@ expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, const 
 }
 
 template <typename... KwArgs>
-std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, const KwArgs &...kw_args)
+    requires igor::validate<vsop2013_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, KwArgs &&...kw_args)
 {
     auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 
@@ -79,7 +74,9 @@ std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, const KwArgs &.
 }
 
 template <typename... KwArgs>
-std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, const KwArgs &...kw_args)
+    requires igor::validate<vsop2013_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwArgs &&...kw_args)
 {
     auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 

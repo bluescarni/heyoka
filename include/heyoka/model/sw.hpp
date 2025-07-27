@@ -89,16 +89,10 @@ auto sw_common_opts(const KwArgs &...kw_args)
     const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
-    auto time_expr = [&p]() {
-        if constexpr (p.has(kw::time_expr)) {
-            return expression{p(kw::time_expr)};
-        } else {
-            return heyoka::time;
-        }
-    }();
+    auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // SW data (defaults to def-cted).
-    auto data = [&p]() -> sw_data {
+    auto data = [&p]() {
         if constexpr (p.has(kw::sw_data)) {
             return p(kw::sw_data);
         } else {
@@ -111,21 +105,25 @@ auto sw_common_opts(const KwArgs &...kw_args)
 
 } // namespace detail
 
+inline constexpr auto sw_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
+                                               kw::descr::same_as<kw::sw_data, sw_data>>{};
+
 inline constexpr auto Ap_avg = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const KwArgs &...kw_args) -> expression {
+    requires igor::validate<sw_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::Ap_avg_func_impl, detail::sw_common_opts(kw_args...));
 };
 
 inline constexpr auto f107 = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const KwArgs &...kw_args) -> expression {
-    return std::apply(detail::f107_func_impl, detail::sw_common_opts(kw_args...));
-};
+    requires igor::validate<sw_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::f107_func_impl, detail::sw_common_opts(kw_args...)); };
 
 inline constexpr auto f107a_center81 = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const KwArgs &...kw_args) -> expression {
+    requires igor::validate<sw_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::f107a_center81_func_impl, detail::sw_common_opts(kw_args...));
 };
 
