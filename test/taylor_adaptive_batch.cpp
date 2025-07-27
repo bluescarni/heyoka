@@ -2265,3 +2265,13 @@ TEST_CASE("empty init state")
         REQUIRE(ta.get_state() == std::vector{0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0});
     }
 }
+
+TEST_CASE("scalar time ctor")
+{
+    const auto dyn = model::pendulum();
+
+    {
+        auto ta = taylor_adaptive_batch<double>{dyn, 2u, kw::time = 42};
+        REQUIRE(ta.get_time() == std::vector{42., 42.});
+    }
+}
