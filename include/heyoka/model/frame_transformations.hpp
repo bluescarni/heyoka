@@ -59,25 +59,13 @@ auto itrs_icrs_common_opts(const KwArgs &...kw_args)
     const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
-    auto time_expr = [&p]() -> expression {
-        if constexpr (p.has(kw::time_expr)) {
-            return p(kw::time_expr);
-        } else {
-            return heyoka::time;
-        }
-    }();
+    auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // Threshold value for the iau2006 theory.
-    auto thresh = [&]() -> double {
-        if constexpr (p.has(kw::thresh)) {
-            return p(kw::thresh);
-        } else {
-            return iau2006_default_thresh;
-        }
-    }();
+    const auto thresh = static_cast<double>(p(kw::thresh, iau2006_default_thresh));
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() -> eop_data {
+    auto data = [&p]() {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {
@@ -90,16 +78,22 @@ auto itrs_icrs_common_opts(const KwArgs &...kw_args)
 
 } // namespace detail
 
+inline constexpr auto rot_itrs_icrs_kw_cfg
+    = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
+                   kw::descr::convertible_to<kw::thresh, double>, kw::descr::same_as<kw::eop_data, eop_data>>{};
+
 inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    requires igor::validate<rot_itrs_icrs_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::rot_itrs_icrs_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
 inline constexpr auto rot_icrs_itrs = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const std::array<expression, 3> &xyz, const KwArgs &...kw_args) {
+    requires igor::validate<rot_itrs_icrs_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::rot_icrs_itrs_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
 };
