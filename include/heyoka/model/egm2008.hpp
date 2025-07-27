@@ -26,37 +26,24 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu();
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a();
+
 namespace detail
 {
-
-// Default values of the gravitational parameter 'mu' and Earth radius 'a' for the egm2008_*() functions.
-// NOTE: these are in SI units, taken from the official documentation of EGM2008.
-inline constexpr double egm2008_default_mu = 3986004.415e8;
-inline constexpr double egm2008_default_a = 6378136.3;
 
 // Common options for the egm2008_*() functions.
 template <typename... KwArgs>
 auto egm2008_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    const igor::parser p{kw_args...};
 
     // Gravitational parameter.
-    auto mu = [&p]() -> expression {
-        if constexpr (p.has(kw::mu)) {
-            return p(kw::mu);
-        } else {
-            return expression{egm2008_default_mu};
-        }
-    }();
+    auto mu = expression(p(kw::mu, get_egm2008_mu()));
 
     // Earth radius.
-    auto a = [&]() -> expression {
-        if constexpr (p.has(kw::a)) {
-            return p(kw::a);
-        } else {
-            return expression{egm2008_default_a};
-        }
-    }();
+    auto a = expression(p(kw::a, get_egm2008_a()));
 
     return std::tuple{std::move(mu), std::move(a)};
 }
@@ -69,23 +56,26 @@ auto egm2008_common_opts(const KwArgs &...kw_args)
 
 } // namespace detail
 
+inline constexpr auto egm2008_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::mu>,
+                                                    kw::descr::constructible_from<expression, kw::a>>{};
+
+// NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
+// be reused in other invocations.
 inline constexpr auto egm2008_pot = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, const KwArgs &...kw_args) {
+    requires igor::validate<egm2008_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, KwArgs &&...kw_args) {
     return std::apply(detail::egm2008_pot_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
 };
 
 inline constexpr auto egm2008_acc = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, const KwArgs &...kw_args) {
+    requires igor::validate<egm2008_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, KwArgs &&...kw_args) {
     return std::apply(detail::egm2008_acc_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
 };
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu();
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a();
 
 } // namespace model
 

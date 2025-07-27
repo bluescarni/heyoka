@@ -31,6 +31,7 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
@@ -98,14 +99,20 @@ HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(mppp::real)
 
 #endif
 
+#undef HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST
+
 } // namespace detail
 
+// NOTE: we accept the keyword arguments as universal references in order to highlight that they cannot be reused in
+// other invocations.
 template <typename T, typename... KwArgs>
+    requires igor::validate<taylor_adaptive<T>::propagate_for_until_kw_cfg, KwArgs...>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
                        step_callback<T>>>
 ensemble_propagate_until(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
                          const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                         const KwArgs &...kw_args)
+                         // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                         KwArgs &&...kw_args)
 {
     auto [max_steps, max_delta_t, cb, write_tc, with_c_out] = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
@@ -114,11 +121,13 @@ ensemble_propagate_until(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
 }
 
 template <typename T, typename... KwArgs>
+    requires igor::validate<taylor_adaptive<T>::propagate_for_until_kw_cfg, KwArgs...>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
                        step_callback<T>>>
 ensemble_propagate_for(const taylor_adaptive<T> &ta, T delta_t, std::size_t n_iter,
                        const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                       const KwArgs &...kw_args)
+                       // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                       KwArgs &&...kw_args)
 {
     auto [max_steps, max_delta_t, cb, write_tc, with_c_out] = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
@@ -127,10 +136,12 @@ ensemble_propagate_for(const taylor_adaptive<T> &ta, T delta_t, std::size_t n_it
 }
 
 template <typename T, typename... KwArgs>
+    requires igor::validate<taylor_adaptive<T>::propagate_grid_kw_cfg, KwArgs...>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>
 ensemble_propagate_grid(const taylor_adaptive<T> &ta, std::vector<T> grid, std::size_t n_iter,
                         const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                        const KwArgs &...kw_args)
+                        // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                        KwArgs &&...kw_args)
 {
     auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
@@ -202,17 +213,22 @@ HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(mppp::real)
 
 #endif
 
+#undef HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
+    requires igor::validate<detail::tab_propagate_common_kw_cfg<T, true> | detail::ta_propagate_for_until_kw_cfg,
+                            KwArgs...>
 std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>
 ensemble_propagate_until_batch(
     const taylor_adaptive_batch<T> &ta, T t, std::size_t n_iter,
-    const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, const KwArgs &...kw_args)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, KwArgs &&...kw_args)
 {
-    // NOTE: here and in the other 2 ensemble batch functions, taylor_propagate_common_ops_batch()
-    // is guaranteed to return max_delta_ts as a new object (that is, it cannot alias anything else).
-    // Hence, we can pass it by reference to the implementation functions.
+    // NOTE: here and in the other 2 ensemble batch functions, taylor_propagate_common_ops_batch() is guaranteed to
+    // return max_delta_ts as a new object (that is, it cannot alias anything else). Hence, we can pass it by reference
+    // to the implementation functions.
     auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
         = detail::taylor_propagate_common_ops_batch<T, false, true>(ta.get_batch_size(), kw_args...);
 
@@ -221,10 +237,13 @@ ensemble_propagate_until_batch(
 }
 
 template <typename T, typename... KwArgs>
+    requires igor::validate<detail::tab_propagate_common_kw_cfg<T, true> | detail::ta_propagate_for_until_kw_cfg,
+                            KwArgs...>
 std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>
 ensemble_propagate_for_batch(const taylor_adaptive_batch<T> &ta, T delta_t, std::size_t n_iter,
                              const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen,
-                             const KwArgs &...kw_args)
+                             // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                             KwArgs &&...kw_args)
 {
     auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
         = detail::taylor_propagate_common_ops_batch<T, false, true>(ta.get_batch_size(), kw_args...);
@@ -233,13 +252,15 @@ ensemble_propagate_for_batch(const taylor_adaptive_batch<T> &ta, T delta_t, std:
                                                      write_tc, with_c_out);
 }
 
-// NOTE: taking grid by reference here is ok, as the implementation needs
-// to splat it anyway and thus it always creates a copy.
+// NOTE: taking grid by reference here is ok, as the implementation needs to splat it anyway and thus it always creates
+// a copy.
 template <typename T, typename... KwArgs>
+    requires igor::validate<detail::tab_propagate_common_kw_cfg<T, true>, KwArgs...>
 std::vector<std::tuple<taylor_adaptive_batch<T>, step_callback_batch<T>, std::vector<T>>>
 ensemble_propagate_grid_batch(const taylor_adaptive_batch<T> &ta, const std::vector<T> &grid, std::size_t n_iter,
                               const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen,
-                              const KwArgs &...kw_args)
+                              // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+                              KwArgs &&...kw_args)
 {
     auto [max_steps, max_delta_ts, cb]
         = detail::taylor_propagate_common_ops_batch<T, true, true>(ta.get_batch_size(), kw_args...);

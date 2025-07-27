@@ -33,9 +33,13 @@ inline constexpr double iau2006_default_thresh = 1e-6;
 
 } // namespace detail
 
+// NOTE: the iau2006 and vsop2013 theories have the same kwargs config.
+inline constexpr auto iau2006_kw_cfg = vsop2013_kw_cfg;
+
 inline constexpr auto iau2006 = []<typename... KwArgs>
-    requires(!igor::has_unnamed_arguments<KwArgs...>())
-(const KwArgs &...kw_args) {
+    requires igor::validate<iau2006_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) {
     return std::apply(detail::iau2006_impl, detail::vsop2013_common_opts(detail::iau2006_default_thresh, kw_args...));
 };
 

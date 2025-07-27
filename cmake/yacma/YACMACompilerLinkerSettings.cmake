@@ -213,7 +213,12 @@ if(NOT _YACMACompilerLinkerSettingsRun)
         # Strict conformance mode.
         _YACMA_CHECK_ENABLE_CXX_FLAG(/permissive-)
         # Strict preprocessor conformance mode.
-        _YACMA_CHECK_ENABLE_CXX_FLAG(/Zc:preprocessor)
+        #
+        # NOTE: disable for now due to issues with user-defined literals:
+        #
+        # https://github.com/boostorg/multiprecision/issues/677
+        #
+        # _YACMA_CHECK_ENABLE_CXX_FLAG(/Zc:preprocessor)
     endif()
 
     # Set the cache variables.

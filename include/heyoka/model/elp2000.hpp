@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/model/vsop2013.hpp>
@@ -33,8 +34,13 @@ HEYOKA_DLL_PUBLIC std::vector<expression> elp2000_cartesian_fk5_impl(const expre
 
 } // namespace detail
 
+// NOTE: the elp2000 and vsop2013 theories have the same kwargs config.
+inline constexpr auto elp2000_kw_cfg = vsop2013_kw_cfg;
+
 template <typename... KwArgs>
-std::vector<expression> elp2000_spherical(const KwArgs &...kw_args)
+    requires igor::validate<elp2000_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> elp2000_spherical(KwArgs &&...kw_args)
 {
     // NOTE: we re-use detail::vsop2013_common_opts() here because the keyword options
     // for ELP2000 are the same.
@@ -42,19 +48,25 @@ std::vector<expression> elp2000_spherical(const KwArgs &...kw_args)
 }
 
 template <typename... KwArgs>
-std::vector<expression> elp2000_cartesian(const KwArgs &...kw_args)
+    requires igor::validate<elp2000_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> elp2000_cartesian(KwArgs &&...kw_args)
 {
     return std::apply(detail::elp2000_cartesian_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 template <typename... KwArgs>
-std::vector<expression> elp2000_cartesian_e2000(const KwArgs &...kw_args)
+    requires igor::validate<elp2000_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> elp2000_cartesian_e2000(KwArgs &&...kw_args)
 {
     return std::apply(detail::elp2000_cartesian_e2000_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 template <typename... KwArgs>
-std::vector<expression> elp2000_cartesian_fk5(const KwArgs &...kw_args)
+    requires igor::validate<elp2000_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+std::vector<expression> elp2000_cartesian_fk5(KwArgs &&...kw_args)
 {
     return std::apply(detail::elp2000_cartesian_fk5_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }

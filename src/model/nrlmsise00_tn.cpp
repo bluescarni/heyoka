@@ -419,8 +419,11 @@ expression rho_approximation(const expression &h, const std::vector<expression> 
 
 } // namespace
 
-// NOTE: geodetic coordinates in the order [h, lat, lon]
-// NOTE: doy_expr is the number of days elapsed since the last 1st of january as a function of heyoka::time.
+// This c++ function returns the symbolic expressions of the thermospheric density at a certain geodetic coordinate,
+// having the f107a, f107, ap indexes and from a time expression returning the days elapsed since the last 1st of
+// January 00:00:00.
+//
+// NOTE: geodetic coordinates in the order [h, lat, lon].
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const expression &f107, const expression &f107a,
                               const expression &ap,       // NOLINT

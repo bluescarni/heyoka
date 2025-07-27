@@ -70,8 +70,14 @@ std::vector<expression> compute_layer(su32 layer_id, const std::vector<expressio
 
 } // namespace
 
+// This function returns the symbolic expressions of the `n_out` output neurons in a feed forward neural network, as a
+// function of the `n_in` input expressions.
+//
+// The expression will contain the weights and biases of the neural network flattened into `nn_wb` with the following
+// conventions: from the left to right layer of parameters: [W01, W12,W23, ..., B1,B2,B3,....] where the weight matrices
+// Wij are to be considered as flattened (row first) and so are the bias vectors.
 std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::vector<std::uint32_t> &nn_hidden,
-                                  std::uint32_t n_out,
+                                  const std::uint32_t n_out,
                                   const std::vector<std::function<expression(const expression &)>> &activations,
                                   const std::vector<expression> &nn_wb)
 {
@@ -99,8 +105,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
         throw std::invalid_argument("The list of activation functions cannot contain empty functions");
     }
 
-    // From now on, always use safe arithmetics to compute/manipulate
-    // indices and sizes.
+    // From now on, always use safe arithmetics to compute/manipulate indices and sizes.
     using detail::su32;
 
     // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons).

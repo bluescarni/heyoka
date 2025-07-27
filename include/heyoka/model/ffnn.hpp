@@ -9,9 +9,12 @@
 #ifndef HEYOKA_MODEL_FFNN_HPP
 #define HEYOKA_MODEL_FFNN_HPP
 
+#include <concepts>
 #include <cstdint>
 #include <functional>
+#include <ranges>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -19,6 +22,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -35,79 +39,42 @@ namespace detail
 template <typename... KwArgs>
 auto ffnn_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
+    using heyoka::detail::ranges_to;
 
-    static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
+    const igor::parser p{kw_args...};
 
-    // Network inputs. Mandatory.
-    // The kw::inputs argument must be a range of values from which
-    // an expression can be constructed.
-    std::vector<expression> inputs;
-    if constexpr (p.has(kw::inputs)) {
-        for (const auto &val : p(kw::inputs)) {
-            inputs.emplace_back(val);
-        }
-    } else {
-        static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                      "The 'inputs' keyword argument is necessary but it was not provided");
-    }
+    // Network inputs.
+    auto inputs = ranges_to<std::vector<expression>>(p(kw::inputs));
 
-    // Number of hidden neurons per hidden layer. Mandatory.
-    // The kw::nn_hidden argument must be a range containing
-    // integral values.
-    std::vector<std::uint32_t> nn_hidden;
-    if constexpr (p.has(kw::nn_hidden)) {
-        for (const auto &nval : p(kw::nn_hidden)) {
-            nn_hidden.push_back(boost::numeric_cast<std::uint32_t>(nval));
-        }
-    } else {
-        static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                      "The 'nn_hidden' keyword argument is necessary but it was not provided");
-    }
+    // Number of hidden neurons per hidden layer.
+    //
+    // NOTE: turn the kwarg into an lvalue otherwise we cannot pipe it into the range transformation if it is an
+    // initializer list.
+    auto &&nnh_arg = p(kw::nn_hidden);
+    auto nn_hidden = ranges_to<std::vector<std::uint32_t>>(
+        nnh_arg | std::views::transform([](const auto n) { return boost::numeric_cast<std::uint32_t>(n); }));
 
-    // Number of network outputs. Mandatory.
-    // The kw::n_out argument must be of integral type.
-    auto n_out = [&p]() {
-        if constexpr (p.has(kw::n_out)) {
-            return boost::numeric_cast<std::uint32_t>(p(kw::n_out));
-        } else {
-            static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                          "The 'n_out' keyword argument is necessary but it was not provided");
-        }
-    }();
+    // Number of network outputs.
+    const auto n_out = boost::numeric_cast<std::uint32_t>(p(kw::n_out));
 
-    // Network activation functions. Mandatory.
-    // The kw::activations argument must be a range containing values
-    // from which a std::function can be constructed.
-    std::vector<std::function<expression(const expression &)>> activations;
-    if constexpr (p.has(kw::activations)) {
-        for (const auto &f : p(kw::activations)) {
-            activations.emplace_back(f);
-        }
-    } else {
-        static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                      "The 'activations' keyword argument is necessary but it was not provided");
-    }
+    // Network activation functions.
+    auto activations = ranges_to<std::vector<std::function<expression(const expression &)>>>(p(kw::activations));
 
     // Network weights and biases. Optional, defaults to heyoka parameters.
-    // The kw::nn_wb argument, if present, must be a range of values from which
-    // expressions can be constructed.
     std::vector<expression> nn_wb;
     if constexpr (p.has(kw::nn_wb)) {
-        for (const auto &val : p(kw::nn_wb)) {
-            nn_wb.emplace_back(val);
-        }
+        nn_wb = ranges_to<std::vector<expression>>(p(kw::nn_wb));
     } else {
         // Safe counterpart to std::uint32_t in order to avoid
         // overflows when manipulating indices and sizes.
         using su32 = boost::safe_numerics::safe<std::uint32_t>;
 
         // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons).
-        auto n_hidden_layers = su32(nn_hidden.size());
+        const auto n_hidden_layers = su32(nn_hidden.size());
         // Number of neuronal layers (counting input and output).
-        auto n_layers = n_hidden_layers + 2;
+        const auto n_layers = n_hidden_layers + 2;
         // Number of inputs.
-        auto n_in = su32(inputs.size());
+        const auto n_in = su32(inputs.size());
         // Number of neurons per neuronal layer.
         std::vector<su32> n_neurons{n_in};
         n_neurons.insert(n_neurons.end(), nn_hidden.begin(), nn_hidden.end());
@@ -125,26 +92,32 @@ auto ffnn_common_opts(const KwArgs &...kw_args)
         }
     }
 
-    return std::tuple{std::move(inputs), std::move(nn_hidden), std::move(n_out), std::move(activations),
-                      std::move(nn_wb)};
+    return std::tuple{std::move(inputs), std::move(nn_hidden), n_out, std::move(activations), std::move(nn_wb)};
 }
 
-// This c++ function returns the symbolic expressions of the `n_out` output neurons in a feed forward neural network,
-// as a function of the `n_in` input expressions.
-//
-// The expression will contain the weights and biases of the neural network flattened into `pars` with the following
-// conventions:
-//
-// from the left to right layer of parameters: [W01, W12,W23, ..., B1,B2,B3,....] where the weight matrices Wij are
-// to be considered as flattened (row first) and so are the bias vectors.
-//
 HEYOKA_DLL_PUBLIC std::vector<expression> ffnn_impl(const std::vector<expression> &, const std::vector<std::uint32_t> &,
                                                     std::uint32_t,
                                                     const std::vector<std::function<expression(const expression &)>> &,
                                                     const std::vector<expression> &);
 } // namespace detail
 
-inline constexpr auto ffnn = [](const auto &...kw_args) -> std::vector<expression> {
+inline constexpr auto ffnn_kw_cfg = igor::config<
+    kw::descr::constructible_input_range<kw::inputs, expression, true>,
+    igor::descr<kw::nn_hidden,
+                []<typename U>() {
+                    return requires {
+                        requires std::ranges::input_range<U>;
+                        requires std::integral<std::remove_cvref_t<std::ranges::range_reference_t<U>>>;
+                    };
+                }>{.required = true},
+    kw::descr::integral<kw::n_out, true>,
+    kw::descr::constructible_input_range<kw::activations, std::function<expression(const expression &)>, true>,
+    kw::descr::constructible_input_range<kw::nn_wb, expression>>{};
+
+inline constexpr auto ffnn = []<typename... KwArgs>
+    requires igor::validate<ffnn_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> std::vector<expression> {
     return std::apply(detail::ffnn_impl, detail::ffnn_common_opts(kw_args...));
 };
 
