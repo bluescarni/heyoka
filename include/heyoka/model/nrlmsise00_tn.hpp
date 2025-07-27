@@ -66,7 +66,7 @@ HEYOKA_DLL_PUBLIC expression nrlmsise00_tn_impl(const std::vector<expression> &,
 #define HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(name) kw::descr::constructible_from<expression, kw::name, true>
 
 inline constexpr auto nrlmsise00_tn_kw_cfg
-    = igor::config<kw::descr::constructible_input_range<kw::geodetic, expression>,
+    = igor::config<kw::descr::constructible_input_range<kw::geodetic, expression, true>,
                    HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(f107), HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(f107a),
                    HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(ap), HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(time_expr)>{};
 

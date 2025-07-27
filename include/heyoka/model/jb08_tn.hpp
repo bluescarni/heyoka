@@ -76,12 +76,12 @@ HEYOKA_DLL_PUBLIC expression jb08_tn_impl(const std::vector<expression> &, const
 #define HEYOKA_MODEL_JB08_KWARG_DESCR(name) kw::descr::constructible_from<expression, kw::name, true>
 
 inline constexpr auto jb08_tn_kw_cfg
-    = igor::config<kw::descr::constructible_input_range<kw::geodetic, expression>, HEYOKA_MODEL_JB08_KWARG_DESCR(f107a),
-                   HEYOKA_MODEL_JB08_KWARG_DESCR(f107), HEYOKA_MODEL_JB08_KWARG_DESCR(s107a),
-                   HEYOKA_MODEL_JB08_KWARG_DESCR(s107), HEYOKA_MODEL_JB08_KWARG_DESCR(m107a),
-                   HEYOKA_MODEL_JB08_KWARG_DESCR(m107), HEYOKA_MODEL_JB08_KWARG_DESCR(y107a),
-                   HEYOKA_MODEL_JB08_KWARG_DESCR(y107), HEYOKA_MODEL_JB08_KWARG_DESCR(dDstdT),
-                   HEYOKA_MODEL_JB08_KWARG_DESCR(time_expr)>{};
+    = igor::config<kw::descr::constructible_input_range<kw::geodetic, expression, true>,
+                   HEYOKA_MODEL_JB08_KWARG_DESCR(f107a), HEYOKA_MODEL_JB08_KWARG_DESCR(f107),
+                   HEYOKA_MODEL_JB08_KWARG_DESCR(s107a), HEYOKA_MODEL_JB08_KWARG_DESCR(s107),
+                   HEYOKA_MODEL_JB08_KWARG_DESCR(m107a), HEYOKA_MODEL_JB08_KWARG_DESCR(m107),
+                   HEYOKA_MODEL_JB08_KWARG_DESCR(y107a), HEYOKA_MODEL_JB08_KWARG_DESCR(y107),
+                   HEYOKA_MODEL_JB08_KWARG_DESCR(dDstdT), HEYOKA_MODEL_JB08_KWARG_DESCR(time_expr)>{};
 
 #undef HEYOKA_MODEL_JB08_KWARG_DESCR
 
