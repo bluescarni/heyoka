@@ -57,7 +57,7 @@ inline constexpr auto rotating_kw_cfg = igor::config<kw::descr::constructible_in
 // centrifugal and Coriolis accelerations (but not the Euler acceleration as omega is assumed to be constant).
 inline constexpr auto rotating = []<typename... KwArgs>
     requires igor::validate<rotating_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::rotating_impl, detail::rotating_common_opts(kw_args...));
 };
@@ -65,7 +65,7 @@ inline constexpr auto rotating = []<typename... KwArgs>
 // NOTE: this returns a specific energy.
 inline constexpr auto rotating_energy = []<typename... KwArgs>
     requires igor::validate<rotating_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::rotating_energy_impl, detail::rotating_common_opts(kw_args...));
 };
@@ -74,7 +74,7 @@ inline constexpr auto rotating_energy = []<typename... KwArgs>
 // and Coriolis accelerations.
 inline constexpr auto rotating_potential = []<typename... KwArgs>
     requires igor::validate<rotating_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::rotating_potential_impl, detail::rotating_common_opts(kw_args...));
 };

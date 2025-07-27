@@ -87,7 +87,7 @@ inline constexpr auto jb08_tn_kw_cfg
 
 inline constexpr auto jb08_tn = []<typename... KwArgs>
     requires igor::validate<jb08_tn_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::jb08_tn_impl, detail::jb08_tn_common_opts(kw_args...));
 };

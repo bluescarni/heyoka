@@ -63,7 +63,7 @@ inline constexpr auto egm2008_kw_cfg = igor::config<kw::descr::constructible_fro
 // be reused in other invocations.
 inline constexpr auto egm2008_pot = []<typename... KwArgs>
     requires igor::validate<egm2008_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, KwArgs &&...kw_args) {
     return std::apply(detail::egm2008_pot_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));
@@ -71,7 +71,7 @@ inline constexpr auto egm2008_pot = []<typename... KwArgs>
 
 inline constexpr auto egm2008_acc = []<typename... KwArgs>
     requires igor::validate<egm2008_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m, KwArgs &&...kw_args) {
     return std::apply(detail::egm2008_acc_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz), n, m), detail::egm2008_common_opts(kw_args...)));

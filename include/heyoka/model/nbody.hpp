@@ -73,7 +73,7 @@ inline constexpr auto nbody_kw_cfg = igor::config<kw::descr::constructible_from<
 
 inline constexpr auto nbody = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::nbody_impl, detail::nbody_common_opts(n, kw_args...));
 };
@@ -81,35 +81,35 @@ inline constexpr auto nbody = []<typename... KwArgs>
 // NOTE: these return energies and potential energies.
 inline constexpr auto nbody_energy = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> expression {
     return std::apply(detail::nbody_energy_impl, detail::nbody_common_opts(n, kw_args...));
 };
 
 inline constexpr auto nbody_potential = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> expression {
     return std::apply(detail::nbody_potential_impl, detail::nbody_common_opts(n, kw_args...));
 };
 
 inline constexpr auto np1body = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::np1body_impl, detail::nbody_common_opts(n, kw_args...));
 };
 
 inline constexpr auto np1body_energy = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> expression {
     return std::apply(detail::np1body_energy_impl, detail::nbody_common_opts(n, kw_args...));
 };
 
 inline constexpr auto np1body_potential = []<typename... KwArgs>
     requires igor::validate<nbody_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (std::uint32_t n, KwArgs &&...kw_args) -> expression {
     return std::apply(detail::np1body_potential_impl, detail::nbody_common_opts(n, kw_args...));
 };

@@ -71,7 +71,7 @@ inline constexpr auto fixed_centres_kw_cfg
 
 inline constexpr auto fixed_centres = []<typename... KwArgs>
     requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::fixed_centres_impl, detail::fixed_centres_common_opts(kw_args...));
 };
@@ -79,14 +79,14 @@ inline constexpr auto fixed_centres = []<typename... KwArgs>
 // NOTE: these return specific energy and potential.
 inline constexpr auto fixed_centres_energy = []<typename... KwArgs>
     requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::fixed_centres_energy_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
 inline constexpr auto fixed_centres_potential = []<typename... KwArgs>
     requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::fixed_centres_potential_impl, detail::fixed_centres_common_opts(kw_args...));
 };

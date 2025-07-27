@@ -116,7 +116,7 @@ inline constexpr auto ffnn_kw_cfg = igor::config<
 
 inline constexpr auto ffnn = []<typename... KwArgs>
     requires igor::validate<ffnn_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<expression> {
     return std::apply(detail::ffnn_impl, detail::ffnn_common_opts(kw_args...));
 };

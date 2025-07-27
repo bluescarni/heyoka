@@ -74,7 +74,7 @@ inline constexpr auto geo2cart_kw_cfg
 // be reused in other invocations.
 inline constexpr auto cart2geo = []<typename... KwArgs>
     requires igor::validate<cart2geo_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::cart2geo_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::cart2geo_common_opts<true>(kw_args...)));
@@ -82,7 +82,7 @@ inline constexpr auto cart2geo = []<typename... KwArgs>
 
 inline constexpr auto geo2cart = []<typename... KwArgs>
     requires igor::validate<geo2cart_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::geo2cart_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::cart2geo_common_opts<false>(kw_args...)));

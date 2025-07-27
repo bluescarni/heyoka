@@ -84,7 +84,7 @@ inline constexpr auto rot_itrs_icrs_kw_cfg
 
 inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
     requires igor::validate<rot_itrs_icrs_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::rot_itrs_icrs_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
@@ -92,7 +92,7 @@ inline constexpr auto rot_itrs_icrs = []<typename... KwArgs>
 
 inline constexpr auto rot_icrs_itrs = []<typename... KwArgs>
     requires igor::validate<rot_itrs_icrs_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
     return std::apply(detail::rot_icrs_itrs_impl,
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));

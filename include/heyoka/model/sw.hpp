@@ -110,19 +110,19 @@ inline constexpr auto sw_kw_cfg = igor::config<kw::descr::constructible_from<exp
 
 inline constexpr auto Ap_avg = []<typename... KwArgs>
     requires igor::validate<sw_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::Ap_avg_func_impl, detail::sw_common_opts(kw_args...));
 };
 
 inline constexpr auto f107 = []<typename... KwArgs>
     requires igor::validate<sw_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::f107_func_impl, detail::sw_common_opts(kw_args...)); };
 
 inline constexpr auto f107a_center81 = []<typename... KwArgs>
     requires igor::validate<sw_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::f107a_center81_func_impl, detail::sw_common_opts(kw_args...));
 };

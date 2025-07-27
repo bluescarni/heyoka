@@ -165,56 +165,56 @@ inline constexpr auto eop_kw_cfg = igor::config<kw::descr::constructible_from<ex
 
 inline constexpr auto era = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::era_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto erap = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto pm_x = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_x_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto pm_xp = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::pm_xp_func_impl, detail::eop_common_opts(kw_args...));
 };
 
 inline constexpr auto pm_y = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_y_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto pm_yp = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::pm_yp_func_impl, detail::eop_common_opts(kw_args...));
 };
 
 inline constexpr auto dX = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::dX_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto dXp = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::dXp_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto dY = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::dY_func_impl, detail::eop_common_opts(kw_args...)); };
 
 inline constexpr auto dYp = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::dYp_func_impl, detail::eop_common_opts(kw_args...)); };
 
 } // namespace model

@@ -51,7 +51,7 @@ inline constexpr auto pendulum_kw_cfg = igor::config<kw::descr::constructible_fr
 
 inline constexpr auto pendulum = []<typename... KwArgs>
     requires igor::validate<pendulum_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(kw_args...));
 };
@@ -59,7 +59,7 @@ inline constexpr auto pendulum = []<typename... KwArgs>
 // NOTE: this returns a specific energy.
 inline constexpr auto pendulum_energy = []<typename... KwArgs>
     requires igor::validate<pendulum_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::pendulum_energy_impl, detail::pendulum_common_opts(kw_args...));
 };

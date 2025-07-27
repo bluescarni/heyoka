@@ -53,14 +53,14 @@ inline constexpr auto c3bp_kw_cfg = igor::config<kw::descr::constructible_from<e
 // be reused in other invocations.
 inline constexpr auto cr3bp = []<typename... KwArgs>
     requires igor::validate<c3bp_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::cr3bp_impl, detail::cr3bp_common_opts(kw_args...));
 };
 
 inline constexpr auto cr3bp_jacobi = []<typename... KwArgs>
     requires igor::validate<c3bp_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::cr3bp_jacobi_impl, detail::cr3bp_common_opts(kw_args...));
 };

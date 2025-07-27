@@ -74,7 +74,7 @@ inline constexpr auto nrlmsise00_tn_kw_cfg
 
 inline constexpr auto nrlmsise00_tn = []<typename... KwArgs>
     requires igor::validate<nrlmsise00_tn_kw_cfg, KwArgs...>
-// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression {
     return std::apply(detail::nrlmsise00_tn_impl, detail::nrlmsise00_tn_common_opts(kw_args...));
 };
