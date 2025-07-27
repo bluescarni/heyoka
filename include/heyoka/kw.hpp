@@ -136,15 +136,16 @@ template <typename T, auto NArg>
 inline constexpr auto constructible_from
     = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{};
 
-template <auto NArg>
+template <auto NArg, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto integral
-    = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{};
+    = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{.required = Mandatory};
 
-template <auto NArg, typename T>
+template <auto NArg, typename T, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto constructible_input_range
-    = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{};
+    = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{.required
+                                                                                                      = Mandatory};
 
 } // namespace descr
 
