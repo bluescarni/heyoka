@@ -131,10 +131,10 @@ template <auto NArg, typename T>
     requires igor::any_named_argument<NArg>
 inline constexpr auto convertible_to = igor::descr<NArg, []<typename U>() { return std::convertible_to<U, T>; }>{};
 
-template <typename T, auto NArg>
+template <typename T, auto NArg, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto constructible_from
-    = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{};
+    = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{.required = Mandatory};
 
 template <auto NArg, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
