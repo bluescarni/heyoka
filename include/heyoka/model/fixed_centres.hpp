@@ -14,6 +14,8 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -29,34 +31,23 @@ namespace detail
 template <typename... KwArgs>
 auto fixed_centres_common_opts(const KwArgs &...kw_args)
 {
+    using heyoka::detail::ranges_to;
+
     const igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(),
-                  "Unnamed arguments cannot be passed in the variadic pack to this function.");
-
     // G constant (defaults to 1).
-    auto Gconst = [&p]() {
-        if constexpr (p.has(kw::Gconst)) {
-            return expression{p(kw::Gconst)};
-        } else {
-            return 1_dbl;
-        }
-    }();
+    auto Gconst = expression(p(kw::Gconst, 1.));
 
     // The vector of masses.
     std::vector<expression> masses_vec;
     if constexpr (p.has(kw::masses)) {
-        for (const auto &mass_value : p(kw::masses)) {
-            masses_vec.emplace_back(mass_value);
-        }
+        masses_vec = ranges_to<std::vector<expression>>(p(kw::masses));
     }
 
     // The vector of positions.
     std::vector<expression> positions_vec;
     if constexpr (p.has(kw::positions)) {
-        for (const auto &pos_value : p(kw::positions)) {
-            positions_vec.emplace_back(pos_value);
-        }
+        positions_vec = ranges_to<std::vector<expression>>(p(kw::positions));
     }
 
     return std::tuple{std::move(Gconst), std::move(masses_vec), std::move(positions_vec)};
@@ -73,17 +64,30 @@ HEYOKA_DLL_PUBLIC expression fixed_centres_potential_impl(const expression &, co
 
 } // namespace detail
 
-inline constexpr auto fixed_centres = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+inline constexpr auto fixed_centres_kw_cfg
+    = igor::config<kw::descr::constructible_from<expression, kw::Gconst>,
+                   kw::descr::constructible_input_range<kw::masses, expression>,
+                   kw::descr::constructible_input_range<kw::positions, expression>>{};
+
+inline constexpr auto fixed_centres = []<typename... KwArgs>
+    requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::fixed_centres_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
 // NOTE: these return specific energy and potential.
-
-inline constexpr auto fixed_centres_energy = [](const auto &...kw_args) -> expression {
+inline constexpr auto fixed_centres_energy = []<typename... KwArgs>
+    requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::fixed_centres_energy_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
-inline constexpr auto fixed_centres_potential = [](const auto &...kw_args) -> expression {
+inline constexpr auto fixed_centres_potential = []<typename... KwArgs>
+    requires igor::validate<fixed_centres_kw_cfg, KwArgs...>
+// NOTLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::fixed_centres_potential_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
