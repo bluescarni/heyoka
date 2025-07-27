@@ -147,7 +147,7 @@ auto eop_common_opts(const KwArgs &...kw_args)
     auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() -> eop_data {
+    auto data = [&p]() {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {
