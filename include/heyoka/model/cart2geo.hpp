@@ -37,10 +37,10 @@ auto cart2geo_common_opts(const KwArgs &...kw_args)
     const igor::parser p{kw_args...};
 
     // The eccentricity squared. Optional. Defaults to the WGS84 value.
-    const double ecc2 = p(kw::ecc2, 1 - (b_earth * b_earth / a_earth / a_earth));
+    const auto ecc2 = static_cast<double>(p(kw::ecc2, 1 - (b_earth * b_earth / a_earth / a_earth)));
 
     // Planet equatorial radius ('a' in the geodetic classical notation). Defaults to a_earth.
-    const double R_eq = p(kw::R_eq, a_earth);
+    const auto R_eq = static_cast<double>(p(kw::R_eq, a_earth));
 
     if constexpr (WithNIters) {
         // Number of iterations. Optional. Defaults to 4 (guarantees an error below the cm level on the Earth).
