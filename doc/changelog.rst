@@ -32,6 +32,10 @@ Changes
 Fix
 ~~~
 
+- Ensure to invoke all TBB primitives in isolated contexts in order to prevent cancellation
+  due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
+  after parallel sections
+  (`#500 <https://github.com/bluescarni/heyoka/pull/500>`__).
 - Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
   in numerical integrations
   (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).
