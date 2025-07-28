@@ -25,13 +25,12 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/analytical_theories_helpers.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_1.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_2.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_3.hpp>
@@ -231,86 +230,89 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     // for different values of alpha.
     std::vector<expression> parts(boost::numeric_cast<std::vector<expression>::size_type>(n_alpha));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(static_cast<std::size_t>(0), n_alpha), [&](const auto &r) {
-        for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
-            // Fetch the number of terms for this chunk.
-            const auto cur_size = sizes_ptr[alpha];
+    heyoka::detail::tbb_isolated_parallel_for(
+        oneapi::tbb::blocked_range(static_cast<std::size_t>(0), n_alpha), [&](const auto &r) {
+            for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
+                // Fetch the number of terms for this chunk.
+                const auto cur_size = sizes_ptr[alpha];
 
-            // This vector will contain the terms of the chunk
-            // for the current value of alpha.
-            std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
+                // This vector will contain the terms of the chunk
+                // for the current value of alpha.
+                std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
 
-            oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
-                // trig will contain the components of the
-                // sin/cos trigonometric argument.
-                auto trig = std::vector<expression>(17u);
+                heyoka::detail::tbb_isolated_parallel_for(
+                    oneapi::tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
+                        // trig will contain the components of the
+                        // sin/cos trigonometric argument.
+                        auto trig = std::vector<expression>(17u);
 
-                for (auto i = r_in.begin(); i != r_in.end(); ++i) {
-                    // Load the C/S values from the table.
-                    const auto Sval = val_ptr[alpha][i].S;
-                    const auto Cval = val_ptr[alpha][i].C;
+                        for (auto i = r_in.begin(); i != r_in.end(); ++i) {
+                            // Load the C/S values from the table.
+                            const auto Sval = val_ptr[alpha][i].S;
+                            const auto Cval = val_ptr[alpha][i].C;
 
-                    // Check if the term is too small.
-                    if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
-                        continue;
+                            // Check if the term is too small.
+                            if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
+                                continue;
+                            }
+
+                            // Assemble the linear combination of trigonometric arguments.
+                            // a1-a9.
+                            for (std::size_t j = 0; j < 9u; ++j) {
+                                // Compute lambda_l for the current element
+                                // of the trigonometric argument.
+                                const auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
+
+                                // Multiply it by the current value in the table.
+                                trig[j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a1_a9[j]);
+                            }
+
+                            // a15-a17.
+                            for (std::size_t j = 0; j < 3u; ++j) {
+                                const auto cur_lam = lam_l_data[14u + j][0] + t_expr * lam_l_data[14u + j][1];
+                                trig[14u + j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a15_a17[j]);
+                            }
+
+                            // a10-a13.
+                            for (std::size_t j = 0; j < 4u; ++j) {
+                                const auto cur_lam = lam_l_data[9u + j][0] + t_expr * lam_l_data[9u + j][1];
+                                trig[9u + j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a10_a13[j]);
+                            }
+
+                            // a14.
+                            {
+                                const auto cur_lam = lam_l_data[13][0] + t_expr * lam_l_data[13][1];
+                                trig[13] = cur_lam * static_cast<double>(val_ptr[alpha][i].a14);
+                            }
+
+                            // Compute the trig arg.
+                            auto trig_arg = sum(trig);
+
+                            // Add the term to the chunk.
+                            auto tmp = Sval * sin(trig_arg);
+                            cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
+                        }
+                    });
+
+                // Partition cur so that all zero expressions (i.e., VSOP2013 terms which have
+                // been skipped) are at the end. Use stable_partition so that the original ordering
+                // is preserved.
+                const auto new_end = std::stable_partition(cur.begin(), cur.end(), [](const expression &e) {
+                    if (const auto *num_ptr = std::get_if<number>(&e.value());
+                        num_ptr != nullptr && is_zero(*num_ptr)) {
+                        return false;
+                    } else {
+                        return true;
                     }
+                });
 
-                    // Assemble the linear combination of trigonometric arguments.
-                    // a1-a9.
-                    for (std::size_t j = 0; j < 9u; ++j) {
-                        // Compute lambda_l for the current element
-                        // of the trigonometric argument.
-                        const auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
+                // Erase the skipped terms.
+                cur.erase(new_end, cur.end());
 
-                        // Multiply it by the current value in the table.
-                        trig[j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a1_a9[j]);
-                    }
-
-                    // a15-a17.
-                    for (std::size_t j = 0; j < 3u; ++j) {
-                        const auto cur_lam = lam_l_data[14u + j][0] + t_expr * lam_l_data[14u + j][1];
-                        trig[14u + j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a15_a17[j]);
-                    }
-
-                    // a10-a13.
-                    for (std::size_t j = 0; j < 4u; ++j) {
-                        const auto cur_lam = lam_l_data[9u + j][0] + t_expr * lam_l_data[9u + j][1];
-                        trig[9u + j] = cur_lam * static_cast<double>(val_ptr[alpha][i].a10_a13[j]);
-                    }
-
-                    // a14.
-                    {
-                        const auto cur_lam = lam_l_data[13][0] + t_expr * lam_l_data[13][1];
-                        trig[13] = cur_lam * static_cast<double>(val_ptr[alpha][i].a14);
-                    }
-
-                    // Compute the trig arg.
-                    auto trig_arg = sum(trig);
-
-                    // Add the term to the chunk.
-                    auto tmp = Sval * sin(trig_arg);
-                    cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
-                }
-            });
-
-            // Partition cur so that all zero expressions (i.e., VSOP2013 terms which have
-            // been skipped) are at the end. Use stable_partition so that the original ordering
-            // is preserved.
-            const auto new_end = std::stable_partition(cur.begin(), cur.end(), [](const expression &e) {
-                if (const auto *num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
-                    return false;
-                } else {
-                    return true;
-                }
-            });
-
-            // Erase the skipped terms.
-            cur.erase(new_end, cur.end());
-
-            // Sum the terms in the chunk and assign the result to parts.
-            parts[alpha] = sum(cur);
-        }
-    });
+                // Sum the terms in the chunk and assign the result to parts.
+                parts[alpha] = sum(cur);
+            }
+        });
 
     // Return the result of Horner evaluation on parts.
     return heyoka::detail::horner_eval(parts, t_expr);
@@ -338,12 +340,12 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     // on the input arguments.
     expression a, lam, k, h, q_, p_;
 
-    oneapi::tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
-                                 [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
-                                 [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
-                                 [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
-                                 [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
-                                 [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
+    heyoka::detail::tbb_isolated_parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
+                                                 [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
+                                                 [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
+                                                 [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
+                                                 [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                                                 [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
     // Compute the gravitational parameter for pl_idx.
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE

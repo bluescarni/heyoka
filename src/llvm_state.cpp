@@ -37,7 +37,6 @@
 #include <fmt/format.h>
 
 #include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
@@ -107,6 +106,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -1673,6 +1673,8 @@ struct multi_jit {
 #if 0
 
 // A task dispatcher class built on top of TBB's task group.
+//
+// NOTE: this needs to be isolated if we ever end up using it.
 class tbb_task_dispatcher : public llvm::orc::TaskDispatcher
 {
     oneapi::tbb::task_group m_tg;
@@ -2361,12 +2363,12 @@ void llvm_multi_state::compile()
     auto *logger = detail::get_logger();
 
     // Verify the modules before compiling.
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
-                              [](const auto &rng) {
-                                  for (const auto &s : rng) {
-                                      detail::verify_module(*s.m_module);
-                                  }
-                              });
+    detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
+                                      [](const auto &rng) {
+                                          for (const auto &s : rng) {
+                                              detail::verify_module(*s.m_module);
+                                          }
+                                      });
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
 

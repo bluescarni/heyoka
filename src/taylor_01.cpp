@@ -31,8 +31,6 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/parallel_invoke.h>
 
 #include <fmt/core.h>
 
@@ -56,6 +54,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_identity.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -1208,20 +1207,20 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_taylor_cm_par_segment(const heyoka::det
                                                                const void *time_ptr, std::uint32_t order) noexcept
 {
     try {
-        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, nfuncs),
-                                  [ncalls_arr, worker_arr, tape_ptr, par_ptr, time_ptr, order](const auto &func_range) {
-                                      for (auto f_idx = func_range.begin(); f_idx != func_range.end(); ++f_idx) {
-                                          const auto cur_ncalls = ncalls_arr[f_idx];
-                                          auto *cur_f = worker_arr[f_idx];
+        heyoka::detail::tbb_isolated_parallel_for(
+            oneapi::tbb::blocked_range<std::uint32_t>(0, nfuncs),
+            [ncalls_arr, worker_arr, tape_ptr, par_ptr, time_ptr, order](const auto &func_range) {
+                for (auto f_idx = func_range.begin(); f_idx != func_range.end(); ++f_idx) {
+                    const auto cur_ncalls = ncalls_arr[f_idx];
+                    auto *cur_f = worker_arr[f_idx];
 
-                                          oneapi::tbb::parallel_for(
-                                              oneapi::tbb::blocked_range<std::uint32_t>(0, cur_ncalls),
-                                              [cur_f, tape_ptr, par_ptr, time_ptr, order](const auto &call_range) {
-                                                  cur_f(call_range.begin(), call_range.end(), tape_ptr, par_ptr,
-                                                        time_ptr, order);
-                                              });
-                                      }
-                                  });
+                    heyoka::detail::tbb_isolated_parallel_for(
+                        oneapi::tbb::blocked_range<std::uint32_t>(0, cur_ncalls),
+                        [cur_f, tape_ptr, par_ptr, time_ptr, order](const auto &call_range) {
+                            cur_f(call_range.begin(), call_range.end(), tape_ptr, par_ptr, time_ptr, order);
+                        });
+                }
+            });
         // LCOV_EXCL_START
     } catch (const std::exception &ex) {
         heyoka::detail::get_logger()->critical("Exception caught in heyoka_taylor_cm_par_segment(): {}", ex.what());
