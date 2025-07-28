@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Comprehensive overhaul of keyword arguments, including extensive compile-time validation
+  (`#498 <https://github.com/bluescarni/heyoka/pull/498>`__).
 - Add getters for the gravitational parameter and reference Earth radius in the EGM2008 model
   (`#493 <https://github.com/bluescarni/heyoka/pull/493>`__).
 - New ``func_args`` class for the management of function arguments in the expression system
@@ -30,11 +32,11 @@ Changes
 Fix
 ~~~
 
-- Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
-  (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
 - Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
   in numerical integrations
   (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).
+- Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
+  (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
 
 7.3.0 (2025-04-21)
 ------------------

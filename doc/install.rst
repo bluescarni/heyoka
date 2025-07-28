@@ -7,7 +7,7 @@ Introduction
 ------------
 
 heyoka is written in modern C++, and it requires a compiler able to understand
-at least C++23. Specifically, heyoka currently targets GCC>=13, clang>=18 and MSVC>=17.4.
+at least C++23. Specifically, heyoka currently targets GCC>=14, clang>=18 and MSVC>=17.4.
 The library is regularly tested on a continuous integration pipeline
 which includes several operating systems (Linux, OSX, Windows)
 and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
