@@ -35,8 +35,6 @@
 #include <oneapi/tbb/blocked_range2d.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
 #include <oneapi/tbb/enumerable_thread_specific.h>
-#include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/parallel_invoke.h>
 #include <oneapi/tbb/task_arena.h>
 
 #include <heyoka/config.hpp>
@@ -44,6 +42,7 @@
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -558,7 +557,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 // Compile in parallel the init (f1) and tprop (f2) functions.
 void sgp4_compile_funcs(const std::function<void()> &f1, const std::function<void()> &f2)
 {
-    oneapi::tbb::parallel_invoke(f1, f2);
+    heyoka::detail::tbb_isolated_parallel_invoke(f1, f2);
 }
 
 } // namespace detail
@@ -920,13 +919,13 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
     // parallelisation if we have 20 satellites or more.
     if (n_sats >= 20u) {
-        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
-                                  [&tms_vec, dates, this, n_sats](const auto &range) {
-                                      for (auto i = range.begin(); i != range.end(); ++i) {
-                                          tms_vec[i]
-                                              = detail::sgp4_date_to_tdelta(i, dates, m_impl->m_sat_buffer, n_sats);
-                                      }
-                                  });
+        heyoka::detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
+                                                  [&tms_vec, dates, this, n_sats](const auto &range) {
+                                                      for (auto i = range.begin(); i != range.end(); ++i) {
+                                                          tms_vec[i] = detail::sgp4_date_to_tdelta(
+                                                              i, dates, m_impl->m_sat_buffer, n_sats);
+                                                      }
+                                                  });
     } else {
         for (tms_vec_size_t i = 0; i < tms_vec.size(); ++i) {
             tms_vec[i] = detail::sgp4_date_to_tdelta(i, dates, m_impl->m_sat_buffer, n_sats);
@@ -990,26 +989,27 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
                                                               oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
         ets_t ets_cfunc([this]() { return m_impl->m_cf_tprop; });
 
-        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
-                                  [&ets_cfunc, &par_iter](const auto &range) {
-                                      // Fetch the thread-local cfunc.
-                                      auto &cf = ets_cfunc.local();
+        heyoka::detail::tbb_isolated_parallel_for(
+            oneapi::tbb::blocked_range<std::size_t>(0, n_evals), [&ets_cfunc, &par_iter](const auto &range) {
+                // Fetch the thread-local cfunc.
+                auto &cf = ets_cfunc.local();
 
-                                      // NOTE: there are well-known pitfalls when using thread-specific
-                                      // storage with nested parallelism:
-                                      //
-                                      // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
-                                      //
-                                      // If the cfunc itself is performing parallel operations, then the current thread
-                                      // will block as execution in the parallel region of the cfunc begins. The
-                                      // blocked thread could then grab another task from the parallel for loop
-                                      // we are currently in, and it would then start operating for a second time
-                                      // on the same cf object.
-                                      oneapi::tbb::this_task_arena::isolate([&]() { par_iter(cf, range); });
-                                  });
+                // NOTE: there are well-known pitfalls when using thread-specific
+                // storage with nested parallelism:
+                //
+                // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
+                //
+                // If the cfunc itself is performing parallel operations, then the current thread
+                // will block as execution in the parallel region of the cfunc begins. The
+                // blocked thread could then grab another task from the parallel for loop
+                // we are currently in, and it would then start operating for a second time
+                // on the same cf object.
+                oneapi::tbb::this_task_arena::isolate([&]() { par_iter(cf, range); });
+            });
     } else {
-        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
-                                  [&par_iter, this](const auto &range) { par_iter(m_impl->m_cf_tprop, range); });
+        heyoka::detail::tbb_isolated_parallel_for(
+            oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
+            [&par_iter, this](const auto &range) { par_iter(m_impl->m_cf_tprop, range); });
     }
 }
 
@@ -1038,7 +1038,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
     // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
     // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 20 or more.
     if (tms_vec.size() >= 20u) {
-        oneapi::tbb::parallel_for(
+        heyoka::detail::tbb_isolated_parallel_for(
             oneapi::tbb::blocked_range2d<std::size_t>(0, dates.extent(0), 0, dates.extent(1)),
             [&tms_vec, dates, this, n_sats](const auto &range) {
                 for (auto i = range.rows().begin(); i != range.rows().end(); ++i) {

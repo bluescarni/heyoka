@@ -36,8 +36,6 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
-#include <oneapi/tbb/parallel_invoke.h>
-
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -74,6 +72,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -2245,10 +2244,10 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
     // would not be worth it, perhaps we can reconsider in the future. It is also not clear how
     // to deal with thread-unsafe type cloning in this hypothetical scenario.
     if (batch_size == 1u) {
-        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); });
     } else {
-        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); },
                                      [&create_cfunc, batch_size]() { create_cfunc(true, batch_size); });
     }

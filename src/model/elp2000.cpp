@@ -16,8 +16,6 @@
 
 #include <fmt/core.h>
 
-#include <oneapi/tbb/parallel_invoke.h>
-
 #include <heyoka/config.hpp>
 #include <heyoka/detail/analytical_theories_helpers.hpp>
 #include <heyoka/detail/elp2000/elp2000_10_15.hpp>
@@ -25,6 +23,7 @@
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
 #include <heyoka/detail/elp2000/elp2000_22_36.hpp>
 #include <heyoka/detail/elp2000/elp2000_4_9.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
@@ -1255,23 +1254,23 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     std::vector<expression> retval;
     retval.resize(3);
 
-    oneapi::tbb::parallel_invoke(
+    heyoka::detail::tbb_isolated_parallel_invoke(
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = sum(r_terms_t1); },
-                                         [&]() { c = sum(r_terms_t2); });
+            heyoka::detail::tbb_isolated_parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = sum(r_terms_t1); },
+                                                         [&]() { c = sum(r_terms_t2); });
             retval[0] = horner_eval({a, b, c}, tm);
         },
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = sum(U_terms_t1); },
-                                         [&]() { c = sum(U_terms_t2); });
+            heyoka::detail::tbb_isolated_parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = sum(U_terms_t1); },
+                                                         [&]() { c = sum(U_terms_t2); });
             retval[1] = horner_eval({a, b, c}, tm);
         },
         [&]() {
             expression a, b, c;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = sum(V_terms_t1); },
-                                         [&]() { c = sum(V_terms_t2); });
+            heyoka::detail::tbb_isolated_parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = sum(V_terms_t1); },
+                                                         [&]() { c = sum(V_terms_t2); });
             retval[2] = horner_eval({a, b, c}, tm);
         });
 
