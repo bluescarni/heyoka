@@ -32,8 +32,6 @@
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
 #include <oneapi/tbb/enumerable_thread_specific.h>
-#include <oneapi/tbb/parallel_for.h>
-#include <oneapi/tbb/parallel_invoke.h>
 #include <oneapi/tbb/task_arena.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -49,6 +47,7 @@
 #endif
 
 #include <heyoka/detail/aligned_buffer.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -221,7 +220,7 @@ struct cfunc<T>::impl {
             auto &s_arr = std::get<0>(m_states);
 
             // Add the compiled functions.
-            oneapi::tbb::parallel_invoke(
+            detail::tbb_isolated_parallel_invoke(
                 [&]() {
                     // Scalar unstrided.
                     // NOTE: we fetch the decomposition from the scalar
@@ -795,32 +794,34 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                                m_impl->m_tape_sa[batch_size > 1u][1]);
         });
 
-        oneapi::tbb::parallel_invoke(
+        detail::tbb_isolated_parallel_invoke(
             [&ets_batch, &batch_iter, n_simd_blocks]() {
-                oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
-                                          [&ets_batch, &batch_iter](const auto &range) {
-                                              // Fetch the local tape.
-                                              auto *tape_ptr = ets_batch.local().get();
+                detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
+                                                  [&ets_batch, &batch_iter](const auto &range) {
+                                                      // Fetch the local tape.
+                                                      auto *tape_ptr = ets_batch.local().get();
 
-                                              // NOTE: there are well-known pitfalls when using thread-specific
-                                              // storage with nested parallelism:
-                                              //
-                                              // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
-                                              //
-                                              // If parallel mode is active in the cfunc, then the current thread
-                                              // will block as execution in the parallel region of the cfunc begins. The
-                                              // blocked thread could then grab another task from the parallel for loop
-                                              // we are currently in, and it would then start writing for a second time
-                                              // into the same tape it already begun writing into.
-                                              oneapi::tbb::this_task_arena::isolate(
-                                                  [&]() { batch_iter.template operator()<true>(range, tape_ptr); });
-                                          });
+                                                      // NOTE: there are well-known pitfalls when using thread-specific
+                                                      // storage with nested parallelism:
+                                                      //
+                                                      // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
+                                                      //
+                                                      // If parallel mode is active in the cfunc, then the current
+                                                      // thread will block as execution in the parallel region of the
+                                                      // cfunc begins. The blocked thread could then grab another task
+                                                      // from the parallel for loop we are currently in, and it would
+                                                      // then start writing for a second time into the same tape it
+                                                      // already begun writing into.
+                                                      oneapi::tbb::this_task_arena::isolate([&]() {
+                                                          batch_iter.template operator()<true>(range, tape_ptr);
+                                                      });
+                                                  });
             },
             [&scalar_rem]() { scalar_rem.template operator()<true>(); });
     } else {
-        oneapi::tbb::parallel_invoke(
+        detail::tbb_isolated_parallel_invoke(
             [fptr_batch_s = m_impl->m_fptr_batch_s, &batch_iter, n_simd_blocks]() {
-                oneapi::tbb::parallel_for(
+                detail::tbb_isolated_parallel_for(
                     oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                     [&batch_iter](const auto &range) { batch_iter.template operator()<false>(range, nullptr); });
             },
