@@ -48,11 +48,17 @@ inline constexpr bool is_any_callable = false;
 // NOTE: we use this rather than, e.g., a null function
 // pointer so that we can enable serialisation of
 // default-constructed callables.
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable{template <typename Archive> void serialize(Archive &, unsigned){}};
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable {
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
 
 // Default (empty) implementation of the callable interface.
 template <typename, typename, typename, typename, typename...>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl{};
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl {
+};
 
 // Implementation of the callable interface for invocable objects.
 template <typename Base, typename Holder, typename T, typename R, typename... Args>
@@ -124,32 +130,32 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
 // Implementation of the reference interface.
 template <typename R, typename... Args>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
+    template <typename Wrap, typename... FArgs>
+        requires requires(Wrap &&self, FArgs &&...fargs) {
+            {
+                std::forward_like<Wrap> (*iface_ptr(std::forward<Wrap>(self)))(std::forward<FArgs>(fargs)...)
+            } -> std::same_as<R>;
+        }
+    R operator()(this Wrap &&self, FArgs &&...fargs)
+    {
+        // NOTE: a wrap in invalid state is considered empty.
+        if (is_invalid(self)) [[unlikely]] {
+            throw std::bad_function_call{};
+        }
+
+        return std::forward_like<Wrap>(*iface_ptr(std::forward<Wrap>(self)))(std::forward<FArgs>(fargs)...);
+    }
+
     template <typename Wrap>
-    struct impl {
-        using result_type = R;
-
-        template <typename JustWrap = Wrap, typename... FArgs>
-        auto operator()(FArgs &&...fargs)
-            -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
-        {
-            // NOTE: a wrap in invalid state is considered empty.
-            if (is_invalid(*static_cast<Wrap *>(this))) {
-                throw std::bad_function_call{};
-            }
-
-            return iface_ptr(*static_cast<Wrap *>(this))->operator()(std::forward<FArgs>(fargs)...);
+    explicit operator bool(this const Wrap &self) noexcept
+    {
+        // NOTE: a wrap in invalid state is considered empty.
+        if (is_invalid(self)) {
+            return false;
+        } else {
+            return static_cast<bool>(*iface_ptr(self));
         }
-
-        explicit operator bool() const noexcept
-        {
-            // NOTE: a wrap in invalid state is considered empty.
-            if (is_invalid(*static_cast<const Wrap *>(this))) {
-                return false;
-            } else {
-                return static_cast<bool>(*iface_ptr(*static_cast<const Wrap *>(this)));
-            }
-        }
-    };
+    }
 };
 
 // Configuration of the callable wrap.

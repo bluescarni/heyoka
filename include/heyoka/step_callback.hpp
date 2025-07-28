@@ -70,8 +70,8 @@ template <typename Base, typename Holder, typename T, typename TA>
     // triggering a hard error due to pre_hook() being marked final.
     std::derived_from<callable_iface_impl<Base, Holder, T, bool, TA &>, step_cb_iface<TA>>
     && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
-    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
-    : callable_iface_impl<Base, Holder, T, bool, TA &> {
+    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS
+    step_cb_iface_impl<Base, Holder, T, TA> : callable_iface_impl<Base, Holder, T, bool, TA &> {
     void pre_hook(TA &ta) final
     {
         static_cast<void>(getval<Holder>(this).pre_hook(ta));
@@ -104,12 +104,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<bool, TA &>
 
 // Implementation of the reference interface.
 template <typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface {
-    template <typename Wrap>
-    struct impl : callable_ref_iface<bool, TA &>::template impl<Wrap> {
-        using ta_t = TA;
-        TANUKI_REF_IFACE_MEMFUN(pre_hook)
-    };
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface : callable_ref_iface<bool, TA &> {
+    using ta_t = TA;
+    TANUKI_REF_IFACE_MEMFUN2(pre_hook);
 };
 
 // Configuration.

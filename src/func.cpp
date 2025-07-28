@@ -42,7 +42,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
