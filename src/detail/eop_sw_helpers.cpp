@@ -171,6 +171,7 @@ llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &s, const Data &da
 
         // Transform TAI into TT.
         double tt_jd1{}, tt_jd2{};
+        // NOTE: eraTaitt() always returns 0 (success), no need to check.
         ::eraTaitt(tai_jd1, tai_jd2, &tt_jd1, &tt_jd2);
 
         // Normalise.
