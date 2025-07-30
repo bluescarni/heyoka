@@ -784,6 +784,112 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
     return builder.CreateCall(f, x);
 }
 
+// Utility to convert the input heyoka.real.N into a double-precision value.
+llvm::Value *llvm_real_to_double(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto *fp_t = x->getType();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+    auto &bld = s.builder();
+
+    const auto fname = fmt::format("heyoka.real.{}.to_double", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function type and the function.
+        auto *dbl_t = bld.getDoubleTy();
+        auto *ft = llvm::FunctionType::get(dbl_t, {fp_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Create the mpfr view from the input argument.
+        auto *mpfr_struct_ptr = llvm_real_to_mpfr_view(s, f->args().begin()).first;
+
+        // Invoke the MPFR primitive.
+        auto *ret = llvm_invoke_external(s, "heyoka_mpfr_to_double", dbl_t, {mpfr_struct_ptr}, get_mpfr_attr_list(ctx));
+
+        // Return the result.
+        bld.CreateRet(ret);
+
+        // Restore the original insertion point.
+        bld.SetInsertPoint(orig_bb);
+    }
+
+    return bld.CreateCall(f, x);
+}
+
+// Utility to convert the input double-precision value x into an heyoka.real.N of type fp_t.
+llvm::Value *llvm_double_to_real(llvm_state &s, llvm::Value *x, llvm::Type *fp_t)
+{
+    assert(x != nullptr);
+    assert(fp_t != nullptr);
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+    auto &bld = s.builder();
+
+    auto *dbl_t = bld.getDoubleTy();
+
+    assert(x->getType() == dbl_t);
+
+    const auto fname = fmt::format("heyoka.real.{}.from_double", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function type and the function.
+        auto *ft = llvm::FunctionType::get(fp_t, {dbl_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Create an undef value for the result.
+        auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+
+        // Invoke the MPFR primitive.
+        llvm_invoke_external(s, "heyoka_double_to_mpfr", bld.getVoidTy(), {real_res, f->getArg(0)},
+                             get_mpfr_attr_list(ctx));
+
+        // Assemble the result.
+        auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
+
+        // Return it.
+        bld.CreateRet(res);
+
+        // Restore the original insertion point.
+        bld.SetInsertPoint(orig_bb);
+    }
+
+    return bld.CreateCall(f, x);
+}
+
 // Utility to create a real with precision p
 // whose value is the epsilon at that precision.
 // NOTE: for consistency with the epsilons returned for the other
@@ -862,6 +968,18 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t 
 extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
 {
     return mpfr_sgn(x);
+}
+
+// Wrapper to convert a real to double precision.
+extern "C" HEYOKA_DLL_PUBLIC double heyoka_mpfr_to_double(const mppp::mpfr_struct_t *x) noexcept
+{
+    return ::mpfr_get_d(x, MPFR_RNDN);
+}
+
+// Wrapper to convert a double into a real.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_double_to_mpfr(mppp::mpfr_struct_t *ret, const double x) noexcept
+{
+    ::mpfr_set_d(ret, x, MPFR_RNDN);
 }
 
 #endif

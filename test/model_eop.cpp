@@ -21,6 +21,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
