@@ -151,6 +151,14 @@ TEST_CASE("dayfrac s11n")
     }
 }
 
+TEST_CASE("dayfrac diff")
+{
+    auto x = make_vars("x");
+
+    REQUIRE(diff(model::dayfrac(kw::time_expr = x), "x") == 1_dbl);
+    REQUIRE(diff(model::dayfrac(kw::time_expr = x * x), "x") == x + x);
+}
+
 TEST_CASE("dayfrac cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool compact_mode) {
