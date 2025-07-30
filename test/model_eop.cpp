@@ -14,7 +14,6 @@
 #include <limits>
 #include <random>
 #include <ranges>
-#include <regex>
 #include <sstream>
 #include <tuple>
 #include <utility>
@@ -22,6 +21,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -483,19 +483,13 @@ TEST_CASE("eop cfunc")
                 // of this check is to make sure that the computation is done with a single call to the combined
                 // function. That is, we want to make sure that LLVM understood it does not need to call the same
                 // function twice.
-                const auto get_eop_eopp_call_regex = std::regex(R"(.*call.*heyoka\.get_.*_.*p\..*)");
+                const auto get_eop_eopp_call_regex = boost::regex(R"(.*call.*heyoka\.get_.*_.*p\..*)");
                 auto count = 0u;
                 const auto ir = s.get_ir();
                 for (const auto line : ir | std::ranges::views::split('\n')) {
-                    // NOTE: libstdc++ bug on large strings:
-                    // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
-                    if (std::ranges::size(line) > 200u) {
-                        continue;
-                    }
-
-                    std::cmatch matches;
-                    if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
-                                         matches, get_eop_eopp_call_regex)) {
+                    boost::cmatch matches;
+                    if (boost::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                           matches, get_eop_eopp_call_regex)) {
                         ++count;
                     }
                 }
