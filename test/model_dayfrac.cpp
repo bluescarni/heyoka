@@ -161,6 +161,10 @@ TEST_CASE("dayfrac cfunc")
         std::vector<fp_t> outs, ins;
 
         for (auto batch_size : {1u, 2u, 3u, 8u}) {
+            if (batch_size != 1u && std::same_as<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
             outs.resize(batch_size);
             ins.resize(batch_size);
 
