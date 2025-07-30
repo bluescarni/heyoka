@@ -299,7 +299,7 @@ TEST_CASE("erap diff")
 }
 
 // NOTE: the functional testing for the era/erap is done in the get_era_erap_func test. Here we
-// just basically checks that the cfunc compiles and that we get a non-nan value out of it.
+// just basically check that the cfunc compiles and that we get a non-nan value out of it.
 TEST_CASE("era erap cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool compact_mode) {
