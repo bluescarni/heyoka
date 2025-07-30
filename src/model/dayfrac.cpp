@@ -12,15 +12,18 @@
 #include <cstdint>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <fmt/core.h>
 
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -35,13 +38,18 @@
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/dayfrac.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -328,6 +336,212 @@ llvm::Function *dayfrac_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, 
     return heyoka::detail::llvm_c_eval_func_helper(
         get_name(), [&s](const std::vector<llvm::Value *> &args, bool) { return dayfrac_llvm_eval_impl(s, args[0]); },
         *this, s, fp_t, batch_size, high_accuracy);
+}
+
+namespace
+{
+
+// Derivative of dayfrac(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Value *taylor_diff_dayfrac_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &, const U &num,
+                                      const std::vector<llvm::Value *> &,
+                                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                      llvm::Value *par_ptr, std::uint32_t, std::uint32_t order,
+                                      std::uint32_t batch_size)
+{
+    namespace hd = heyoka::detail;
+
+    if (order == 0u) {
+        return dayfrac_llvm_eval_impl(s, hd::taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+    } else {
+        return hd::vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
+    }
+}
+
+// Derivative of dayfrac(variable).
+//
+// NOTE: dayfrac is defined as follows:
+//
+// dayfrac(b(t)) = b(t) + c(b(t)),
+//
+// where c is a step function (hence with null derivatives). Taking the first order derivative wrt t:
+//
+// dayfrac'(b(t)) = b'(t),
+//
+// and, generalising,
+//
+// dayfrac^[n] = b^[n].
+llvm::Value *taylor_diff_dayfrac_impl(llvm_state &s, llvm::Type *, const std::vector<std::uint32_t> &,
+                                      const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
+                                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                      std::uint32_t n_uvars, std::uint32_t order, std::uint32_t)
+{
+    namespace hd = heyoka::detail;
+
+    // Fetch the index of the variable.
+    const auto b_idx = hd::uname_to_index(var.name());
+
+    // Load b^[n].
+    auto *bn = hd::taylor_fetch_diff(arr, b_idx, order, n_uvars);
+
+    if (order == 0u) {
+        // Evaluate dayfrac for b^[0] and return it.
+        return dayfrac_llvm_eval_impl(s, bn);
+    } else {
+        // Just return b^[n].
+        return bn;
+    }
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Value *taylor_diff_dayfrac_impl(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &, const U &,
+                                      const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                      std::uint32_t)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of dayfrc()");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Value *dayfrac_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                       std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 1u);
+    assert(deps.empty());
+
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_dayfrac_impl(s, fp_t, deps, v, arr, par_ptr, n_uvars, order, batch_size);
+        },
+        args()[0].value());
+}
+
+namespace
+{
+
+// Derivative of dayfrac(number).
+template <typename U>
+    requires(heyoka::detail::is_num_param_v<U>)
+llvm::Function *taylor_c_diff_func_dayfrac_impl(llvm_state &s, llvm::Type *fp_t, const dayfrac_impl &fn, const U &num,
+                                                std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    return heyoka::detail::taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, fn.get_name(), 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return dayfrac_llvm_eval_impl(s, args[0]);
+        },
+        num);
+}
+
+// Derivative of dayfrac(variable).
+llvm::Function *taylor_c_diff_func_dayfrac_impl(llvm_state &s, llvm::Type *fp_t, const dayfrac_impl &fn,
+                                                const variable &var, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    namespace hd = heyoka::detail;
+
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    const auto [fname, fargs] = hd::taylor_c_diff_func_name_args(ctx, fp_t, fn.get_name(), n_uvars, batch_size, {var});
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+    if (f != nullptr) {
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = hd::make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *diff_ptr = f->args().begin() + 2;
+    auto *b_idx = f->args().begin() + 5;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Create the return value.
+    auto *retval = bld.CreateAlloca(val_t);
+
+    // Load b^[n].
+    auto *bn = hd::taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx);
+
+    hd::llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // For order 0, compute dayfrac() for the order 0 of b_idx.
+
+            // Evaluate.
+            auto *dayfrac_val = dayfrac_llvm_eval_impl(s, bn);
+
+            // Store the result.
+            bld.CreateStore(dayfrac_val, retval);
+        },
+        [&]() {
+            // For order > 0, we just return b^[n].
+            bld.CreateStore(bn, retval);
+        });
+
+    // Return the result.
+    bld.CreateRet(bld.CreateLoad(val_t, retval));
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U>
+llvm::Function *taylor_c_diff_func_dayfrac_impl(llvm_state &, llvm::Type *, const dayfrac_impl &, const U &,
+                                                std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of dayfrac() in compact mode");
+}
+
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Function *dayfrac_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                 std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 1u);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_dayfrac_impl(s, fp_t, *this, v, n_uvars, batch_size); },
+        args()[0].value());
 }
 
 } // namespace model::detail

@@ -12,6 +12,7 @@
 #include <cmath>
 #include <concepts>
 #include <limits>
+#include <ranges>
 #include <sstream>
 #include <tuple>
 #include <vector>
@@ -241,3 +242,50 @@ TEST_CASE("dayfrac cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("dayfrac taylor scalar")
+{
+    using model::dayfrac;
+
+    auto x = "x"_var, y = "y"_var;
+
+    const auto dyn = {prime(x) = dayfrac(kw::time_expr = 2. * x) + y + dayfrac(kw::time_expr = 4.),
+                      prime(y) = dayfrac(kw::time_expr = par[0]) + x};
+
+    auto scalar_tester = [&dyn, x, y](auto fp_x, unsigned opt_level, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        // Create a compiled function wrapper for the evaluation of dayfrac().
+        auto dayfrac_wrapper = [cf = cfunc<fp_t>{{dayfrac(kw::time_expr = x)}, {x}}](const fp_t v) mutable {
+            fp_t retval{};
+            cf(std::ranges::subrange(&retval, &retval + 1), std::ranges::subrange(&v, &v + 1));
+            return retval;
+        };
+
+        const std::vector<fp_t> pars = {fp_t(42)};
+
+        auto ta = taylor_adaptive<fp_t>{dyn, kw::tol = .1, kw::compact_mode = compact_mode, kw::opt_level = opt_level,
+                                        kw::pars = pars};
+
+        ta.step(true);
+
+        const auto jet = tc_to_jet(ta);
+
+        REQUIRE(jet[0] == 0);
+        REQUIRE(jet[1] == 0);
+
+        REQUIRE(jet[2] == approximately(dayfrac_wrapper(jet[0]) + jet[1] + dayfrac_wrapper(4)));
+        REQUIRE(jet[3] == approximately(dayfrac_wrapper(42) + jet[0]));
+
+        REQUIRE(jet[4] == approximately((2 * jet[2] + jet[3]) / 2));
+        REQUIRE(jet[5] == approximately(jet[2] / 2));
+
+        REQUIRE(jet[6] == approximately((4 * jet[4] + 2 * jet[5]) / 6));
+        REQUIRE(jet[7] == approximately((2 * jet[4]) / 6));
+    };
+
+    for (auto cm : {false, true}) {
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 0, cm); });
+        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
+    }
+}

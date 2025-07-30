@@ -51,12 +51,12 @@ public:
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    // [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-    //                                        const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-    //                                        std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
+                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
-    // [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
-    //                                                  bool) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool) const;
 };
 
 HEYOKA_DLL_PUBLIC expression dayfrac_func_impl(expression);
