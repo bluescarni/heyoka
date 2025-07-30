@@ -66,8 +66,7 @@ static_assert(std::is_signed_v<real_rnd_t>);
 // NOTE: we want to make extra sure long long can represent any mpfr_prec_t.
 static_assert(std::numeric_limits<mpfr_prec_t>::max() <= std::numeric_limits<long long>::max());
 
-// Helper to generate the function attributes list to
-// be used when invoking MPFR primitives.
+// Helper to generate the function attributes list to be used when invoking MPFR primitives.
 llvm::AttributeList get_mpfr_attr_list(llvm::LLVMContext &context)
 {
     return llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
@@ -210,8 +209,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, ll
     return {mpfr_struct_inst, limb_arr};
 }
 
-// Create an mpfr view with an undefined value, with the precision of the input type fp_t
-// (which must be a heyoka.real.N). This is used to create return values for the functions in the mpfr API.
+// Create an mpfr view with an undefined value, with the precision of the input type fp_t (which must be a
+// heyoka.real.N). This is used to create return values for the functions in the mpfr API.
 std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm::Type *fp_t)
 {
     const auto real_prec = llvm_is_real(fp_t);
@@ -228,15 +227,14 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Create the limb array.
-    // NOTE: the limb array will contain undefined values,
-    // under the assumption that the MPFR functions only care about the
-    // precision of the result (and not sign, exponent and significand).
-    // If that turns out not to be true, we can always codegen a zero real
-    // constant with appropriate precision and use its data, instead of leaving
-    // things undefined.
-    // NOTE: currently the mpfr_custom_init_set() macro sets something for sign and
-    // exponent, in addition to the precision. Perhaps we could invoke it here and
-    // then pick up the sign/exponent values as compile-time constants?
+    //
+    // NOTE: the limb array will contain undefined values, under the assumption that the MPFR functions only care about
+    // the precision of the result (and not sign, exponent and significand). If that turns out not to be true, we can
+    // always codegen a zero real constant with appropriate precision and use its data, instead of leaving things
+    // undefined.
+    //
+    // NOTE: currently the mpfr_custom_init_set() macro sets something for sign and exponent, in addition to the
+    // precision. Perhaps we could invoke it here and then pick up the sign/exponent values as compile-time constants?
     auto *limb_arr = builder.CreateAlloca(limb_arr_t);
 
     // Create the mpfr_struct_t.
@@ -255,8 +253,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     return {mpfr_struct_inst, limb_arr};
 }
 
-// Load the data from the input mpfr view (mpfr_struct_inst, limb_arr) into a heyoka.real.N
-// instance of type fp_t.
+// Load the data from the input mpfr view (mpfr_struct_inst, limb_arr) into a heyoka.real.N instance of type fp_t.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst, llvm::Value *limb_arr,
                                     llvm::Type *fp_t)
