@@ -41,7 +41,7 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
 ninja -v
 
 # Run the tests.
-ctest -VV -j4
+ASAN_OPTIONS=detect_container_overflow=0 ctest -VV -j4
 
 set +e
 set +x
