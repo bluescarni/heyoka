@@ -34,6 +34,7 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DHEYOKA_FORCE_STATIC_LLVM=yes \
+    -DCMAKE_CXX_FLAGS="-fsanitize=address" \
     -DHEYOKA_HIDE_LLVM_SYMBOLS=yes
 
 # Build.
