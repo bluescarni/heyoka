@@ -158,8 +158,12 @@ llvm::Constant *llvm_mpfr_prec(llvm_state &s, mpfr_prec_t prec)
                                         boost::numeric_cast<std::int64_t>(prec));
 }
 
-// Construct an mpfr view from the input heyoka.real.N r. An mpfr view is a pair consisting
-// of 1) an mpfr_struct_t instance and 2) the limb array to which the mpfr_struct_t points.
+// Construct an mpfr view from the input heyoka.real.N r. An mpfr view is a pair consisting of 1) an mpfr_struct_t
+// instance and 2) the limb array to which the mpfr_struct_t points, which is copied from the limb array of r.
+//
+// NOTE: we need to create the limb array ex-novo here because the input value r is formally stored within an LLVM
+// register and thus we cannot just take the address of its limb array. A copy operation into an alloca needs to
+// happen in order to be able to take memory addresses.
 std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, llvm::Value *r)
 {
     const auto real_prec = llvm_is_real(r->getType());
