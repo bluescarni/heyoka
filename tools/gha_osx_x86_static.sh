@@ -25,6 +25,10 @@ unset CXXFLAGS
 unset CFLAGS
 
 # Configure.
+#
+# NOTE: regarding D_LIBCPP_DISABLE_AVAILABILITY, see:
+#
+# https://conda-forge.org/docs/maintainer/knowledge_base/#newer-c-features-with-old-sdk
 CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -33,7 +37,7 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
-    -DCMAKE_CXX_FLAGS="-fsanitize=address" \
+    -DCMAKE_CXX_FLAGS="-D_LIBCPP_DISABLE_AVAILABILITY -fsanitize=address" \
     -DHEYOKA_FORCE_STATIC_LLVM=yes \
     -DHEYOKA_HIDE_LLVM_SYMBOLS=yes
 
