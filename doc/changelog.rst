@@ -36,7 +36,7 @@ Fix
 ~~~
 
 - Replace ``std::regex`` with ``boost::regex``, which should help preventing potential stack overflow issues
-  when working with large regular expressions
+  with long strings
   (`#501 <https://github.com/bluescarni/heyoka/pull/501>`__).
 - Ensure to invoke all TBB primitives in isolated contexts in order to prevent cancellation
   due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
