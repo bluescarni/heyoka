@@ -3456,21 +3456,25 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
         }
         // LCOV_EXCL_STOP
 
+        // Assemble the type name.
         const auto name = fmt::format("heyoka.real.{}", prec);
 
+        // Check if we have already defined the type in the current context.
         if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
             return ptr;
         }
 
         // Compute the required number of limbs.
-        // NOTE: this is a computation done in the implementation of mppp::real and
-        // reproduced here. We should consider exposing this functionality in mp++.
+        //
+        // NOTE: this is a computation done in the implementation of mppp::real and reproduced here. We should consider
+        // exposing this functionality in mp++.
         const auto nlimbs = boost::numeric_cast<std::uint64_t>((prec / GMP_NUMB_BITS)
                                                                + static_cast<int>((prec % GMP_NUMB_BITS) != 0));
 
         // Fetch the limb array type.
         auto *limb_arr_t = llvm::ArrayType::get(to_external_llvm_type<mp_limb_t>(c), nlimbs);
 
+        // Define the real type.
         auto *ret = llvm::StructType::create(
             {to_external_llvm_type<mpfr_sign_t>(c), to_external_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 

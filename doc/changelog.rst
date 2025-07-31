@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- New ``dayfrac()`` model to represent in the expression system the number of
+  fractional days elapsed since January 1st
+  (`#501 <https://github.com/bluescarni/heyoka/pull/501>`__).
 - Comprehensive overhaul of keyword arguments, including extensive compile-time validation
   (`#498 <https://github.com/bluescarni/heyoka/pull/498>`__).
 - Add getters for the gravitational parameter and reference Earth radius in the EGM2008 model
@@ -32,6 +35,9 @@ Changes
 Fix
 ~~~
 
+- Replace ``std::regex`` with ``boost::regex``, which should help preventing potential stack overflow issues
+  with long strings
+  (`#501 <https://github.com/bluescarni/heyoka/pull/501>`__).
 - Ensure to invoke all TBB primitives in isolated contexts in order to prevent cancellation
   due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
   after parallel sections

@@ -17,7 +17,7 @@ target_link_libraries(heyoka_test PRIVATE spdlog::spdlog heyoka)
 
 function(ADD_HEYOKA_TESTCASE arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt heyoka_llvm_internal Boost::boost)
+  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt heyoka_llvm_internal Boost::boost Boost::regex)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -158,6 +158,7 @@ ADD_HEYOKA_TESTCASE(model_frame_transformations)
 ADD_HEYOKA_TESTCASE(model_era)
 ADD_HEYOKA_TESTCASE(model_eop)
 ADD_HEYOKA_TESTCASE(model_sw)
+ADD_HEYOKA_TESTCASE(model_dayfrac)
 ADD_HEYOKA_TESTCASE(step_callback)
 ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
 ADD_HEYOKA_TESTCASE(angle_reducer)

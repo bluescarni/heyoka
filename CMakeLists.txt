@@ -307,6 +307,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sw.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2006.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/egm2008.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/dayfrac.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
@@ -533,17 +534,17 @@ set(_HEYOKA_MIN_BOOST_VERSION "1.85")
 # NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
 # of locating Boost in recent Boost/CMake versions. If we fail, we try again in
 # MODULE mode as last resort.
-find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv CONFIG)
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv regex CONFIG)
 if(NOT ${Boost_FOUND})
     message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
-    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv)
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv regex)
 endif()
 if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 message(STATUS "Found Boost version ${Boost_VERSION}.")
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
-target_link_libraries(heyoka PRIVATE Boost::charconv)
+target_link_libraries(heyoka PRIVATE Boost::charconv Boost::regex)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 # NOTE: make sure we do not use deprecated ASIO bits.

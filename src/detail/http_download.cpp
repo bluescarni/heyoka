@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <exception>
 #include <memory>
-#include <regex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -27,6 +26,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -63,7 +63,7 @@ const auto http_download_month_names_map = []() {
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto http_download_date_regexp = std::regex(
+const auto http_download_date_regexp = boost::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
                 fmt::join(http_download_month_names, "|")));
 
@@ -85,8 +85,8 @@ std::string http_download_parse_last_modified(std::string_view lm_field)
         return out;
     };
 
-    std::cmatch matches;
-    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, http_download_date_regexp))
+    boost::cmatch matches;
+    if (boost::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, http_download_date_regexp))
         [[likely]] {
         // Check if all groups matched.
         // NOTE: 7 + 1 because the first match is the entire string.

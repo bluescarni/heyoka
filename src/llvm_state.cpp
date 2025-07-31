@@ -20,7 +20,6 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -33,6 +32,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/format.h>
 
@@ -142,11 +142,11 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // NOTE: the pattern reported by LLVM here seems to be pwrN
 // (sample size of 1, on travis...).
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex ppc_regex_pattern("pwr([1-9]*)");
+const boost::regex ppc_regex_pattern("pwr([1-9]*)");
 
 // Regex to check for AMD Zen processors.
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex zen_regex_pattern("znver([1-9]*)");
+const boost::regex zen_regex_pattern("znver([1-9]*)");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -192,8 +192,8 @@ target_features get_target_features_impl()
 
         // Check if we are on Zen version 4 or later.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
-        std::cmatch m;
-        if (std::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
+        boost::cmatch m;
+        if (boost::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "znverN".
@@ -216,9 +216,9 @@ target_features get_target_features_impl()
         // instruction set from the CPU string.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
 
-        std::cmatch m;
+        boost::cmatch m;
 
-        if (std::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
+        if (boost::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
