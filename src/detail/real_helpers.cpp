@@ -47,6 +47,11 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
+// NOTE: most of the functionality here is implemented as full-blown LLVM functions, despite the fact that generally all
+// we are doing is just invoking corresponding MPFR primitives after having converted LLVM reals into MPFR views. The
+// reason for going through this process is that the LLVM functions can be marked as speculatable, which should in
+// principle allow for better optimisation at the LLVM level.
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
@@ -909,10 +914,11 @@ mppp::real eps_from_prec(mpfr_prec_t p)
 
 HEYOKA_END_NAMESPACE
 
+extern "C" {
+
 #if !defined(NDEBUG)
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1,
-                                                                                   mpfr_prec_t p2) noexcept
+HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
@@ -920,8 +926,7 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_re
 #endif
 
 // Wrapper to implement ULT comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -935,8 +940,7 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to implement UGE comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -950,8 +954,7 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to implement ULE comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -965,21 +968,22 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to invoke the mpfr_sgn() macro.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
 {
     return mpfr_sgn(x);
 }
 
 // Wrapper to convert a real to double precision.
-extern "C" HEYOKA_DLL_PUBLIC double heyoka_mpfr_to_double(const mppp::mpfr_struct_t *x) noexcept
+HEYOKA_DLL_PUBLIC double heyoka_mpfr_to_double(const mppp::mpfr_struct_t *x) noexcept
 {
     return ::mpfr_get_d(x, MPFR_RNDN);
 }
 
 // Wrapper to convert a double into a real.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_double_to_mpfr(mppp::mpfr_struct_t *ret, const double x) noexcept
+HEYOKA_DLL_PUBLIC void heyoka_double_to_mpfr(mppp::mpfr_struct_t *ret, const double x) noexcept
 {
     ::mpfr_set_d(ret, x, MPFR_RNDN);
+}
 }
 
 #endif

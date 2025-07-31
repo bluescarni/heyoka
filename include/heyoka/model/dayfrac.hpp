@@ -32,6 +32,7 @@ namespace model
 namespace detail
 {
 
+// Implementation of dayfrac().
 class HEYOKA_DLL_PUBLIC dayfrac_impl : public func_base
 {
     // Serialization.

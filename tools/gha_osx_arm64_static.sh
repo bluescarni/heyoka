@@ -41,6 +41,8 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
 ninja -v
 
 # Run the tests.
+#
+# See: https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow
 ASAN_OPTIONS=detect_container_overflow=0 ctest -VV -j4
 
 set +e
