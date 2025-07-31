@@ -243,7 +243,7 @@ HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 template <typename Callback, typename CallbackSet, typename Parser>
 Callback parse_propagate_cb(const Parser &p)
 {
-    if constexpr (p.has(kw::callback)) {
+    if constexpr (Parser::has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
 
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
