@@ -243,20 +243,14 @@ HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 template <typename Callback, typename CallbackSet, typename Parser>
 Callback parse_propagate_cb(const Parser &p)
 {
-    if constexpr (Parser::has(kw::callback)) {
+    if constexpr (p.has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
 
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
             return p(kw::callback);
-        } else if constexpr (constructible_input_range<cb_arg_t, Callback>) {
-            return CallbackSet(ranges_to<std::vector<Callback>>(p(kw::callback)));
         } else {
-            // LCOV_EXCL_START
-            static_assert(detail::always_false_v<CallbackSet>,
-                          "A 'callback' keyword argument of an invalid type was passed to a propagate_*() function.");
-
-            throw;
-            // LCOV_EXCL_STOP
+            static_assert(constructible_input_range<cb_arg_t, Callback>);
+            return CallbackSet(ranges_to<std::vector<Callback>>(p(kw::callback)));
         }
     } else {
         return {};
