@@ -33,6 +33,7 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
+    -DCMAKE_CXX_FLAGS="-fsanitize=address" \
     -DHEYOKA_FORCE_STATIC_LLVM=yes \
     -DHEYOKA_HIDE_LLVM_SYMBOLS=yes
 
@@ -40,7 +41,9 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
 ninja -v
 
 # Run the tests.
-ctest -VV -j4
+#
+# See: https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow
+ASAN_OPTIONS=detect_container_overflow=0 ctest -VV -j4
 
 set +e
 set +x
