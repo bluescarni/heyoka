@@ -46,6 +46,8 @@ llvm::Value *llvm_real_fnz(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 llvm::Value *llvm_real_sgn(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_isfinite(llvm_state &, llvm::Value *);
+llvm::Value *llvm_real_to_double(llvm_state &, llvm ::Value *);
+llvm::Value *llvm_double_to_real(llvm_state &, llvm::Value *, llvm::Type *);
 
 HEYOKA_DLL_PUBLIC mppp::real eps_from_prec(mpfr_prec_t);
 

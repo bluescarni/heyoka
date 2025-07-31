@@ -47,6 +47,11 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
+// NOTE: most of the functionality here is implemented as full-blown LLVM functions, despite the fact that generally all
+// we are doing is just invoking corresponding MPFR primitives after having converted LLVM reals into MPFR views. The
+// reason for going through this process is that the LLVM functions can be marked as speculatable, which should in
+// principle allow for better optimisation at the LLVM level.
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
@@ -66,8 +71,7 @@ static_assert(std::is_signed_v<real_rnd_t>);
 // NOTE: we want to make extra sure long long can represent any mpfr_prec_t.
 static_assert(std::numeric_limits<mpfr_prec_t>::max() <= std::numeric_limits<long long>::max());
 
-// Helper to generate the function attributes list to
-// be used when invoking MPFR primitives.
+// Helper to generate the function attributes list to be used when invoking MPFR primitives.
 llvm::AttributeList get_mpfr_attr_list(llvm::LLVMContext &context)
 {
     return llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
@@ -158,8 +162,13 @@ llvm::Constant *llvm_mpfr_prec(llvm_state &s, mpfr_prec_t prec)
                                         boost::numeric_cast<std::int64_t>(prec));
 }
 
-// Construct an mpfr view from the input heyoka.real.N r. An mpfr view is a pair consisting
-// of 1) an mpfr_struct_t instance and 2) the limb array to which the mpfr_struct_t points.
+// Construct an mpfr view from the input heyoka.real.N r. An mpfr view is a pair consisting of 1) a pointer to an
+// mpfr_struct_t instance and 2) a pointer to the limb array to which the mpfr_struct_t points, which is copied from the
+// limb array of r.
+//
+// NOTE: we need to create the limb array ex-novo here because the input value r is formally stored within an LLVM
+// register and thus we cannot just take the address of its limb array. A copy operation into an alloca needs to
+// happen in order to be able to take memory addresses.
 std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, llvm::Value *r)
 {
     const auto real_prec = llvm_is_real(r->getType());
@@ -205,8 +214,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, ll
     return {mpfr_struct_inst, limb_arr};
 }
 
-// Create an mpfr view with an undefined value, with the precision of the input type fp_t
-// (which must be a heyoka.real.N). This is used to create return values for the functions in the mpfr API.
+// Create an mpfr view with an undefined value, with the precision of the input type fp_t (which must be a
+// heyoka.real.N). This is used to create return values for the functions in the mpfr API.
 std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm::Type *fp_t)
 {
     const auto real_prec = llvm_is_real(fp_t);
@@ -223,15 +232,14 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Create the limb array.
-    // NOTE: the limb array will contain undefined values,
-    // under the assumption that the MPFR functions only care about the
-    // precision of the result (and not sign, exponent and significand).
-    // If that turns out not to be true, we can always codegen a zero real
-    // constant with appropriate precision and use its data, instead of leaving
-    // things undefined.
-    // NOTE: currently the mpfr_custom_init_set() macro sets something for sign and
-    // exponent, in addition to the precision. Perhaps we could invoke it here and
-    // then pick up the sign/exponent values as compile-time constants?
+    //
+    // NOTE: the limb array will contain undefined values, under the assumption that the MPFR functions only care about
+    // the precision of the result (and not sign, exponent and significand). If that turns out not to be true, we can
+    // always codegen a zero real constant with appropriate precision and use its data, instead of leaving things
+    // undefined.
+    //
+    // NOTE: currently the mpfr_custom_init_set() macro sets something for sign and exponent, in addition to the
+    // precision. Perhaps we could invoke it here and then pick up the sign/exponent values as compile-time constants?
     auto *limb_arr = builder.CreateAlloca(limb_arr_t);
 
     // Create the mpfr_struct_t.
@@ -250,8 +258,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     return {mpfr_struct_inst, limb_arr};
 }
 
-// Load the data from the input mpfr view (mpfr_struct_inst, limb_arr) into a heyoka.real.N
-// instance of type fp_t.
+// Load the data from the input mpfr view (mpfr_struct_inst, limb_arr) into a heyoka.real.N instance of type fp_t.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst, llvm::Value *limb_arr,
                                     llvm::Type *fp_t)
@@ -782,6 +789,112 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
     return builder.CreateCall(f, x);
 }
 
+// Utility to convert the input heyoka.real.N into a double-precision value.
+llvm::Value *llvm_real_to_double(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto *fp_t = x->getType();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+    auto &bld = s.builder();
+
+    const auto fname = fmt::format("heyoka.real.{}.to_double", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function type and the function.
+        auto *dbl_t = bld.getDoubleTy();
+        auto *ft = llvm::FunctionType::get(dbl_t, {fp_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Create the mpfr view from the input argument.
+        auto *mpfr_struct_ptr = llvm_real_to_mpfr_view(s, f->args().begin()).first;
+
+        // Invoke the MPFR primitive.
+        auto *ret = llvm_invoke_external(s, "heyoka_mpfr_to_double", dbl_t, {mpfr_struct_ptr}, get_mpfr_attr_list(ctx));
+
+        // Return the result.
+        bld.CreateRet(ret);
+
+        // Restore the original insertion point.
+        bld.SetInsertPoint(orig_bb);
+    }
+
+    return bld.CreateCall(f, x);
+}
+
+// Utility to convert the input double-precision value x into an heyoka.real.N of type fp_t.
+llvm::Value *llvm_double_to_real(llvm_state &s, llvm::Value *x, llvm::Type *fp_t)
+{
+    assert(x != nullptr);
+    assert(fp_t != nullptr);
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+    auto &bld = s.builder();
+
+    auto *dbl_t = bld.getDoubleTy();
+
+    assert(x->getType() == dbl_t);
+
+    const auto fname = fmt::format("heyoka.real.{}.from_double", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function type and the function.
+        auto *ft = llvm::FunctionType::get(fp_t, {dbl_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Create an undef value for the result.
+        auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+
+        // Invoke the MPFR primitive.
+        llvm_invoke_external(s, "heyoka_double_to_mpfr", bld.getVoidTy(), {real_res, f->getArg(0)},
+                             get_mpfr_attr_list(ctx));
+
+        // Assemble the result.
+        auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
+
+        // Return it.
+        bld.CreateRet(res);
+
+        // Restore the original insertion point.
+        bld.SetInsertPoint(orig_bb);
+    }
+
+    return bld.CreateCall(f, x);
+}
+
 // Utility to create a real with precision p
 // whose value is the epsilon at that precision.
 // NOTE: for consistency with the epsilons returned for the other
@@ -801,10 +914,11 @@ mppp::real eps_from_prec(mpfr_prec_t p)
 
 HEYOKA_END_NAMESPACE
 
+extern "C" {
+
 #if !defined(NDEBUG)
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1,
-                                                                                   mpfr_prec_t p2) noexcept
+HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
@@ -812,8 +926,7 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_re
 #endif
 
 // Wrapper to implement ULT comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -827,8 +940,7 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to implement UGE comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -842,8 +954,7 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_uge(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to implement ULE comparison semantics for real types.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a,
-                                                      const mppp::mpfr_struct_t *b) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
 {
     assert(a != nullptr);
     assert(b != nullptr);
@@ -857,9 +968,22 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t 
 }
 
 // Wrapper to invoke the mpfr_sgn() macro.
-extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
 {
     return mpfr_sgn(x);
+}
+
+// Wrapper to convert a real to double precision.
+HEYOKA_DLL_PUBLIC double heyoka_mpfr_to_double(const mppp::mpfr_struct_t *x) noexcept
+{
+    return ::mpfr_get_d(x, MPFR_RNDN);
+}
+
+// Wrapper to convert a double into a real.
+HEYOKA_DLL_PUBLIC void heyoka_double_to_mpfr(mppp::mpfr_struct_t *ret, const double x) noexcept
+{
+    ::mpfr_set_d(ret, x, MPFR_RNDN);
+}
 }
 
 #endif

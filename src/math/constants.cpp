@@ -14,7 +14,6 @@
 #include <ios>
 #include <limits>
 #include <locale>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -24,6 +23,7 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/format.h>
 
@@ -127,7 +127,7 @@ namespace
 // Regex to match floating-point numbers. See:
 // https://www.regular-expressions.info/floatingpoint.html
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
+const boost::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
 
 } // namespace
 
@@ -192,7 +192,7 @@ std::string constant::operator()(unsigned prec) const
     auto ret = m_str_func(prec);
 
     // Validate the return value.
-    if (!std::regex_match(ret, detail::fp_regex)) {
+    if (!boost::regex_match(ret, detail::fp_regex)) [[unlikely]] {
         throw std::invalid_argument(fmt::format("The string '{}' returned by the implementation of a constant is not a "
                                                 "valid representation of a floating-point number in base 10",
                                                 ret));
