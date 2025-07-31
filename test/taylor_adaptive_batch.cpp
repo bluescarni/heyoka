@@ -2275,3 +2275,15 @@ TEST_CASE("scalar time ctor")
         REQUIRE(ta.get_time() == std::vector{42., 42.});
     }
 }
+
+// A test to check that the llvm_state kwargs are correctly propagated.
+TEST_CASE("llvm_state kwargs propagate")
+{
+    const auto dyn = model::pendulum();
+
+    auto ta = taylor_adaptive_batch<double>{dyn, 2u, kw::fast_math = true};
+    REQUIRE(std::get<0>(ta.get_llvm_state()).fast_math());
+
+    ta = taylor_adaptive_batch<double>{dyn, 2u, kw::fast_math = true, kw::compact_mode = true};
+    REQUIRE(std::get<1>(ta.get_llvm_state()).fast_math());
+}

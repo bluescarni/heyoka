@@ -281,6 +281,15 @@ TEST_CASE("basic")
         REQUIRE(outputs[0] == 3);
         REQUIRE(outputs[1] == 1);
         std::ranges::fill(outputs, fp_t(0));
+
+        // Check that the llvm_state keyword arguments are correctly forwarded.
+        cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::fast_math = true};
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[0].fast_math());
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[1].fast_math());
+        REQUIRE(std::get<0>(cf0.get_llvm_states())[2].fast_math());
+
+        cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::fast_math = true, kw::compact_mode = true};
+        REQUIRE(std::get<1>(cf0.get_llvm_states()).fast_math());
     };
 
     for (auto cm : {false, true}) {
