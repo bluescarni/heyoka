@@ -286,8 +286,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     auto *prec_value = builder.CreateLoad(prec_t, prec_ptr);
 
     // Check that it matches the precision of fp_t.
-    llvm_invoke_external(s, "heyoka_assert_real_match_precs_mpfr_view_to_real", builder.getVoidTy(),
-                         {prec_value, llvm_mpfr_prec(s, llvm_is_real(fp_t))});
+    llvm_assert(s, builder.CreateICmpEQ(prec_value, llvm_mpfr_prec(s, llvm_is_real(fp_t))));
 
 #endif
 
@@ -915,15 +914,6 @@ mppp::real eps_from_prec(mpfr_prec_t p)
 HEYOKA_END_NAMESPACE
 
 extern "C" {
-
-#if !defined(NDEBUG)
-
-HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
-{
-    assert(p1 == p2);
-}
-
-#endif
 
 // Wrapper to implement ULT comparison semantics for real types.
 HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept

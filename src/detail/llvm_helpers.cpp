@@ -20,6 +20,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <source_location>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -1130,10 +1131,8 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 #endif
 
         // Init the return value.
@@ -1230,9 +1229,8 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 
 #endif
 
@@ -3888,25 +3886,61 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     return bld.CreateLoad(idx_vec_t, first);
 }
 
+HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::Value *val,
+                                   [[maybe_unused]] std::source_location loc)
+{
+
+#if !defined(NDEBUG)
+
+    auto &bld = s.builder();
+
+    assert(val != nullptr);
+    assert(val->getType()->getScalarType() == bld.getInt1Ty());
+
+    // Transfer the file/function name strings into the LLVM world.
+    //
+    // NOTE: it may be possible that the pointers returned by loc refer to strings with static storage duration, in
+    // which case we could just copy the pointers. However I cannot find any conclusive reference at this time that
+    // guarantees this.
+    auto *file_name = bld.CreateGlobalStringPtr(loc.file_name());
+    auto *function_name = bld.CreateGlobalStringPtr(loc.function_name());
+
+    // Build the assertion condition.
+    auto *cond = val;
+    if (llvm::isa<llvm::FixedVectorType>(val->getType())) {
+        // val is a vector: the assertion condition is true if all SIMD lanes are true, false otherwise.
+        cond = bld.CreateAndReduce(cond);
+    }
+
+    // Check it.
+    llvm_if_then_else(
+        s, cond, []() {},
+        [&s, &bld, file_name, function_name, &loc]() {
+            llvm_invoke_external(s, "heyoka_llvm_assertion_failure", bld.getVoidTy(),
+                                 {bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
+                                  bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
+                                  function_name});
+        });
+
+#endif
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
 
 #if !defined(NDEBUG)
 
-#if defined(HEYOKA_HAVE_REAL)
-
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(const std::uint64_t line,
+                                                                             const std::uint64_t column,
+                                                                             const char *file_name,
+                                                                             const char *function_name) noexcept
 {
-    assert(p1 == p2);
-}
+    heyoka::detail::get_logger()->critical("LLVM assertion failure in file '{}', function '{}', line={}, column={}",
+                                           file_name, function_name, line, column);
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
-{
-    assert(p1 == p2);
+    assert(false);
 }
-
-#endif
 
 #endif
 
