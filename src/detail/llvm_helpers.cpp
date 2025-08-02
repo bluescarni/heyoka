@@ -2266,6 +2266,31 @@ llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpORD(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ord(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ord values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
 // Check if the input floating-point value(s) x is anything other
 // than zero (including NaN).
 llvm::Value *llvm_fnz(llvm_state &s, llvm::Value *x)
@@ -3677,9 +3702,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
 // Implementation of the std::upper_bound() algorithm for floating-point types.
 //
-// Given an array of sorted scalar values beginning at ptr and of size arr_size (a 32-bit int), this function
-// will return the index of the first element in the array that is *greater than* v. If no such element exists,
-// arr_size will be returned. v can be a scalar or a vector.
+// Given an array of scalar values sorted in ascending order beginning at ptr and of size arr_size (a 32-bit int), this
+// function will return the index of the first element in the array that is *greater than* v. If no such element exists,
+// arr_size will be returned. v can be a scalar or a vector. No element in the array can be NaN, but v can be NaN. If v
+// is NaN, it is considered greater than any value in the array.
 //
 // The algorithm is short enough to be reproduced here:
 //
@@ -3708,10 +3734,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 //     return first;
 // }
 //
-// Particular care must be taken for the vector implementation: while in a scalar implementation
-// the bisection loop is never entered if count == 0, in the vector implementation we will be entering
-// the bisection loop with count == 0 whenever a SIMD lane has finished but the other SIMD lanes have not.
-// In a loop iteration with count == 0, the following happens:
+// Particular care must be taken for the vector implementation: while in a scalar implementation the bisection loop is
+// never entered if count == 0, in the vector implementation we will be entering the bisection loop with count == 0
+// whenever a SIMD lane has finished but the other SIMD lanes have not. In a loop iteration with count == 0, the
+// following happens:
 //
 // - step is set to 0 and 'it' remains inited to 'first';
 // - 'it' may be pointing one past the end of the array, and thus we must take care
@@ -3740,6 +3766,29 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     auto *int32_tp = bld.getInt32Ty();
     // NOTE: this will also check that arr_size is not a vector of values.
     assert(arr_size->getType() == int32_tp);
+
+#if !defined(NDEBUG)
+
+    // Validate the input array.
+    llvm_loop_u32(s, bld.getInt32(0), arr_size, [&bld, &s, scal_t, ptr, arr_size](llvm::Value *cur_idx) {
+        // Load the current value.
+        auto *cur_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {cur_idx}));
+
+        // Check that it is not NaN.
+        llvm_assert(s, llvm_fcmp_ord(s, cur_val, cur_val));
+
+        // Check that it is less than or equal to the next value (if available).
+        auto *next_idx = bld.CreateAdd(cur_idx, bld.getInt32(1));
+        llvm_if_then_else(
+            s, bld.CreateICmpEQ(next_idx, arr_size), []() {},
+            [&bld, &s, cur_val, scal_t, ptr, next_idx]() {
+                auto *next_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {next_idx}));
+
+                llvm_assert(s, llvm_fcmp_ole(s, cur_val, next_val));
+            });
+    });
+
+#endif
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
@@ -3802,6 +3851,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
             llvm::Value *cur_value{}, *mask{};
             if (batch_size == 1u) {
                 // Normal scalar load.
+                HEYOKA_LLVM_ASSERT(s, bld.CreateICmpULT(it, arr_size_splat));
                 cur_value = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, arr_ptr, {it}));
             } else {
                 // NOTE: as explained above, in vector mode we must take care to avoid loading from 'it'
@@ -3905,6 +3955,9 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
     auto *file_name = bld.CreateGlobalStringPtr(loc.file_name());
     auto *function_name = bld.CreateGlobalStringPtr(loc.function_name());
 
+    assert(file_name->getType()->isPointerTy());
+    assert(function_name->getType()->isPointerTy());
+
     // Build the assertion condition.
     auto *cond = val;
     if (llvm::isa<llvm::FixedVectorType>(val->getType())) {
@@ -3931,6 +3984,8 @@ HEYOKA_END_NAMESPACE
 
 #if !defined(NDEBUG)
 
+// LCOV_EXCL_START
+
 extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(const std::uint64_t line,
                                                                              const std::uint64_t column,
                                                                              const char *file_name,
@@ -3941,6 +3996,8 @@ extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(con
 
     assert(false);
 }
+
+// LCOV_EXCL_STOP
 
 #endif
 

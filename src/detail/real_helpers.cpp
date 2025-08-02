@@ -615,6 +615,20 @@ llvm::Value *llvm_real_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateICmpEQ(ret, llvm::ConstantInt::getNullValue(ret->getType()));
 }
 
+// NOTE: fcmp ORD means that both operands are not NaN.
+llvm::Value *llvm_real_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "heyoka_mpfr_fcmp_ord", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
 llvm::Value *llvm_real_fnz(llvm_state &s, llvm::Value *x)
 {
     // LCOV_EXCL_START
@@ -955,6 +969,16 @@ HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ule(const mppp::mpfr_struct_t *a, const m
     } else {
         return ::mpfr_lessequal_p(a, b);
     }
+}
+
+// Wrapper to implement ORD comparison semantics for real types.
+HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ord(const mppp::mpfr_struct_t *a, const mppp::mpfr_struct_t *b) noexcept
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(mpfr_get_prec(a) == mpfr_get_prec(b));
+
+    return static_cast<int>((mpfr_nan_p(a) == 0) && (mpfr_nan_p(b) == 0));
 }
 
 // Wrapper to invoke the mpfr_sgn() macro.
