@@ -3963,6 +3963,13 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
 
 #if !defined(NDEBUG)
 
+    // NOTE: run the assertion check only if we are not optimising the JIT compilation. The idea here is that the
+    // assertion check will result in invoking an external C function, which will likely impede a lot of optimisations
+    // and reduce the diversity of tested IR code.
+    if (s.get_opt_level() > 0u) {
+        return;
+    }
+
     auto &bld = s.builder();
 
     assert(val != nullptr);
