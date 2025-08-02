@@ -3936,6 +3936,27 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     return bld.CreateLoad(idx_vec_t, first);
 }
 
+namespace
+{
+
+// Helper to generate a global string constant as a null-terminated char array.
+//
+// A pointer to the beginning of the array will be returned.
+//
+// NOTE: this is similar to the old CreateGlobalStringPtr() LLVM function which has recently been deprecated.
+llvm::Value *llvm_create_global_string_ptr(llvm_state &s, const char *str)
+{
+    auto &bld = s.builder();
+
+    // Create the global variable.
+    auto *gv = bld.CreateGlobalString(str);
+
+    // Fetch and return a pointer to the first element of the array.
+    return bld.CreateInBoundsGEP(gv->getValueType(), gv, {bld.getInt32(0), bld.getInt32(0)});
+}
+
+} // namespace
+
 HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::Value *val,
                                    [[maybe_unused]] std::source_location loc)
 {
@@ -3952,8 +3973,8 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
     // NOTE: it may be possible that the pointers returned by loc refer to strings with static storage duration, in
     // which case we could just copy the pointers. However I cannot find any conclusive reference at this time that
     // guarantees this.
-    auto *file_name = bld.CreateGlobalStringPtr(loc.file_name());
-    auto *function_name = bld.CreateGlobalStringPtr(loc.function_name());
+    auto *file_name = llvm_create_global_string_ptr(s, loc.file_name());
+    auto *function_name = llvm_create_global_string_ptr(s, loc.function_name());
 
     assert(file_name->getType()->isPointerTy());
     assert(function_name->getType()->isPointerTy());
