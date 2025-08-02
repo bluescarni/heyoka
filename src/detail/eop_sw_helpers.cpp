@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -306,6 +307,20 @@ llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm:
     // Second step: ret = (ret == arr_size) ? ret : (ret - 1).
     auto *ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
     ret = bld.CreateSelect(ret_eq_arr_size, ret, bld.CreateSub(ret, llvm::ConstantInt::get(ret->getType(), 1)));
+
+#if !defined(NDEBUG)
+
+    // Check ret: either it must be equal to the array size, or ret + 1 must be < arr_size.
+    ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
+    // NOTE: as a corner case, we need to handle the possibility that ret is the max uint32_t. If we don't, ret + 1 will
+    // wrap around and may pass the ret + 1 < arr_size check even if it should not.
+    auto *ret_not_max = bld.CreateICmpNE(ret, llvm::ConstantInt::get(ret_t, std::numeric_limits<std::uint32_t>::max()));
+    auto *retp1_lt_arr_size = bld.CreateICmpULT(bld.CreateAdd(ret, llvm::ConstantInt::get(ret_t, 1)), arr_size_splat);
+    auto *check = bld.CreateAnd(ret_not_max, retp1_lt_arr_size);
+    check = bld.CreateOr(ret_eq_arr_size, check);
+    llvm_assert(s, check);
+
+#endif
 
     // Create the return value.
     bld.CreateRet(ret);
