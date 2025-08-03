@@ -458,6 +458,417 @@ llvm::Function *div_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
                       args()[0].value(), args()[1].value());
 }
 
+std::vector<std::pair<std::uint32_t, std::uint32_t>> div_impl::taylor_c_diff_get_n_iters(std::uint32_t order_) const
+{
+    assert(args().size() == 2u);
+
+    // Prepare the return value.
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto order = safe_u32_t(order_);
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> retval;
+    retval.reserve(order + 1);
+
+    std::visit(
+        [&retval, order]<typename T, typename U>(const T &, const U &) {
+            if constexpr ((std::same_as<T, variable> || is_num_param_v<T>) && std::same_as<U, variable>) {
+                // variable/variable or numpar/variable.
+                retval.emplace_back(0, 1);
+                retval.emplace_back(0, 1);
+
+                for (safe_u32_t i = 2; i <= order; ++i) {
+                    retval.emplace_back(i - 1, 1);
+                }
+            } else if constexpr (std::same_as<T, variable> && is_num_param_v<U>) {
+                // variable/numpar.
+                retval.resize(order + 1, std::pair<std::uint32_t, std::uint32_t>{0, 1});
+            } else {
+                // numpar/numpar.
+                retval.emplace_back(0, 1);
+                retval.resize(order + 1, std::pair<std::uint32_t, std::uint32_t>{0, 0});
+            }
+        },
+        args()[0].value(), args()[1].value());
+
+    return retval;
+}
+
+namespace
+{
+
+// Derivative of numpar / numpar.
+template <typename U, typename V>
+    requires(is_num_param_v<U>) && (is_num_param_v<V>)
+llvm::Function *div_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
+                                                        std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    return taylor_c_diff_single_iter_func_numpar(
+        s, fp_t, n_uvars, batch_size, "div", 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 2u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_fdiv(s, args[0], args[1]);
+        },
+        num0, num1);
+}
+
+// Derivative of var / numpar.
+template <typename U>
+    requires(is_num_param_v<U>)
+llvm::Function *div_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const variable &var,
+                                                        const U &n, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "div", n_uvars, batch_size, {var, n});
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *order = f->args().begin();
+    auto *diff_arr = f->args().begin() + 2;
+    auto *par_ptr = f->args().begin() + 3;
+    auto *var_idx = f->args().begin() + 5;
+    auto *num = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Load the derivative.
+    auto *ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
+
+    // Do the division.
+    ret = llvm_fdiv(s, ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size));
+
+    // Store the result into the accumulator.
+    bld.CreateStore(ret, acc_ptr);
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// Derivative of numpar / var.
+template <typename U>
+    requires(is_num_param_v<U>)
+llvm::Function *div_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const U &n,
+                                                        const variable &var, std::uint32_t n_uvars,
+                                                        std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "div", n_uvars, batch_size, {n, var});
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the 32-bit int type.
+    auto *i32_t = bld.getInt32Ty();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *u_idx = f->args().begin() + 1;
+    auto *diff_ptr = f->args().begin() + 2;
+    auto *par_ptr = f->args().begin() + 3;
+    auto *num = f->args().begin() + 5;
+    auto *var_idx = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+    auto *iter_idx = f->args().begin() + 8;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // Order 0: store num/var.
+
+            // Codegen the numerator.
+            auto *nm = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
+
+            // Load the order 0 of the variable.
+            auto *c0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), var_idx);
+
+            // Compute the return value and store it.
+            auto *ret = llvm_fdiv(s, nm, c0);
+            bld.CreateStore(ret, acc_ptr);
+        },
+        [&]() {
+            // Order > 0.
+
+            // Storage for the loading indices.
+            auto *idx0_ptr = bld.CreateAlloca(i32_t);
+            auto *idx1_ptr = bld.CreateAlloca(i32_t);
+
+            // Compute iter_idx + 1.
+            auto *iter_idx_p1 = bld.CreateAdd(iter_idx, bld.getInt32(1));
+
+            // Are we in an unordered iteration?
+            auto *is_unordered_iteration = bld.CreateICmpULT(iter_idx_p1, ord);
+
+            llvm_if_then_else(
+                s, is_unordered_iteration,
+                [&]() {
+                    // Unordered iteration: the load indices are (order - iter_idx - 1) and (iter_idx + 1).
+                    bld.CreateStore(bld.CreateSub(ord, iter_idx_p1), idx0_ptr);
+                    bld.CreateStore(iter_idx_p1, idx1_ptr);
+                },
+                [&]() {
+                    // Ordered iteration: there is always a single ordered iteration and its loading indices are 0 and
+                    // order.
+                    bld.CreateStore(bld.getInt32(0), idx0_ptr);
+                    bld.CreateStore(ord, idx1_ptr);
+                });
+
+            // Fetch the indices.
+            auto *idx0 = bld.CreateLoad(i32_t, idx0_ptr);
+            auto *idx1 = bld.CreateLoad(i32_t, idx1_ptr);
+
+            // Load the derivatives, multiply and compute the result.
+            auto *d0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, idx0, u_idx);
+            auto *d1 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, idx1, var_idx);
+            auto *ret = llvm_fmul(s, d0, d1);
+
+            // Add the result to the accumulator.
+            llvm::Value *acc = bld.CreateLoad(val_t, acc_ptr);
+            ret = llvm_fadd(s, ret, acc);
+
+            llvm_if_then_else(
+                s, is_unordered_iteration,
+                [&]() {
+                    // Unordered iteration: store ret into the accumulator.
+                    bld.CreateStore(ret, acc_ptr);
+                },
+                [&]() {
+                    // Ordered iteration: this is the last iteration, thus we need to negate the result and divide
+                    // by c^[0].
+                    auto *c0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), var_idx);
+                    ret = llvm_fneg(s, ret);
+                    ret = llvm_fdiv(s, ret, c0);
+
+                    bld.CreateStore(ret, acc_ptr);
+                });
+        });
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// Derivative of var / var.
+llvm::Function *div_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const variable &var0,
+                                                        const variable &var1, std::uint32_t n_uvars,
+                                                        std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "div", n_uvars, batch_size, {var0, var1});
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the 32-bit int type.
+    auto *i32_t = bld.getInt32Ty();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *u_idx = f->args().begin() + 1;
+    auto *diff_ptr = f->args().begin() + 2;
+    auto *var_idx0 = f->args().begin() + 5;
+    auto *var_idx1 = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+    auto *iter_idx = f->args().begin() + 8;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // Order 0: store num/var.
+
+            // Load the order 0 of the variables.
+            auto *b0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), var_idx0);
+            auto *c0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), var_idx1);
+
+            // Compute the return value and store it.
+            auto *ret = llvm_fdiv(s, b0, c0);
+            bld.CreateStore(ret, acc_ptr);
+        },
+        [&]() {
+            // Order > 0.
+
+            // Storage for the loading indices.
+            auto *idx0_ptr = bld.CreateAlloca(i32_t);
+            auto *idx1_ptr = bld.CreateAlloca(i32_t);
+
+            // Compute iter_idx + 1.
+            auto *iter_idx_p1 = bld.CreateAdd(iter_idx, bld.getInt32(1));
+
+            // Are we in an unordered iteration?
+            auto *is_unordered_iteration = bld.CreateICmpULT(iter_idx_p1, ord);
+
+            llvm_if_then_else(
+                s, is_unordered_iteration,
+                [&]() {
+                    // Unordered iteration: the load indices are (order - iter_idx - 1) and (iter_idx + 1).
+                    bld.CreateStore(bld.CreateSub(ord, iter_idx_p1), idx0_ptr);
+                    bld.CreateStore(iter_idx_p1, idx1_ptr);
+                },
+                [&]() {
+                    // Ordered iteration: there is always a single ordered iteration and its loading indices are 0 and
+                    // order.
+                    bld.CreateStore(bld.getInt32(0), idx0_ptr);
+                    bld.CreateStore(ord, idx1_ptr);
+                });
+
+            // Fetch the indices.
+            auto *idx0 = bld.CreateLoad(i32_t, idx0_ptr);
+            auto *idx1 = bld.CreateLoad(i32_t, idx1_ptr);
+
+            // Load the derivatives, multiply and compute the result.
+            auto *d0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, idx0, u_idx);
+            auto *d1 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, idx1, var_idx1);
+            auto *ret = llvm_fmul(s, d0, d1);
+
+            // Add the result to the accumulator.
+            llvm::Value *acc = bld.CreateLoad(val_t, acc_ptr);
+            ret = llvm_fadd(s, ret, acc);
+
+            llvm_if_then_else(
+                s, is_unordered_iteration,
+                [&]() {
+                    // Unordered iteration: store ret into the accumulator.
+                    bld.CreateStore(ret, acc_ptr);
+                },
+                [&]() {
+                    // Ordered iteration: this is the last iteration, thus we need to subtract the result from b^[order]
+                    // and divide by c^[0].
+                    auto *bn = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx0);
+                    auto *c0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, bld.getInt32(0), var_idx1);
+                    ret = llvm_fsub(s, bn, ret);
+                    ret = llvm_fdiv(s, ret, c0);
+
+                    bld.CreateStore(ret, acc_ptr);
+                });
+        });
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// All the other cases.
+// LCOV_EXCL_START
+template <typename V1, typename V2>
+llvm::Function *div_taylor_c_diff_single_iter_func_impl(llvm_state &, llvm::Type *, const V1 &, const V2 &,
+                                                        std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of div() in compact mode");
+}
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Function *div_impl::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                             std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 2u);
+
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return div_taylor_c_diff_single_iter_func_impl(s, fp_t, v1, v2, n_uvars, batch_size);
+        },
+        args()[0].value(), args()[1].value());
+}
+
 expression div(expression a, expression b)
 {
     return expression{func{div_impl(std::move(a), std::move(b))}};
