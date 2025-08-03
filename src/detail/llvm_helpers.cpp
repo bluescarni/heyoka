@@ -20,6 +20,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <source_location>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -1130,10 +1131,8 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 #endif
 
         // Init the return value.
@@ -1230,9 +1229,8 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 
 #endif
 
@@ -2264,6 +2262,31 @@ llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_one values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
+llvm::Value *llvm_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpORD(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ord(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ord values of type '{}'", llvm_type_name(fp_t)));
         // LCOV_EXCL_STOP
     }
 }
@@ -3679,9 +3702,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
 // Implementation of the std::upper_bound() algorithm for floating-point types.
 //
-// Given an array of sorted scalar values beginning at ptr and of size arr_size (a 32-bit int), this function
-// will return the index of the first element in the array that is *greater than* v. If no such element exists,
-// arr_size will be returned. v can be a scalar or a vector.
+// Given an array of scalar values sorted in ascending order beginning at ptr and of size arr_size (a 32-bit int), this
+// function will return the index of the first element in the array that is *greater than* v. If no such element exists,
+// arr_size will be returned. v can be a scalar or a vector. No element in the array can be NaN, but v can be NaN. If v
+// is NaN, it is considered greater than any value in the array.
 //
 // The algorithm is short enough to be reproduced here:
 //
@@ -3710,10 +3734,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 //     return first;
 // }
 //
-// Particular care must be taken for the vector implementation: while in a scalar implementation
-// the bisection loop is never entered if count == 0, in the vector implementation we will be entering
-// the bisection loop with count == 0 whenever a SIMD lane has finished but the other SIMD lanes have not.
-// In a loop iteration with count == 0, the following happens:
+// Particular care must be taken for the vector implementation: while in a scalar implementation the bisection loop is
+// never entered if count == 0, in the vector implementation we will be entering the bisection loop with count == 0
+// whenever a SIMD lane has finished but the other SIMD lanes have not. In a loop iteration with count == 0, the
+// following happens:
 //
 // - step is set to 0 and 'it' remains inited to 'first';
 // - 'it' may be pointing one past the end of the array, and thus we must take care
@@ -3742,6 +3766,29 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     auto *int32_tp = bld.getInt32Ty();
     // NOTE: this will also check that arr_size is not a vector of values.
     assert(arr_size->getType() == int32_tp);
+
+#if !defined(NDEBUG)
+
+    // Validate the input array.
+    llvm_loop_u32(s, bld.getInt32(0), arr_size, [&bld, &s, scal_t, ptr, arr_size](llvm::Value *cur_idx) {
+        // Load the current value.
+        auto *cur_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {cur_idx}));
+
+        // Check that it is not NaN.
+        llvm_assert(s, llvm_fcmp_ord(s, cur_val, cur_val));
+
+        // Check that it is less than or equal to the next value (if available).
+        auto *next_idx = bld.CreateAdd(cur_idx, bld.getInt32(1));
+        llvm_if_then_else(
+            s, bld.CreateICmpEQ(next_idx, arr_size), []() {},
+            [&bld, &s, cur_val, scal_t, ptr, next_idx]() {
+                auto *next_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {next_idx}));
+
+                llvm_assert(s, llvm_fcmp_ole(s, cur_val, next_val));
+            });
+    });
+
+#endif
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
@@ -3804,6 +3851,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
             llvm::Value *cur_value{}, *mask{};
             if (batch_size == 1u) {
                 // Normal scalar load.
+                HEYOKA_LLVM_ASSERT(s, bld.CreateICmpULT(it, arr_size_splat));
                 cur_value = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, arr_ptr, {it}));
             } else {
                 // NOTE: as explained above, in vector mode we must take care to avoid loading from 'it'
@@ -3888,25 +3936,96 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     return bld.CreateLoad(idx_vec_t, first);
 }
 
+namespace
+{
+
+// Helper to generate a global string constant as a null-terminated char array.
+//
+// A pointer to the beginning of the array will be returned.
+//
+// NOTE: this is similar to the old CreateGlobalStringPtr() LLVM function which has recently been deprecated.
+llvm::Value *llvm_create_global_string_ptr(llvm_state &s, const char *str)
+{
+    auto &bld = s.builder();
+
+    // Create the global variable.
+    auto *gv = bld.CreateGlobalString(str);
+
+    // Fetch and return a pointer to the first element of the array.
+    return bld.CreateInBoundsGEP(gv->getValueType(), gv, {bld.getInt32(0), bld.getInt32(0)});
+}
+
+} // namespace
+
+HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::Value *val,
+                                   [[maybe_unused]] std::source_location loc)
+{
+
+#if !defined(NDEBUG)
+
+    // NOTE: run the assertion check only if we are not optimising the JIT compilation. The idea here is that the
+    // assertion check will result in invoking an external C function, which will likely impede a lot of optimisations
+    // and reduce the diversity of tested IR code.
+    if (s.get_opt_level() > 0u) {
+        return;
+    }
+
+    auto &bld = s.builder();
+
+    assert(val != nullptr);
+    assert(val->getType()->getScalarType() == bld.getInt1Ty());
+
+    // Transfer the file/function name strings into the LLVM world.
+    //
+    // NOTE: it may be possible that the pointers returned by loc refer to strings with static storage duration, in
+    // which case we could just copy the pointers. However I cannot find any conclusive reference at this time that
+    // guarantees this.
+    auto *file_name = llvm_create_global_string_ptr(s, loc.file_name());
+    auto *function_name = llvm_create_global_string_ptr(s, loc.function_name());
+
+    assert(file_name->getType()->isPointerTy());
+    assert(function_name->getType()->isPointerTy());
+
+    // Build the assertion condition.
+    auto *cond = val;
+    if (llvm::isa<llvm::FixedVectorType>(val->getType())) {
+        // val is a vector: the assertion condition is true if all SIMD lanes are true, false otherwise.
+        cond = bld.CreateAndReduce(cond);
+    }
+
+    // Check it.
+    llvm_if_then_else(
+        s, cond, []() {},
+        [&s, &bld, file_name, function_name, &loc]() {
+            llvm_invoke_external(s, "heyoka_llvm_assertion_failure", bld.getVoidTy(),
+                                 {bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
+                                  bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
+                                  function_name});
+        });
+
+#endif
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
 
 #if !defined(NDEBUG)
 
-#if defined(HEYOKA_HAVE_REAL)
+// LCOV_EXCL_START
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(const std::uint64_t line,
+                                                                             const std::uint64_t column,
+                                                                             const char *file_name,
+                                                                             const char *function_name) noexcept
 {
-    assert(p1 == p2);
+    heyoka::detail::get_logger()->critical("LLVM assertion failure in file '{}', function '{}', line={}, column={}",
+                                           file_name, function_name, line, column);
+
+    assert(false);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
-{
-    assert(p1 == p2);
-}
-
-#endif
+// LCOV_EXCL_STOP
 
 #endif
 
