@@ -11,6 +11,7 @@
 
 #include <heyoka/model/cart2geo.hpp>
 #include <heyoka/model/cr3bp.hpp>
+#include <heyoka/model/dayfrac.hpp>
 #include <heyoka/model/egm2008.hpp>
 #include <heyoka/model/elp2000.hpp>
 #include <heyoka/model/eop.hpp>

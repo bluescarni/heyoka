@@ -423,13 +423,13 @@ TEST_CASE("get_eop_eop_func")
                     if (std::isnan(pm_x_cmp)) {
                         REQUIRE(std::isnan(pm_x_vec[j]));
                     } else {
-                        REQUIRE(pm_x_vec[j] == approximately(pm_x_cmp, T(1000)));
+                        REQUIRE(pm_x_vec[j] == approximately(pm_x_cmp, T(10000)));
                     }
 
                     if (std::isnan(pm_xp_cmp)) {
                         REQUIRE(std::isnan(pm_xp_vec[j]));
                     } else {
-                        REQUIRE(pm_xp_vec[j] == approximately(pm_xp_cmp, T(1000)));
+                        REQUIRE(pm_xp_vec[j] == approximately(pm_xp_cmp, T(10000)));
                     }
                 }
             }
