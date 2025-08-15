@@ -79,8 +79,8 @@ inline constexpr auto dayfrac_kw_cfg = igor::config<kw::descr::constructible_fro
 
 // Function to transform the input expression into the number of days elapsed since January 1st.
 //
-// The input time expression is assumed to represent the number of TT days elapsed since the epoch of J2000. The return
-// expression evaluates to the number of TT days elapsed since January 1st 00:00 UTC of the calendar year of tt.
+// The input time expression tt is assumed to represent the number of TT days elapsed since the epoch of J2000. The
+// return expression evaluates to the number of TT days elapsed since January 1st 00:00 UTC of the calendar year of tt.
 inline constexpr auto dayfrac = []<typename... KwArgs>
     requires igor::validate<dayfrac_kw_cfg, KwArgs...>
 // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
