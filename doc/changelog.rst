@@ -40,6 +40,8 @@ Fix
   due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
   after parallel sections
   (`#500 <https://github.com/bluescarni/heyoka/pull/500>`__).
+- Workaround for a compilation failure with recent Boost versions
+  (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
 - Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
   in numerical integrations
   (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).
