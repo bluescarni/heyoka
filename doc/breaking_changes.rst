@@ -3,17 +3,6 @@
 Breaking changes
 ================
 
-.. _bchanges_8_0_0:
-
-8.0.0
------
-
-General
-~~~~~~~
-
-- heyoka is now a C++23 project.
-- heyoka now depends on CMake >= 3.20 when building from source.
-
 .. _bchanges_7_0_0:
 
 7.0.0

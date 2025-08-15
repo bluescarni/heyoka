@@ -1,7 +1,7 @@
 Changelog
 =========
 
-8.0.0 (unreleased)
+7.4.0 (unreleased)
 ------------------
 
 New
@@ -20,12 +20,10 @@ New
 Changes
 ~~~~~~~
 
-- **BREAKING**: heyoka now requires C++23
+- heyoka now requires C++23
   (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
-  This is a :ref:`breaking change <bchanges_8_0_0>`.
-- **BREAKING**: heyoka now depends on CMake >= 3.20 when building from source
+- heyoka now depends on CMake >= 3.20 when building from source
   (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
-  This is a :ref:`breaking change <bchanges_8_0_0>`.
 - General overhaul of several symbolic transformation primitives,
   avoiding recursion in favour of a stack-based iterative approach and taking better
   advantage of shared function arguments sets
