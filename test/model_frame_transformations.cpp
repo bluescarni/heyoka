@@ -287,7 +287,7 @@ TEST_CASE("rot_itrs_teme")
         REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
     }
 
-    // NOTE: this is a test from the Vallado paper:
+    // NOTE: this is a test from the Vallado paper (Appendix C):
     //
     // https://celestrak.org/publications/AIAA/2006-6753/AIAA-2006-6753-Rev3.pdf
     {
@@ -295,10 +295,11 @@ TEST_CASE("rot_itrs_teme")
         cf(out, in, kw::time = 0.04262363188899029);
 
         // NOTE: we need to relax the tolerance a bit here for the test to pass. Vallado uses different values for the
-        // EOP parameters and, in particular, it is not 100% clear how he computes the UT1-UTC value for the test epoch
-        // from the tabulated values (which refer to UTC midnight). We use linear interpolation, he may be using
+        // EOP parameters and, in particular, it is not 100% clear how he computes the UT1-UTC value for the test's
+        // epoch from the tabulated values (which refer to UTC midnight). We use linear interpolation, he may be using
         // directly the midnight value, or perhaps he employs the LOD value to infer the UT1-UTC difference at the
-        // epoch.
+        // epoch. Back-of-the-envelope calculations suggest that this may be enough to explain the few-decimetres
+        // discrepancies we are seeing.
         REQUIRE(std::abs(out[0] - 5094.18010720) < tol * 100);
         REQUIRE(std::abs(out[1] - 6127.64470520) < tol * 100);
         REQUIRE(std::abs(out[2] - 6380.34453270) < tol * 100);
