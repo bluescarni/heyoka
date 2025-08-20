@@ -1,6 +1,12 @@
 Changelog
 =========
 
+7.5.0 (unreleased)
+------------------
+
+- New ``gmst82()`` model to represent the Greenwich mean sidereal time (IAU 1982 model)
+  (`#506 <https://github.com/bluescarni/heyoka/pull/506>`__).
+
 7.4.0 (2025-08-15)
 ------------------
 
