@@ -1,7 +1,7 @@
 Changelog
 =========
 
-7.5.0 (unreleased)
+7.5.0 (2025-08-20)
 ------------------
 
 - New frame transformation: ITRS to TEME and viceversa
