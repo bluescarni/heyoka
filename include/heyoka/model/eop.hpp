@@ -118,6 +118,8 @@ public:
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                        const eop_data &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                             const eop_data &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
 llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, const char *,
@@ -125,6 +127,9 @@ llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, c
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression era_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82p_func_impl(expression, eop_data);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_x_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_xp_func_impl(expression, eop_data);
@@ -172,6 +177,20 @@ inline constexpr auto erap = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>
 // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> expression { return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...)); };
+
+inline constexpr auto gmst82 = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
+    return std::apply(detail::gmst82_func_impl, detail::eop_common_opts(kw_args...));
+};
+
+inline constexpr auto gmst82p = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
+    return std::apply(detail::gmst82p_func_impl, detail::eop_common_opts(kw_args...));
+};
 
 inline constexpr auto pm_x = []<typename... KwArgs>
     requires igor::validate<eop_kw_cfg, KwArgs...>

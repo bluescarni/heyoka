@@ -321,6 +321,12 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     return llvm_get_eop_angle_func_dl(s, fp_t, batch_size, data, "era", heyoka::detail::llvm_get_eop_data_era);
 }
 
+llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                             const eop_data &data)
+{
+    return llvm_get_eop_angle_func_dl(s, fp_t, batch_size, data, "gmst82", heyoka::detail::llvm_get_eop_data_gmst82);
+}
+
 // Helper to get/generate the function for the simultaneous computation of an eop quantity and its derivative via
 // first-order polynomial interpolation.
 //
@@ -535,6 +541,10 @@ const std::unordered_map<std::string, eop_impl_funcs> eop_impl_funcs_map = {
      {.grad
       = [](const expression &arg, const eop_data &data) { return erap(kw::time_expr = arg, kw::eop_data = data); },
       .llvm_eval = &llvm_get_era_erap_func}},
+    {"gmst82",
+     {.grad
+      = [](const expression &arg, const eop_data &data) { return gmst82p(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval = &llvm_get_gmst82_gmst82p_func}},
     {"pm_x",
      {.grad
       = [](const expression &arg, const eop_data &data) { return pm_xp(kw::time_expr = arg, kw::eop_data = data); },
@@ -1213,6 +1223,16 @@ expression era_func_impl(expression time_expr, eop_data data)
 expression erap_func_impl(expression time_expr, eop_data data)
 {
     return expression{func{eopp_impl{"era", std::move(time_expr), std::move(data)}}};
+}
+
+expression gmst82_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"gmst82", std::move(time_expr), std::move(data)}}};
+}
+
+expression gmst82p_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"gmst82", std::move(time_expr), std::move(data)}}};
 }
 
 expression pm_x_func_impl(expression time_expr, eop_data data)
