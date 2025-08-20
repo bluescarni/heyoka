@@ -24,6 +24,17 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+namespace
+{
+
+auto get_latest_iers_long_term()
+{
+    static auto retval = eop_data::fetch_latest_iers_long_term();
+    return retval;
+}
+
+} // namespace
+
 TEST_CASE("rot_fk5j2000_icrs")
 {
     const auto [x, y, z] = make_vars("x", "y", "z");
@@ -69,7 +80,7 @@ TEST_CASE("rot_itrs_icrs")
 
     try {
         // NOTE: the online iers service uses the long-term data in the computation.
-        eop_opt.emplace(eop_data::fetch_latest_iers_long_term());
+        eop_opt.emplace(get_latest_iers_long_term());
     } catch (const std::exception &e) {
         std::cout << "Exception caught during download test: " << e.what() << '\n';
         return;
@@ -79,7 +90,7 @@ TEST_CASE("rot_itrs_icrs")
 
     const auto [x, y, z] = make_vars("x", "y", "z");
 
-    // Construct compiled functions for the rotation and its inverse
+    // Construct compiled functions for the rotation and its inverse.
     const auto [icrs_x, icrs_y, icrs_z] = model::rot_itrs_icrs({x, y, z}, kw::thresh = 0., kw::eop_data = data);
     auto cf = cfunc<double>{{icrs_x, icrs_y, icrs_z}, {x, y, z}, kw::compact_mode = true};
 
@@ -171,6 +182,106 @@ TEST_CASE("rot_itrs_icrs")
         REQUIRE(std::abs(out[2] - 823.8553721) < tol);
 
         cf_inv(out_inv, out, kw::time = -0.05223132900347306);
+        REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
+        REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
+        REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
+    }
+}
+
+// In this test we are using teme positions calculated via astropy.
+TEST_CASE("rot_itrs_teme")
+{
+    heyoka::detail::edb_disabler ed;
+
+    std::optional<eop_data> eop_opt;
+
+    try {
+        // NOTE: astropy seems to be using the long-term data in the computation.
+        eop_opt.emplace(get_latest_iers_long_term());
+    } catch (const std::exception &e) {
+        std::cout << "Exception caught during download test: " << e.what() << '\n';
+        return;
+    }
+
+    const auto &data = *eop_opt;
+
+    const auto [x, y, z] = make_vars("x", "y", "z");
+
+    // Construct compiled functions for the rotation and its inverse.
+    const auto [teme_x, teme_y, teme_z] = model::rot_itrs_teme({x, y, z}, kw::eop_data = data);
+    auto cf = cfunc<double>{{teme_x, teme_y, teme_z}, {x, y, z}, kw::compact_mode = true};
+
+    const auto [itrs_x, itrs_y, itrs_z] = model::rot_teme_itrs({x, y, z}, kw::eop_data = data);
+    auto cf_inv = cfunc<double>{{itrs_x, itrs_y, itrs_z}, {x, y, z}, kw::compact_mode = true};
+
+    // Allow for an error of 1 cm.
+    const auto tol = 1e-5;
+
+    {
+        std::array<double, 3> in = {-5821.35967267, 2079.53567927, -2820.30734583}, out{}, out_inv{};
+        cf(out, in, kw::time = 0.19938024382589065);
+
+        REQUIRE(std::abs(out[0] - -6102.44327643) < tol);
+        REQUIRE(std::abs(out[1] - -986.33201609) < tol);
+        REQUIRE(std::abs(out[2] - -2820.31307072) < tol);
+
+        cf_inv(out_inv, out, kw::time = 0.19938024382589065);
+        REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
+        REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
+        REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
+    }
+
+    {
+        std::array<double, 3> in = {5108.1300867, 1029.19120806, 4321.09042602}, out{}, out_inv{};
+        cf(out, in, kw::time = 0.22902190444900752);
+
+        REQUIRE(std::abs(out[0] - -404.33833309) < tol);
+        REQUIRE(std::abs(out[1] - -5195.0661522) < tol);
+        REQUIRE(std::abs(out[2] - 4321.0934012) < tol);
+
+        cf_inv(out_inv, out, kw::time = 0.22902190444900752);
+        REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
+        REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
+        REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
+    }
+
+    {
+        std::array<double, 3> in = {4334.31606348, -299.5426868, -5203.20305015}, out{}, out_inv{};
+        cf(out, in, kw::time = 0.23098060853296828);
+
+        REQUIRE(std::abs(out[0] - -3960.33828337) < tol);
+        REQUIRE(std::abs(out[1] - 1786.54525152) < tol);
+        REQUIRE(std::abs(out[2] - -5203.20288726) < tol);
+
+        cf_inv(out_inv, out, kw::time = 0.23098060853296828);
+        REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
+        REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
+        REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
+    }
+
+    {
+        std::array<double, 3> in = {-4245.78271088, -687.61920164, 5282.22485249}, out{}, out_inv{};
+        cf(out, in, kw::time = 0.14454494739270413);
+
+        REQUIRE(std::abs(out[0] - -346.48598399) < tol);
+        REQUIRE(std::abs(out[1] - 4287.12687365) < tol);
+        REQUIRE(std::abs(out[2] - 5282.22311333) < tol);
+
+        cf_inv(out_inv, out, kw::time = 0.14454494739270413);
+        REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
+        REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
+        REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
+    }
+
+    {
+        std::array<double, 3> in = {2563.80117325, -4269.64305692, 4481.67891136}, out{}, out_inv{};
+        cf(out, in, kw::time = -0.12546190103683424);
+
+        REQUIRE(std::abs(out[0] - -4478.10994923) < tol);
+        REQUIRE(std::abs(out[1] - -2179.31668306) < tol);
+        REQUIRE(std::abs(out[2] - 4481.68319178) < tol);
+
+        cf_inv(out_inv, out, kw::time = -0.12546190103683424);
         REQUIRE(std::abs(in[0] - out_inv[0]) < 1e-10);
         REQUIRE(std::abs(in[1] - out_inv[1]) < 1e-10);
         REQUIRE(std::abs(in[2] - out_inv[2]) < 1e-10);
