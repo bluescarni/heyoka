@@ -244,6 +244,9 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         // to higher precision in the future if needed.
 
         // Use octuple precision as a safety margin.
+        //
+        // NOTE: cpp_bin_float_oct is defined as having expression templates turned off, thus we are ok with the use of
+        // auto throughout the computation.
         using oct_t = boost::multiprecision::cpp_bin_float_oct;
         const auto tU = oct_t{ut1_jd1} + ut1_jd2 - 2451545.0;
         const auto twopi = 2 * boost::math::constants::pi<oct_t>();
