@@ -20,6 +20,7 @@ double eraEra00(double, double);
 int eraCal2jd(int, int, int, double *, double *);
 int eraJd2cal(double, double, int *, int *, int *, double *);
 int eraTttai(double, double, double *, double *);
+double eraGmst82(double, double);
 }
 
 #endif

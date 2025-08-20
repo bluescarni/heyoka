@@ -276,6 +276,111 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
     return llvm_get_eop_sw_data(s, data, value_t, "era", value_getter, "eop");
 }
 
+// eop data getter for the gmst82.
+//
+// The gmst82 will be represented as a double-length floating-point, hence the value type of the
+// global array is itself a 2-elements array (of type scal_t).
+llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
+{
+    // NOTE: for the gmst82 data specifically, we want to make sure that the array size x 2 is representable
+    // as a 32-bit int. The reason for this is that in the implementation of the gmst82/gmst82p functions,
+    // we will be reinterpreting the array of size-2 arrays as a 1D flattened array, into which we want
+    // to be able to index via 32-bit ints.
+    if (data.get_table().size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::overflow_error("Overflow detected while generating the LLVM gmst82 data");
+        // LCOV_EXCL_STOP
+    }
+
+    // Determine the value type.
+    auto *value_t = llvm::ArrayType::get(scal_t, 2);
+
+    const auto value_getter = [&s, scal_t, value_t](const eop_data_row &r) {
+        // Fetch the UTC mjd.
+        const auto utc_mjd = r.mjd;
+
+        // Turn it into a UTC jd.
+        const auto utc_jd1 = 2400000.5;
+        const auto utc_jd2 = utc_mjd;
+
+        // Fetch the UT1-UTC difference.
+        const auto dut1 = r.delta_ut1_utc;
+
+        // Convert the UTC jd into UT1.
+        // LCOV_EXCL_START
+        double ut1_jd1{}, ut1_jd2{};
+        const auto ret = ::eraUtcut1(utc_jd1, utc_jd2, dut1, &ut1_jd1, &ut1_jd2);
+        if (ret == -1) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Unable to convert the UTC Julian date ({}, {}) into a UT1 Julian date", utc_jd1, utc_jd2));
+        }
+        // LCOV_EXCL_STOP
+
+        // Compute the gmst82 and return. We use eq. (2) from:
+        //
+        // https://celestrak.org/publications/AIAA/2006-6753/AIAA-2006-6753-Rev3.pdf
+        //
+        // The approach we follow here is to first compute the gmst82 in multiprecision (without any reduction to the
+        // [0, 2pi] range), and then to truncate and store the result as a double-double number. This gives us the
+        // gmst82 with roughly 30 decimal digits of precision. Then, in the implementation of the gmst82/gmst82p
+        // functions in the expression system, we will perform double-double interpolation and reduction to the [0, 2pi]
+        // range, and finally we will truncate the result back to single-length representation.
+        //
+        // NOTE: at this time the gmst82 has an intrinsic accuracy no better than ~1e-10 rad, due to the ~1e-5s
+        // uncertainty in the measurement of the UT1-UTC difference. Thus it seems like there's no point
+        // in attempting to generalise this process to precisions higher than double. We can always generalise this
+        // to higher precision in the future if needed.
+
+        // Use octuple precision as a safety margin.
+        //
+        // NOTE: cpp_bin_float_oct is defined as having expression templates turned off, thus we are ok with the use of
+        // auto throughout the computation.
+        using oct_t = boost::multiprecision::cpp_bin_float_oct;
+
+        // Assemble the UT1 Julian date.
+        auto tUT1 = (oct_t{ut1_jd1} + ut1_jd2);
+
+        // Turn it into Julian centuries elapsed since JD 2451545.0, as requested by the formula. See also the "Sidereal
+        // Time" section in the Vallado book.
+        tUT1 = (tUT1 - 2451545.0) / 36525;
+
+        // The coefficients for the expression of the gmst82, in seconds.
+        const auto c0 = 67310.54841;
+        const auto c1 = oct_t{876600.} * 3600 + 8640184.812866;
+        const auto c2 = 0.093104;
+        const auto c3 = -6.2e-6;
+
+        // Compute the value of the gmst82.
+        auto gmst82 = c0 + (c1 + (c2 + c3 * tUT1) * tUT1) * tUT1;
+
+        // Convert it to radians.
+        gmst82 = gmst82 * boost::math::constants::pi<oct_t>() / 43200;
+
+        // Compute the hi/lo components of the double-double gmst82 approximation.
+        auto gmst82_hi = static_cast<double>(gmst82);
+        auto gmst82_lo = static_cast<double>(gmst82 - gmst82_hi);
+
+        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision
+        // rounds correctly, but better safe than sorry.
+        std::tie(gmst82_hi, gmst82_lo) = eft_add_knuth(gmst82_hi, gmst82_lo);
+
+        if (!std::isfinite(gmst82_hi) || !std::isfinite(gmst82_lo)) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(fmt::format(
+                "The computation of the gmst82 at the UTC MJD {} produced the non-finite double-length value ({}, {})",
+                utc_mjd, gmst82_hi, gmst82_lo));
+            // LCOV_EXCL_STOP
+        }
+
+        // Pack the values into an array and return.
+        return llvm::ConstantArray::get(value_t,
+                                        {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_hi})),
+                                         llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_lo}))});
+    };
+
+    return llvm_get_eop_sw_data(s, data, value_t, "gmst82", value_getter, "eop");
+}
+
 // Getters for the polar motion and dX/dY data.
 // NOTE: these are all similar, use a macro (yuck) to avoid repetition.
 // NOTE: like with the ERA, perform the computations in double-precision.
