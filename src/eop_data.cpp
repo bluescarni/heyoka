@@ -228,7 +228,7 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         }
         // LCOV_EXCL_STOP
 
-        // Compute the ERA and return. See:
+        // Compute the ERA. See:
         //
         // https://en.wikipedia.org/wiki/Sidereal_time#ERA
         //
@@ -316,7 +316,7 @@ llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm:
         }
         // LCOV_EXCL_STOP
 
-        // Compute the gmst82 and return. We use eq. (2) from:
+        // Compute the gmst82. We use eq. (2) from:
         //
         // https://celestrak.org/publications/AIAA/2006-6753/AIAA-2006-6753-Rev3.pdf
         //
