@@ -256,8 +256,8 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         auto era_hi = static_cast<double>(era);
         auto era_lo = static_cast<double>(era - era_hi);
 
-        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision
-        // rounds correctly, but better safe than sorry.
+        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision rounds
+        // correctly, but better safe than sorry.
         std::tie(era_hi, era_lo) = eft_add_knuth(era_hi, era_lo);
 
         if (!std::isfinite(era_hi) || !std::isfinite(era_lo)) [[unlikely]] {
@@ -360,8 +360,8 @@ llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm:
         auto gmst82_hi = static_cast<double>(gmst82);
         auto gmst82_lo = static_cast<double>(gmst82 - gmst82_hi);
 
-        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision
-        // rounds correctly, but better safe than sorry.
+        // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision rounds
+        // correctly, but better safe than sorry.
         std::tie(gmst82_hi, gmst82_lo) = eft_add_knuth(gmst82_hi, gmst82_lo);
 
         if (!std::isfinite(gmst82_hi) || !std::isfinite(gmst82_lo)) [[unlikely]] {
