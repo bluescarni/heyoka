@@ -88,6 +88,17 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
     // Fetch the table of EOP data.
     const auto &table = data.get_table();
 
+    // NOTE: when working with double-length eop data, we want to make sure that the table size x 2 is representable as
+    // a 32-bit int. The reason for this is that, later in this function, in batch mode we will be reinterpreting the
+    // table of size-2 arrays as a 1D flattened array, into which we want to be able to index via 32-bit ints.
+    if (table.size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::overflow_error(fmt::format("Overflow detected while generating the double-length LLVM interpolation "
+                                              "function for the eop quantity '{}'",
+                                              name));
+        // LCOV_EXCL_STOP
+    }
+
     // Start by creating the mangled name of the function. The mangled name will be based on:
     //
     // - the name of the eop quantity we are computing,
@@ -229,7 +240,7 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
 
         // Multiply idx and idxp1 by two to access the hi parts.
         //
-        // NOTE: the multiplication is safe, as we checked when creating the eop data that arr_size x 2 is representable
+        // NOTE: the multiplication is safe, as we checked earlier in this function that arr_size x 2 is representable
         // as a 32-bit int and the max possible value for idx/idxp1 is arr_size.
         auto *idx_hi = bld.CreateMul(idx, llvm::ConstantInt::get(idx->getType(), 2));
         auto *idxp1_hi = bld.CreateMul(idxp1, llvm::ConstantInt::get(idxp1->getType(), 2));

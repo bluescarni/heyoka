@@ -8,8 +8,6 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstdint>
-#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -194,16 +192,6 @@ namespace detail
 // global array is itself a 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
-    // NOTE: for the ERA data specifically, we want to make sure that the array size x 2 is representable
-    // as a 32-bit int. The reason for this is that in the implementation of the era/erap functions,
-    // we will be reinterpreting the array of size-2 arrays as a 1D flattened array, into which we want
-    // to be able to index via 32-bit ints.
-    if (data.get_table().size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
-        // LCOV_EXCL_START
-        throw std::overflow_error("Overflow detected while generating the LLVM ERA data");
-        // LCOV_EXCL_STOP
-    }
-
     // Determine the value type.
     auto *value_t = llvm::ArrayType::get(scal_t, 2);
 
@@ -282,16 +270,6 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
 // global array is itself a 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
-    // NOTE: for the gmst82 data specifically, we want to make sure that the array size x 2 is representable
-    // as a 32-bit int. The reason for this is that in the implementation of the gmst82/gmst82p functions,
-    // we will be reinterpreting the array of size-2 arrays as a 1D flattened array, into which we want
-    // to be able to index via 32-bit ints.
-    if (data.get_table().size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
-        // LCOV_EXCL_START
-        throw std::overflow_error("Overflow detected while generating the LLVM gmst82 data");
-        // LCOV_EXCL_STOP
-    }
-
     // Determine the value type.
     auto *value_t = llvm::ArrayType::get(scal_t, 2);
 
