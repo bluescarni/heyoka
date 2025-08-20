@@ -113,6 +113,7 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     }
 
     // We need to create a new array. Begin with the array type.
+    //
     // NOTE: array size needs a 64-bit int, but we want to guarantee that the array size fits in a 32-bit int.
     auto *arr_type = llvm::ArrayType::get(value_t, boost::numeric_cast<std::uint32_t>(table.size()));
 
@@ -129,8 +130,9 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     }
 
     // Create the array.
-    // NOTE: we use linkonce_odr linkage so that we do not get duplicate definitions of the
-    // same data in multiple llvm modules.
+    //
+    // NOTE: we use linkonce_odr linkage so that we do not get duplicate definitions of the same data in multiple llvm
+    // modules.
     auto *arr = llvm::ConstantArray::get(arr_type, data_init);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_arr = new llvm::GlobalVariable(md, arr_type, true, llvm::GlobalVariable::LinkOnceODRLinkage, arr, name);

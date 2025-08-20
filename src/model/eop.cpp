@@ -59,15 +59,24 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model::detail
 {
 
-// Helper to get/generate the function for the simultaneous computation of era and erap via first-order
-// polynomial interpolation.
+namespace
+{
+
+// Helper to get/generate the function for the simultaneous computation of an angular eop quantity and its derivative
+// via double-length first-order polynomial interpolation.
 //
 // fp_t is the scalar floating-point value that will be used in the computation. batch_size is the batch size.
-// 'data' is the source of EOP data.
+// 'data' is the source of EOP data. 'name' is the name of the eop quantity. eop_data_getter is the function to
+// create/fetch the eop data.
 //
-// NOTE: we need a custom function for the ERA because of the double-length representation.
-llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data)
+// The eop quantity will be returned normalised to the [0, 2pi] range.
+llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           const eop_data &data, const char *name,
+                                           llvm::Value *(*eop_data_getter)(llvm_state &, const eop_data &,
+                                                                           llvm::Type *))
 {
+    assert(eop_data_getter != nullptr);
+
     namespace hy = heyoka;
     namespace hd = hy::detail;
 
@@ -79,12 +88,24 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // Fetch the table of EOP data.
     const auto &table = data.get_table();
 
+    // NOTE: when working with double-length eop data, we want to make sure that the table size x 2 is representable as
+    // a 32-bit int. The reason for this is that, later in this function, in batch mode we will be reinterpreting the
+    // table of size-2 arrays as a 1D flattened array, into which we want to be able to index via 32-bit ints.
+    if (table.size() > std::numeric_limits<std::uint32_t>::max() / 2u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::overflow_error(fmt::format("Overflow detected while generating the double-length LLVM interpolation "
+                                              "function for the eop quantity '{}'",
+                                              name));
+        // LCOV_EXCL_STOP
+    }
+
     // Start by creating the mangled name of the function. The mangled name will be based on:
     //
+    // - the name of the eop quantity we are computing,
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.eop_get_era_erap.{}.{}_{}.{}", table.size(), data.get_timestamp(),
+    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -99,8 +120,8 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // Fetch the current insertion block.
     auto *orig_bb = bld.GetInsertBlock();
 
-    // Construct the function prototype. The only input is the time value, the output is the array of
-    // two values [era, erap].
+    // Construct the function prototype. The only input is the time value, the output is the array of two values [eop,
+    // eopp].
     auto *ret_t = llvm::ArrayType::get(val_t, 2);
     auto *ft = llvm::FunctionType::get(ret_t, {val_t}, false);
 
@@ -117,9 +138,9 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // Create a new basic block to start insertion into.
     bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
-    // Get/generate the date and ERA data.
+    // Get/generate the date and eop data.
     auto *date_ptr = hd::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, "eop");
-    auto *era_ptr = hd::llvm_get_eop_data_era(s, data, fp_t);
+    auto *eop_ptr = eop_data_getter(s, data, fp_t);
 
     // Codegen the array size (and its splatted counterpart).
     auto *arr_size = bld.getInt32(boost::numeric_cast<std::uint32_t>(table.size()));
@@ -131,39 +152,39 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     // Codegen nan for use later.
     auto *nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});
 
-    // Codegen the type representing the ERA data: an array of 2 scalars storing the
-    // hi/lo double-length parts of the ERA.
-    auto *era_t = llvm::ArrayType::get(fp_t, 2);
+    // Codegen the type representing the eop data: an array of 2 scalars storing the hi/lo double-length parts of the
+    // eop quantity.
+    auto *eop_t = llvm::ArrayType::get(fp_t, 2);
 
-    // We can now load the data from the date/era arrays. The loaded data will be stored in
-    // the t0, t1, era0_* and era1_* variables.
-    llvm::Value *t0{}, *t1{}, *era0_hi{}, *era0_lo{}, *era1_hi{}, *era1_lo{};
+    // We can now load the data from the date/eop arrays. The loaded data will be stored in the t0, t1, eop0_* and
+    // eop1_* variables.
+    llvm::Value *t0{}, *t1{}, *eop0_hi{}, *eop0_lo{}, *eop1_hi{}, *eop1_lo{};
     if (batch_size == 1u) {
         // Scalar implementation.
 
-        // Storage for the values we will be loading from the date/era arrays.
+        // Storage for the values we will be loading from the date/eop arrays.
         auto *t0_alloc = bld.CreateAlloca(fp_t);
         auto *t1_alloc = bld.CreateAlloca(fp_t);
-        auto *era0_hi_alloc = bld.CreateAlloca(fp_t);
-        auto *era0_lo_alloc = bld.CreateAlloca(fp_t);
-        auto *era1_hi_alloc = bld.CreateAlloca(fp_t);
-        auto *era1_lo_alloc = bld.CreateAlloca(fp_t);
+        auto *eop0_hi_alloc = bld.CreateAlloca(fp_t);
+        auto *eop0_lo_alloc = bld.CreateAlloca(fp_t);
+        auto *eop1_hi_alloc = bld.CreateAlloca(fp_t);
+        auto *eop1_lo_alloc = bld.CreateAlloca(fp_t);
 
         // NOTE: in the scalar implementation, we need to branch on the value of idx: if idx == arr_size, we will return
         // NaNs, otherwise we will return the values in the arrays at indices idx and idx + 1.
         hd::llvm_if_then_else(
             s, bld.CreateICmpEQ(idx, arr_size),
-            [&bld, nan_const, t0_alloc, t1_alloc, era0_hi_alloc, era0_lo_alloc, era1_hi_alloc, era1_lo_alloc]() {
+            [&bld, nan_const, t0_alloc, t1_alloc, eop0_hi_alloc, eop0_lo_alloc, eop1_hi_alloc, eop1_lo_alloc]() {
                 // Store the nans.
                 bld.CreateStore(nan_const, t0_alloc);
                 bld.CreateStore(nan_const, t1_alloc);
-                bld.CreateStore(nan_const, era0_hi_alloc);
-                bld.CreateStore(nan_const, era0_lo_alloc);
-                bld.CreateStore(nan_const, era1_hi_alloc);
-                bld.CreateStore(nan_const, era1_lo_alloc);
+                bld.CreateStore(nan_const, eop0_hi_alloc);
+                bld.CreateStore(nan_const, eop0_lo_alloc);
+                bld.CreateStore(nan_const, eop1_hi_alloc);
+                bld.CreateStore(nan_const, eop1_lo_alloc);
             },
-            [&bld, idx, fp_t, era_t, date_ptr, era_ptr, t0_alloc, t1_alloc, era0_hi_alloc, era0_lo_alloc, era1_hi_alloc,
-             era1_lo_alloc]() {
+            [&bld, idx, fp_t, eop_t, date_ptr, eop_ptr, t0_alloc, t1_alloc, eop0_hi_alloc, eop0_lo_alloc, eop1_hi_alloc,
+             eop1_lo_alloc]() {
                 // Compute idx + 1.
                 auto *idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
 
@@ -171,24 +192,24 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
                 bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx})), t0_alloc);
                 bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1})), t1_alloc);
 
-                // Load the era values.
-                auto *era_0 = bld.CreateLoad(era_t, bld.CreateInBoundsGEP(era_t, era_ptr, {idx}));
-                auto *era_1 = bld.CreateLoad(era_t, bld.CreateInBoundsGEP(era_t, era_ptr, {idxp1}));
+                // Load the eop values.
+                auto *eop0 = bld.CreateLoad(eop_t, bld.CreateInBoundsGEP(eop_t, eop_ptr, {idx}));
+                auto *eop1 = bld.CreateLoad(eop_t, bld.CreateInBoundsGEP(eop_t, eop_ptr, {idxp1}));
 
                 // Decompose into hi/lo parts.
-                bld.CreateStore(bld.CreateExtractValue(era_0, {0}), era0_hi_alloc);
-                bld.CreateStore(bld.CreateExtractValue(era_0, {1}), era0_lo_alloc);
-                bld.CreateStore(bld.CreateExtractValue(era_1, {0}), era1_hi_alloc);
-                bld.CreateStore(bld.CreateExtractValue(era_1, {1}), era1_lo_alloc);
+                bld.CreateStore(bld.CreateExtractValue(eop0, {0}), eop0_hi_alloc);
+                bld.CreateStore(bld.CreateExtractValue(eop0, {1}), eop0_lo_alloc);
+                bld.CreateStore(bld.CreateExtractValue(eop1, {0}), eop1_hi_alloc);
+                bld.CreateStore(bld.CreateExtractValue(eop1, {1}), eop1_lo_alloc);
             });
 
         // Fetch the values that we have stored in the allocs.
         t0 = bld.CreateLoad(fp_t, t0_alloc);
         t1 = bld.CreateLoad(fp_t, t1_alloc);
-        era0_hi = bld.CreateLoad(fp_t, era0_hi_alloc);
-        era0_lo = bld.CreateLoad(fp_t, era0_lo_alloc);
-        era1_hi = bld.CreateLoad(fp_t, era1_hi_alloc);
-        era1_lo = bld.CreateLoad(fp_t, era1_lo_alloc);
+        eop0_hi = bld.CreateLoad(fp_t, eop0_hi_alloc);
+        eop0_lo = bld.CreateLoad(fp_t, eop0_lo_alloc);
+        eop1_hi = bld.CreateLoad(fp_t, eop1_hi_alloc);
+        eop1_lo = bld.CreateLoad(fp_t, eop1_lo_alloc);
     } else {
         // Vector implementation.
 
@@ -213,35 +234,37 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
         t1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1}), llvm::Align(align), mask,
                                     nan_const);
 
-        // NOTE: we are now going to do a bit of type punning. The era data is originally an array of size-2
-        // arrays, but we will be accessing it as a flat 1D array, which allows us to perform vector
-        // gathers more easily. This would probably be technically undefined behaviour in C++, but it should be
-        // ok in the LLVM world.
+        // NOTE: we are now going to do a bit of type punning. The eop data is originally an array of size-2 arrays, but
+        // we will be accessing it as a flat 1D array, which allows us to perform vector gathers more easily. This would
+        // probably be technically undefined behaviour in C++, but it should be ok in the LLVM world.
 
         // Multiply idx and idxp1 by two to access the hi parts.
-        // NOTE: the multiplication is safe, as we checked when creating the era data that arr_size x 2
-        // is representable as a 32-bit int and the max possible value for idx/idxp1 is arr_size.
+        //
+        // NOTE: the multiplication is safe, as we checked earlier in this function that arr_size x 2 is representable
+        // as a 32-bit int and the max possible value for idx/idxp1 is arr_size.
         auto *idx_hi = bld.CreateMul(idx, llvm::ConstantInt::get(idx->getType(), 2));
         auto *idxp1_hi = bld.CreateMul(idxp1, llvm::ConstantInt::get(idxp1->getType(), 2));
 
         // Add 1 to access the low parts.
+        //
         // NOTE: again, use the mask to avoid possible overflow.
         auto *idx_lo = bld.CreateAdd(idx_hi, mask32);
         auto *idxp1_lo = bld.CreateAdd(idxp1_hi, mask32);
 
-        // Load the hi/lo era values.
-        era0_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, era_ptr, {idx_hi}), llvm::Align(align),
+        // Load the hi/lo eop values.
+        eop0_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idx_hi}), llvm::Align(align),
                                          mask, nan_const);
-        era0_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, era_ptr, {idx_lo}), llvm::Align(align),
+        eop0_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idx_lo}), llvm::Align(align),
                                          mask, nan_const);
-        era1_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, era_ptr, {idxp1_hi}), llvm::Align(align),
+        eop1_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idxp1_hi}), llvm::Align(align),
                                          mask, nan_const);
-        era1_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, era_ptr, {idxp1_lo}), llvm::Align(align),
+        eop1_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idxp1_lo}), llvm::Align(align),
                                          mask, nan_const);
     }
 
     // We can now proceed to perform linear interpolation in double-length arithmetic.
-    // NOTE: the ERA hi/lo values are constructed already normalised.
+    //
+    // NOTE: the eop hi/lo values are constructed already normalised.
 
     // Codegen the zero constant.
     auto *zero_const = llvm_codegen(s, val_t, number{0.});
@@ -252,35 +275,36 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     const auto t1_m_t = hd::llvm_dl_sub(s, t1, zero_const, tm_val, zero_const);
     // t - t0.
     const auto t_m_t0 = hd::llvm_dl_sub(s, tm_val, zero_const, t0, zero_const);
-    // era0*(t1-t).
-    const auto tmp1 = hd::llvm_dl_mul(s, era0_hi, era0_lo, t1_m_t.first, t1_m_t.second);
-    // era1*(t-t0).
-    const auto tmp2 = hd::llvm_dl_mul(s, era1_hi, era1_lo, t_m_t0.first, t_m_t0.second);
-    // era0*(t1-t)+era1*(t-t0).
+    // eop0*(t1-t).
+    const auto tmp1 = hd::llvm_dl_mul(s, eop0_hi, eop0_lo, t1_m_t.first, t1_m_t.second);
+    // eop1*(t-t0).
+    const auto tmp2 = hd::llvm_dl_mul(s, eop1_hi, eop1_lo, t_m_t0.first, t_m_t0.second);
+    // eop0*(t1-t)+eop1*(t-t0).
     const auto tmp3 = hd::llvm_dl_add(s, tmp1.first, tmp1.second, tmp2.first, tmp2.second);
-    // era = (era0*(t1-t)+era1*(t-t0))/(t1-t0).
-    const auto era_dl = hd::llvm_dl_div(s, tmp3.first, tmp3.second, t1_m_t0.first, t1_m_t0.second);
-    // era1-era0.
-    const auto tmp4 = hd::llvm_dl_sub(s, era1_hi, era1_lo, era0_hi, era0_lo);
-    // erap = (era1-era0)/(t1-t0).
-    auto *erap = hd::llvm_dl_div(s, tmp4.first, tmp4.second, t1_m_t0.first, t1_m_t0.second).first;
+    // eop = (eop0*(t1-t)+eop1*(t-t0))/(t1-t0).
+    const auto eop_dl = hd::llvm_dl_div(s, tmp3.first, tmp3.second, t1_m_t0.first, t1_m_t0.second);
+    // eop1-eop0.
+    const auto tmp4 = hd::llvm_dl_sub(s, eop1_hi, eop1_lo, eop0_hi, eop0_lo);
+    // eopp = (eop1-eop0)/(t1-t0).
+    auto *eopp = hd::llvm_dl_div(s, tmp4.first, tmp4.second, t1_m_t0.first, t1_m_t0.second).first;
 
-    // Reduce the ERA to the [0, 2pi) range.
+    // Reduce the eop to the [0, 2pi) range.
 
     // Fetch 2pi in double-length format.
     const auto [dl_twopi_hi, dl_twopi_lo] = hd::dl_twopi_like(s, fp_t);
 
-    // Reduce era modulo 2*pi in double-length precision.
-    // NOTE: we are ok here if the reduction is not 100% correct (that is, it is ok if era is slightly outside
-    // the [0, 2pi) range due to fp rounding effects).
-    auto *era = hd::llvm_dl_modulus(s, era_dl.first, era_dl.second, llvm_codegen(s, val_t, dl_twopi_hi),
+    // Reduce eop modulo 2*pi in double-length precision.
+    //
+    // NOTE: we are ok here if the reduction is not 100% correct (that is, it is ok if eop is slightly outside the [0,
+    // 2pi) range due to fp rounding effects).
+    auto *eop = hd::llvm_dl_modulus(s, eop_dl.first, eop_dl.second, llvm_codegen(s, val_t, dl_twopi_hi),
                                     llvm_codegen(s, val_t, dl_twopi_lo))
                     .first;
 
     // Create the return value.
     llvm::Value *ret = llvm::UndefValue::get(ret_t);
-    ret = bld.CreateInsertValue(ret, era, 0);
-    ret = bld.CreateInsertValue(ret, erap, 1);
+    ret = bld.CreateInsertValue(ret, eop, 0);
+    ret = bld.CreateInsertValue(ret, eopp, 1);
 
     bld.CreateRet(ret);
 
@@ -288,6 +312,19 @@ llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uin
     bld.SetInsertPoint(orig_bb);
 
     return f;
+}
+
+} // namespace
+
+llvm::Function *llvm_get_era_erap_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const eop_data &data)
+{
+    return llvm_get_eop_angle_func_dl(s, fp_t, batch_size, data, "era", heyoka::detail::llvm_get_eop_data_era);
+}
+
+llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                             const eop_data &data)
+{
+    return llvm_get_eop_angle_func_dl(s, fp_t, batch_size, data, "gmst82", heyoka::detail::llvm_get_eop_data_gmst82);
 }
 
 // Helper to get/generate the function for the simultaneous computation of an eop quantity and its derivative via
@@ -504,6 +541,10 @@ const std::unordered_map<std::string, eop_impl_funcs> eop_impl_funcs_map = {
      {.grad
       = [](const expression &arg, const eop_data &data) { return erap(kw::time_expr = arg, kw::eop_data = data); },
       .llvm_eval = &llvm_get_era_erap_func}},
+    {"gmst82",
+     {.grad
+      = [](const expression &arg, const eop_data &data) { return gmst82p(kw::time_expr = arg, kw::eop_data = data); },
+      .llvm_eval = &llvm_get_gmst82_gmst82p_func}},
     {"pm_x",
      {.grad
       = [](const expression &arg, const eop_data &data) { return pm_xp(kw::time_expr = arg, kw::eop_data = data); },
@@ -1182,6 +1223,16 @@ expression era_func_impl(expression time_expr, eop_data data)
 expression erap_func_impl(expression time_expr, eop_data data)
 {
     return expression{func{eopp_impl{"era", std::move(time_expr), std::move(data)}}};
+}
+
+expression gmst82_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eop_impl{"gmst82", std::move(time_expr), std::move(data)}}};
+}
+
+expression gmst82p_func_impl(expression time_expr, eop_data data)
+{
+    return expression{func{eopp_impl{"gmst82", std::move(time_expr), std::move(data)}}};
 }
 
 expression pm_x_func_impl(expression time_expr, eop_data data)

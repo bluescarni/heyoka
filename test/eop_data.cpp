@@ -35,6 +35,7 @@
 #include <llvm/IR/Type.h>
 
 #include <heyoka/detail/eop_sw_helpers.hpp>
+#include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -1066,5 +1067,95 @@ TEST_CASE("eop_data locate_date")
     };
 
     tester.operator()<float>();
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_gmst82")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy function that uses the array, returning a pointer to the first element.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_gmst82(s, data, scal_t));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "eop_data"));
+
+        // Compile and fetch the function pointer.
+        s.compile();
+        using arr_t = T[2];
+        auto *fptr = reinterpret_cast<const arr_t *(*)()>(s.jit_lookup("test"));
+
+        // Fetch the array pointer.
+        const auto *arr_ptr = fptr();
+
+        // We will be loading the double-length gmst82 approximation and reduce it in octuple precision.
+        // Then, we will compare it to values computed with erfa.
+        using oct_t = boost::multiprecision::cpp_bin_float_oct;
+        auto reducer = [](const auto &x) {
+            using std::atan2;
+            using std::sin;
+            using std::cos;
+
+            auto ret = atan2(sin(x), cos(x));
+            if (ret < 0) {
+
+                ret = 2 * boost::math::constants::pi<oct_t>() + ret;
+            }
+            return ret;
+        };
+
+        // The erfa-based implementation.
+        auto erfa_gmst82 = [](double utc_mjd, double dut1) {
+            // Convert the UTC jd into UT1.
+            double ut1_jd1{}, ut1_jd2{};
+            [[maybe_unused]] const auto ret = ::eraUtcut1(2400000.5, utc_mjd, dut1, &ut1_jd1, &ut1_jd2);
+            assert(ret == 0);
+            return ::eraGmst82(ut1_jd1, ut1_jd2);
+        };
+
+        using std::abs;
+        {
+            oct_t gmst82{arr_ptr[0][0]};
+            gmst82 += arr_ptr[0][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(41684, 0.8075)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[6678][0]};
+            gmst82 += arr_ptr[6678][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(48362, 0.37842)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[15024][0]};
+            gmst82 += arr_ptr[15024][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(56708, -0.149055)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[16271][0]};
+            gmst82 += arr_ptr[16271][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(57955, 0.3520877)) < 1e-9);
+        }
+    };
+
+    // NOTE: test only double for the gmst82.
     tester.operator()<double>();
 }
