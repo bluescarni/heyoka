@@ -319,24 +319,24 @@ auto build_rot_itrs_teme(const expression &time_expr, const eop_data &data)
     // Construct x_p, y_p and gmst82.
     const auto x_p = pm_x(kw::time_expr = time_expr, kw::eop_data = data);
     const auto y_p = pm_y(kw::time_expr = time_expr, kw::eop_data = data);
-    const auto mgmst82 = gmst82(kw::time_expr = time_expr, kw::eop_data = data);
+    const auto g82 = gmst82(kw::time_expr = time_expr, kw::eop_data = data);
 
     // Compute sin/cos of x_p, y_p and gmst82.
     const auto cxp = cos(x_p);
     const auto sxp = sin(x_p);
     const auto cyp = cos(y_p);
     const auto syp = sin(y_p);
-    const auto cmgmst82 = cos(mgmst82);
-    const auto smgmst82 = sin(mgmst82);
+    const auto cg82 = cos(g82);
+    const auto sg82 = sin(g82);
 
     // Create the entries of the rotation matrix.
-    const auto R00 = cxp * cmgmst82;
-    const auto R01 = -cyp * smgmst82 + syp * sxp * cmgmst82;
-    const auto R02 = -syp * smgmst82 - cyp * sxp * cmgmst82;
+    const auto R00 = cxp * cg82;
+    const auto R01 = -cyp * sg82 + syp * sxp * cg82;
+    const auto R02 = -syp * sg82 - cyp * sxp * cg82;
 
-    const auto R10 = cxp * smgmst82;
-    const auto R11 = cyp * cmgmst82 + syp * sxp * smgmst82;
-    const auto R12 = syp * cmgmst82 - cyp * sxp * smgmst82;
+    const auto R10 = cxp * sg82;
+    const auto R11 = cyp * cg82 + syp * sxp * sg82;
+    const auto R12 = syp * cg82 - cyp * sxp * sg82;
 
     // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
     const auto R20 = sxp;
