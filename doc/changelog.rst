@@ -4,6 +4,8 @@ Changelog
 7.5.0 (unreleased)
 ------------------
 
+- New frame transformation: ITRS to TEME and viceversa
+  (`#507 <https://github.com/bluescarni/heyoka/pull/507>`__).
 - New ``gmst82()`` model to represent the Greenwich mean sidereal time (IAU 1982 model)
   (`#506 <https://github.com/bluescarni/heyoka/pull/506>`__).
 
