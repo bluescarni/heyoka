@@ -4010,7 +4010,7 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
 
 // Helper to add the nocapture attribute to a pointer function argument. The syntax changes in LLVM 21, hence the need
 // for a wrapper.
-void llvm_add_no_capture_argattr(llvm_state &s, llvm::Argument *arg)
+void llvm_add_no_capture_argattr([[maybe_unused]] llvm_state &s, llvm::Argument *arg)
 {
     assert(arg != nullptr);
     assert(arg->getType()->isPointerTy());
