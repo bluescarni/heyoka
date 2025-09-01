@@ -39,6 +39,7 @@
 
 #include <llvm/Analysis/VectorUtils.h>
 #include <llvm/Config/llvm-config.h>
+#include <llvm/IR/Argument.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
@@ -58,6 +59,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/ModRef.h>
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -2649,13 +2651,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
         // Fetch the necessary function arguments.
         auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
-        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, out_ptr);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
         auto *cf_ptr = f->args().begin() + 1;
         cf_ptr->setName("cf_ptr");
-        cf_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, cf_ptr);
         cf_ptr->addAttr(llvm::Attribute::NoAlias);
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -4002,6 +4004,44 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
                                   bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
                                   function_name});
         });
+
+#endif
+}
+
+// Helper to add the nocapture attribute to a pointer function argument. The syntax changes in LLVM 21, hence the need
+// for a wrapper.
+void llvm_add_no_capture_argattr(llvm_state &s, llvm::Argument *arg)
+{
+    assert(arg != nullptr);
+    assert(arg->getType()->isPointerTy());
+
+#if LLVM_VERSION_MAJOR <= 20
+
+    arg->addAttr(llvm::Attribute::NoCapture);
+
+#else
+
+    arg->addAttr(llvm::Attribute::getWithCaptureInfo(s.context(), llvm::CaptureInfo::none()));
+
+#endif
+}
+
+// Helper to check if the input type is an IEEE-like floating-point type.
+//
+// NOTE: LLVM<=20 had an isIEEE() method for this, but it got slightly changed in LLVM 21 so that now it is called
+// isIEEELikeFPTy() and it *excludes* 80-bit extended precision. For our internal use, we want to consider 80-bit
+// extended precision as IEEE-like.
+bool llvm_is_ieee_like_fp(llvm::Type *tp)
+{
+    assert(tp != nullptr);
+
+#if LLVM_VERSION_MAJOR <= 20
+
+    return tp->isFloatingPointTy() && tp->isIEEE();
+
+#else
+
+    return tp->isFloatingPointTy() && (tp->isIEEELikeFPTy() || tp->isX86_FP80Ty());
 
 #endif
 }

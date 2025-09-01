@@ -1032,18 +1032,18 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tc_ptr = f->args().begin() + 1;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *h_ptr = f->args().begin() + 2;
     h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, h_ptr);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
     h_ptr->addAttr(llvm::Attribute::ReadOnly);
 

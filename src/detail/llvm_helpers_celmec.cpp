@@ -500,19 +500,19 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // Setup the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *ecc_ptr = f->args().begin() + 1;
     ecc_ptr->setName("ecc_ptr");
-    ecc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, ecc_ptr);
     ecc_ptr->addAttr(llvm::Attribute::NoAlias);
     ecc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *M_ptr = f->args().begin() + 2;
     M_ptr->setName("M_ptr");
-    M_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, M_ptr);
     M_ptr->addAttr(llvm::Attribute::NoAlias);
     M_ptr->addAttr(llvm::Attribute::ReadOnly);
 

@@ -145,29 +145,29 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tm_ptr = f->args().begin() + 1;
     tm_ptr->setName("tm_ptr");
-    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tm_ptr);
     tm_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
-    times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_hi);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
-    times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_lo);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
     times_ptr_lo->addAttr(llvm::Attribute::ReadOnly);
 
@@ -633,30 +633,30 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tm_ptr = f->args().begin() + 1;
     tm_ptr->setName("tm_ptr");
-    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tm_ptr);
     tm_ptr->addAttr(llvm::Attribute::NoAlias);
     tm_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
-    times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_hi);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
-    times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_lo);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
     times_ptr_lo->addAttr(llvm::Attribute::ReadOnly);
 

@@ -529,18 +529,18 @@ llvm::Function *taylor_cm_make_driver_proto(llvm_state &s, unsigned cur_idx)
     // arguments.
     auto *tape_arg = f->args().begin();
     tape_arg->setName("tape_ptr");
-    tape_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, tape_arg);
     tape_arg->addAttr(llvm::Attribute::NoAlias);
 
     auto *par_ptr_arg = tape_arg + 1;
     par_ptr_arg->setName("par_ptr");
-    par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr_arg);
     par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
     par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr_arg = tape_arg + 2;
     time_ptr_arg->setName("time_ptr");
-    time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr_arg);
     time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
     time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
@@ -726,18 +726,18 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
 
         auto *tape_ptr_arg = worker->args().begin() + 2;
         tape_ptr_arg->setName("tape_ptr");
-        tape_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr_arg);
         tape_ptr_arg->addAttr(llvm::Attribute::NoAlias);
 
         auto *par_ptr_arg = worker->args().begin() + 3;
         par_ptr_arg->setName("par_ptr");
-        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr_arg);
         par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr_arg = worker->args().begin() + 4;
         time_ptr_arg->setName("time_ptr");
-        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr_arg);
         time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 

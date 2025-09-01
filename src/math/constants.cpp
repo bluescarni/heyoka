@@ -208,7 +208,7 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
 
-    if (tp->isFloatingPointTy() && tp->isIEEE()) {
+    if (detail::llvm_is_ieee_like_fp(tp)) {
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);

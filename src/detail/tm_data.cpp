@@ -160,17 +160,17 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, out_ptr);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *in_ptr = out_ptr + 1;
     in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, in_ptr);
     in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *state_ptr = out_ptr + 2;
     state_ptr->setName("state_ptr");
-    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, state_ptr);
     state_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     // Create a new basic block to start insertion into.

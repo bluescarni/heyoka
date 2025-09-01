@@ -148,8 +148,8 @@ endif()
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 16 OR ${LLVM_VERSION_MAJOR} GREATER 20)
-  message(FATAL_ERROR "LLVM >= 16 and <= 20 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 17 OR ${LLVM_VERSION_MAJOR} GREATER 21)
+  message(FATAL_ERROR "LLVM >= 17 and <= 21 is required.")
 endif()
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")

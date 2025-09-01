@@ -1089,10 +1089,12 @@ TEST_CASE("csc_scalar")
 
             llvm_add_csc(s, to_external_llvm_type<fp_t>(s.context()), degree, 1);
 
+            const auto func_name = fmt::format("heyoka_csc_degree_{}_{}", degree,
+                                               llvm_mangle_type(to_external_llvm_type<fp_t>(s.context())));
+
             s.compile();
 
-            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(fmt::format(
-                "heyoka_csc_degree_{}_{}", degree, llvm_mangle_type(to_external_llvm_type<fp_t>(s.context())))));
+            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(func_name));
 
             // Random testing.
             std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -1163,11 +1165,13 @@ TEST_CASE("csc_batch")
 
                 llvm_add_csc(s, to_external_llvm_type<fp_t>(s.context()), degree, batch_size);
 
+                const auto func_name = fmt::format(
+                    "heyoka_csc_degree_{}_{}", degree,
+                    llvm_mangle_type(make_vector_type(to_external_llvm_type<fp_t>(s.context()), batch_size)));
+
                 s.compile();
 
-                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(fmt::format(
-                    "heyoka_csc_degree_{}_{}", degree,
-                    llvm_mangle_type(make_vector_type(to_external_llvm_type<fp_t>(s.context()), batch_size)))));
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(func_name));
 
                 // Random testing.
                 std::uniform_real_distribution<double> rdist(-10., 10.);

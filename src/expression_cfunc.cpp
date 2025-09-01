@@ -1472,25 +1472,25 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *in_ptr = out_ptr + 1;
     in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, in_ptr);
     in_ptr->addAttr(llvm::Attribute::NoAlias);
     in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *par_ptr = out_ptr + 2;
     par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr);
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr = out_ptr + 3;
     time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr);
     time_ptr->addAttr(llvm::Attribute::NoAlias);
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -1654,18 +1654,18 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
         // arguments.
         auto *eval_arr_arg = f->args().begin();
         eval_arr_arg->setName("eval_arr_ptr");
-        eval_arr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, eval_arr_arg);
         eval_arr_arg->addAttr(llvm::Attribute::NoAlias);
 
         auto *par_ptr_arg = eval_arr_arg + 1;
         par_ptr_arg->setName("par_ptr");
-        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr_arg);
         par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr_arg = eval_arr_arg + 2;
         time_ptr_arg->setName("time_ptr");
-        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr_arg);
         time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
@@ -2170,31 +2170,31 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
         // Set the names/attributes of the function arguments.
         auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
-        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, out_ptr);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
         auto *in_ptr = out_ptr + 1;
         in_ptr->setName("in_ptr");
-        in_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, in_ptr);
         in_ptr->addAttr(llvm::Attribute::NoAlias);
         in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *par_ptr = out_ptr + 2;
         par_ptr->setName("par_ptr");
-        par_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr);
         par_ptr->addAttr(llvm::Attribute::NoAlias);
         par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr = out_ptr + 3;
         time_ptr->setName("time_ptr");
-        time_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr);
         time_ptr->addAttr(llvm::Attribute::NoAlias);
         time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *tape_ptr = out_ptr + 4;
         tape_ptr->setName("tape_ptr");
-        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr);
         tape_ptr->addAttr(llvm::Attribute::NoAlias);
 
         llvm::Value *stride = nullptr;
