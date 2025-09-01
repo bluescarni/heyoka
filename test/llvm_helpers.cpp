@@ -129,10 +129,9 @@ TEST_CASE("sgn scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *val_t = to_external_llvm_type<fp_t>(context);
         auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
-        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(context)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
 
         auto *xptr = f->args().begin();
@@ -193,8 +192,8 @@ TEST_CASE("sgn batch")
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
                 auto *ft = llvm::FunctionType::get(
-                    builder.getVoidTy(),
-                    {llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(val_t)}, false);
+                    builder.getVoidTy(), {llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)},
+                    false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
 
                 auto out = f->args().begin();
@@ -257,8 +256,8 @@ TEST_CASE("sincos scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{val_t, llvm::PointerType::getUnqual(val_t),
-                                            llvm::PointerType::getUnqual(val_t)};
+            std::vector<llvm::Type *> fargs{val_t, llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context)};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
@@ -315,9 +314,9 @@ TEST_CASE("sincos batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t)};
+                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                                llvm::PointerType::getUnqual(context),
+                                                llvm::PointerType::getUnqual(context)};
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
@@ -379,10 +378,9 @@ TEST_CASE("sincos mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = to_external_llvm_type<mppp::real>(context);
         auto *fp_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
-        const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(real_t));
+        const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(context));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
@@ -1245,9 +1243,9 @@ TEST_CASE("minmax")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t)};
+                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                                llvm::PointerType::getUnqual(context),
+                                                llvm::PointerType::getUnqual(context)};
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
 
                 // llvm_min.
@@ -1503,7 +1501,7 @@ TEST_CASE("fma batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
 
@@ -1569,10 +1567,9 @@ TEST_CASE("fma scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = to_external_llvm_type<mppp::real>(context);
         auto *fp_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
-        const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
+        const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(context));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
 
@@ -1630,8 +1627,8 @@ TEST_CASE("eft_product scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
-                                            val_t, val_t};
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context), val_t, val_t};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_eft_prod", &md);
 
@@ -1713,7 +1710,7 @@ TEST_CASE("eft_product batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_eft_prod", &md);
 
@@ -1803,8 +1800,12 @@ TEST_CASE("dl mul scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{
-                llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context),
+                                            val_t,
+                                            val_t,
+                                            val_t,
+                                            val_t};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_mul", &md);
 
@@ -1903,7 +1904,7 @@ TEST_CASE("dl mul batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_mul", &md);
 
@@ -2018,8 +2019,12 @@ TEST_CASE("dl div scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{
-                llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context),
+                                            val_t,
+                                            val_t,
+                                            val_t,
+                                            val_t};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_div", &md);
 
@@ -2114,7 +2119,7 @@ TEST_CASE("dl div batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_div", &md);
 
@@ -2268,7 +2273,7 @@ TEST_CASE("floor batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_floor", &md);
 
@@ -2327,8 +2332,8 @@ TEST_CASE("dl floor scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
-                                            val_t, val_t};
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context), val_t, val_t};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_floor", &md);
 
@@ -2410,7 +2415,7 @@ TEST_CASE("dl floor batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_floor", &md);
 
@@ -2502,8 +2507,12 @@ TEST_CASE("dl modulus scalar")
 
             auto val_t = to_external_llvm_type<fp_t>(context);
 
-            std::vector<llvm::Type *> fargs{
-                llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t), val_t, val_t, val_t, val_t};
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context),
+                                            llvm::PointerType::getUnqual(context),
+                                            val_t,
+                                            val_t,
+                                            val_t,
+                                            val_t};
             auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
             auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_modulus", &md);
 
@@ -2582,7 +2591,7 @@ TEST_CASE("dl modulus batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(6u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_modulus", &md);
 
@@ -2724,9 +2733,7 @@ TEST_CASE("to_size_t")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *lst = to_external_llvm_type<std::size_t>(context);
-        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
-                                        llvm::PointerType::getUnqual(builder.getInt32Ty())};
+        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)};
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
 
@@ -2789,9 +2796,7 @@ TEST_CASE("to_size_t")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *lst = to_external_llvm_type<std::size_t>(context);
-        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
-                                        llvm::PointerType::getUnqual(builder.getInt64Ty())};
+        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)};
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
 
@@ -2833,12 +2838,10 @@ TEST_CASE("real_ext_load")
     auto &builder = s.builder();
     auto &context = s.context();
 
-    auto *real_t = detail::to_external_llvm_type<mppp::real>(context);
-
     const auto real_pi_257 = mppp::real_pi(257);
 
     auto *ft = llvm::FunctionType::get(
-        builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t), llvm::PointerType::getUnqual(real_t)}, false);
+        builder.getVoidTy(), {llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)}, false);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
 
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -3135,7 +3138,7 @@ TEST_CASE("trunc batch")
 
                 auto val_t = to_external_llvm_type<fp_t>(context);
 
-                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(val_t));
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(context));
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_trunc", &md);
 
@@ -3192,11 +3195,10 @@ TEST_CASE("trunc scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *val_t = to_external_llvm_type<fp_t>(context);
         auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
         auto *ft = llvm::FunctionType::get(
-            builder.getVoidTy(), {llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t)}, false);
+            builder.getVoidTy(), {llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "trunc", &md);
 
         auto *ret_ptr = f->args().begin();
@@ -3364,10 +3366,9 @@ TEST_CASE("is_finite scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *val_t = to_external_llvm_type<fp_t>(context);
         auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
-        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(context)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "is_finite", &md);
 
         auto *in_ptr = f->args().begin();
@@ -3552,10 +3553,9 @@ TEST_CASE("is_natural scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *val_t = to_external_llvm_type<fp_t>(context);
         auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
 
-        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(context)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "is_natural", &md);
 
         auto *in_ptr = f->args().begin();

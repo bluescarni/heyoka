@@ -113,21 +113,19 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
     // Init the name.
     auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);
 
     // Init the vector of arguments:
+    //
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array (pointer to val_t),
     // - par ptr (pointer to external scalar),
     // - time ptr (pointer to external scalar).
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(ext_fp_t),
-                                    llvm::PointerType::getUnqual(ext_fp_t)};
+    auto *ptr_t = llvm::PointerType::getUnqual(context);
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), ptr_t, ptr_t,
+                                    ptr_t};
 
     // Add the mangling and LLVM arg types for the argument types. Also, detect if
     // we have variables in the arguments.
@@ -1017,11 +1015,13 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - the output pointer (read/write, used also for accumulation),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the h values (read-only).
+    //
     // No overlap is allowed. All pointers are external.
-    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_scal_t));
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE

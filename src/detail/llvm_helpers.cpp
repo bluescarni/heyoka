@@ -170,10 +170,10 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret = llvm::StructType::create(
-            {to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
-             to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(to_external_llvm_type<mp_limb_t>(c))},
-            "heyoka.real");
+        auto *ret
+            = llvm::StructType::create({to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
+                                        to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(c)},
+                                       "heyoka.real");
 
         assert(ret != nullptr);
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
@@ -1152,7 +1152,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Load in a local variable the input pointer to the limbs.
         auto *limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
-        auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), limb_ptr_ptr);
+        auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), limb_ptr_ptr);
 
         // Load and insert the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
@@ -1246,7 +1246,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // Load in a local variable the output pointer to the limbs.
         auto *out_limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
-        auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), out_limb_ptr_ptr);
+        auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), out_limb_ptr_ptr);
 
         // Store the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
@@ -2625,13 +2625,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     const auto fname = fmt::format("heyoka_csc_degree_{}_{}", n, llvm_mangle_type(tp));
 
     // The function arguments:
+    //
     // - pointer to the return value,
     // - pointer to the array of coefficients.
-    // NOTE: both pointers are to the scalar counterparts
-    // of the vector types, so that we can call this from regular
-    // C++ code. The second pointer is to an external type.
-    const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                          llvm::PointerType::getUnqual(ext_fp_t)};
+    //
+    // NOTE: both pointers are to the scalar counterparts of the vector types, so that we can call this from regular C++
+    // code. The second pointer is to an external type.
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(context));
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);

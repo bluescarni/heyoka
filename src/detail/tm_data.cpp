@@ -125,7 +125,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     // in the ctor.
     auto *fp_t = detail::internal_llvm_type_like(st, state[0]);
     auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
-    auto *ext_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
+    auto *ext_ptr_t = llvm::PointerType::getUnqual(context);
 
     // Cache the precision.
     const auto prec = [&]() -> long long {

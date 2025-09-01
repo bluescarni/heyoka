@@ -481,14 +481,13 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // Add the implementation function.
     auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
-    // Fetch the external type.
-    auto *ext_fp_t = make_external_llvm_type(scal_t);
-
     // The function arguments:
+    //
     // - output pointer (write only),
     // - input ecc and mean anomaly pointers (read only).
+    //
     // No overlap allowed.
-    const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(context));
     // The return type is void.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     // Create the function

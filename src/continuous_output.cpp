@@ -124,18 +124,20 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     const detail::dfloat<T> df_t_start(m_times_hi[0], m_times_lo[0]), df_t_end(m_times_hi.back(), m_times_lo.back());
     const auto dir = df_t_start < df_t_end;
 
+    // Fetch the external floating-point type.
+    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
+
     // The function arguments:
+    //
     // - the output pointer (read/write, used also for accumulation),
-    // - the pointer to the time value (read/write: after the time value
-    //   is read, the pointer will be re-used to store the h value
-    //   that needs to be passed to the dense output function),
+    // - the pointer to the time value (read/write: after the time value is read, the pointer will be re-used to store
+    //   the h value that needs to be passed to the dense output function),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
+    //
     // No overlap is allowed. All pointers are external.
-    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
-    auto *ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    const std::vector<llvm::Type *> fargs(5u, ptr_t);
+    const std::vector<llvm::Type *> fargs(5u, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -613,17 +615,20 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto &builder = m_llvm_state.builder();
     auto &context = m_llvm_state.context();
 
+    // Fetch the floating-point types.
+    auto *fp_t = detail::to_external_llvm_type<T>(context);
+    auto *fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
+
     // The function arguments:
+    //
     // - the output pointer (read/write, used also for accumulation),
     // - the pointer to the target time values (read-only),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
+    //
     // No overlap is allowed.
-    auto fp_t = detail::to_external_llvm_type<T>(context);
-    auto fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
-    auto ptr_t = llvm::PointerType::getUnqual(fp_t);
-    const std::vector<llvm::Type *> fargs(5, ptr_t);
+    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE

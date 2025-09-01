@@ -1441,6 +1441,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
+    // Fetch the internal type.
+    auto *fp_t = to_internal_llvm_type<T>(s, prec);
+
     // Prepare the arguments:
     //
     // - a write-only float pointer to the outputs,
@@ -1450,12 +1453,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - the stride (if requested).
     //
     // The pointer arguments cannot overlap.
-
-    // Fetch the internal and external types.
-    auto *fp_t = to_internal_llvm_type<T>(s, prec);
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
-
+    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     if (strided) {
         fargs.push_back(to_external_llvm_type<std::size_t>(context));
     }
@@ -1630,11 +1628,11 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
         auto &ctx = s.context();
 
         // The arguments to the driver are:
+        //
         // - a pointer to the tape,
         // - pointers to par and time,
         // - the stride (if not a constant).
-        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(ctx), llvm::PointerType::getUnqual(ctx),
-                                        llvm::PointerType::getUnqual(ctx)};
+        std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ctx));
         if (!const_stride) {
             fargs.push_back(to_external_llvm_type<std::size_t>(ctx));
         }

@@ -847,7 +847,7 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     ext_store_vector_to_memory(s, h_ptr, h);
 
     // Write the Taylor coefficients, if requested.
-    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ext_fp_t));
+    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(context));
     llvm_if_then_else(
         s, builder.CreateICmpNE(tc_ptr, nptr),
         [&]() {
