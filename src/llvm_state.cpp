@@ -76,17 +76,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-
-#if LLVM_VERSION_MAJOR >= 17
-
-// NOTE: this header was moved in LLVM 17.
 #include <llvm/TargetParser/Triple.h>
-
-#else
-
-#include <llvm/ADT/Triple.h>
-
-#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -341,17 +331,15 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 
     // LCOV_EXCL_START
 
-    // NOTE: the code model setup is working only on LLVM>=19 (or at least
-    // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
+    // NOTE: the code model setup is working only on LLVM>=19 (or at least LLVM 18 + patches, as in the conda-forge LLVM
+    // package), due to this bug:
     //
     // https://github.com/llvm/llvm-project/issues/88115
     //
-    // Additionally, there are indications from our CI that attempting to set
-    // the code model before LLVM 17 or on Windows might just be buggy, as we see widespread
-    // ASAN failures all over the place. Thus, let us not do anything with the code
-    // model setting before LLVM 17 or on Windows.
-
-#if LLVM_VERSION_MAJOR >= 17 && !defined(_WIN32)
+    // Additionally, there are indications from our CI that attempting to set the code model on Windows might just be
+    // buggy, as we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model
+    // setting on Windows altogether. We can revisit this at a later stage if needed.
+#if !defined(_WIN32)
 
     // Setup the code model.
     switch (c_model) {

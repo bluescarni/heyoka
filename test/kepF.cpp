@@ -19,8 +19,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <llvm/Config/llvm-config.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -63,13 +61,7 @@ const auto fp_types = std::tuple<float, double
 #endif
                                  >{};
 
-constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR <= 17
-    std::numeric_limits<long double>::digits == 64
-#else
-    false
-#endif
-    ;
+constexpr bool skip_batch_ld = false;
 
 TEST_CASE("kepF def ctor")
 {
