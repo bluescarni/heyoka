@@ -16,6 +16,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -69,6 +70,10 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>> taylor_c_diff_get_n_iters(std::uint32_t) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                     std::uint32_t, bool) const;
 };
 
 // NOTE: this struct stores a std::function for the evaluation (in LLVM) of an exponentiation.

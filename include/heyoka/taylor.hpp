@@ -122,6 +122,11 @@ std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t, std::uint32_t,
                              const std::vector<std::variant<variable, number, param>> &, std::uint32_t = 0);
 
+std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_single_iter_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t,
+                                         std::uint32_t, const std::vector<std::variant<variable, number, param>> &,
+                                         std::uint32_t = 0);
+
 // Add a function for computing the dense output
 // via polynomial evaluation.
 void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, std::uint32_t, bool,
