@@ -588,7 +588,7 @@ HEYOKA_DLL_PUBLIC void heyoka_continuous_output_batch_tc_idx_debug(const std::ui
     // LCOV_EXCL_STOP
 
     for (std::uint32_t i = 0; i < batch_size; ++i) {
-        assert(tc_idx[i] < times_size / batch_size - 2u); // LCOV_EXCL_LINE
+        assert(tc_idx[i] < (times_size / batch_size) - 2u); // LCOV_EXCL_LINE
     }
 }
 }

@@ -1819,7 +1819,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
         assert(obj_buffer);
 
         // Lock down for access to m_object_files.
-        const std::lock_guard lock{m_object_files_mutex};
+        const std::scoped_lock lock{m_object_files_mutex};
 
         assert(m_object_files.size() <= m_n_modules);
 
@@ -1899,7 +1899,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
                 auto ir_snap = detail::ir_from_module(M);
 
                 // NOTE: protect for multi-threaded access.
-                const std::lock_guard lock{m_ir_bc_mutex};
+                const std::scoped_lock lock{m_ir_bc_mutex};
 
                 m_bc_snapshots.push_back(std::move(bc_snap));
                 m_ir_snapshots.push_back(std::move(ir_snap));
