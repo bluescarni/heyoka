@@ -1948,14 +1948,14 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 #if LLVM_VERSION_MAJOR <= 20
 
     // Create the master module.
-    m_module = std::make_unique<llvm::Module>(master_module_name, m_ctx->getContext());
+    m_module = std::make_unique<llvm::Module>(master_module_name, *m_ctx->getContext());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(m_lljit->getDataLayout());
     m_module->setTargetTriple(m_lljit->getTargetTriple().str());
 
     // Create a new builder for the master module.
     // NOTE: no need to mess around with fast math flags for this builder.
-    m_builder = std::make_unique<ir_builder>(m_ctx->getContext());
+    m_builder = std::make_unique<ir_builder>(*m_ctx->getContext());
 
 #else
 
