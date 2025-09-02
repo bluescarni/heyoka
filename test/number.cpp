@@ -674,11 +674,9 @@ TEST_CASE("llvm_codegen")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = detail::to_external_llvm_type<mppp::real>(context);
-
         const auto real_pi_256 = mppp::real_pi(256);
 
-        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t)}, false);
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), {llvm::PointerType::getUnqual(context)}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

@@ -635,36 +635,36 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     // Set the names/attributes of the function arguments.
     auto *jet_ptr = f->args().begin();
     jet_ptr->setName("jet_ptr");
-    jet_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, jet_ptr);
     jet_ptr->addAttr(llvm::Attribute::NoAlias);
     jet_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *state_ptr = jet_ptr + 1;
     state_ptr->setName("state_ptr");
-    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, state_ptr);
     state_ptr->addAttr(llvm::Attribute::NoAlias);
     state_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *par_ptr = state_ptr + 1;
     par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr);
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr = par_ptr + 1;
     time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr);
     time_ptr->addAttr(llvm::Attribute::NoAlias);
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *h_ptr = time_ptr + 1;
     h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, h_ptr);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *max_abs_state_ptr = h_ptr + 1;
     max_abs_state_ptr->setName("max_abs_state_ptr");
-    max_abs_state_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, max_abs_state_ptr);
     max_abs_state_ptr->addAttr(llvm::Attribute::NoAlias);
     max_abs_state_ptr->addAttr(llvm::Attribute::WriteOnly);
 
@@ -672,7 +672,7 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     if (compact_mode) {
         tape_ptr = max_abs_state_ptr + 1;
         tape_ptr->setName("tape_ptr");
-        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr);
         tape_ptr->addAttr(llvm::Attribute::NoAlias);
     }
 
@@ -764,29 +764,29 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     // Set the names/attributes of the function arguments.
     auto *state_ptr = f->args().begin();
     state_ptr->setName("state_ptr");
-    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, state_ptr);
     state_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *par_ptr = state_ptr + 1;
     par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr);
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr = par_ptr + 1;
     time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr);
     time_ptr->addAttr(llvm::Attribute::NoAlias);
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *h_ptr = time_ptr + 1;
     h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, h_ptr);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tc_ptr = h_ptr + 1;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
@@ -794,7 +794,7 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     if (compact_mode) {
         tape_ptr = tc_ptr + 1;
         tape_ptr->setName("tape_ptr");
-        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr);
         tape_ptr->addAttr(llvm::Attribute::NoAlias);
     }
 
@@ -847,7 +847,7 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     ext_store_vector_to_memory(s, h_ptr, h);
 
     // Write the Taylor coefficients, if requested.
-    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ext_fp_t));
+    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(context));
     llvm_if_then_else(
         s, builder.CreateICmpNE(tc_ptr, nptr),
         [&]() {

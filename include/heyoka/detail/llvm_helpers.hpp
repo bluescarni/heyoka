@@ -242,6 +242,10 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_upper_bound(llvm_state &, llvm::Value *, llv
 
 HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
 
+void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
+
+bool llvm_is_ieee_like_fp(llvm::Type *);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

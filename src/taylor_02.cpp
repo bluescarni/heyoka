@@ -196,7 +196,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
         counter += s.size();
     }
 
-    assert(counter == dc.size() - static_cast<decltype(dc.size())>(n_eq) * 2u);
+    assert(counter == dc.size() - (static_cast<decltype(dc.size())>(n_eq) * 2u));
 
 #endif
 
@@ -529,18 +529,18 @@ llvm::Function *taylor_cm_make_driver_proto(llvm_state &s, unsigned cur_idx)
     // arguments.
     auto *tape_arg = f->args().begin();
     tape_arg->setName("tape_ptr");
-    tape_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, tape_arg);
     tape_arg->addAttr(llvm::Attribute::NoAlias);
 
     auto *par_ptr_arg = tape_arg + 1;
     par_ptr_arg->setName("par_ptr");
-    par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr_arg);
     par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
     par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr_arg = tape_arg + 2;
     time_ptr_arg->setName("time_ptr");
-    time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr_arg);
     time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
     time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
@@ -726,18 +726,18 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
 
         auto *tape_ptr_arg = worker->args().begin() + 2;
         tape_ptr_arg->setName("tape_ptr");
-        tape_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr_arg);
         tape_ptr_arg->addAttr(llvm::Attribute::NoAlias);
 
         auto *par_ptr_arg = worker->args().begin() + 3;
         par_ptr_arg->setName("par_ptr");
-        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr_arg);
         par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr_arg = worker->args().begin() + 4;
         time_ptr_arg->setName("time_ptr");
-        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr_arg);
         time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
@@ -1027,6 +1027,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
 
     // The driver function for the evaluation of the segment containing max_svf_idx. Will remain null if we do not need
     // to compute the last-order derivatives for the sv funcs.
+    // NOLINTNEXTLINE(misc-const-correctness)
     llvm::Function *max_svf_driver = nullptr;
 
     // Add the driver declaration to the current state, and start insertion into the driver.
@@ -1393,13 +1394,13 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
 
 #if !defined(NDEBUG)
         if (sv_funcs_dc.empty()) {
-            assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
+            assert(diff_arr.size() == (static_cast<decltype(diff_arr.size())>(n_uvars) * order) + n_eq);
         } else {
             // NOTE: we use std::max<std::uint32_t>(n_eq, max_svf_idx + 1u) here because
             // the sv funcs could all be aliases of the state variables themselves,
             // in which case in the previous loop we ended up appending nothing.
             assert(diff_arr.size()
-                   == static_cast<decltype(diff_arr.size())>(n_uvars) * order
+                   == (static_cast<decltype(diff_arr.size())>(n_uvars) * order)
                           + std::max<std::uint32_t>(n_eq, max_svf_idx + 1u));
         }
 #endif

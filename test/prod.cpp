@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <initializer_list>
-#include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
@@ -20,8 +19,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <fmt/core.h>
-
-#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -66,13 +63,7 @@ const auto fp_types = std::tuple<float, double
 #endif
                                  >{};
 
-constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR <= 17
-    std::numeric_limits<long double>::digits == 64
-#else
-    false
-#endif
-    ;
+constexpr bool skip_batch_ld = false;
 
 TEST_CASE("basic test")
 {
