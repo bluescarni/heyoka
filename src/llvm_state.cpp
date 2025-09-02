@@ -1784,8 +1784,9 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
-// NOTE: disable parallel compilation altogether for the time being,
-// as of LLVM 20 it just seems to be buggy overall. Reconsider for the future.
+// NOTE: disable parallel compilation altogether for the time being, as of LLVM 21 it just seems to be buggy overall.
+// Reconsider for the future.
+//
 // NOLINTNEXTLINE
 #if 0
 
