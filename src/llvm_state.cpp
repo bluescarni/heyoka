@@ -992,6 +992,8 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool, code_
 
 #else
 
+    // NOTE: in llvm 21 the ability to fetch a context from its thread-safe LLJIT counterpart was removed, in favour of
+    // the thread-safe withContextDo() which gives access to the context with automatic locking.
     m_jitter->m_ctx->withContextDo([this](llvm::LLVMContext *ctx) {
         // Create the module.
         m_module = std::make_unique<llvm::Module>(m_module_name, *ctx);
