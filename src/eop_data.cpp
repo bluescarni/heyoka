@@ -163,8 +163,8 @@ eop_data::eop_data(eop_data_table data, std::string timestamp, std::string ident
 eop_data::eop_data()
     : m_impl(std::make_shared<const impl>(
           eop_data_table(std::ranges::begin(detail::builtin_eop_data), std::ranges::end(detail::builtin_eop_data)),
-          // NOTE: the builtin EOP data is from IERS' rapid finals2000A.all file.
-          detail::builtin_eop_data_ts, "iers_rapid_finals2000A_all"))
+          // NOTE: the builtin EOP data is from IERS' rapid finals2000A.all file downloaded from USNO.
+          detail::builtin_eop_data_ts, "iers_rapid_usno_finals2000A_all"))
 {
 }
 

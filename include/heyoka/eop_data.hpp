@@ -77,7 +77,7 @@ public:
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
     [[nodiscard]] const std::string &get_identifier() const noexcept;
 
-    static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
+    static eop_data fetch_latest_iers_rapid(const std::string & = "usno", const std::string & = "finals2000A.all");
     static eop_data fetch_latest_iers_long_term();
 };
 
