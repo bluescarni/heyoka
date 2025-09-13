@@ -10,11 +10,14 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <tuple>
 #include <type_traits>
 
 #include <boost/math/constants/constants.hpp>
+
+#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -49,7 +52,13 @@ const auto fp_types = std::tuple<float, double
 #endif
                                  >{};
 
-constexpr bool skip_batch_ld = false;
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR <= 17
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
 
 TEST_CASE("taylor erf decompose bug 00")
 {
