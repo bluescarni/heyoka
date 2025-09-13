@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <utility>
 
 #include <boost/charconv.hpp>
@@ -197,34 +198,62 @@ namespace
 {
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::set<std::string> eop_data_iers_rapid_filenames
+const std::set<std::string> eop_data_iers_rapid_filenames_usno
     = {"finals2000A.all", "finals2000A.daily", "finals2000A.daily.extended", "finals2000A.data"};
+
+// NOTE: on the IERS website, there's no file corresponding to USNO's finals2000A.daily.extended.
+//
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::set<std::string> eop_data_iers_rapid_filenames_iers
+    = {"finals.all.iau2000.txt", "finals.daily.iau2000.txt", "finals.data.iau2000.txt"};
 
 } // namespace
 
 } // namespace detail
 
-// NOTE: if we want to provide mirrors for the datafiles in the future, we must be really careful about adding
-// further mangling to the identifiers. Even if the mirrors contain the same files, the timestamps will be in general
-// different, which could lead to confusion about which data is exactly being used. Probably it's best to treat
-// mirrors of the same data as different data altogether.
-eop_data eop_data::fetch_latest_iers_rapid(const std::string &filename)
+eop_data eop_data::fetch_latest_iers_rapid(const std::string &origin, const std::string &filename)
 {
-    // Check the provided filename.
-    if (!detail::eop_data_iers_rapid_filenames.contains(filename)) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("Invalid filename '{}' specified for a IERS rapid EOP data file: the valid names are {}",
-                        filename, detail::eop_data_iers_rapid_filenames));
+    // Check the origin.
+    if (origin != "usno" && origin != "iers") [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid origin '{}' specified for a IERS rapid EOP data file: the valid origins are 'usno' and 'iers'",
+            origin));
     }
 
+    // Check the provided filename.
+    if (origin == "usno") {
+        if (!detail::eop_data_iers_rapid_filenames_usno.contains(filename)) [[unlikely]] {
+            throw std::invalid_argument(fmt::format(
+                "Invalid filename '{}' specified for a IERS rapid EOP data file (USNO origin): the valid names are {}",
+                filename, detail::eop_data_iers_rapid_filenames_usno));
+        }
+    } else {
+        if (!detail::eop_data_iers_rapid_filenames_iers.contains(filename)) [[unlikely]] {
+            throw std::invalid_argument(fmt::format(
+                "Invalid filename '{}' specified for a IERS rapid EOP data file (IERS origin): the valid names are {}",
+                filename, detail::eop_data_iers_rapid_filenames_iers));
+        }
+    }
+
+    std::string text, timestamp;
+
     // Download it.
-    auto [text, timestamp] = detail::https_download("maia.usno.navy.mil", 443, fmt::format("/ser7/{}", filename));
+    if (origin == "usno") {
+        std::tie(text, timestamp)
+            = detail::https_download("maia.usno.navy.mil", 443, fmt::format("/ser7/{}", filename));
+    } else {
+        std::tie(text, timestamp)
+            = detail::https_download("datacenter.iers.org", 443, fmt::format("/data/latestVersion/{}", filename));
+    }
 
     // Build the identifier string.
-    auto identifier = fmt::format("iers_rapid_{}", filename);
-    // NOTE: we transform '.' into '_' so that we can use the identifier
-    // to construct the mangled name of compact-mode primitives (which
-    // use '.' as a separator).
+    //
+    // NOTE: we want to mangle the origin together with the filename. Even if the two origins contain the same files,
+    // the timestamps will be in general different, which could lead to confusion about which data is exactly being
+    // used.
+    auto identifier = fmt::format("iers_rapid_{}_{}", origin, filename);
+    // NOTE: we transform '.' into '_' so that we can use the identifier to construct the mangled name of compact-mode
+    // primitives (which use '.' as a separator).
     std::ranges::replace(identifier, '.', '_');
 
     // Parse, validate and return.

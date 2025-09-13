@@ -29,12 +29,14 @@ unset CFLAGS
 # NOTE: regarding D_LIBCPP_DISABLE_AVAILABILITY, see:
 #
 # https://conda-forge.org/docs/maintainer/knowledge_base/#newer-c-features-with-old-sdk
+#
+# NOTE: turn off tutorials until the fmt+malloc compilation failure is resolved.
 CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
     -DHEYOKA_WITH_MPPP=yes \
-    -DHEYOKA_BUILD_TUTORIALS=ON \
+    -DHEYOKA_BUILD_TUTORIALS=OFF \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DCMAKE_CXX_FLAGS="-D_LIBCPP_DISABLE_AVAILABILITY -fsanitize=address"

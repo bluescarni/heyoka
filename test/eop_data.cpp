@@ -13,10 +13,12 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -57,7 +59,9 @@ TEST_CASE("basic")
 
     REQUIRE(!idata.get_table().empty());
     REQUIRE(!idata.get_timestamp().empty());
-    REQUIRE(idata.get_identifier() == "iers_rapid_finals2000A_all");
+    // NOTE: it is important that we make sure this has the correct value, because this name is created manually (unlike
+    // the download functions, which create this name automatically).
+    REQUIRE(idata.get_identifier() == "iers_rapid_usno_finals2000A_all");
 }
 
 TEST_CASE("parse_eop_data_iers_rapid test")
@@ -360,13 +364,6 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
     }
-
-    // A check for wrong filename for the download function.
-    REQUIRE_THROWS_MATCHES(
-        eop_data::fetch_latest_iers_rapid("helloworld"), std::invalid_argument,
-        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file: the valid names "
-                "are {\"finals2000A.all\", "
-                "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
 }
 
 TEST_CASE("parse_eop_data_iers_long_term test")
@@ -775,13 +772,54 @@ TEST_CASE("eop_data_dX_dY")
 // Test to check the download code. We pick a small file for testing.
 TEST_CASE("download finals2000A.daily")
 {
-    try {
-        const auto data = eop_data::fetch_latest_iers_rapid("finals2000A.daily");
-        REQUIRE(!data.get_table().empty());
-        REQUIRE(data.get_identifier() == "iers_rapid_finals2000A_daily");
-    } catch (const std::exception &e) {
-        std::cout << "Exception caught during download test: " << e.what() << '\n';
-    }
+    // NOTE: need to protect REQUIRE() invocations as Catch is not thread-safe.
+    std::mutex mut;
+
+    std::thread t1([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_iers_rapid("usno", "finals2000A.daily");
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "iers_rapid_usno_finals2000A_daily");
+        } catch (...) {
+            // NOTE: ignore exceptions here, which are most likely caused by network issues.
+            ;
+        }
+    });
+    std::thread t2([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_iers_rapid("iers", "finals.all.iau2000.txt");
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "iers_rapid_iers_finals_all_iau2000_txt");
+        } catch (...) {
+            ;
+        }
+    });
+
+    t1.join();
+    t2.join();
+}
+
+TEST_CASE("fetch_latest_iers_rapid error handling")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(eop_data::fetch_latest_iers_rapid("faffo"), std::invalid_argument,
+                           Message("Invalid origin 'faffo' specified for a IERS rapid EOP data file: the valid origins "
+                                   "are 'usno' and 'iers'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data::fetch_latest_iers_rapid("usno", "helloworld"), std::invalid_argument,
+        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file (USNO origin): the valid names "
+                "are {\"finals2000A.all\", "
+                "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data::fetch_latest_iers_rapid("iers", "helloworld"), std::invalid_argument,
+        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file (IERS origin): the valid names "
+                "are {\"finals.all.iau2000.txt\", "
+                "\"finals.daily.iau2000.txt\", \"finals.data.iau2000.txt\"}"));
 }
 
 TEST_CASE("eop_data upper_bound")

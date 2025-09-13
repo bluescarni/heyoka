@@ -1,6 +1,24 @@
 Changelog
 =========
 
+7.6.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Allow to select an alternative origin for IERS' rapid EOP data
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+- Add support for LLVM 21
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now requires LLVM >= 17
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+
 7.5.0 (2025-08-20)
 ------------------
 
