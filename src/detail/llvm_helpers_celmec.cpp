@@ -481,14 +481,13 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // Add the implementation function.
     auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
-    // Fetch the external type.
-    auto *ext_fp_t = make_external_llvm_type(scal_t);
-
     // The function arguments:
+    //
     // - output pointer (write only),
     // - input ecc and mean anomaly pointers (read only).
+    //
     // No overlap allowed.
-    const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(context));
     // The return type is void.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     // Create the function
@@ -500,19 +499,19 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // Setup the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *ecc_ptr = f->args().begin() + 1;
     ecc_ptr->setName("ecc_ptr");
-    ecc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, ecc_ptr);
     ecc_ptr->addAttr(llvm::Attribute::NoAlias);
     ecc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *M_ptr = f->args().begin() + 2;
     M_ptr->setName("M_ptr");
-    M_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, M_ptr);
     M_ptr->addAttr(llvm::Attribute::NoAlias);
     M_ptr->addAttr(llvm::Attribute::ReadOnly);
 

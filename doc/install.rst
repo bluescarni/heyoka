@@ -14,7 +14,7 @@ and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
 
-* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=16 and <=20),
+* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=17 and <=21),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.85),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=11),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
@@ -117,17 +117,11 @@ to the channels, and then we can immediately install heyoka:
    $ conda config --set channel_priority strict
    $ conda install heyoka
 
-Note that the ``heyoka`` package on conda is built against an unspecified version of LLVM. If you need
-a package built against a *specific* version of LLVM, you can install one of the ``heyoka-llvm-*``
-meta-packages. For instance, in order to install a package built against LLVM 12, you
-could use the following command:
+.. versionchanged:: 7.4.0
 
-.. code-block:: console
-
-   $ conda install heyoka-llvm-12
-
-The list of heyoka meta-packages is available
-`here <https://github.com/conda-forge/heyoka-feedstock>`__.
+   While previously multiple conda meta-packages compiled against different versions of LLVM where available,
+   starting with heyoka 7.4.0 there is a single ``heyoka`` package, statically linked against the latest LLVM version
+   available on conda.
 
 The conda packages for heyoka are maintained by the core development team,
 and they are regularly updated when new heyoka versions are released.

@@ -98,6 +98,56 @@ inline constexpr auto rot_icrs_itrs = []<typename... KwArgs>
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_icrs_common_opts(kw_args...)));
 };
 
+namespace detail
+{
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> rot_itrs_teme_impl(const std::array<expression, 3> &,
+                                                                             const expression &, const eop_data &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<expression, 3> rot_teme_itrs_impl(const std::array<expression, 3> &,
+                                                                             const expression &, const eop_data &);
+
+// Common options for the itrs/teme rotations.
+template <typename... KwArgs>
+auto itrs_teme_common_opts(const KwArgs &...kw_args)
+{
+    const igor::parser p{kw_args...};
+
+    // Time expression (defaults to heyoka::time).
+    auto time_expr = expression(p(kw::time_expr, heyoka::time));
+
+    // EOP data (defaults to def-cted).
+    auto data = [&p]() {
+        if constexpr (p.has(kw::eop_data)) {
+            return p(kw::eop_data);
+        } else {
+            return eop_data{};
+        }
+    }();
+
+    return std::tuple{std::move(time_expr), std::move(data)};
+}
+
+} // namespace detail
+
+inline constexpr auto rot_itrs_teme_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
+                                                          kw::descr::same_as<kw::eop_data, eop_data>>{};
+
+inline constexpr auto rot_itrs_teme = []<typename... KwArgs>
+    requires igor::validate<rot_itrs_teme_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
+    return std::apply(detail::rot_itrs_teme_impl,
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_teme_common_opts(kw_args...)));
+};
+
+inline constexpr auto rot_teme_itrs = []<typename... KwArgs>
+    requires igor::validate<rot_itrs_teme_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(const std::array<expression, 3> &xyz, KwArgs &&...kw_args) {
+    return std::apply(detail::rot_teme_itrs_impl,
+                      std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_teme_common_opts(kw_args...)));
+};
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE

@@ -124,18 +124,20 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     const detail::dfloat<T> df_t_start(m_times_hi[0], m_times_lo[0]), df_t_end(m_times_hi.back(), m_times_lo.back());
     const auto dir = df_t_start < df_t_end;
 
+    // Fetch the external floating-point type.
+    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
+
     // The function arguments:
+    //
     // - the output pointer (read/write, used also for accumulation),
-    // - the pointer to the time value (read/write: after the time value
-    //   is read, the pointer will be re-used to store the h value
-    //   that needs to be passed to the dense output function),
+    // - the pointer to the time value (read/write: after the time value is read, the pointer will be re-used to store
+    //   the h value that needs to be passed to the dense output function),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
+    //
     // No overlap is allowed. All pointers are external.
-    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
-    auto *ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    const std::vector<llvm::Type *> fargs(5u, ptr_t);
+    const std::vector<llvm::Type *> fargs(5u, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -145,29 +147,29 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tm_ptr = f->args().begin() + 1;
     tm_ptr->setName("tm_ptr");
-    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tm_ptr);
     tm_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
-    times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_hi);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
-    times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_lo);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
     times_ptr_lo->addAttr(llvm::Attribute::ReadOnly);
 
@@ -586,7 +588,7 @@ HEYOKA_DLL_PUBLIC void heyoka_continuous_output_batch_tc_idx_debug(const std::ui
     // LCOV_EXCL_STOP
 
     for (std::uint32_t i = 0; i < batch_size; ++i) {
-        assert(tc_idx[i] < times_size / batch_size - 2u); // LCOV_EXCL_LINE
+        assert(tc_idx[i] < (times_size / batch_size) - 2u); // LCOV_EXCL_LINE
     }
 }
 }
@@ -613,17 +615,20 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto &builder = m_llvm_state.builder();
     auto &context = m_llvm_state.context();
 
+    // Fetch the floating-point types.
+    auto *fp_t = detail::to_external_llvm_type<T>(context);
+    auto *fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
+
     // The function arguments:
+    //
     // - the output pointer (read/write, used also for accumulation),
     // - the pointer to the target time values (read-only),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
+    //
     // No overlap is allowed.
-    auto fp_t = detail::to_external_llvm_type<T>(context);
-    auto fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
-    auto ptr_t = llvm::PointerType::getUnqual(fp_t);
-    const std::vector<llvm::Type *> fargs(5, ptr_t);
+    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -633,30 +638,30 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tm_ptr = f->args().begin() + 1;
     tm_ptr->setName("tm_ptr");
-    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tm_ptr);
     tm_ptr->addAttr(llvm::Attribute::NoAlias);
     tm_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
-    times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_hi);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
     auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
-    times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
+    detail::llvm_add_no_capture_argattr(m_llvm_state, times_ptr_lo);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
     times_ptr_lo->addAttr(llvm::Attribute::ReadOnly);
 

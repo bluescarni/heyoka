@@ -77,7 +77,7 @@ public:
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
     [[nodiscard]] const std::string &get_identifier() const noexcept;
 
-    static eop_data fetch_latest_iers_rapid(const std::string & = "finals2000A.all");
+    static eop_data fetch_latest_iers_rapid(const std::string & = "usno", const std::string & = "finals2000A.all");
     static eop_data fetch_latest_iers_long_term();
 };
 
@@ -94,6 +94,7 @@ void validate_eop_data_table(const eop_data_table &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_pm_y(llvm_state &, const eop_data &, llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dX(llvm_state &, const eop_data &, llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_dY(llvm_state &, const eop_data &, llvm::Type *);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_gmst82(llvm_state &, const eop_data &, llvm::Type *);
 
 } // namespace detail
 

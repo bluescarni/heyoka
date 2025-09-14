@@ -389,10 +389,12 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
+    //
     // No overlap is allowed, all pointers are to external types.
-    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -402,12 +404,12 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -565,13 +567,13 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - two poly coefficients output pointers,
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
+    //
     // No overlap is allowed. The coefficient pointers are to external types.
-    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t,
-                                          llvm::PointerType::getUnqual(builder.getInt32Ty()), ext_fp_ptr_t};
+    const std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -587,23 +589,23 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     // mark them as writeonly.
     auto *out_ptr1 = f->args().begin();
     out_ptr1->setName("out_ptr1");
-    out_ptr1->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr1);
     out_ptr1->addAttr(llvm::Attribute::NoAlias);
 
     auto *out_ptr2 = f->args().begin() + 1;
     out_ptr2->setName("out_ptr2");
-    out_ptr2->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr2);
     out_ptr2->addAttr(llvm::Attribute::NoAlias);
 
     auto *n_sc_ptr = f->args().begin() + 2;
     n_sc_ptr->setName("n_sc_ptr");
-    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, n_sc_ptr);
     n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
     n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *cf_ptr = f->args().begin() + 3;
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -661,21 +663,18 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the external type.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - pointer to the array of poly coefficients (read-only),
     // - pointer to the timestep value (s) (read-only),
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
+    //
     // No overlap is allowed. All floating-point pointers are to external types.
-    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    const std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -685,25 +684,25 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Set the names/attributes of the function arguments.
     auto *cf_ptr = f->args().begin();
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *h_ptr = f->args().begin() + 1;
     h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, h_ptr);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
     h_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *back_flag_ptr = f->args().begin() + 2;
     back_flag_ptr->setName("back_flag_ptr");
-    back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, back_flag_ptr);
     back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
     back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *out_ptr = f->args().begin() + 3;
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 

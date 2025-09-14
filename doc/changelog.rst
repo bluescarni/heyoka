@@ -1,7 +1,33 @@
 Changelog
 =========
 
-8.0.0 (unreleased)
+7.6.0 (2025-09-14)
+------------------
+
+New
+~~~
+
+- Allow to select an alternative origin for the IERS rapid EOP data
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+- Add support for LLVM 21
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now requires LLVM >= 17
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+
+7.5.0 (2025-08-20)
+------------------
+
+- New frame transformation: ITRS to TEME and viceversa
+  (`#507 <https://github.com/bluescarni/heyoka/pull/507>`__).
+- New ``gmst82()`` model to represent the Greenwich mean sidereal time (IAU 1982 model)
+  (`#506 <https://github.com/bluescarni/heyoka/pull/506>`__).
+
+7.4.0 (2025-08-15)
 ------------------
 
 New
@@ -20,12 +46,10 @@ New
 Changes
 ~~~~~~~
 
-- **BREAKING**: heyoka now requires C++23
+- heyoka now requires C++23
   (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
-  This is a :ref:`breaking change <bchanges_8_0_0>`.
-- **BREAKING**: heyoka now depends on CMake >= 3.20 when building from source
+- heyoka now depends on CMake >= 3.20 when building from source
   (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
-  This is a :ref:`breaking change <bchanges_8_0_0>`.
 - General overhaul of several symbolic transformation primitives,
   avoiding recursion in favour of a stack-based iterative approach and taking better
   advantage of shared function arguments sets
@@ -42,6 +66,8 @@ Fix
   due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
   after parallel sections
   (`#500 <https://github.com/bluescarni/heyoka/pull/500>`__).
+- Workaround for a compilation failure with recent Boost versions
+  (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
 - Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
   in numerical integrations
   (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).

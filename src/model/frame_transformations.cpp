@@ -304,6 +304,72 @@ std::array<expression, 3> rot_icrs_itrs_impl(const std::array<expression, 3> &xy
     return rot_tirs_itrs(xyz_tirs, time_expr, data);
 }
 
+namespace
+{
+
+// Helper to build the rotation matrix from itrs to teme.
+//
+// NOTE: this is very similar to the itrs->tirs rotation, but instead of -s' we use -gmst82 for the R3 rotation.
+// See the "Polar Motion" section in the Vallado book.
+auto build_rot_itrs_teme(const expression &time_expr, const eop_data &data)
+{
+    using std::cos;
+    using std::sin;
+
+    // Construct x_p, y_p and gmst82.
+    const auto x_p = pm_x(kw::time_expr = time_expr, kw::eop_data = data);
+    const auto y_p = pm_y(kw::time_expr = time_expr, kw::eop_data = data);
+    const auto g82 = gmst82(kw::time_expr = time_expr, kw::eop_data = data);
+
+    // Compute sin/cos of x_p, y_p and gmst82.
+    const auto cxp = cos(x_p);
+    const auto sxp = sin(x_p);
+    const auto cyp = cos(y_p);
+    const auto syp = sin(y_p);
+    const auto cg82 = cos(g82);
+    const auto sg82 = sin(g82);
+
+    // Create the entries of the rotation matrix.
+    const auto R00 = cxp * cg82;
+    const auto R01 = -cyp * sg82 + syp * sxp * cg82;
+    const auto R02 = -syp * sg82 - cyp * sxp * cg82;
+
+    const auto R10 = cxp * sg82;
+    const auto R11 = cyp * cg82 + syp * sxp * sg82;
+    const auto R12 = syp * cg82 - cyp * sxp * sg82;
+
+    // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
+    const auto R20 = sxp;
+    const auto R21 = -syp * cxp;
+    const auto R22 = cyp * cxp;
+
+    return std::array{R00, R01, R02, R10, R11, R12, R20, R21, R22};
+}
+
+} // namespace
+
+std::array<expression, 3> rot_itrs_teme_impl(const std::array<expression, 3> &xyz, const expression &time_expr,
+                                             const eop_data &data)
+{
+    // Build the rotation matrix.
+    const auto [R00, R01, R02, R10, R11, R12, R20, R21, R22] = build_rot_itrs_teme(time_expr, data);
+
+    // Perform the rotation and return the result.
+    const auto &[x, y, z] = xyz;
+    return {sum({R00 * x, R01 * y, R02 * z}), sum({R10 * x, R11 * y, R12 * z}), sum({R20 * x, R21 * y, R22 * z})};
+}
+
+std::array<expression, 3> rot_teme_itrs_impl(const std::array<expression, 3> &xyz, const expression &time_expr,
+                                             const eop_data &data)
+{
+    // Build the rotation matrix.
+    const auto [R00, R01, R02, R10, R11, R12, R20, R21, R22] = build_rot_itrs_teme(time_expr, data);
+
+    // Perform the inverse rotation and return the result.
+    const auto &[x, y, z] = xyz;
+    return {sum({R00 * x, R10 * y, R20 * z}), sum({R01 * x, R11 * y, R21 * z}), sum({R02 * x, R12 * y, R22 * z})};
+}
+
 } // namespace detail
 
 } // namespace model

@@ -178,7 +178,7 @@ void llvm_state_mem_cache_sanity_checks()
 std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &bc, unsigned comp_flag)
 {
     // Lock down.
-    const std::lock_guard lock(mem_cache_mutex);
+    const std::scoped_lock lock(mem_cache_mutex);
 
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
@@ -202,7 +202,7 @@ std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::
 void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_flag, llvm_mc_value val)
 {
     // Lock down.
-    const std::lock_guard lock(mem_cache_mutex);
+    const std::scoped_lock lock(mem_cache_mutex);
 
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
@@ -282,7 +282,7 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
 std::size_t llvm_state::get_memcache_size()
 {
     // Lock down.
-    const std::lock_guard lock(detail::mem_cache_mutex);
+    const std::scoped_lock lock(detail::mem_cache_mutex);
 
     return detail::mem_cache_size;
 }
@@ -290,7 +290,7 @@ std::size_t llvm_state::get_memcache_size()
 std::size_t llvm_state::get_memcache_limit()
 {
     // Lock down.
-    const std::lock_guard lock(detail::mem_cache_mutex);
+    const std::scoped_lock lock(detail::mem_cache_mutex);
 
     return boost::numeric_cast<std::size_t>(detail::mem_cache_limit);
 }
@@ -298,7 +298,7 @@ std::size_t llvm_state::get_memcache_limit()
 void llvm_state::set_memcache_limit(std::size_t new_limit)
 {
     // Lock down.
-    const std::lock_guard lock(detail::mem_cache_mutex);
+    const std::scoped_lock lock(detail::mem_cache_mutex);
 
     detail::mem_cache_limit = boost::numeric_cast<std::uint64_t>(new_limit);
 }
@@ -306,7 +306,7 @@ void llvm_state::set_memcache_limit(std::size_t new_limit)
 void llvm_state::clear_memcache()
 {
     // Lock down.
-    const std::lock_guard lock(detail::mem_cache_mutex);
+    const std::scoped_lock lock(detail::mem_cache_mutex);
 
     // Sanity checks.
     detail::llvm_state_mem_cache_sanity_checks();
