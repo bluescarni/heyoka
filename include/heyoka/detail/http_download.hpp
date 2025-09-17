@@ -9,10 +9,12 @@
 #ifndef HEYOKA_DETAIL_HTTP_DOWNLOAD_HPP
 #define HEYOKA_DETAIL_HTTP_DOWNLOAD_HPP
 
+#include <optional>
 #include <string>
 #include <utility>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -21,6 +23,9 @@ namespace detail
 
 std::pair<std::string, std::string> https_download(const std::string &, unsigned, const std::string &);
 std::pair<std::string, std::string> http_download(const std::string &, unsigned, const std::string &);
+
+HEYOKA_DLL_PUBLIC void set_ssl_verify_file(std::string);
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::optional<std::string> get_ssl_verify_file();
 
 } // namespace detail
 

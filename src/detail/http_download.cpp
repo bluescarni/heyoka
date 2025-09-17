@@ -13,6 +13,8 @@
 #include <cstddef>
 #include <exception>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -369,7 +371,39 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+HEYOKA_CONSTINIT std::mutex ssl_verify_file_mutex;
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+HEYOKA_CONSTINIT std::optional<std::string> ssl_verify_file;
+
 } // namespace
+
+// Machinery to get/set a global SSL verify file.
+//
+// This can be used in cases where the system's certificate store is not working properly (e.g., this can happen if a
+// vendored SSL library uses a hard-coded certificate store path different from the one in use on the current system).
+std::optional<std::string> get_ssl_verify_file()
+{
+    std::scoped_lock lock(ssl_verify_file_mutex);
+
+    return ssl_verify_file;
+}
+
+// LCOV_EXCL_START
+
+void set_ssl_verify_file(std::string path)
+{
+    std::scoped_lock lock(ssl_verify_file_mutex);
+
+    if (path.empty()) {
+        ssl_verify_file.reset();
+    } else {
+        ssl_verify_file.emplace(std::move(path));
+    }
+}
+
+// LCOV_EXCL_STOP
 
 // NOTE: this is a function to download a file from a remote server via https. In addition to the file,
 // its timestamp on the remote server will also be returned in the format year_month_day_hour_minute_second.
@@ -387,6 +421,11 @@ std::pair<std::string, std::string> https_download(const std::string &host, unsi
 
         // Set default verification paths (uses system's certificate store).
         ctx.set_default_verify_paths();
+
+        // Load a custom verify file, if provided by the user.
+        if (const auto vfile = get_ssl_verify_file()) {
+            ctx.load_verify_file(*vfile); // LCOV_EXCL_LINE
+        }
 
         // Set verification mode.
         ctx.set_verify_mode(ssl::verify_peer);
