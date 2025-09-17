@@ -239,6 +239,13 @@ public:
     {
         check_error(ec, "read");
 
+        if (res_.result() != http::status::ok) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(
+                fmt::format("HTTP error {}, the response is: '{}'", res_.result_int(), res_.body()));
+            // LCOV_EXCL_STOP
+        }
+
         // Parse the "last modified field" to construct the timestamp.
         timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
 
@@ -352,6 +359,13 @@ public:
     void on_read(beast::error_code ec, std::size_t)
     {
         check_error(ec, "read");
+
+        if (res_.result() != http::status::ok) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(
+                fmt::format("HTTP error {}, the response is: '{}'", res_.result_int(), res_.body()));
+            // LCOV_EXCL_STOP
+        }
 
         // Parse the "last modified field" to construct the timestamp.
         timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
