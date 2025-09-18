@@ -399,7 +399,7 @@ HEYOKA_CONSTINIT std::optional<std::string> ssl_verify_file;
 // vendored SSL library uses a hard-coded certificate store path different from the one in use on the current system).
 std::optional<std::string> get_ssl_verify_file()
 {
-    std::scoped_lock lock(ssl_verify_file_mutex);
+    const std::scoped_lock lock(ssl_verify_file_mutex);
 
     return ssl_verify_file;
 }
@@ -408,7 +408,7 @@ std::optional<std::string> get_ssl_verify_file()
 
 void set_ssl_verify_file(std::string path)
 {
-    std::scoped_lock lock(ssl_verify_file_mutex);
+    const std::scoped_lock lock(ssl_verify_file_mutex);
 
     if (path.empty()) {
         ssl_verify_file.reset();
