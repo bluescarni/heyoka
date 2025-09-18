@@ -1,6 +1,17 @@
 Changelog
 =========
 
+7.7.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Improve the reporting of HTTP errors when downloading datafiles
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+- Add an internal mechanism to specify a custom SSL verify file
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+
 7.6.0 (2025-09-14)
 ------------------
 

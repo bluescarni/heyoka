@@ -782,9 +782,9 @@ TEST_CASE("download finals2000A.daily")
             std::scoped_lock lock(mut);
             REQUIRE(!data.get_table().empty());
             REQUIRE(data.get_identifier() == "iers_rapid_usno_finals2000A_daily");
-        } catch (...) {
+        } catch (const std::exception &ex) {
             // NOTE: ignore exceptions here, which are most likely caused by network issues.
-            ;
+            std::cout << "Exception caught in the usno download test: " << ex.what() << std::endl;
         }
     });
     std::thread t2([&mut]() {
@@ -794,8 +794,8 @@ TEST_CASE("download finals2000A.daily")
             std::scoped_lock lock(mut);
             REQUIRE(!data.get_table().empty());
             REQUIRE(data.get_identifier() == "iers_rapid_iers_finals_all_iau2000_txt");
-        } catch (...) {
-            ;
+        } catch (const std::exception &ex) {
+            std::cout << "Exception caught in the iers download test: " << ex.what() << std::endl;
         }
     });
 
