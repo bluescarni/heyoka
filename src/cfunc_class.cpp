@@ -791,7 +791,12 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         auto *fptr = std::get<(CM ? 1 : 0)>(fptr_scal_s);
 
         // Tape setup.
+        //
+        // NOTE: clang-tidy would want these to be const if CM is false, but we cannot do that. Disable the checks.
+        //
+        // NOLINTNEXTLINE(misc-const-correctness)
         void *scalar_tape_ptr = nullptr;
+        // NOLINTNEXTLINE(misc-const-correctness)
         std::optional<detail::tape_handle> opt_tape_hdl;
         if constexpr (CM) {
             opt_tape_hdl.emplace(tape_sa[0][0]);
