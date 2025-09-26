@@ -31,6 +31,7 @@
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
+#include <oneapi/tbb/concurrent_queue.h>
 #include <oneapi/tbb/enumerable_thread_specific.h>
 #include <oneapi/tbb/task_arena.h>
 
@@ -46,7 +47,7 @@
 
 #endif
 
-#include <heyoka/detail/aligned_buffer.hpp>
+#include <heyoka/detail/max_align_vector.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
@@ -58,6 +59,69 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+namespace
+{
+
+// Cache of maximally-aligned memory buffers for use by cfuncs during compact-mode evaluation.
+//
+// NOTE: this will introduce a serialising bottleneck when compact-mode cfuncs are evaluating in parallel from multiple
+// threads. Ideally, we would like to turn this into thread-local storage, but we must be careful about the performance
+// consequences of this. E.g.:
+//
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81501
+//
+// Additionally, TLS may be buggy on certain platforms:
+//
+// https://sourceforge.net/p/mingw-w64/bugs/527/
+//
+// Perhaps in the future after profiling we can make the switch (conditional on compiler/platform perhaps).
+//
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
+oneapi::tbb::concurrent_queue<max_align_vector<std::byte>> cfunc_tape_cache;
+
+// RAII type managing an aligned tape from the cache.
+//
+// It will grab a tape from the cache on construction, and it will return it upon destruction.
+struct tape_handle {
+    max_align_vector<std::byte> tape;
+
+    explicit tape_handle(const std::size_t sz)
+    {
+        // Try to pop a vector from the cache.
+        cfunc_tape_cache.try_pop(tape);
+
+        // Regardless of whether the pop was successful or not, we need to make sure that the tape has a size of at
+        // least sz.
+        if (tape.size() < sz) {
+            tape.resize(boost::numeric_cast<decltype(tape.size())>(sz));
+        }
+    }
+    // NOTE: ater construction, the handle can *only* be destroyed.
+    tape_handle(const tape_handle &) = delete;
+    tape_handle(tape_handle &&) noexcept = delete;
+    tape_handle &operator=(const tape_handle &) = delete;
+    tape_handle &operator=(tape_handle &&) noexcept = delete;
+    ~tape_handle()
+    {
+        // NOTE: ignore any exception, in order to make the destructor truly noexcept. The worst that can happen is that
+        // the tape won't be returned to the cache.
+        try {
+            cfunc_tape_cache.push(std::move(tape));
+            // LCOV_EXCL_START
+        } catch (...) {
+            ;
+        }
+        // LCOV_EXCL_STOP
+    }
+};
+
+} // namespace
+
+} // namespace detail
+
 template <typename T>
 struct cfunc<T>::impl {
     // The compiled function types.
@@ -68,8 +132,8 @@ struct cfunc<T>::impl {
     using c_cfunc_ptr_t = void (*)(T *, const T *, const T *, const T *, void *) noexcept;
     using c_cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, void *, std::size_t) noexcept;
 
-    // Thread-local storage for parallel operations.
-    using ets_item_t = detail::aligned_buffer_t;
+    // Thread-local storage for internal parallel operations.
+    using ets_item_t = detail::max_align_vector<std::byte>;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
@@ -80,7 +144,6 @@ struct cfunc<T>::impl {
     std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
     std::vector<std::array<std::size_t, 2>> m_tape_sa;
-    std::vector<detail::aligned_buffer_t> m_tapes;
     std::variant<cfunc_ptr_t, c_cfunc_ptr_t> m_fptr_scal;
     std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_scal_s;
     std::variant<cfunc_ptr_s_t, c_cfunc_ptr_s_t> m_fptr_batch_s;
@@ -133,14 +196,10 @@ struct cfunc<T>::impl {
 
         // Recover the function pointers.
         assign_fptrs();
-
-        // Reconstruct the tapes.
-        m_tapes.clear();
-        construct_tapes();
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    // Small helper to fetch the function pointers from the states. Used after des11n or copy.
+    // Small helper to assign the function pointers from the states. Used after des11n or copy.
     void assign_fptrs()
     {
         if (auto *arr_ptr = std::get_if<0>(&m_states)) {
@@ -150,7 +209,7 @@ struct cfunc<T>::impl {
             m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>((*arr_ptr)[1].jit_lookup("cfunc"));
             m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>((*arr_ptr)[2].jit_lookup("cfunc"));
         } else {
-            assert(m_compact_mode);
+            assert(m_compact_mode); // LCOV_EXCL_LINE
 
             auto &ms = std::get<1>(m_states);
 
@@ -161,23 +220,12 @@ struct cfunc<T>::impl {
         }
     }
 
-    // Small helper to construct the tapes from the information in m_tape_sa.
-    // Assumes an empty m_tapes.
-    void construct_tapes()
-    {
-        assert(m_tapes.empty());
-
-        for (const auto [sz, al] : m_tape_sa) {
-            m_tapes.push_back(detail::make_aligned_buffer(sz, al));
-        }
-    }
-
     // NOTE: this is necessary only for s11n.
     impl() = default;
 
-    // NOTE: we use a single llvm_state for construction - all the internal
-    // llvm_state instances will be either copied from s, or we will use
-    // s as a template.
+    // NOTE: we use a single llvm_state for construction - all the internal llvm_state instances will be either copied
+    // from s, or we will use s as a template.
+    //
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
@@ -187,6 +235,7 @@ struct cfunc<T>::impl {
           m_parallel_mode(parallel_mode)
     {
         // Setup the batch size.
+        //
         // NOTE: manually specified batch size of zero is interpreted as undefined.
         if (batch_size && *batch_size != 0u) {
             m_batch_size = *batch_size;
@@ -197,7 +246,7 @@ struct cfunc<T>::impl {
 #if defined(HEYOKA_HAVE_REAL)
 
         // NOTE: batch size > 1u not supported for real.
-        if (std::same_as<T, mppp::real> && m_batch_size > 1u) {
+        if (std::same_as<T, mppp::real> && m_batch_size > 1u) [[unlikely]] {
             throw std::invalid_argument("Batch size > 1 is not supported for mppp::real");
         }
 
@@ -208,14 +257,23 @@ struct cfunc<T>::impl {
             std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
                 std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec, parjit);
 
+            // Check that the alignment requirements on the tapes are not excessive.
+            for (const auto &[tape_size, tape_align] : m_tape_sa) {
+                if (tape_align > detail::max_alignment) [[unlikely]] {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        fmt::format("Invalid alignment required by a compact-mode tape in a cfunc: the required "
+                                    "alignment of {} is larger than the maximum supported alignment of {}",
+                                    tape_align, detail::max_alignment));
+                    // LCOV_EXCL_STOP
+                }
+            }
+
             // Compile.
             std::get<1>(m_states).compile();
 
             // Assign the function pointers.
             assign_fptrs();
-
-            // Construct the tapes.
-            construct_tapes();
         } else {
             auto &s_arr = std::get<0>(m_states);
 
@@ -223,14 +281,13 @@ struct cfunc<T>::impl {
             detail::tbb_isolated_parallel_invoke(
                 [&]() {
                     // Scalar unstrided.
-                    // NOTE: we fetch the decomposition from the scalar
-                    // unstrided invocation of add_cfunc().
+                    //
+                    // NOTE: we fetch the decomposition from the scalar unstrided invocation of add_cfunc().
                     m_dc = add_cfunc<T>(s_arr[0], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
                                         kw::prec = prec,
-                                        // NOTE: be explicit about the lack of compact mode,
-                                        // because the default setting for mppp::real is different
-                                        // from the other types and if we leave this unset we will
-                                        // get the wrong function.
+                                        // NOTE: be explicit about the lack of compact mode, because the default setting
+                                        // for mppp::real is different from the other types and if we leave this unset
+                                        // we will get the wrong function.
                                         kw::compact_mode = false);
 
                     s_arr[0].compile();
@@ -239,13 +296,12 @@ struct cfunc<T>::impl {
                 },
                 [&]() {
                     // Scalar strided.
-                    add_cfunc<T>(s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
-                                 kw::strided = true,
-                                 // NOTE: be explicit about the lack of compact mode,
-                                 // because the default setting for mppp::real is different
-                                 // from the other types and if we leave this unset we will
-                                 // get the wrong function.
-                                 kw::compact_mode = false);
+                    add_cfunc<T>(
+                        s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
+                        kw::strided = true,
+                        // NOTE: be explicit about the lack of compact mode, because the default setting for mppp::real
+                        // is different from the other types and if we leave this unset we will get the wrong function.
+                        kw::compact_mode = false);
 
                     s_arr[1].compile();
 
@@ -253,13 +309,12 @@ struct cfunc<T>::impl {
                 },
                 [&]() {
                     // Batch strided.
-                    add_cfunc<T>(s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
-                                 kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true,
-                                 // NOTE: be explicit about the lack of compact mode,
-                                 // because the default setting for mppp::real is different
-                                 // from the other types and if we leave this unset we will
-                                 // get the wrong function.
-                                 kw::compact_mode = false);
+                    add_cfunc<T>(
+                        s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
+                        kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true,
+                        // NOTE: be explicit about the lack of compact mode because the default setting for mppp::real
+                        // is different from the other types and if we leave this unset we will get the wrong function.
+                        kw::compact_mode = false);
 
                     s_arr[2].compile();
 
@@ -272,9 +327,9 @@ struct cfunc<T>::impl {
         m_is_time_dependent = heyoka::is_time_dependent(m_fn);
 
         // Cache the number of variables and outputs.
-        // NOTE: static casts should also be fine here, because add_cfunc()
-        // succeeded and that guarantees that the number of vars and outputs
-        // fits in a 32-bit int.
+        //
+        // NOTE: static casts should also be fine here, because add_cfunc() succeeded and that guarantees that the
+        // number of vars and outputs fits in a 32-bit int.
         m_nouts = boost::numeric_cast<std::uint32_t>(m_fn.size());
         m_nvars = boost::numeric_cast<std::uint32_t>(m_vars.size());
     }
@@ -287,9 +342,6 @@ struct cfunc<T>::impl {
     {
         // Recover the function pointers.
         assign_fptrs();
-
-        // Construct the tapes.
-        construct_tapes();
     }
 
     // These are never needed.
@@ -313,6 +365,7 @@ cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
     auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec, parjit] = tup;
 
     // Construct the impl.
+    //
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_impl = std::make_unique<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
                                     compact_mode, parallel_mode, prec, check_prec, parjit);
@@ -326,8 +379,7 @@ cfunc<T>::cfunc(const cfunc &other)
 {
 }
 
-// NOTE: document that other is left into the def-cted
-// state afterwards.
+// NOTE: document that other is left into the def-cted state afterwards.
 template <typename T>
 cfunc<T>::cfunc(cfunc &&) noexcept = default;
 
@@ -341,8 +393,7 @@ cfunc<T> &cfunc<T>::operator=(const cfunc &other)
     return *this;
 }
 
-// NOTE: document that other is left into the def-cted
-// state afterwards.
+// NOTE: document that other is left into the def-cted state afterwards.
 template <typename T>
 cfunc<T> &cfunc<T>::operator=(cfunc &&) noexcept = default;
 
@@ -459,9 +510,8 @@ mpfr_prec_t cfunc<T>::get_prec() const
 {
     check_valid(__func__);
 
-    // NOTE: the cast here is safe because the value of
-    // m_prec was checked inside add_cfunc() during the
-    // construction of this object.
+    // NOTE: the cast here is safe because the value of m_prec was checked inside add_cfunc() during the construction of
+    // this object.
     return static_cast<mpfr_prec_t>(m_impl->m_prec);
 }
 
@@ -483,11 +533,15 @@ void cfunc<T>::load(boost::archive::binary_iarchive &ar, unsigned version)
     }
     // LCOV_EXCL_STOP
 
+    // Store the old impl for exception safety.
+    auto old_impl = std::move(m_impl);
+
     try {
         ar >> m_impl;
         // LCOV_EXCL_START
     } catch (...) {
-        *this = cfunc{};
+        // Restore the old impl before re-throwing.
+        m_impl = std::move(old_impl);
 
         throw;
     }
@@ -504,7 +558,7 @@ void cfunc<T>::check_valid(const char *name) const
 }
 
 template <typename T>
-void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time)
+void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time) const
 {
     check_valid(__func__);
 
@@ -526,13 +580,11 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
             "An array of parameter values must be passed in order to evaluate a function with parameters");
     }
 
-    if (pars) {
-        if (pars->size() != m_impl->m_nparams) [[unlikely]] {
-            throw std::invalid_argument(fmt::format("The array of parameter values provided for the evaluation "
-                                                    "of a compiled function has {} element(s), "
-                                                    "but the number of parameters in the function is {}",
-                                                    pars->size(), m_impl->m_nparams));
-        }
+    if (pars && pars->size() != m_impl->m_nparams) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The array of parameter values provided for the evaluation "
+                                                "of a compiled function has {} element(s), "
+                                                "but the number of parameters in the function is {}",
+                                                pars->size(), m_impl->m_nparams));
     }
 
     if (m_impl->m_is_time_dependent && !time) [[unlikely]] {
@@ -576,11 +628,12 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
 
     // Invoke the compiled function.
     if (m_impl->m_compact_mode) {
-        assert(!m_impl->m_tapes.empty());
+        // Fetch a tape from the cache.
+        detail::tape_handle tape_hdl(m_impl->m_tape_sa[0][0]);
 
         std::get<1>(m_impl->m_fptr_scal)(outputs.data_handle(), inputs.data_handle(),
                                          pars ? pars->data_handle() : nullptr, time ? &*time : nullptr,
-                                         m_impl->m_tapes[0].get());
+                                         tape_hdl.tape.data());
     } else {
         std::get<0>(m_impl->m_fptr_scal)(outputs.data_handle(), inputs.data_handle(),
                                          pars ? pars->data_handle() : nullptr, time ? &*time : nullptr);
@@ -588,7 +641,7 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
 }
 
 template <typename T>
-void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
 {
     // Cache the number of evals.
     const auto nevals = outputs.extent(1);
@@ -603,8 +656,8 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // Cache the compact mode flag.
     const auto compact_mode = m_impl->m_compact_mode;
 
-    // Cache a reference to the tapes.
-    const auto &tapes = m_impl->m_tapes;
+    // Fetch the info about size/alignment of the tapes.
+    const auto &tape_sa = m_impl->m_tape_sa;
 
     // Number of simd blocks in the arrays.
     const auto n_simd_blocks = nevals / batch_size;
@@ -615,27 +668,22 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     const auto *par_data = pars ? pars->data_handle() : nullptr;
     const auto *time_data = times ? times->data_handle() : nullptr;
 
-    // NOTE: the idea of these booleans is that we want to do arithmetics
-    // on the inputs/pars/time pointers only if we know that we **must** read from them,
-    // in which case the validation steps taken earlier ensure that
-    // arithmetics on them is safe. Otherwise, there are certain corner cases in which
-    // we might end up doing pointer arithmetics which leads to UB. Two examples:
+    // NOTE: the idea of these booleans is that we want to do arithmetics on the inputs/pars/time pointers only if we
+    // know that we **must** read from them, in which case the validation steps taken earlier ensure that arithmetics on
+    // them is safe. Otherwise, there are certain corner cases in which we might end up doing pointer arithmetics which
+    // leads to UB. Two examples:
     //
     // - the function has no inputs, or
-    // - the function has no params but the user anyway passed an empty
-    //   array of par values.
+    // - the function has no params but the user anyway passed an empty array of par values.
     //
-    // In these two cases we are dealing with input and/or pars arrays of shape
-    // (0, nevals). If the pointers stored in the mdspans are null, then we would
-    // be committing UB by doing arithmetic on them.
+    // In these two cases we are dealing with input and/or pars arrays of shape (0, nevals). If the pointers stored in
+    // the mdspans are null, then we would be committing UB by doing arithmetic on them.
     //
-    // NOTE: if nevals is zero, then the two for loops below are never
-    // entered and we never end up doing arithmetics on potentially-null
-    // pointers.
+    // NOTE: if nevals is zero, then the two for loops below are never entered and we never end up doing arithmetics on
+    // potentially-null pointers.
     //
-    // NOTE: in case of the outputs array, the data pointer can never be null
-    // (unless nevals is zero) because we do not allow to construct a cfunc
-    // object for a function with zero outputs. Hence, no checks are needed.
+    // NOTE: in case of the outputs array, the data pointer can never be null (unless nevals is zero) because we do not
+    // allow to construct a cfunc object for a function with zero outputs. Hence, no checks are needed.
     const auto read_inputs = m_impl->m_nvars > 0u;
     const auto read_pars = m_impl->m_nparams > 0u;
     const auto read_time = m_impl->m_is_time_dependent;
@@ -643,9 +691,9 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
     // Evaluate over the simd blocks.
     if (compact_mode) {
-        // NOTE: the batch-mode tape is at index 1 only if the batch
-        // size is > 1, otherwise we are using the scalar tape.
-        auto *batch_tape_ptr = tapes[batch_size > 1u].get();
+        // NOTE: the batch-mode tape is at index 1 only if the batch size is > 1, otherwise we are using the scalar
+        // tape.
+        detail::tape_handle tape_hdl(tape_sa[batch_size > 1u][0]);
 
         auto *fptr = std::get<1>(fptr_batch_s);
 
@@ -654,7 +702,7 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
             fptr(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
                  read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
-                 batch_tape_ptr, nevals);
+                 tape_hdl.tape.data(), nevals);
         }
     } else {
         auto *fptr = std::get<0>(fptr_batch_s);
@@ -669,13 +717,13 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
     // Handle the remainder, if present.
     if (compact_mode) {
-        auto *scalar_tape_ptr = tapes[0].get();
+        detail::tape_handle tape_hdl(tape_sa[0][0]);
 
         auto *fptr = std::get<1>(fptr_scal_s);
 
         for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
             fptr(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
-                 read_time ? time_data + k : nullptr, scalar_tape_ptr, nevals);
+                 read_time ? time_data + k : nullptr, tape_hdl.tape.data(), nevals);
         }
     } else {
         auto *fptr = std::get<0>(fptr_scal_s);
@@ -688,7 +736,7 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 }
 
 template <typename T>
-void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
 {
     // Cache the number of evals.
     const auto nevals = outputs.extent(1);
@@ -703,8 +751,8 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // Cache the compact mode flag.
     const auto compact_mode = m_impl->m_compact_mode;
 
-    // Cache a reference to the tapes.
-    const auto &tapes = m_impl->m_tapes;
+    // Fetch the info about size/alignment of the tapes.
+    const auto &tape_sa = m_impl->m_tape_sa;
 
     // Fetch the pointers.
     auto *out_data = outputs.data_handle();
@@ -712,27 +760,22 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     const auto *par_data = pars ? pars->data_handle() : nullptr;
     const auto *time_data = times ? times->data_handle() : nullptr;
 
-    // NOTE: the idea of these booleans is that we want to do arithmetics
-    // on the inputs/pars/time pointers only if we know that we **must** read from them,
-    // in which case the validation steps taken earlier ensure that
-    // arithmetics on them is safe. Otherwise, there are certain corner cases in which
-    // we might end up doing pointer arithmetics which leads to UB. Two examples:
+    // NOTE: the idea of these booleans is that we want to do arithmetics on the inputs/pars/time pointers only if we
+    // know that we **must** read from them, in which case the validation steps taken earlier ensure that arithmetics on
+    // them is safe. Otherwise, there are certain corner cases in which we might end up doing pointer arithmetics which
+    // leads to UB. Two examples:
     //
     // - the function has no inputs, or
-    // - the function has no params but the user anyway passed an empty
-    //   array of par values.
+    // - the function has no params but the user anyway passed an empty array of par values.
     //
-    // In these two cases we are dealing with input and/or pars arrays of shape
-    // (0, nevals). If the pointers stored in the mdspans are null, then we would
-    // be committing UB by doing arithmetic on them.
+    // In these two cases we are dealing with input and/or pars arrays of shape (0, nevals). If the pointers stored in
+    // the mdspans are null, then we would be committing UB by doing arithmetic on them.
     //
-    // NOTE: if nevals is zero, then the two for loops below are never
-    // entered and we never end up doing arithmetics on potentially-null
-    // pointers.
+    // NOTE: if nevals is zero, then the two for loops below are never entered and we never end up doing arithmetics on
+    // potentially-null pointers.
     //
-    // NOTE: in case of the outputs array, the data pointer can never be null
-    // (unless nevals is zero) because we do not allow to construct a cfunc
-    // object for a function with zero outputs. Hence, no checks are needed.
+    // NOTE: in case of the outputs array, the data pointer can never be null (unless nevals is zero) because we do not
+    // allow to construct a cfunc object for a function with zero outputs. Hence, no checks are needed.
     const auto read_inputs = m_impl->m_nvars > 0u;
     const auto read_pars = m_impl->m_nparams > 0u;
     const auto read_time = m_impl->m_is_time_dependent;
@@ -741,15 +784,19 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // Number of simd blocks in the arrays.
     const auto n_simd_blocks = nevals / batch_size;
 
-    // The functor to evaluate the scalar remainder, if present. It will be run concurrently with
-    // the batch-parallel iterations.
-    // NOTE: in compact mode, this function uses the existing scalar tape. It is invoked concurrently
-    // with batch_iter, which, in compact mode, uses thread-local tapes and does not use
-    // any of the existing tapes in the class. Thus, there is no danger of data races.
+    // The functor to evaluate the scalar remainder, if present. It will be run concurrently with the batch-parallel
+    // iterations.
     const auto scalar_rem = [n_simd_blocks, batch_size, fptr_scal_s, nevals, out_data, read_inputs, in_data, read_pars,
-                             par_data, read_time, time_data, &tapes]<bool CM>() {
+                             par_data, read_time, time_data, &tape_sa]<bool CM>() {
         auto *fptr = std::get<(CM ? 1 : 0)>(fptr_scal_s);
-        auto *scalar_tape_ptr = CM ? tapes[0].get() : nullptr;
+
+        // Tape setup.
+        void *scalar_tape_ptr = nullptr;
+        std::optional<detail::tape_handle> opt_tape_hdl;
+        if constexpr (CM) {
+            opt_tape_hdl.emplace(tape_sa[0][0]);
+            scalar_tape_ptr = opt_tape_hdl->tape.data();
+        }
 
         for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
             if constexpr (CM) {
@@ -787,11 +834,11 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // NOTE: in compact mode each batch-parallel iteration needs its own tape.
     if (compact_mode) {
         // Construct the thread-specific storage for batch parallel operations.
-        typename impl::ets_t ets_batch([this, batch_size]() {
-            // NOTE: the batch-mode tape is at index 1 only if the batch
-            // size is > 1, otherwise we are using the scalar tape.
-            return detail::make_aligned_buffer(m_impl->m_tape_sa[batch_size > 1u][0],
-                                               m_impl->m_tape_sa[batch_size > 1u][1]);
+        typename impl::ets_t ets_batch([batch_size, &tape_sa]() {
+            // NOTE: the batch-mode tape is at index 1 only if the batch size is > 1, otherwise we are using the scalar
+            // tape.
+            return detail::max_align_vector<std::byte>(
+                boost::numeric_cast<detail::max_align_vector<std::byte>::size_type>(tape_sa[batch_size > 1u][0]));
         });
 
         detail::tbb_isolated_parallel_invoke(
@@ -799,7 +846,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                 detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                                                   [&ets_batch, &batch_iter](const auto &range) {
                                                       // Fetch the local tape.
-                                                      auto *tape_ptr = ets_batch.local().get();
+                                                      auto *tape_ptr = ets_batch.local().data();
 
                                                       // NOTE: there are well-known pitfalls when using thread-specific
                                                       // storage with nested parallelism:
@@ -820,7 +867,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
             [&scalar_rem]() { scalar_rem.template operator()<true>(); });
     } else {
         detail::tbb_isolated_parallel_invoke(
-            [fptr_batch_s = m_impl->m_fptr_batch_s, &batch_iter, n_simd_blocks]() {
+            [&batch_iter, n_simd_blocks]() {
                 detail::tbb_isolated_parallel_for(
                     oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                     [&batch_iter](const auto &range) { batch_iter.template operator()<false>(range, nullptr); });
@@ -830,7 +877,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 }
 
 template <typename T>
-void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
 {
     check_valid(__func__);
 
@@ -884,14 +931,12 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
             "An array of time values must be provided in order to evaluate a time-dependent function");
     }
 
-    if (times) {
-        if (times->size() != ncols) [[unlikely]] {
-            throw std::invalid_argument(fmt::format("The array of time values provided for the evaluation "
-                                                    "of a compiled function has a size of {}, "
-                                                    "but the expected size deduced from the "
-                                                    "outputs array is {}",
-                                                    times->size(), ncols));
-        }
+    if (times && times->size() != ncols) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The array of time values provided for the evaluation "
+                                                "of a compiled function has a size of {}, "
+                                                "but the expected size deduced from the "
+                                                "outputs array is {}",
+                                                times->size(), ncols));
     }
 
 #if defined(HEYOKA_HAVE_REAL)
