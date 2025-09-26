@@ -1,6 +1,19 @@
 Changelog
 =========
 
+7.8.0 (unreleased)
+------------------
+
+New
+~~~
+
+- New ``batch_parallel`` keyword argument, allowing explicit control on the parallelisation
+  strategy for ``cfunc`` evaluation
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+- The call operators of the ``cfunc`` class are now ``const``. This implies that it is now possible
+  to evaluate a ``cfunc`` from multiple threads at the same time
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+
 7.7.0 (2025-09-18)
 ------------------
 
