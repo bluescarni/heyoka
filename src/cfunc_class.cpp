@@ -882,7 +882,8 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 }
 
 template <typename T>
-void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
+void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times,
+                          const std::optional<bool> batch_parallel) const
 {
     check_valid(__func__);
 
@@ -987,43 +988,50 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
 
 #endif
 
-    // A simple cost model for deciding when to parallelise over ncols. We consider:
-    //
-    // - an estimate of the total number of elementary operations necessary to
-    //   evaluate the function,
-    // - the value of ncols,
-    // - the floating-point type in use,
-    // - the batch size.
-    //
-    // Note that this cost model is very rough and does not take into account,
-    // for instance, that different elementary operations may have very different
-    // costs (e.g., a trig function vs a simple add). Perhaps we can re-evaluate this
-    // in the future and maybe just remove it and parallelise regardless to simplify
-    // the logic.
-
-    // Cost of a scalar fp operation.
-    const auto fp_unit_cost = detail::get_fp_unit_cost<T>();
-
-    // Total number of fp operations: number of elementary subexpressions in the
-    // decomposition * ncols.
-    assert(m_impl->m_dc.size() >= m_impl->m_nouts);
-    assert(m_impl->m_dc.size() - m_impl->m_nouts >= m_impl->m_nvars);
-    const auto tot_n_flops
-        = static_cast<double>(m_impl->m_dc.size() - m_impl->m_nouts - m_impl->m_nvars) * static_cast<double>(ncols);
-
-    // The total work.
-    // NOTE: clearly if the user specifies a custom value larger than the native SIMD size here
-    // for m_batch_size the estimation will be off. Using recommended_simd_size() here is not much
-    // better in that respect either (since the user could still specify a smaller batch size), plus
-    // it is going to be somewhat expensive due to accessing a thread-safe static global.
-    const auto tot_work = (fp_unit_cost / m_impl->m_batch_size) * static_cast<double>(tot_n_flops);
-
-    // NOTE: the commonly-quoted figure on the internet is a threshold of 10'000 clock cycles
-    // for parallel work.
-    if (tot_work >= 1e4) {
-        multi_eval_mt(outputs, inputs, pars, times);
+    // If batch_parallel was provided by the user, use it to determine whether or not to parallelise. Otherwise, decide
+    // automatically based on a heuristic.
+    if (batch_parallel) {
+        if (*batch_parallel) {
+            multi_eval_mt(outputs, inputs, pars, times);
+        } else {
+            multi_eval_st(outputs, inputs, pars, times);
+        }
     } else {
-        multi_eval_st(outputs, inputs, pars, times);
+        // A simple cost model for deciding when to parallelise over ncols. We consider:
+        //
+        // - an estimate of the total number of elementary operations necessary to evaluate the function,
+        // - the value of ncols,
+        // - the floating-point type in use,
+        // - the batch size.
+        //
+        // Note that this cost model is very rough and does not take into account, for instance, that different
+        // elementary operations may have very different costs (e.g., a trig function vs a simple add). Perhaps we can
+        // re-evaluate this in the future.
+
+        // Cost of a scalar fp operation.
+        const auto fp_unit_cost = detail::get_fp_unit_cost<T>();
+
+        // Total number of fp operations: (number of elementary subexpressions in the decomposition) * ncols.
+        assert(m_impl->m_dc.size() >= m_impl->m_nouts);
+        assert(m_impl->m_dc.size() - m_impl->m_nouts >= m_impl->m_nvars);
+        const auto tot_n_flops
+            = static_cast<double>(m_impl->m_dc.size() - m_impl->m_nouts - m_impl->m_nvars) * static_cast<double>(ncols);
+
+        // NOTE: in order to account for the batch size, we need to consider that the user might have specified a custom
+        // batch size smaller or larger than the native SIMD size. In the former case, we use the user-provided batch
+        // size, in the latter case we use the native SIMD size.
+        const auto rec_simd_size = recommended_simd_size<T>();
+        const auto batch_size = (m_impl->m_batch_size < rec_simd_size) ? m_impl->m_batch_size : rec_simd_size;
+
+        // Compute the total work.
+        const auto tot_work = (fp_unit_cost / batch_size) * static_cast<double>(tot_n_flops);
+
+        // NOTE: the commonly-quoted figure on the internet is a threshold of 10'000 clock cycles for parallel work.
+        if (tot_work >= 1e4) {
+            multi_eval_mt(outputs, inputs, pars, times);
+        } else {
+            multi_eval_st(outputs, inputs, pars, times);
+        }
     }
 }
 

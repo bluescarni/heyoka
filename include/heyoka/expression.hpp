@@ -911,11 +911,15 @@ public:
 private:
     HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>) const;
     HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>) const;
-    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>) const;
+    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>, std::optional<bool>) const;
 
     // kwargs configuration for the call operator, multi evaluation overload.
     static constexpr auto multi_eval_kw_cfg
-        = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>>{};
+        = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>,
+                       igor::descr<kw::batch_parallel, []<typename U>() {
+                           return std::same_as<std::remove_cvref_t<U>, bool>
+                                  || std::same_as<std::remove_cvref_t<U>, std::optional<bool>>;
+                       }>{}>{};
 
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
@@ -945,7 +949,15 @@ public:
             }
         }();
 
-        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm));
+        auto batch_parallel = [&]() -> std::optional<bool> {
+            if constexpr (p.has(kw::batch_parallel)) {
+                return p(kw::batch_parallel);
+            } else {
+                return {};
+            }
+        }();
+
+        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm), std::move(batch_parallel));
     }
 };
 
