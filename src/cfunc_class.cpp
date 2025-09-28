@@ -106,7 +106,7 @@ struct tape_handle {
         : alignment(al), tape(cfunc_cm_tape_cache_fetch(sz, al))
     {
     }
-    // NOTE: ater construction, the handle can *only* be destroyed.
+    // NOTE: after construction, the handle can *only* be destroyed.
     tape_handle(const tape_handle &) = delete;
     tape_handle(tape_handle &&) noexcept = delete;
     tape_handle &operator=(const tape_handle &) = delete;
