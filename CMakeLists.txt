@@ -185,7 +185,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_buffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
