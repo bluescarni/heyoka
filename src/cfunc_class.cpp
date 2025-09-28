@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/flat_map.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/serialization/array.hpp>
@@ -31,7 +32,6 @@
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
-#include <oneapi/tbb/concurrent_queue.h>
 #include <oneapi/tbb/enumerable_thread_specific.h>
 #include <oneapi/tbb/task_arena.h>
 
@@ -47,7 +47,7 @@
 
 #endif
 
-#include <heyoka/detail/max_align_vector.hpp>
+#include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
@@ -65,39 +65,46 @@ namespace detail
 namespace
 {
 
-// Cache of maximally-aligned memory buffers for use by cfuncs during compact-mode evaluation.
+// Thread-local cache of aligned memory buffers for use by cfuncs during compact-mode evaluation.
 //
-// NOTE: this will introduce a serialising bottleneck when compact-mode cfuncs are evaluating in parallel from multiple
-// threads. Ideally, we would like to turn this into thread-local storage, but we must be careful about the performance
-// consequences of this. E.g.:
+// Keys are alignments, values are queues of aligned byte vectors.
 //
-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81501
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+thread_local boost::container::flat_map<std::size_t, std::vector<aligned_vector<std::byte>>> cfunc_cm_tape_cache;
+
+// Helper to fetch a tape from the cache.
 //
-// Additionally, TLS may be buggy on certain platforms:
-//
-// https://sourceforge.net/p/mingw-w64/bugs/527/
-//
-// Perhaps in the future after profiling we can make the switch (conditional on compiler/platform perhaps).
-//
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
-oneapi::tbb::concurrent_queue<max_align_vector<std::byte>> cfunc_tape_cache;
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+aligned_vector<std::byte> cfunc_cm_tape_cache_fetch(const std::size_t sz, const std::size_t al)
+{
+    const auto it = cfunc_cm_tape_cache.find(al);
+
+    if (it == cfunc_cm_tape_cache.end() || it->second.empty()) {
+        // No queue for the required alignment has been created yet, create a new tape.
+        aligned_vector<std::byte> tape{aligned_allocator<std::byte>(al)};
+        tape.resize(boost::numeric_cast<decltype(tape.size())>(sz));
+        return tape;
+    } else {
+        // A queue for the required alignment is available and non-empty, pop its last element.
+        auto tape = std::move(it->second.back());
+        it->second.pop_back();
+
+        // Make sure the tape has the required size.
+        tape.resize(boost::numeric_cast<decltype(tape.size())>(sz));
+        return tape;
+    }
+}
 
 // RAII type managing an aligned tape from the cache.
 //
 // It will grab a tape from the cache on construction, and it will return it upon destruction.
 struct tape_handle {
-    max_align_vector<std::byte> tape;
+    std::size_t alignment;
+    aligned_vector<std::byte> tape;
 
-    explicit tape_handle(const std::size_t sz)
+    explicit tape_handle(const std::size_t sz, const std::size_t al)
+        : alignment(al), tape(cfunc_cm_tape_cache_fetch(sz, al))
     {
-        // Try to pop a vector from the cache.
-        cfunc_tape_cache.try_pop(tape);
-
-        // Regardless of whether the pop was successful or not, we need to make sure that the tape has a size of at
-        // least sz.
-        if (tape.size() < sz) {
-            tape.resize(boost::numeric_cast<decltype(tape.size())>(sz));
-        }
     }
     // NOTE: ater construction, the handle can *only* be destroyed.
     tape_handle(const tape_handle &) = delete;
@@ -109,7 +116,7 @@ struct tape_handle {
         // NOTE: ignore any exception, in order to make the destructor truly noexcept. The worst that can happen is that
         // the tape won't be returned to the cache.
         try {
-            cfunc_tape_cache.push(std::move(tape));
+            cfunc_cm_tape_cache[alignment].push_back(std::move(tape));
             // LCOV_EXCL_START
         } catch (...) {
             ;
@@ -133,7 +140,7 @@ struct cfunc<T>::impl {
     using c_cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, void *, std::size_t) noexcept;
 
     // Thread-local storage for internal parallel operations.
-    using ets_item_t = detail::max_align_vector<std::byte>;
+    using ets_item_t = detail::aligned_vector<std::byte>;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
@@ -256,18 +263,6 @@ struct cfunc<T>::impl {
             // Build the multi cfunc, and assign the internal members.
             std::tie(m_states, m_dc, m_tape_sa) = detail::make_multi_cfunc<T>(
                 std::move(s), "cfunc", m_fn, m_vars, m_batch_size, high_accuracy, m_parallel_mode, prec, parjit);
-
-            // Check that the alignment requirements on the tapes are not excessive.
-            for (const auto &[tape_size, tape_align] : m_tape_sa) {
-                if (tape_align > detail::max_alignment) [[unlikely]] {
-                    // LCOV_EXCL_START
-                    throw std::invalid_argument(
-                        fmt::format("Invalid alignment required by a compact-mode tape in a cfunc: the required "
-                                    "alignment of {} is larger than the maximum supported alignment of {}",
-                                    tape_align, detail::max_alignment));
-                    // LCOV_EXCL_STOP
-                }
-            }
 
             // Compile.
             std::get<1>(m_states).compile();
@@ -629,7 +624,8 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
     // Invoke the compiled function.
     if (m_impl->m_compact_mode) {
         // Fetch a tape from the cache.
-        detail::tape_handle tape_hdl(m_impl->m_tape_sa[0][0]);
+        const auto [sz, al] = m_impl->m_tape_sa[0];
+        detail::tape_handle tape_hdl(sz, al);
 
         std::get<1>(m_impl->m_fptr_scal)(outputs.data_handle(), inputs.data_handle(),
                                          pars ? pars->data_handle() : nullptr, time ? &*time : nullptr,
@@ -693,7 +689,8 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     if (compact_mode) {
         // NOTE: the batch-mode tape is at index 1 only if the batch size is > 1, otherwise we are using the scalar
         // tape.
-        detail::tape_handle tape_hdl(tape_sa[batch_size > 1u][0]);
+        const auto [sz, al] = tape_sa[batch_size > 1u];
+        detail::tape_handle tape_hdl(sz, al);
 
         auto *fptr = std::get<1>(fptr_batch_s);
 
@@ -717,7 +714,8 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 
     // Handle the remainder, if present.
     if (compact_mode) {
-        detail::tape_handle tape_hdl(tape_sa[0][0]);
+        const auto [sz, al] = tape_sa[0];
+        detail::tape_handle tape_hdl(sz, al);
 
         auto *fptr = std::get<1>(fptr_scal_s);
 
@@ -799,7 +797,8 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         // NOLINTNEXTLINE(misc-const-correctness)
         std::optional<detail::tape_handle> opt_tape_hdl;
         if constexpr (CM) {
-            opt_tape_hdl.emplace(tape_sa[0][0]);
+            const auto [sz, al] = tape_sa[0];
+            opt_tape_hdl.emplace(sz, al);
             scalar_tape_ptr = opt_tape_hdl->tape.data();
         }
 
@@ -842,8 +841,10 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         typename impl::ets_t ets_batch([batch_size, &tape_sa]() {
             // NOTE: the batch-mode tape is at index 1 only if the batch size is > 1, otherwise we are using the scalar
             // tape.
-            return detail::max_align_vector<std::byte>(
-                boost::numeric_cast<detail::max_align_vector<std::byte>::size_type>(tape_sa[batch_size > 1u][0]));
+            const auto [sz, al] = tape_sa[batch_size > 1u];
+            return detail::aligned_vector<std::byte>(
+                boost::numeric_cast<detail::aligned_vector<std::byte>::size_type>(sz),
+                detail::aligned_allocator<detail::aligned_vector<std::byte>>{al});
         });
 
         detail::tbb_isolated_parallel_invoke(

@@ -40,7 +40,7 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
-#include <heyoka/detail/aligned_buffer.hpp>
+#include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
@@ -141,7 +141,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -330,7 +330,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
         // Create the storage for the tape of derivatives.
         const auto [sz, al] = m_tape_sa;
-        m_tape = detail::make_aligned_buffer(sz, al);
+        m_cm_tape = detail::aligned_vector<std::byte>(detail::aligned_allocator<std::byte>(al));
+        m_cm_tape.resize(boost::numeric_cast<decltype(m_cm_tape.size())>(sz));
     } else {
         std::get<0>(m_llvm_state).compile();
     }
@@ -635,7 +636,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
 
     using std::abs;
     using std::isfinite;
@@ -675,8 +676,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             std::get<0>(m_step_f)(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
                                   wtc ? m_tc.data() : nullptr);
         } else {
+            assert(m_cm_tape.size() == m_i_data->m_tape_sa[0]);
+            assert(m_cm_tape.get_allocator().get_alignment() == m_i_data->m_tape_sa[1]);
+
             std::get<2>(m_step_f)(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
-                                  wtc ? m_tc.data() : nullptr, m_tape.get());
+                                  wtc ? m_tc.data() : nullptr, m_cm_tape.data());
         }
 
         // Update the times and the last timesteps, and write out the result.
@@ -717,8 +721,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
                                   m_delta_ts.data(), edd.m_max_abs_state.data());
         } else {
+            assert(m_cm_tape.size() == m_i_data->m_tape_sa[0]);
+            assert(m_cm_tape.get_allocator().get_alignment() == m_i_data->m_tape_sa[1]);
+
             std::get<3>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
-                                  m_delta_ts.data(), edd.m_max_abs_state.data(), m_tape.get());
+                                  m_delta_ts.data(), edd.m_max_abs_state.data(), m_cm_tape.data());
         }
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
