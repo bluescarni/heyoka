@@ -993,7 +993,7 @@ namespace detail
 // Boost s11n class version history for the cfunc class:
 //
 // - 1: implemented parallel compilation for compact mode, introduced external storage for the evaluation tape.
-// - 2: removed the internal tapes, rely on a global thread-safe lock-free cache instead.
+// - 2: removed the internal tapes, rely on a thread-local cache instead.
 inline constexpr int cfunc_s11n_version = 2;
 
 } // namespace detail

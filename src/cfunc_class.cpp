@@ -67,7 +67,13 @@ namespace
 
 // Thread-local cache of aligned memory buffers for use by cfuncs during compact-mode evaluation.
 //
-// Keys are alignments, values are queues of aligned byte vectors.
+// Keys are alignments, values are pools of aligned byte vectors.
+//
+// NOTE: it is important that each thread has a *pool* of values (rather than a single value) in order to ensure safe
+// operations in case of nested parallelism. A thread in a parallel outer loop could request a value from the cache,
+// start executing an inner parallel loop, and, in the middle of the inner loop, grab another task from the outer loop
+// due to task stealing. In such a situation, the thread needs to be able to ask for a second value from the cache while
+// the value it originally requested has not been returned to the cache yet.
 //
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 thread_local boost::container::flat_map<std::size_t, std::vector<aligned_vector<std::byte>>> cfunc_cm_tape_cache;
@@ -80,12 +86,12 @@ aligned_vector<std::byte> cfunc_cm_tape_cache_fetch(const std::size_t sz, const 
     const auto it = cfunc_cm_tape_cache.find(al);
 
     if (it == cfunc_cm_tape_cache.end() || it->second.empty()) {
-        // No queue for the required alignment has been created yet, create a new tape.
+        // No pool for the required alignment has been created yet, create a new tape.
         aligned_vector<std::byte> tape{aligned_allocator<std::byte>(al)};
         tape.resize(boost::numeric_cast<decltype(tape.size())>(sz));
         return tape;
     } else {
-        // A queue for the required alignment is available and non-empty, pop its last element.
+        // A pool for the required alignment is available and non-empty, pop its last element.
         auto tape = std::move(it->second.back());
         it->second.pop_back();
 
