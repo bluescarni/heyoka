@@ -15,8 +15,6 @@
 #include <new>
 #include <stdexcept>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
