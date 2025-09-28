@@ -6,9 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// NOTE: this is a workaround for a compilation issue on OSX, where clang complains that malloc()/free() declarations
+// (used somewhere inside fmt) are not available. See:
+// https://github.com/fmtlib/fmt/pull/4477
+#include <cstdlib>
+
 #include <cstddef>
 #include <new>
 #include <stdexcept>
+
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
