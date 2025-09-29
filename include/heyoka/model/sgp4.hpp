@@ -225,7 +225,7 @@ namespace detail
 
 // Boost s11n class version history for the sgp4 class:
 //
-// - 1: removed the temporary internal buffers in favour of thread_local buffers.
+// - 1: removed the temporary internal buffer in favour of a thread_local cache of buffers.
 inline constexpr int sgp4_propagator_s11n_version = 1;
 
 } // namespace detail
