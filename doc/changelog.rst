@@ -17,6 +17,13 @@ New
   to evaluate a ``cfunc`` from multiple threads at the same time
   (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
 
+Changes
+~~~~~~~
+
+- The ``replace_sat_data()`` function of the ``sgp4_propagator`` class now provides strong exception safety
+  guarantees
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
+
 7.7.0 (2025-09-18)
 ------------------
 
