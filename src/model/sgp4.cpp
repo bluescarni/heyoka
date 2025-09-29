@@ -791,12 +791,24 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
                                                 new_data.extent(1), nsats));
     }
 
-    // Fetch references to sat_buffer and init_buffer.
-    auto &sat_buffer = m_impl->m_sat_buffer;
-    auto &init_buffer = m_impl->m_init_buffer;
+    // NOTE: for exception safety, we do not want to write directly into init_buffer/sat_buffer because if TBB throws
+    // during parallel operations we may be left with an integrator in an inconsistent state. Thus, for storing the new
+    // data, we will initially use buffers from the cache.
+    //
+    // NOTE: here it would be appealing to use directly new_data, instead of relying on new_sat_buffer. However, this
+    // creates potential aliasing issues as in principle new_data could point to the existing sat data. Instead of
+    // complicated overlap checking, we just take the easy route and copy new_data into a distinct memory area.
+    detail::buffer_handle<T> hdl_init_buffer, hdl_sat_buffer;
+    auto &new_init_buffer = hdl_init_buffer.buffer;
+    auto &new_sat_buffer = hdl_sat_buffer.buffer;
 
-    // Write the new data into sat_buffer.
-    const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(sat_buffer.data(), new_data.extent(1));
+    // Prepare the buffers with the required sizes.
+    new_init_buffer.resize(m_impl->m_init_buffer.size());
+    new_sat_buffer.resize(m_impl->m_sat_buffer.size());
+
+    // Copy the new data into new_sat_buffer.
+    const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(new_sat_buffer.data(),
+                                                                              new_data.extent(1));
     for (std::size_t i = 0; i < buffer_span.extent(0); ++i) {
         for (std::size_t j = 0; j < buffer_span.extent(1); ++j) {
             buffer_span(i, j) = new_data(i, j);
@@ -807,18 +819,29 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
     auto &cf_init = m_impl->m_cf_init;
 
     // Prepare the in/out spans for the invocation of cf_init.
-    // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
-    // the epochs do not matter. Hence, 7 rows instead of 9.
+    //
+    // NOTE: for initialisation we only need to read the elements and the bstars from new_sat_buffer, the epochs do not
+    // matter. Hence, 7 rows instead of 9.
+    //
     // NOTE: static casts are ok, we already inited once during construction.
-    const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
-    const typename cfunc<T>::out_2d init_output(init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
+    const typename cfunc<T>::in_2d init_input(new_sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
+    const typename cfunc<T>::out_2d init_output(new_init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
                                                 static_cast<std::size_t>(nsats));
 
     // Evaluate the intermediate quantities and their derivatives.
-    // NOTE: here is where we could potentially throw, as cf_init() may end up being
-    // parallelised which could lead in principle to exceptions being thrown by
-    // the TBB primitives.
     cf_init(init_output, init_input);
+
+    // NOTE: up until now, we have only written into temporary storage and we have not touched data members yet. From
+    // now on, everything is noexcept, so there's not risk of leaving the integrator into an inconsistent state.
+
+    // Swap in the new init buffer.
+    new_init_buffer.swap(m_impl->m_init_buffer);
+
+    // Copy in the new sat data.
+    //
+    // NOTE: we cannot swap in the new sat data because otherwise we lose pointer stability on the satellite data. Thus,
+    // we resort to a copy.
+    std::ranges::copy(new_sat_buffer, m_impl->m_sat_buffer.begin());
 }
 
 template <typename T>
