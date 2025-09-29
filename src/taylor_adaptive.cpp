@@ -43,7 +43,7 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
-#include <heyoka/detail/aligned_buffer.hpp>
+#include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
@@ -196,7 +196,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -501,7 +501,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
         // Create the storage for the tape of derivatives.
         const auto [sz, al] = m_tape_sa;
-        m_tape = detail::make_aligned_buffer(sz, al);
+        m_cm_tape = detail::aligned_vector<std::byte>(detail::aligned_allocator<std::byte>(al));
+        m_cm_tape.resize(boost::numeric_cast<decltype(m_cm_tape.size())>(sz));
     } else {
         std::get<0>(m_llvm_state).compile();
     }
@@ -751,7 +752,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
 
     auto h = max_delta_t;
 
@@ -762,8 +763,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         if (m_step_f.index() == 0u) {
             std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
         } else {
+            assert(m_cm_tape.size() == m_i_data->m_tape_sa[0]);
+            assert(m_cm_tape.get_allocator().get_alignment() == m_i_data->m_tape_sa[1]);
+
             std::get<2>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr,
-                                  m_tape.get());
+                                  m_cm_tape.data());
         }
 
         // Update the time.
@@ -774,8 +778,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
         // Check if the time or the state vector are non-finite at the
         // end of the timestep.
-        if (!isfinite(m_time)
-            || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
+        if (!isfinite(m_time) || std::ranges::any_of(m_state, [](const auto &x) { return !isfinite(x); })) {
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
@@ -791,8 +794,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         if (m_step_f.index() == 1u) {
             std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
         } else {
+            assert(m_cm_tape.size() == m_i_data->m_tape_sa[0]);
+            assert(m_cm_tape.get_allocator().get_alignment() == m_i_data->m_tape_sa[1]);
+
             std::get<3>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state,
-                                  m_tape.get());
+                                  m_cm_tape.data());
         }
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for

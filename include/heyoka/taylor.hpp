@@ -1220,7 +1220,8 @@ namespace detail
 // - 4: switched to pimpl implementation for i_data.
 // - 5: removed m_state_vars/m_rhs, variational ODE data.
 // - 6: added parallel JIT compilation for compact mode.
-inline constexpr int taylor_adaptive_s11n_version = 6;
+// - 7: replaced aligned_buffer with aligned_vector.
+inline constexpr int taylor_adaptive_s11n_version = 7;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
@@ -1229,7 +1230,8 @@ inline constexpr int taylor_adaptive_s11n_version = 6;
 // - 3: switched to pimpl implementation for i_data.
 // - 4: removed m_state_vars/m_rhs, variational ODE data.
 // - 5: added parallel JIT compilation for compact mode.
-inline constexpr int taylor_adaptive_batch_s11n_version = 5;
+// - 6: replaced aligned_buffer with aligned_vector.
+inline constexpr int taylor_adaptive_batch_s11n_version = 6;
 
 } // namespace detail
 

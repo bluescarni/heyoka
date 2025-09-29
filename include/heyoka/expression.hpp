@@ -136,7 +136,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 template <char... Chars>
 expression operator""_f128()
 {
-    return expression { mppp::literals::operator""_rq < Chars...>() };
+    return expression{mppp::literals::operator""_rq < Chars...>()};
 }
 
 #endif
@@ -836,7 +836,7 @@ public:
     using out_1d = mdspan<T, dextents<std::size_t, 1>>;
 
 private:
-    void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>);
+    void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>) const;
 
     // kwargs configuration for the call operator, single evaluation overload.
     static constexpr auto single_eval_kw_cfg
@@ -849,9 +849,6 @@ private:
 
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
-    //
-    // NOTE: if/when we add overloads with user-provided tape pointers, then we must document the non-overlapping
-    // requirement for them too.
     template <typename Out, typename In, typename... KwArgs>
         requires igor::validate<single_eval_kw_cfg, KwArgs...>
                  && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
@@ -860,7 +857,7 @@ public:
     // safe to re-use them.
     //
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(Out &&out, In &&in, KwArgs &&...kw_args)
+    void operator()(Out &&out, In &&in, KwArgs &&...kw_args) const
     {
         const igor::parser p{kw_args...};
 
@@ -912,13 +909,17 @@ public:
     using out_2d = mdspan<T, dextents<std::size_t, 2>>;
 
 private:
-    HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
-    HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
-    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+    HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>) const;
+    HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>) const;
+    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>, std::optional<bool>) const;
 
     // kwargs configuration for the call operator, multi evaluation overload.
     static constexpr auto multi_eval_kw_cfg
-        = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>>{};
+        = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>,
+                       igor::descr<kw::batch_parallel, []<typename U>() {
+                           return std::same_as<std::remove_cvref_t<U>, bool>
+                                  || std::same_as<std::remove_cvref_t<U>, std::optional<bool>>;
+                       }>{}>{};
 
 public:
     // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
@@ -928,7 +929,7 @@ public:
     // safe to re-use them.
     //
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(out_2d out, in_2d in, KwArgs &&...kw_args)
+    void operator()(out_2d out, in_2d in, KwArgs &&...kw_args) const
     {
         const igor::parser p{kw_args...};
 
@@ -948,7 +949,15 @@ public:
             }
         }();
 
-        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm));
+        auto batch_parallel = [&]() -> std::optional<bool> {
+            if constexpr (p.has(kw::batch_parallel)) {
+                return p(kw::batch_parallel);
+            } else {
+                return {};
+            }
+        }();
+
+        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm), std::move(batch_parallel));
     }
 };
 
@@ -982,9 +991,10 @@ namespace detail
 {
 
 // Boost s11n class version history for the cfunc class:
-// - 1: implemented parallel compilation for compact mode, introduced
-//      external storage for the evaluation tape.
-inline constexpr int cfunc_s11n_version = 1;
+//
+// - 1: implemented parallel compilation for compact mode, introduced external storage for the evaluation tape.
+// - 2: removed the internal tapes, rely on a thread-local cache instead.
+inline constexpr int cfunc_s11n_version = 2;
 
 } // namespace detail
 
