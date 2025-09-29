@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- The call operators of the ``sgp4_propagator`` class are now ``const``. This implies that it is now possible
+  to use an ``sgp4_propagator`` from multiple threads at the same time
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
 - New ``batch_parallel`` keyword argument, allowing explicit control on the parallelisation
   strategy for ``cfunc`` evaluation
   (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
