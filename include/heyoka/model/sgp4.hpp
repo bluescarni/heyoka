@@ -206,6 +206,16 @@ public:
     //
     // NOTE: Julian dates are to be provided in the UTC scale of time. Internal conversion to TAI will ensure correct
     // propagation across leap seconds.
+    //
+    // NOTE: in principle we could accept here the batch_parallel kwarg in input and pass it down to the evaluation of
+    // the cfunc. Perhaps something to keep in mind for the future, but we should be careful not to complicate the
+    // interface too much. We have two potential parallelisations to think about here: the internal cfunc
+    // parallelisation and the further explicit parallelisation happening in batch propagation (last 2 overloads).
+    //
+    // NOTE: for my future self's sanity: the internal cfunc is SIMD-batching over the satellites and times, with the
+    // assumption that we are doing 1 evaluation per satellite (we refer to this as "scalar mode", a bit confusingly
+    // because there is SIMD batch happening). In "batch mode", we evaluate each satellite for *multiple* time points,
+    // parallelising the internal cfunc evaluations via multithreading.
     void operator()(out_2d, in_1d<T>) const;
     void operator()(out_2d, in_1d<date>) const;
     void operator()(out_3d, in_2d<T>) const;
