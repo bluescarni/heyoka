@@ -1,6 +1,40 @@
 Changelog
 =========
 
+7.8.0 (unreleased)
+------------------
+
+New
+~~~
+
+- The call operators of the ``sgp4_propagator`` class are now ``const``. This implies that it is now possible
+  to use an ``sgp4_propagator`` from multiple threads at the same time
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
+- New ``batch_parallel`` keyword argument, allowing explicit control on the parallelisation
+  strategy for ``cfunc`` evaluation
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+- The call operators of the ``cfunc`` class are now ``const``. This implies that it is now possible
+  to evaluate a ``cfunc`` from multiple threads at the same time
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+
+Changes
+~~~~~~~
+
+- The ``replace_sat_data()`` function of the ``sgp4_propagator`` class now provides strong exception safety
+  guarantees
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
+
+7.7.0 (2025-09-18)
+------------------
+
+New
+~~~
+
+- Improve the reporting of HTTP errors when downloading datafiles
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+- Add an internal mechanism to specify a custom SSL verify file
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+
 7.6.0 (2025-09-14)
 ------------------
 

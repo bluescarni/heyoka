@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.6.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.8.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -185,12 +185,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_buffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/http_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ex_traversal.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_vector.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -358,7 +358,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 38)
+set(HEYOKA_ABI_VERSION 40)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.

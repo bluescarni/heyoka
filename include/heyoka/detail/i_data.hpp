@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/aligned_buffer.hpp>
+#include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -96,7 +96,9 @@ struct taylor_adaptive<T>::i_data {
     // Size/alignment for the compact mode tape.
     std::array<std::size_t, 2> m_tape_sa{};
     // Compact mode tape.
-    detail::aligned_buffer_t m_tape;
+    //
+    // NOTE: we init this with an alignment of max_align_t, the correct alignment will be set at a later stage.
+    detail::aligned_vector<std::byte> m_cm_tape{detail::aligned_allocator<std::byte>(alignof(std::max_align_t))};
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -133,8 +135,6 @@ public:
     i_data &operator=(i_data &&) noexcept = delete;
 
     ~i_data();
-
-    void init_cm_tape();
 };
 
 template <typename T>
@@ -174,7 +174,9 @@ struct taylor_adaptive_batch<T>::i_data {
     // Size/alignment for the compact mode tape.
     std::array<std::size_t, 2> m_tape_sa{};
     // Compact mode tape.
-    detail::aligned_buffer_t m_tape;
+    //
+    // NOTE: we init this with an alignment of max_align_t, the correct alignment will be set at a later stage.
+    detail::aligned_vector<std::byte> m_cm_tape{detail::aligned_allocator<std::byte>(alignof(std::max_align_t))};
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -233,8 +235,6 @@ public:
     i_data &operator=(i_data &&) noexcept = delete;
 
     ~i_data();
-
-    void init_cm_tape();
 };
 
 HEYOKA_END_NAMESPACE

@@ -41,9 +41,9 @@ IGOR_MAKE_NAMED_ARGUMENT(code_model);
 IGOR_MAKE_NAMED_ARGUMENT(parjit);
 
 // cfunc API.
-IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(strided);
 IGOR_MAKE_NAMED_ARGUMENT(check_prec);
+IGOR_MAKE_NAMED_ARGUMENT(batch_parallel);
 
 // taylor_adaptive and friends.
 IGOR_MAKE_NAMED_ARGUMENT(tol);
@@ -64,6 +64,7 @@ IGOR_MAKE_NAMED_ARGUMENT(c_output);
 IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 // Used in several APIs.
+IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(time_expr);
 IGOR_MAKE_NAMED_ARGUMENT(prec);
@@ -79,12 +80,12 @@ IGOR_MAKE_NAMED_ARGUMENT(n_out);
 IGOR_MAKE_NAMED_ARGUMENT(activations);
 IGOR_MAKE_NAMED_ARGUMENT(nn_wb);
 
-// cartesian2geodetic
+// Cartesian<->geodetic conversion.
 IGOR_MAKE_NAMED_ARGUMENT(ecc2);
 IGOR_MAKE_NAMED_ARGUMENT(R_eq);
 IGOR_MAKE_NAMED_ARGUMENT(n_iters);
 
-// thermonets
+// Thermonets.
 IGOR_MAKE_NAMED_ARGUMENT(geodetic);
 IGOR_MAKE_NAMED_ARGUMENT(f107a);
 IGOR_MAKE_NAMED_ARGUMENT(f107);
@@ -114,7 +115,7 @@ IGOR_MAKE_NAMED_ARGUMENT(eop_data);
 IGOR_MAKE_NAMED_ARGUMENT(sw_data);
 IGOR_MAKE_NAMED_ARGUMENT(a);
 
-// NOTE: this namespace contains several commonly-used descriptors.
+// NOTE: this namespace contains several commonly-used kwargs descriptors.
 namespace descr
 {
 

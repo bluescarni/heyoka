@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <heyoka/config.hpp>
 
+#include <optional>
 #include <random>
 #include <ranges>
 #include <stdexcept>
@@ -176,7 +177,19 @@ TEST_CASE("multieval st")
         std::ranges::generate(ibuf, gen);
 
         cf0(ospan, ispan);
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == ispan(0, j) + ispan(1, j));
+            REQUIRE(ospan(1, j) == ispan(0, j) - ispan(1, j));
+        }
 
+        // Test also with explicitly-supplied batch_parallel flag.
+        cf0(ospan, ispan, kw::batch_parallel = true);
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == ispan(0, j) + ispan(1, j));
+            REQUIRE(ospan(1, j) == ispan(0, j) - ispan(1, j));
+        }
+
+        cf0(ospan, ispan, kw::batch_parallel = false);
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == ispan(0, j) + ispan(1, j));
             REQUIRE(ospan(1, j) == ispan(0, j) - ispan(1, j));
@@ -281,7 +294,18 @@ TEST_CASE("multieval mt double")
                 {x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm, kw::batch_size = batch_size};
 
             cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
+            for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+                REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+                REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+            }
 
+            cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan, kw::batch_parallel = false);
+            for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+                REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+                REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+            }
+
+            cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan, kw::batch_parallel = true);
             for (std::size_t j = 0; j < ospan.extent(1); ++j) {
                 REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
                 REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));

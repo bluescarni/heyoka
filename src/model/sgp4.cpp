@@ -33,9 +33,6 @@
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/blocked_range2d.h>
-#include <oneapi/tbb/cache_aligned_allocator.h>
-#include <oneapi/tbb/enumerable_thread_specific.h>
-#include <oneapi/tbb/task_arena.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
@@ -560,6 +557,58 @@ void sgp4_compile_funcs(const std::function<void()> &f1, const std::function<voi
     heyoka::detail::tbb_isolated_parallel_invoke(f1, f2);
 }
 
+namespace
+{
+
+// Thread-local cache of memory buffers for use by sgp4_propagator.
+//
+// NOTE: it is important that each thread has a *pool* of values (rather than a single value) in order to ensure safe
+// operations in case of nested parallelism. A thread in a parallel outer loop could request a value from the cache,
+// start executing an inner parallel loop, and, in the middle of the inner loop, grab another task from the outer loop
+// due to task stealing. In such a situation, the thread needs to be able to ask for a second value from the cache while
+// the value it originally requested has not been returned to the cache yet.
+template <typename T>
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+thread_local std::vector<std::vector<T>> sgp4_propagator_buffer_cache;
+
+// RAII type managing a buffer from the cache.
+//
+// It will grab a buffer from the cache on construction, and it will return it upon destruction.
+template <typename T>
+struct buffer_handle {
+    std::vector<T> buffer;
+
+    buffer_handle()
+    {
+        if (!sgp4_propagator_buffer_cache<T>.empty()) {
+            buffer = std::move(sgp4_propagator_buffer_cache<T>.back());
+            sgp4_propagator_buffer_cache<T>.pop_back();
+        }
+    }
+    // NOTE: after construction, the handle can *only* be destroyed.
+    buffer_handle(const buffer_handle &) = delete;
+    buffer_handle(buffer_handle &&) noexcept = delete;
+    buffer_handle &operator=(const buffer_handle &) = delete;
+    buffer_handle &operator=(buffer_handle &&) noexcept = delete;
+    ~buffer_handle()
+    {
+        // NOTE: ignore any exception, in order to make the destructor truly noexcept. The worst that can happen is that
+        // the buffer won't be returned to the cache.
+        try {
+            // NOTE: no point in returning an empty buffer to the cache.
+            if (!buffer.empty()) {
+                sgp4_propagator_buffer_cache<T>.push_back(std::move(buffer));
+            }
+            // LCOV_EXCL_START
+        } catch (...) {
+            ;
+        }
+        // LCOV_EXCL_STOP
+    }
+};
+
+} // namespace
+
 } // namespace detail
 
 template <typename T>
@@ -570,9 +619,6 @@ struct sgp4_propagator<T>::impl {
     cfunc<T> m_cf_tprop;
     cfunc<T> m_cf_init;
     std::optional<dtens> m_dtens;
-    // NOTE: this is a buffer used to convert dates to tsinces in the call operator
-    // overloads taking dates in input.
-    std::vector<T> m_tms_vec;
 
     // Serialization.
     template <typename Archive>
@@ -583,7 +629,6 @@ struct sgp4_propagator<T>::impl {
         ar & m_cf_tprop;
         ar & m_cf_init;
         ar & m_dtens;
-        // NOTE: no need to save the content of m_tms_vec.
     }
 };
 
@@ -596,9 +641,28 @@ void sgp4_propagator<T>::save(boost::archive::binary_oarchive &ar, unsigned) con
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+void sgp4_propagator<T>::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
-    ar >> m_impl;
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<sgp4_propagator<T>>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load an sgp4_propagator: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
+    // Store the old impl for exception safety.
+    auto old_impl = std::move(m_impl);
+
+    try {
+        ar >> m_impl;
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Restore the old impl before re-throwing.
+        m_impl = std::move(old_impl);
+
+        throw;
+    }
+    // LCOV_EXCL_STOP
 }
 
 template <typename T>
@@ -659,8 +723,8 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
     cf_init(init_output, init_input);
 
     // Build and assign the implementation.
-    m_impl = std::make_unique<impl>(impl{
-        std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(cf_init), std::move(dt), {}});
+    m_impl = std::make_unique<impl>(
+        impl{std::move(sat_buffer), std::move(init_buffer), std::move(cf_tprop), std::move(cf_init), std::move(dt)});
 }
 
 template <typename T>
@@ -727,12 +791,24 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
                                                 new_data.extent(1), nsats));
     }
 
-    // Fetch references to sat_buffer and init_buffer.
-    auto &sat_buffer = m_impl->m_sat_buffer;
-    auto &init_buffer = m_impl->m_init_buffer;
+    // NOTE: for exception safety, we do not want to write directly into init_buffer/sat_buffer because if TBB throws
+    // during parallel operations we may be left with an integrator in an inconsistent state. Thus, for storing the new
+    // data, we will initially use buffers from the cache.
+    //
+    // NOTE: here it would be appealing to use directly new_data, instead of relying on new_sat_buffer. However, this
+    // creates potential aliasing issues as in principle new_data could point to the existing sat data. Instead of
+    // complicated overlap checking, we just take the easy route and copy new_data into a distinct memory area.
+    detail::buffer_handle<T> hdl_init_buffer, hdl_sat_buffer;
+    auto &new_init_buffer = hdl_init_buffer.buffer;
+    auto &new_sat_buffer = hdl_sat_buffer.buffer;
 
-    // Write the new data into sat_buffer.
-    const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(sat_buffer.data(), new_data.extent(1));
+    // Prepare the buffers with the required sizes.
+    new_init_buffer.resize(m_impl->m_init_buffer.size());
+    new_sat_buffer.resize(m_impl->m_sat_buffer.size());
+
+    // Copy the new data into new_sat_buffer.
+    const mdspan<T, extents<std::size_t, 9, std::dynamic_extent>> buffer_span(new_sat_buffer.data(),
+                                                                              new_data.extent(1));
     for (std::size_t i = 0; i < buffer_span.extent(0); ++i) {
         for (std::size_t j = 0; j < buffer_span.extent(1); ++j) {
             buffer_span(i, j) = new_data(i, j);
@@ -743,18 +819,29 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
     auto &cf_init = m_impl->m_cf_init;
 
     // Prepare the in/out spans for the invocation of cf_init.
-    // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
-    // the epochs do not matter. Hence, 7 rows instead of 9.
+    //
+    // NOTE: for initialisation we only need to read the elements and the bstars from new_sat_buffer, the epochs do not
+    // matter. Hence, 7 rows instead of 9.
+    //
     // NOTE: static casts are ok, we already inited once during construction.
-    const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
-    const typename cfunc<T>::out_2d init_output(init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
+    const typename cfunc<T>::in_2d init_input(new_sat_buffer.data(), 7, static_cast<std::size_t>(nsats));
+    const typename cfunc<T>::out_2d init_output(new_init_buffer.data(), static_cast<std::size_t>(cf_init.get_nouts()),
                                                 static_cast<std::size_t>(nsats));
 
     // Evaluate the intermediate quantities and their derivatives.
-    // NOTE: here is where we could potentially throw, as cf_init() may end up being
-    // parallelised which could lead in principle to exceptions being thrown by
-    // the TBB primitives.
     cf_init(init_output, init_input);
+
+    // NOTE: up until now, we have only written into temporary storage and we have not touched data members yet. From
+    // now on, everything is noexcept, so there's not risk of leaving the integrator into an inconsistent state.
+
+    // Swap in the new init buffer.
+    new_init_buffer.swap(m_impl->m_init_buffer);
+
+    // Copy in the new sat data.
+    //
+    // NOTE: we cannot swap in the new sat data because otherwise we lose pointer stability on the satellite data. Thus,
+    // we resort to a copy.
+    std::ranges::copy(new_sat_buffer, m_impl->m_sat_buffer.begin());
 }
 
 template <typename T>
@@ -836,7 +923,7 @@ const dtens::sv_idx_t &sgp4_propagator<T>::get_mindex(std::uint32_t i) const
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms)
+void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms) const
 {
     const auto n_sats = get_nsats();
     assert(n_sats != 0u); // LCOV_EXCL_LINE
@@ -857,12 +944,11 @@ namespace detail
 namespace
 {
 
-// Helper to convert a Julian date into a time delta suitable for use in the SGP4 algorithm.
-// The reference epochs for all satellites are stored in sat_buffer, the dates are passed in
-// via the 'dates' argument, n_sats is the total number of satellites and i is the index
-// of the satellite on which we are operating. The double-length UTC Julian dates are first converted
-// to TAI Julian dates using an erfa routine. The resulting TAI dates are then normalised and
-// subtracted to yield the final time delta.
+// Helper to convert a Julian date into a time delta suitable for use in the SGP4 algorithm. The reference epochs for
+// all satellites are stored in sat_buffer, the dates are passed in via the 'dates' argument, n_sats is the total number
+// of satellites and i is the index of the satellite on which we are operating. The double-length UTC Julian dates are
+// first converted to TAI Julian dates using an erfa routine. The resulting TAI dates are then normalised and subtracted
+// to yield the final time delta.
 template <typename SizeType, typename Dates, typename T>
 T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer, std::uint32_t n_sats)
 {
@@ -897,7 +983,7 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
+void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates) const
 {
     // Check the dates array.
     const auto n_sats = get_nsats();
@@ -911,7 +997,8 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     // We need to convert the dates into time deltas suitable for use in the other call operator overload.
 
     // Prepare the memory buffer.
-    auto &tms_vec = m_impl->m_tms_vec;
+    detail::buffer_handle<T> tms_vec_hdl;
+    auto &tms_vec = tms_vec_hdl.buffer;
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
 
@@ -941,7 +1028,7 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
+void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms) const
 {
     // Check the dimensionalities of out and tms.
     const auto n_evals = out.extent(0);
@@ -981,41 +1068,14 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
         }
     };
 
-    // NOTE: in compact mode concurrent parallel operations on the same cfunc
-    // object are not safe.
-    if (m_impl->m_cf_tprop.get_compact_mode()) {
-        // Construct the thread-specific storage for parallel operations.
-        using ets_t = oneapi::tbb::enumerable_thread_specific<cfunc<T>, oneapi::tbb::cache_aligned_allocator<cfunc<T>>,
-                                                              oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
-        ets_t ets_cfunc([this]() { return m_impl->m_cf_tprop; });
-
-        heyoka::detail::tbb_isolated_parallel_for(
-            oneapi::tbb::blocked_range<std::size_t>(0, n_evals), [&ets_cfunc, &par_iter](const auto &range) {
-                // Fetch the thread-local cfunc.
-                auto &cf = ets_cfunc.local();
-
-                // NOTE: there are well-known pitfalls when using thread-specific
-                // storage with nested parallelism:
-                //
-                // https://oneapi-src.github.io/oneTBB/main/tbb_userguide/work_isolation.html
-                //
-                // If the cfunc itself is performing parallel operations, then the current thread
-                // will block as execution in the parallel region of the cfunc begins. The
-                // blocked thread could then grab another task from the parallel for loop
-                // we are currently in, and it would then start operating for a second time
-                // on the same cf object.
-                oneapi::tbb::this_task_arena::isolate([&]() { par_iter(cf, range); });
-            });
-    } else {
-        heyoka::detail::tbb_isolated_parallel_for(
-            oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
-            [&par_iter, this](const auto &range) { par_iter(m_impl->m_cf_tprop, range); });
-    }
+    heyoka::detail::tbb_isolated_parallel_for(
+        oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
+        [&par_iter, this](const auto &range) { par_iter(m_impl->m_cf_tprop, range); });
 }
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
+void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates) const
 {
     // Check the dates array.
     const auto n_sats = get_nsats();
@@ -1030,7 +1090,8 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 
     // Prepare the memory buffer.
     const auto n_evals = dates.extent(0);
-    auto &tms_vec = m_impl->m_tms_vec;
+    detail::buffer_handle<T> tms_vec_hdl;
+    auto &tms_vec = tms_vec_hdl.buffer;
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::safe_numerics::safe<tms_vec_size_t>(n_evals) * dates.extent(1));
 
