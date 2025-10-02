@@ -368,24 +368,19 @@ cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
     // Construct the impl.
     //
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    m_impl = std::make_unique<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
+    m_impl = std::make_shared<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
                                     compact_mode, parallel_mode, prec, check_prec, parjit);
 }
 
 template <typename T>
-cfunc<T>::cfunc(const cfunc &other)
-    : m_impl(
-          // NOTE: support copy-construction from invalid object.
-          other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr)
-{
-}
+cfunc<T>::cfunc(const cfunc &) noexcept = default;
 
 // NOTE: document that other is left into the def-cted state afterwards.
 template <typename T>
 cfunc<T>::cfunc(cfunc &&) noexcept = default;
 
 template <typename T>
-cfunc<T> &cfunc<T>::operator=(const cfunc &other)
+cfunc<T> &cfunc<T>::operator=(const cfunc &other) noexcept
 {
     if (this != &other) {
         *this = cfunc(other);

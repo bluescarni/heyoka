@@ -272,15 +272,15 @@ void dtens::impl::load(boost::archive::binary_iarchive &ar, unsigned version)
     // LCOV_EXCL_STOP
 }
 
-dtens::dtens(impl x) : p_impl(std::make_unique<impl>(std::move(x))) {}
+dtens::dtens(impl x) : p_impl(std::make_shared<impl>(std::move(x))) {}
 
 dtens::dtens() : dtens(impl{}) {}
 
-dtens::dtens(const dtens &other) : dtens(*other.p_impl) {}
+dtens::dtens(const dtens &) noexcept = default;
 
 dtens::dtens(dtens &&) noexcept = default;
 
-dtens &dtens::operator=(const dtens &other)
+dtens &dtens::operator=(const dtens &other) noexcept
 {
     if (&other != this) {
         *this = dtens(other);
@@ -680,13 +680,25 @@ void dtens::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << p_impl;
 }
 
-void dtens::load(boost::archive::binary_iarchive &ar, unsigned)
+void dtens::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<dtens>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a dtens: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
+    // Store the old impl for exception safety.
+    auto old_impl = std::move(p_impl);
+
     try {
         ar >> p_impl;
         // LCOV_EXCL_START
     } catch (...) {
-        *this = dtens{};
+        // Restore the old impl before re-throwing.
+        p_impl = std::move(old_impl);
+
         throw;
     }
     // LCOV_EXCL_STOP
