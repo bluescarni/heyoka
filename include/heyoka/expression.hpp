@@ -437,7 +437,7 @@ private:
 
     struct impl;
 
-    std::unique_ptr<impl> p_impl;
+    std::shared_ptr<impl> p_impl;
 
     explicit HEYOKA_DLL_LOCAL dtens(impl);
 
@@ -452,9 +452,9 @@ private:
 
 public:
     dtens();
-    dtens(const dtens &);
+    dtens(const dtens &) noexcept;
     dtens(dtens &&) noexcept;
-    dtens &operator=(const dtens &);
+    dtens &operator=(const dtens &) noexcept;
     dtens &operator=(dtens &&) noexcept;
     ~dtens();
 
@@ -490,9 +490,9 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);
 HEYOKA_END_NAMESPACE
 
 // Version changelog:
-// - version 1: switched from dense to sparse
-//   format for the indices vectors.
-BOOST_CLASS_VERSION(heyoka::dtens::impl, 1)
+// - version 1: switched from dense to sparse format for the indices vectors.
+// - version 2: switched from unique to shared ptr to manage the pimpl.
+BOOST_CLASS_VERSION(heyoka::dtens::impl, 2)
 
 // fmt formatter for dtens, implemented
 // on top of the streaming operator.
@@ -733,7 +733,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 {
     struct impl;
 
-    std::unique_ptr<impl> m_impl;
+    std::shared_ptr<impl> m_impl;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -804,9 +804,9 @@ public:
                 detail::ranges_to<std::vector<expression>>(std::forward<R2>(rng2)), kw_args...)
     {
     }
-    cfunc(const cfunc &);
+    cfunc(const cfunc &) noexcept;
     cfunc(cfunc &&) noexcept;
-    cfunc &operator=(const cfunc &);
+    cfunc &operator=(const cfunc &) noexcept;
     cfunc &operator=(cfunc &&) noexcept;
     ~cfunc();
 
@@ -993,7 +993,8 @@ namespace detail
 // Boost s11n class version history for the cfunc class:
 //
 // - 1: implemented parallel compilation for compact mode, introduced external storage for the evaluation tape.
-// - 2: removed the internal tapes, rely on a thread-local cache instead.
+// - 2: removed the internal tapes (a thread-local cache is now used instead), switched from unique to shared ptr to
+//      manage the pimpl.
 inline constexpr int cfunc_s11n_version = 2;
 
 } // namespace detail
