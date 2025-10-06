@@ -257,6 +257,35 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
                 fmt::format("Taylor diff in compact mode is not implemented for the function '{}'", get_name()));
         }
     }
+    [[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>>
+    taylor_c_diff_get_n_iters(std::uint32_t order) const final
+    {
+        if constexpr (requires(const T &x) {
+                          {
+                              x.taylor_c_diff_get_n_iters(order)
+                          } -> std::same_as<std::vector<std::pair<std::uint32_t, std::uint32_t>>>;
+                      }) {
+            return getval<Holder>(this).taylor_c_diff_get_n_iters(order);
+        } else {
+            throw not_implemented_error(
+                fmt::format("taylor_c_diff_get_n_iters() is not implemented for the function '{}'", get_name()));
+        }
+    }
+    [[nodiscard]] llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t,
+                                                                     std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                                     bool high_accuracy) const final
+    {
+        if constexpr (requires(const T &x) {
+                          {
+                              x.taylor_c_diff_get_single_iter_func(s, fp_t, n_uvars, batch_size, high_accuracy)
+                          } -> std::same_as<llvm::Function *>;
+                      }) {
+            return getval<Holder>(this).taylor_c_diff_get_single_iter_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error(fmt::format(
+                "taylor_c_diff_get_single_iter_func() is not implemented for the function '{}'", get_name()));
+        }
+    }
 };
 
 // The function interface.
@@ -295,6 +324,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
         = 0;
 
     virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
+        = 0;
+    [[nodiscard]] virtual std::vector<std::pair<std::uint32_t, std::uint32_t>>
+    taylor_c_diff_get_n_iters(std::uint32_t) const = 0;
+    [[nodiscard]] virtual llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                             std::uint32_t, bool) const
         = 0;
 
     template <typename Base, typename Holder, typename T>
@@ -409,6 +443,9 @@ public:
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+    [[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>> taylor_c_diff_get_n_iters(std::uint32_t) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                     std::uint32_t, bool) const;
 };
 
 namespace detail

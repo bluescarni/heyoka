@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <ranges>
@@ -33,6 +34,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>
@@ -401,6 +403,132 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
                                              std::uint32_t batch_size, bool) const
 {
     return sum_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+std::vector<std::pair<std::uint32_t, std::uint32_t>> sum_impl::taylor_c_diff_get_n_iters(std::uint32_t order) const
+{
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> retval;
+    retval.resize(safe_u32_t(order) + 1u, std::pair<std::uint32_t, std::uint32_t>{0, 1});
+
+    return retval;
+}
+
+llvm::Function *sum_impl::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                             std::uint32_t batch_size, bool) const
+{
+    // NOTE: this is prevented in the implementation of the sum() function.
+    assert(!args().empty());
+
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Build the vector of arguments needed to determine the function name.
+    std::vector<std::variant<variable, number, param>> nm_args;
+    nm_args.reserve(args().size());
+    for (const auto &arg : args()) {
+        nm_args.push_back(std::visit(
+            []<typename T>(const T &v) -> std::variant<variable, number, param> {
+                if constexpr (std::same_as<T, func>) {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
+                } else {
+                    return v;
+                }
+            },
+            arg.value()));
+    }
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "sum", n_uvars, batch_size, nm_args);
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *order = f->args().begin();
+    auto *diff_arr = f->args().begin() + 2;
+    auto *par_ptr = f->args().begin() + 3;
+    auto *terms = f->args().begin() + 5;
+    auto *acc_ptr = f->args().begin() + 5 + args().size();
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Load all values to be summed in local variables and do a pairwise summation.
+    std::vector<llvm::Value *> vals;
+    vals.reserve(args().size());
+    for (decltype(args().size()) i = 0; i < args().size(); ++i) {
+        vals.push_back(std::visit(
+            [&]<typename T>(const T &v) -> llvm::Value * {
+                if constexpr (std::same_as<T, variable>) {
+                    // Variable argument, load it from the tape.
+                    return taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, terms + i);
+                } else if constexpr (is_num_param_v<T>) {
+                    // Number/param argument.
+
+                    // Create storage for the return value.
+                    auto *retval = bld.CreateAlloca(val_t);
+
+                    llvm_if_then_else(
+                        s, bld.CreateICmpEQ(order, bld.getInt32(0)),
+                        [&]() {
+                            // If the order is zero, run the codegen.
+                            bld.CreateStore(taylor_c_diff_numparam_codegen(s, fp_t, v, terms + i, par_ptr, batch_size),
+                                            retval);
+                        },
+                        [&]() {
+                            // Otherwise, return zero.
+                            bld.CreateStore(llvm_codegen(s, val_t, number{0.}), retval);
+                        });
+
+                    return bld.CreateLoad(val_t, retval);
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
+                                                "Taylor derivative of a sum in compact mode");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            args()[i].value()));
+    }
+
+    // Compute the pairwise sum and store it into the accumulator.
+    auto *ret = pairwise_sum(s, vals);
+    bld.CreateStore(ret, acc_ptr);
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
 }
 
 // Helper to split the input sum 'e' into nested sums, each

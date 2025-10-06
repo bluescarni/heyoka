@@ -40,6 +40,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -475,6 +476,98 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
     if (retval == nullptr) {
         throw std::invalid_argument(
             fmt::format("Null return value detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    return retval;
+}
+
+std::vector<std::pair<std::uint32_t, std::uint32_t>> func::taylor_c_diff_get_n_iters(std::uint32_t order) const
+{
+    // Require order >= 2.
+    if (order < 2u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "The order passed to taylor_c_diff_get_n_iters() must be at least 2, but a value of {} was passed instead",
+            order));
+    }
+
+    // Compute the return value.
+    auto retval = m_func->taylor_c_diff_get_n_iters(order);
+
+    // The size of retval must be order + 1.
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto expected_size = static_cast<std::uint32_t>(safe_u32_t(order) + 1u);
+    if (retval.size() != expected_size) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid value returned by taylor_c_diff_get_n_iters() for the "
+                                                "function '{}': the expected size is {} but the actual size is {}",
+                                                get_name(), expected_size, retval.size()));
+    }
+
+    // We must be able to represent as std::uint32_t the total number of iterations for every order.
+    for (const auto &[n_uiter, n_oiter] : retval) {
+        try {
+            static_cast<void>(static_cast<std::uint32_t>(safe_u32_t(n_uiter) + n_oiter));
+        } catch (...) {
+            throw std::overflow_error(fmt::format(
+                "Overflow detected in the return value of taylor_c_diff_get_n_iters() for the function '{}'",
+                get_name()));
+        }
+    }
+
+    // The first element in retval must be (0, 1).
+    //
+    // NOTE: this has to always be the case for "normal" functions, in the sense that the first and only iteration at
+    // differentiation order 0 corresponds to the evaluation of the function, which normally requires the function
+    // arguments to be evaluated first (and thus this has to be an ordered iteration).
+    //
+    // The exception is nullary functions such as heyoka::time and constants with adaptive precision (e.g., pi). For
+    // these, in theory we could have only unordered iterations for all differentiation orders.
+    //
+    // However, in the Taylor integrator at order 0 we are using exclusively ordered evaluations to initialise the u
+    // variables, while skipping unordered iterations altogether. Thus we enforce the single ordered iteration to be
+    // present at order 0.
+    if (retval[0] != std::pair<std::uint32_t, std::uint32_t>{0, 1}) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The first element of the return value of taylor_c_diff_get_n_iters() "
+                                                "for the function '{}' must be (0, 1), but it is ({}, {}) instead",
+                                                get_name(), retval[0].first, retval[0].second));
+    }
+
+    return retval;
+}
+
+// NOTE: the LLVM function returned by this function needs to take into account that:
+//
+// - at differentiation order zero, it must never read from the accumulator, only write into it. This is because we
+//   assume that the order-0 iteration is used only to initialise the u variables, thus we can avoid initing the order-0
+//   section of the tape with zeroes that would be immediately overwritten anyway;
+// - at differentiation orders > 0, it can assume that, at the first iteration, the accumulator has been
+//   zero-initialised.
+llvm::Function *func::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                         std::uint32_t batch_size, bool high_accuracy) const
+{
+    if (fp_t == nullptr) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Null floating-point type detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
+    }
+
+    if (batch_size == 0u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Zero batch size detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+                        get_name()));
+    }
+
+    if (n_uvars == 0u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Zero number of u variables detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
+    }
+
+    auto *retval = m_func->taylor_c_diff_get_single_iter_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+
+    if (retval == nullptr) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Null return value detected in func::taylor_c_diff_get_single_iter_func() for the function '{}'",
+            get_name()));
     }
 
     return retval;
