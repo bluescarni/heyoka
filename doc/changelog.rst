@@ -1,7 +1,7 @@
 Changelog
 =========
 
-7.8.0 (unreleased)
+7.8.0 (2025-10-06)
 ------------------
 
 New
@@ -20,6 +20,9 @@ New
 Changes
 ~~~~~~~
 
+- The ``cfunc`` and ``dtens`` classes are now implemented on top of a ``std::shared_ptr``.
+  As a consequence, copy construction/assignment are now ``noexcept`` constant-time operations
+  (`#515 <https://github.com/bluescarni/heyoka/pull/515>`__).
 - The ``replace_sat_data()`` function of the ``sgp4_propagator`` class now provides strong exception safety
   guarantees
   (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
