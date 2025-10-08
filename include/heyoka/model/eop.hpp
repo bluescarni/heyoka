@@ -34,6 +34,15 @@
 // implement, for each EOP quantity, two unary functions which return respectively the EOP quantity and its first-order
 // derivative at the given input time.
 //
+// NOTE: for the computation of angles such as the ERA and gmst82 (which do not show up directly in the EOP data, but
+// rather are derived from it), we use a different approach wrt astropy/ERFA. Specifically, we precompute values at the
+// dates in the eop dataset and then we interpolate directly between these precomputed values. Both the precomputation
+// and the interpolation are performed in extended precision, and the result is cast back to the original precision only
+// at the very end. By contrast, the canonical approach in astropy/ERFA is to first interpolate the ut1-utc difference,
+// and then use the result of the interpolation to compute the desired value. This difference in approach is most likely
+// at the root of the slight discrepancies we see wrt astropy/ERFA, which amount to < 1 part over 1 billion (circa
+// millimetre level in LEO).
+//
 // NOTE: the linear interpolation approach should be adequate for astrodynamical applications. In principle, however,
 // for both the polar motion and the UT1-UTC difference, there are short-term (diurnal and semi-diurnal) variations
 // due to ocean tides and high-frequency nutation terms that should be accounted for. For this purpose, IERS provides
