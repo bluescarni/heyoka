@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.8.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.8.1 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -511,12 +511,8 @@ target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
-set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 11)
-find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION} OR
-   ${fmt_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION})
-   message(FATAL_ERROR "The supported fmt versions are in the range [${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}, ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION}], but version ${fmt_VERSION_MAJOR} was found instead.")
-endif()
+set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 12)
+find_package(fmt ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}...${_HEYOKA_MAX_SUPPORTED_FMT_VERSION} REQUIRED CONFIG)
 message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
