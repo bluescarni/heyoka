@@ -31,11 +31,7 @@ if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 
-find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} VERSION_LESS @_HEYOKA_MIN_SUPPORTED_FMT_VERSION@ OR
-   ${fmt_VERSION_MAJOR} VERSION_GREATER @_HEYOKA_MAX_SUPPORTED_FMT_VERSION@)
-   message(FATAL_ERROR "The supported fmt versions are in the range [@_HEYOKA_MIN_SUPPORTED_FMT_VERSION@, @_HEYOKA_MAX_SUPPORTED_FMT_VERSION@], but version ${fmt_VERSION_MAJOR} was found instead.")
-endif()
+find_package(fmt @_HEYOKA_MIN_SUPPORTED_FMT_VERSION@...@_HEYOKA_MAX_SUPPORTED_FMT_VERSION@ REQUIRED CONFIG)
 
 # Optional public dependency on mp++.
 if(${heyoka_WITH_MPPP})
