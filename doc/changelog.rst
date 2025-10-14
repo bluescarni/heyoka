@@ -1,6 +1,15 @@
 Changelog
 =========
 
+7.8.1 (unreleased)
+------------------
+
+New
+~~~
+
+- Enable support for the newly-released fmt 12
+  (`#517 <https://github.com/bluescarni/heyoka/pull/517>`__).
+
 7.8.0 (2025-10-06)
 ------------------
 
