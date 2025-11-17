@@ -213,6 +213,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_helpers.cpp"

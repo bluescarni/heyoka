@@ -488,6 +488,101 @@ TEST_CASE("parse_eop_data_iers_long_term test")
     }
 }
 
+TEST_CASE("parse_eop_data_celestrak test")
+{
+    using Catch::Matchers::Message;
+
+    // Successful parses.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O";
+
+        const auto data = detail::parse_eop_data_celestrak(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 58849);
+        REQUIRE(data[0].delta_ut1_utc == -0.1771665);
+        REQUIRE(data[0].pm_x == 0.076614);
+        REQUIRE(data[0].pm_y == 0.282309);
+        REQUIRE(data[0].dX == 0.000358 * 1000);
+        REQUIRE(data[0].dY == -0.000007 * 1000);
+
+        REQUIRE(data[1].mjd == 58850);
+        REQUIRE(data[1].delta_ut1_utc == -0.1776348);
+        REQUIRE(data[1].pm_x == 0.074686);
+        REQUIRE(data[1].pm_y == 0.282694);
+        REQUIRE(data[1].dX == 0.000397 * 1000);
+        REQUIRE(data[1].dY == 0.000024 * 1000);
+    }
+
+    // With newline at the end.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O\n";
+
+        const auto data = detail::parse_eop_data_celestrak(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 58849);
+        REQUIRE(data[0].delta_ut1_utc == -0.1771665);
+        REQUIRE(data[0].pm_x == 0.076614);
+        REQUIRE(data[0].pm_y == 0.282309);
+        REQUIRE(data[0].dX == 0.000358 * 1000);
+        REQUIRE(data[0].dY == -0.000007 * 1000);
+
+        REQUIRE(data[1].mjd == 58850);
+        REQUIRE(data[1].delta_ut1_utc == -0.1776348);
+        REQUIRE(data[1].pm_x == 0.074686);
+        REQUIRE(data[1].pm_y == 0.282694);
+        REQUIRE(data[1].dX == 0.000397 * 1000);
+        REQUIRE(data[1].dY == 0.000024 * 1000);
+    }
+
+    // Invalid mjd.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849a,0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O\n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: the string '58849a' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid ut1-utc value.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,b0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: the string 'b0.076614' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid number of fields.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: at least 10 fields "
+                                       "were expected in a data row, but 8 were found instead"));
+    }
+}
+
 TEST_CASE("s11n")
 {
     eop_data idata;
@@ -796,6 +891,40 @@ TEST_CASE("download finals2000A.daily")
             REQUIRE(data.get_identifier() == "iers_rapid_iers_finals_all_iau2000_txt");
         } catch (const std::exception &ex) {
             std::cout << "Exception caught in the iers download test: " << ex.what() << std::endl;
+        }
+    });
+
+    t1.join();
+    t2.join();
+}
+
+// Test to check the celestrak download code.
+TEST_CASE("download celestrak")
+{
+    // NOTE: need to protect REQUIRE() invocations as Catch is not thread-safe.
+    std::mutex mut;
+
+    std::thread t1([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_celestrak();
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "celestrak_last_5_years");
+        } catch (const std::exception &ex) {
+            // NOTE: ignore exceptions here, which are most likely caused by network issues.
+            std::cout << "Exception caught in the celestrak download test: " << ex.what() << std::endl;
+        }
+    });
+    std::thread t2([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_celestrak(true);
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "celestrak_long_term");
+        } catch (const std::exception &ex) {
+            std::cout << "Exception caught in the celestrak download test: " << ex.what() << std::endl;
         }
     });
 
