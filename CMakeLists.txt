@@ -132,6 +132,13 @@ if(YACMA_COMPILER_IS_MSVC)
   endif()
 endif()
 
+# Check the presence of the thread-safe variant of strerror() called strerror_r().
+#
+# This function is available both in the POSIX standard and as a GNU extension. Here we check only
+# the presence of the symbol, we will detect and choose the correct variant from within the code.
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
+
 # Mandatory dependency on LLVM.
 #
 # NOTE: do it early so that we can set up
@@ -372,6 +379,11 @@ else()
     set_property(TARGET heyoka PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+endif()
+
+if(_HEYOKA_HAVE_STRERROR_R)
+    # strerror_r() is available, signal its presence when compiling the library.
+    target_compile_definitions(heyoka PRIVATE HEYOKA_HAVE_STRERROR_R)
 endif()
 
 # Setup common to both the shared and static variants.
@@ -630,6 +642,7 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
+unset(_HEYOKA_HAVE_STRERROR_R)
 if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
 endif()

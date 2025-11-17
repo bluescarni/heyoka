@@ -12,7 +12,10 @@
 #include <cassert>
 #include <cerrno>
 #include <cmath>
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -106,6 +109,48 @@ namespace detail
 
 namespace
 {
+
+// LCOV_EXCL_START
+
+#if defined(HEYOKA_HAVE_STRERROR_R)
+
+// NOTE: the strerror_r() function is the thread-safe counterpart to strerror(), and it can come in 2 flavours with
+// different signatures: POSIX and GNU. We want to be able to use either. See:
+//
+// https://www.man7.org/linux/man-pages/man3/strerror.3.html
+
+// NOTE: we introduce a small wrapper for the invocation of strerror_r(). The reason is that we will need to examine the
+// signature of strerror_r() in order to determine how to call it (see below), but it is underspecified whether or not
+// strerror_r() is marked noexcept, which complicates the logic. Thus, we introduce this wrapper which is explicitly
+// noexcept.
+decltype(auto) strerror_r_wrap(int errnum, char *buf, std::size_t buflen) noexcept
+{
+    return ::strerror_r(errnum, buf, buflen);
+}
+
+// This is the strerror_r() wrapper we will be using in the code below. It will return a pointer to the storage
+// containing the null-terminated error message on success, nullptr on failure. The returned pointer could be buf or a
+// pointer to static storage, depending on the strerror_r() variant being called.
+template <typename T = decltype(&strerror_r_wrap)>
+const char *errno_to_str(int errnum, char *buf, std::size_t buflen, T f = &strerror_r_wrap) noexcept
+{
+    if constexpr (std::same_as<T, int (*)(int, char *, std::size_t) noexcept>) {
+        // POSIX version. This one can fail, if it succeeds the error will be written into buf.
+        if (f(errnum, buf, buflen) == 0) [[likely]] {
+            return buf;
+        } else {
+            return nullptr;
+        }
+    } else {
+        // GNU version. This one never fails, but it could write into and return something other than buf.
+        static_assert(std::same_as<T, char *(*)(int, char *, std::size_t) noexcept>);
+        return f(errnum, buf, buflen);
+    }
+}
+
+#endif
+
+// LCOV_EXCL_STOP
 
 // Given an input polynomial a(x), substitute
 // x with x_1 * scal and write to ret the resulting
@@ -1424,9 +1469,39 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                         detail::get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
-                        detail::get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                                   "errno with error code {}",
-                                                   cflag);
+                        // Helper to log with a default error message.
+                        const auto log_default = [cflag]() {
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection returned a nonzero "
+                                "errno with error code {}",
+                                cflag);
+                        };
+
+#if defined(HEYOKA_HAVE_STRERROR_R)
+                        // We have strerror_r() available, try to use it to produce a better error message.
+
+                        // Buffer for the error message.
+                        char err_msg_buf[256u];
+
+                        // Attempt to produce the error message.
+                        const auto *const err_msg
+                            = detail::errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
+
+                        if (err_msg == nullptr) [[unlikely]] {
+                            // Something went wrong while constructing the error message, log with the default error
+                            // message.
+                            log_default();
+                        } else {
+                            // Log with the descriptive error message.
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection returned a nonzero "
+                                "errno with message '{}'",
+                                err_msg);
+                        }
+#else
+                        // No strerror_r() available, log with the default error message.
+                        log_default();
+#endif
                     }
                     // LCOV_EXCL_STOP
                 }
