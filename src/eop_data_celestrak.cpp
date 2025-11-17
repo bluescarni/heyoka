@@ -56,16 +56,9 @@ double parse_eop_data_celestrak_double(const std::ranges::contiguous_range auto 
 // https://celestrak.org/SpaceData/EOP-format.php
 eop_data_table parse_eop_data_celestrak(const std::string &str)
 {
-    // Parse line by line, splitting on newlines.
+    // Parse line by line, splitting on newlines and skipping the first line (which contains the header).
     eop_data_table retval;
-    bool past_first_line = false;
-    for (const auto cur_line : str | std::views::split('\n')) {
-        // NOTE: skip the first line which contains the CSV header.
-        if (!past_first_line) {
-            past_first_line = true;
-            continue;
-        }
-
+    for (const auto cur_line : str | std::views::split('\n') | std::views::drop(1)) {
         // NOTE: celestrak data files may have a newline at the end. When we encounter it, just break out.
         if (std::ranges::empty(cur_line)) {
             break;
