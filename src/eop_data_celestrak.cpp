@@ -6,7 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <algorithm>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -31,8 +30,8 @@ namespace detail
 namespace
 {
 
-// Helper to parse a double-precision value from a field in a row of a IERS EOP long term data file.
-double parse_eop_data_iers_long_term_double(const std::ranges::contiguous_range auto &cur_field)
+// Helper to parse a double-precision value from a field in a row of a celestrak EOP data file.
+double parse_eop_data_celestrak_double(const std::ranges::contiguous_range auto &cur_field)
 {
     // Fetch the range of data.
     const auto *const begin = std::ranges::data(cur_field);
@@ -42,7 +41,7 @@ double parse_eop_data_iers_long_term_double(const std::ranges::contiguous_range 
     double retval{};
     const auto parse_res = boost::charconv::from_chars(begin, end, retval);
     if (parse_res.ec != std::errc{} || parse_res.ptr != end) [[unlikely]] {
-        throw std::invalid_argument(fmt::format("Error parsing a IERS long term EOP data file: the string '{}' could "
+        throw std::invalid_argument(fmt::format("Error parsing a CelesTrak EOP data file: the string '{}' could "
                                                 "not be parsed as a valid double-precision value",
                                                 std::string_view(begin, end)));
     }
@@ -54,13 +53,13 @@ double parse_eop_data_iers_long_term_double(const std::ranges::contiguous_range 
 
 // NOTE: the expected format for the data in str is described here:
 //
-// https://datacenter.iers.org/versionMetadata.php?filename=latestVersionMeta/234_EOP_C04_20.62-NOW234.txt
-eop_data_table parse_eop_data_iers_long_term(const std::string &str)
+// https://celestrak.org/SpaceData/EOP-format.php
+eop_data_table parse_eop_data_celestrak(const std::string &str)
 {
     // Parse line by line, splitting on newlines and skipping the first line (which contains the header).
     eop_data_table retval;
     for (const auto cur_line : str | std::views::split('\n') | std::views::drop(1)) {
-        // NOTE: IERS long term EOP data files may have a newline at the end. When we encounter it, just break out.
+        // NOTE: celestrak data files may have a newline at the end. When we encounter it, just break out.
         if (std::ranges::empty(cur_line)) {
             break;
         }
@@ -69,10 +68,10 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         double mjd{}, delta_ut1_utc{}, pm_x{}, pm_y{}, dX{}, dY{};
 
         // This is the index of the last field we will be reading from.
-        constexpr auto last_field_idx = 25u;
+        constexpr auto last_field_idx = 9u;
 
-        // Within an individual line, we split on the CSV separator ';'.
-        auto field_range = cur_line | std::views::split(';');
+        // Within an individual line, we split on the CSV separator ','.
+        auto field_range = cur_line | std::views::split(',');
         // NOTE: keep track of the field index.
         boost::safe_numerics::safe<unsigned> field_idx = 0;
         for (auto field_it = std::ranges::begin(field_range);
@@ -81,29 +80,31 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
              // last_field_idx + 1 when exiting the loop.
              field_idx <= last_field_idx && field_it != std::ranges::end(field_range); ++field_it, ++field_idx) {
             switch (static_cast<unsigned>(field_idx)) {
-                case 0u:
+                case 1u:
                     // Parse the mjd.
-                    mjd = parse_eop_data_iers_long_term_double(*field_it);
+                    mjd = parse_eop_data_celestrak_double(*field_it);
                     break;
-                case 5u:
+                case 2u:
                     // Parse pm_x.
-                    pm_x = parse_eop_data_iers_long_term_double(*field_it);
+                    pm_x = parse_eop_data_celestrak_double(*field_it);
                     break;
-                case 7u:
+                case 3u:
                     // Parse pm_y.
-                    pm_y = parse_eop_data_iers_long_term_double(*field_it);
+                    pm_y = parse_eop_data_celestrak_double(*field_it);
                     break;
-                case 14u:
+                case 4u:
                     // Parse the UT1-UTC value.
-                    delta_ut1_utc = parse_eop_data_iers_long_term_double(*field_it);
+                    delta_ut1_utc = parse_eop_data_celestrak_double(*field_it);
                     break;
-                case 23u:
+                case 8u:
                     // Parse the dX value.
-                    dX = parse_eop_data_iers_long_term_double(*field_it);
+                    //
+                    // NOTE: celestrak provides dX/dY in arcsecs but we want them in milliarcsecs.
+                    dX = parse_eop_data_celestrak_double(*field_it) * 1000.;
                     break;
-                case 25u:
+                case 9u:
                     // Parse the dY value.
-                    dY = parse_eop_data_iers_long_term_double(*field_it);
+                    dY = parse_eop_data_celestrak_double(*field_it) * 1000.;
                     break;
                 default:;
             }
@@ -112,7 +113,7 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         // Check if we parsed everything we needed to.
         if (field_idx != last_field_idx + 1u) [[unlikely]] {
             // LCOV_EXCL_START
-            throw std::invalid_argument(fmt::format("Error parsing a IERS long term EOP data file: at least {} fields "
+            throw std::invalid_argument(fmt::format("Error parsing a CelesTrak EOP data file: at least {} fields "
                                                     // LCOV_EXCL_STOP
                                                     "were expected in a data row, but {} were found instead",
                                                     last_field_idx + 1u, static_cast<unsigned>(field_idx)));
@@ -130,23 +131,17 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
 
 } // namespace detail
 
-eop_data eop_data::fetch_latest_iers_long_term()
+eop_data eop_data::fetch_latest_celestrak(bool long_term)
 {
     // Download the file.
-    constexpr auto filename = "eopc04_20.1962-now.csv";
-    auto [text, timestamp] = detail::https_download("datacenter.iers.org", 443, fmt::format("/data/csv/{}", filename));
+    const auto *filename = long_term ? "EOP-All.csv" : "EOP-Last5Years.csv";
+    auto [text, timestamp] = detail::http_download("celestrak.org", 80, fmt::format("/SpaceData/{}", filename));
 
     // Build the identifier string.
-    auto identifier = fmt::format("iers_long_term_{}", filename);
-    // NOTE: we transform '.' into '_' so that we can use the identifier
-    // to construct the mangled name of compact-mode primitives (which
-    // use '.' as a separator).
-    std::ranges::replace(identifier, '.', '_');
-    // Replace also '-' with '_'.
-    std::ranges::replace(identifier, '-', '_');
+    const auto *identifier = long_term ? "celestrak_long_term" : "celestrak_last_5_years";
 
     // Parse, validate and return.
-    return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier));
+    return eop_data(detail::parse_eop_data_celestrak(text), std::move(timestamp), identifier);
 }
 
 HEYOKA_END_NAMESPACE
