@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <concepts>
 #include <initializer_list>
 #include <type_traits>
 #include <vector>
