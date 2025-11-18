@@ -55,7 +55,6 @@ using step_cb_impl_base = callable_iface<false, bool, TA &>::template impl<Base,
 // Definition of the step_cb interface.
 //
 // It inherits from the mutable variant of callable_iface.
-//
 template <typename TA>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<false, bool, TA &> {
