@@ -103,163 +103,8 @@ concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
     { std::move(x).taylor_decompose(dc) } -> std::same_as<taylor_dc_t::size_type>;
 };
 
-// Function interface implementation.
-template <typename Base, typename Holder, typename T>
-    requires is_udf<T>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
-    [[nodiscard]] const std::string &get_name() const noexcept final
-    {
-        // NOTE: make sure we are invoking the member function from func_base,
-        // as in principle there could be a get_name() function in the derived
-        // function class that hides it.
-        return static_cast<const func_base &>(getval<Holder>(this)).get_name();
-    }
-    [[nodiscard]] const func_args &get_func_args() const noexcept final
-    {
-        // NOTE: make sure we are invoking the member function from func_base,
-        // as in principle there could be a get_func_args() function in the derived
-        // function class that hides it.
-        return static_cast<const func_base &>(getval<Holder>(this)).get_func_args();
-    }
-
-    void to_stream(std::ostringstream &oss) const final
-    {
-        if constexpr (requires(const T &x) { static_cast<void>(x.to_stream(oss)); }) {
-            static_cast<void>(getval<Holder>(this).to_stream(oss));
-        } else {
-            func_default_to_stream(oss, static_cast<const func_base &>(getval<Holder>(this)));
-        }
-    }
-
-    [[nodiscard]] bool is_time_dependent() const final
-    {
-        if constexpr (requires(const T &x) { static_cast<bool>(x.is_time_dependent()); }) {
-            return static_cast<bool>(getval<Holder>(this).is_time_dependent());
-        } else {
-            return false;
-        }
-    }
-
-    [[nodiscard]] const std::vector<expression> &args() const noexcept final
-    {
-        // NOTE: make sure we are invoking the member function from func_base,
-        // as in principle there could be an args() function in the derived
-        // function class that hides it.
-        return static_cast<const func_base &>(getval<Holder>(this)).args();
-    }
-    [[nodiscard]] func_args::shared_args_t shared_args() const noexcept final
-    {
-        // NOTE: make sure we are invoking the member function from func_base,
-        // as in principle there could be a shared_args() function in the derived
-        // function class that hides it.
-        return static_cast<const func_base &>(getval<Holder>(this)).shared_args();
-    }
-    // NOTE: the implementation of the first overload must go in expression.hpp
-    // as the definition of the expression class must be available.
-    void replace_args(std::vector<expression>) final;
-    void replace_args(func_args::shared_args_t new_args) final
-    {
-        static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
-    }
-
-    // gradient.
-    [[nodiscard]] bool has_gradient() const final
-    {
-        return func_has_gradient<T>;
-    }
-    [[nodiscard]] std::vector<expression> gradient() const final
-    {
-        if constexpr (func_has_gradient<T>) {
-            return getval<Holder>(this).gradient();
-        }
-
-        // LCOV_EXCL_START
-        assert(false);
-        throw;
-        // LCOV_EXCL_STOP
-    }
-
-    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
-                                         std::uint32_t batch_size, bool high_accuracy) const final
-    {
-        if constexpr (requires(const T &x) {
-                          {
-                              x.llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy)
-                          } -> std::same_as<llvm::Value *>;
-                      }) {
-            return getval<Holder>(this).llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size,
-                                                  high_accuracy);
-        } else {
-            throw not_implemented_error(
-                fmt::format("llvm_eval() is not implemented for the function '{}'", get_name()));
-        }
-    }
-
-    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                                   bool high_accuracy) const final
-    {
-        if constexpr (requires(const T &x) {
-                          { x.llvm_c_eval_func(s, fp_t, batch_size, high_accuracy) } -> std::same_as<llvm::Function *>;
-                      }) {
-            return getval<Holder>(this).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error(
-                fmt::format("llvm_c_eval_func() is not implemented for the function '{}'", get_name()));
-        }
-    }
-
-    // Taylor.
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
-    {
-        if constexpr (func_has_taylor_decompose<T>) {
-            return std::move(getval<Holder>(this)).taylor_decompose(dc);
-        }
-
-        // LCOV_EXCL_START
-        assert(false);
-        throw;
-        // LCOV_EXCL_STOP
-    }
-    [[nodiscard]] bool has_taylor_decompose() const final
-    {
-        return func_has_taylor_decompose<T>;
-    }
-    llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy) const final
-    {
-        if constexpr (requires(const T &x) {
-                          {
-                              x.taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                            high_accuracy)
-                          } -> std::same_as<llvm::Value *>;
-                      }) {
-            return getval<Holder>(this).taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx,
-                                                    batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error(
-                fmt::format("Taylor diff is not implemented for the function '{}'", get_name()));
-        }
-    }
-    llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                       bool high_accuracy) const final
-    {
-        if constexpr (requires(const T &x) {
-                          {
-                              x.taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy)
-                          } -> std::same_as<llvm::Function *>;
-                      }) {
-            return getval<Holder>(this).taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error(
-                fmt::format("Taylor diff in compact mode is not implemented for the function '{}'", get_name()));
-        }
-    }
-};
-
 // The function interface.
+//
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::string &get_name() const noexcept = 0;
@@ -283,8 +128,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
 
-    // NOTE: this is the last remaining trace of mutability
-    // related to decomposition. Note, however, that this is never
+    // NOTE: this is the last remaining trace of mutability related to decomposition. Note, however, that this is never
     // exposed in the public API.
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     [[nodiscard]] virtual bool has_taylor_decompose() const = 0;
@@ -297,8 +141,160 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
         = 0;
 
+    // The implementation.
     template <typename Base, typename Holder, typename T>
-    using impl = func_iface_impl<Base, Holder, T>;
+        requires is_udf<T>
+    struct impl : public Base {
+        [[nodiscard]] const std::string &get_name() const noexcept final
+        {
+            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be a
+            // get_name() function in the derived function class that hides it.
+            return static_cast<const func_base &>(getval<Holder>(this)).get_name();
+        }
+        [[nodiscard]] const func_args &get_func_args() const noexcept final
+        {
+            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be a
+            // get_func_args() function in the derived function class that hides it.
+            return static_cast<const func_base &>(getval<Holder>(this)).get_func_args();
+        }
+
+        void to_stream(std::ostringstream &oss) const final
+        {
+            if constexpr (requires(const T &x) { static_cast<void>(x.to_stream(oss)); }) {
+                static_cast<void>(getval<Holder>(this).to_stream(oss));
+            } else {
+                func_default_to_stream(oss, static_cast<const func_base &>(getval<Holder>(this)));
+            }
+        }
+
+        [[nodiscard]] bool is_time_dependent() const final
+        {
+            if constexpr (requires(const T &x) { static_cast<bool>(x.is_time_dependent()); }) {
+                return static_cast<bool>(getval<Holder>(this).is_time_dependent());
+            } else {
+                return false;
+            }
+        }
+
+        [[nodiscard]] const std::vector<expression> &args() const noexcept final
+        {
+            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be an
+            // args() function in the derived function class that hides it.
+            return static_cast<const func_base &>(getval<Holder>(this)).args();
+        }
+        [[nodiscard]] func_args::shared_args_t shared_args() const noexcept final
+        {
+            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be a
+            // shared_args() function in the derived function class that hides it.
+            return static_cast<const func_base &>(getval<Holder>(this)).shared_args();
+        }
+        // NOTE: the implementation of the first overload must go in expression.hpp as the definition of the expression
+        // class must be available.
+        void replace_args(std::vector<expression>) final;
+        void replace_args(func_args::shared_args_t new_args) final
+        {
+            static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
+        }
+
+        // gradient.
+        [[nodiscard]] bool has_gradient() const final
+        {
+            return func_has_gradient<T>;
+        }
+        [[nodiscard]] std::vector<expression> gradient() const final
+        {
+            if constexpr (func_has_gradient<T>) {
+                return getval<Holder>(this).gradient();
+            }
+
+            // LCOV_EXCL_START
+            assert(false);
+            throw;
+            // LCOV_EXCL_STOP
+        }
+
+        [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t,
+                                             const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                             llvm::Value *time_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                             bool high_accuracy) const final
+        {
+            if constexpr (requires(const T &x) {
+                              {
+                                  x.llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy)
+                              } -> std::same_as<llvm::Value *>;
+                          }) {
+                return getval<Holder>(this).llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size,
+                                                      high_accuracy);
+            } else {
+                throw not_implemented_error(
+                    fmt::format("llvm_eval() is not implemented for the function '{}'", get_name()));
+            }
+        }
+
+        [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                                       bool high_accuracy) const final
+        {
+            if constexpr (requires(const T &x) {
+                              {
+                                  x.llvm_c_eval_func(s, fp_t, batch_size, high_accuracy)
+                              } -> std::same_as<llvm::Function *>;
+                          }) {
+                return getval<Holder>(this).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
+            } else {
+                throw not_implemented_error(
+                    fmt::format("llvm_c_eval_func() is not implemented for the function '{}'", get_name()));
+            }
+        }
+
+        // Taylor.
+        taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
+        {
+            if constexpr (func_has_taylor_decompose<T>) {
+                return std::move(getval<Holder>(this)).taylor_decompose(dc);
+            }
+
+            // LCOV_EXCL_START
+            assert(false);
+            throw;
+            // LCOV_EXCL_STOP
+        }
+        [[nodiscard]] bool has_taylor_decompose() const final
+        {
+            return func_has_taylor_decompose<T>;
+        }
+        llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                 const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                 std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                 std::uint32_t batch_size, bool high_accuracy) const final
+        {
+            if constexpr (requires(const T &x) {
+                              {
+                                  x.taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                                high_accuracy)
+                              } -> std::same_as<llvm::Value *>;
+                          }) {
+                return getval<Holder>(this).taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx,
+                                                        batch_size, high_accuracy);
+            } else {
+                throw not_implemented_error(
+                    fmt::format("Taylor diff is not implemented for the function '{}'", get_name()));
+            }
+        }
+        llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                           std::uint32_t batch_size, bool high_accuracy) const final
+        {
+            if constexpr (requires(const T &x) {
+                              {
+                                  x.taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy)
+                              } -> std::same_as<llvm::Function *>;
+                          }) {
+                return getval<Holder>(this).taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+            } else {
+                throw not_implemented_error(
+                    fmt::format("Taylor diff in compact mode is not implemented for the function '{}'", get_name()));
+            }
+        }
+    };
 };
 
 // The udf used in the default construction of a func.

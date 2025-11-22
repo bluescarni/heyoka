@@ -148,11 +148,11 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: some member functions of func_iface_impl need to go here because
+// NOTE: some member functions of func_iface::impl need to go here because
 // the definition of expression must be available.
 template <typename Base, typename Holder, typename T>
     requires is_udf<T>
-inline void func_iface_impl<Base, Holder, T>::replace_args(std::vector<expression> new_args)
+inline void func_iface::impl<Base, Holder, T>::replace_args(std::vector<expression> new_args)
 {
     static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
 }
