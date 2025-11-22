@@ -1054,13 +1054,13 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<float> &, int)
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<double> &, int)
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<long double> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<float> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<double> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<long double> &, int)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<mppp::real128> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<mppp::real128> &, int)
 
 #endif
 

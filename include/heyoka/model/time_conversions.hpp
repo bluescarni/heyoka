@@ -51,6 +51,6 @@ HEYOKA_DLL_PUBLIC extern const expression delta_tt_tai;
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::model::detail::delta_tt_tai_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::model::detail::delta_tt_tai_func, true, std::string, unsigned)
 
 #endif

@@ -222,8 +222,8 @@ struct foo_s11n {
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, int, int)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::detail::empty_callable, int, int)
+HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, false, int, int)
+HEYOKA_S11N_CALLABLE_EXPORT(heyoka::detail::empty_callable, false, int, int)
 
 TEST_CASE("callable s11n")
 {

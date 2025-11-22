@@ -340,10 +340,10 @@ const expression pi(func(constant("pi", detail::pi_constant_func{}, "π")));
 HEYOKA_END_NAMESPACE
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, true, std::string, unsigned)
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, true, std::string, unsigned)
 
 // NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::constant)

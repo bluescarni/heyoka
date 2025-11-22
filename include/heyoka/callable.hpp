@@ -266,13 +266,13 @@ HEYOKA_END_NAMESPACE
 // name too long" issue.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, ...)                                                                      \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::callable<" #__VA_ARGS__ ">@" #udc,                                      \
-                                 heyoka::detail::callable_iface<false, __VA_ARGS__>)
+                                 heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY2(udc, gid, ...)                                                                \
-    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::callable_iface<false, __VA_ARGS__>)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(udc, ...)                                                                \
-    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::callable_iface<false, __VA_ARGS__>)
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT(udc, ...)                                                                          \
     HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, __VA_ARGS__)                                                                  \
