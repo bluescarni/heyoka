@@ -118,6 +118,11 @@ HEYOKA_DLL_PUBLIC extern const expression pi;
 
 HEYOKA_END_NAMESPACE
 
+// Boost s11n class version history for the constant class:
+//
+// - 1: m_str_func is now a const callable.
+BOOST_CLASS_VERSION(heyoka::constant, 1);
+
 HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, true, std::string, unsigned)
 
 HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::pi_constant_func, true, std::string, unsigned)

@@ -150,8 +150,15 @@ void constant::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_repr;
 }
 
-void constant::load(boost::archive::binary_iarchive &ar, unsigned)
+void constant::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<constant>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a constant object: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ar >> boost::serialization::base_object<func_base>(*this);
     ar >> m_str_func;
     ar >> m_repr;
