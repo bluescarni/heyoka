@@ -105,10 +105,15 @@ TEST_CASE("callable basics")
     REQUIRE(!c8);
 
     // Check that a mutable function object cannot be used to construct a const callable.
-    // NOLINTNEXTLINE
-    auto mut_lambda = [n = 123]() mutable { ++n; };
-    REQUIRE(!std::constructible_from<callable<void() const>, decltype(mut_lambda)>);
-    REQUIRE(std::constructible_from<callable<void()>, decltype(mut_lambda)>);
+    struct mut_lambda {
+        int n = 123;
+        void operator()()
+        {
+            ++n;
+        }
+    };
+    REQUIRE(!std::constructible_from<callable<void() const>, mut_lambda>);
+    REQUIRE(std::constructible_from<callable<void()>, mut_lambda>);
 }
 
 struct foo_mem_ptr {
