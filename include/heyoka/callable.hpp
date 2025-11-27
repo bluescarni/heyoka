@@ -67,7 +67,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS base_callable_iface {
     struct impl : public Base {
         explicit operator bool() const noexcept final
         {
-            using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
+            // NOTE: make sure to fully unwrap T (including const qualifiers), otherwise we will misdetect
+            // callable/std::function below if we are wrapping a const reference.
+            using unrefT = tanuki::unwrap_cvref_t<T>;
 
             if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
                 return getval<Holder>(this) != nullptr;
@@ -106,7 +108,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS mutable_callable_iface : base_callable_ifa
 template <typename Holder, typename T, typename R, typename Impl, typename... Args>
 R callable_call_operator(Impl &self, Args &&...args)
 {
-    using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
+    using unrefT = tanuki::unwrap_cvref_t<T>;
 
     // Check if this is empty before invoking the call operator.
     //
@@ -140,7 +142,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface
     // Implementation for mutable invocable objects.
     template <typename Base, typename Holder, typename T>
         requires(!Const)
-                && std::is_invocable_r_v<R, std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
+                && std::is_invocable_r_v<R, tanuki::unwrap_cvref_t<T> &, Args...>
+                // NOTE: here we are also checking that T is not a const reference wrapper, which would lead to a
+                // runtime exception when invoking getval() in the call operator. Like this, we move the error to
+                // compile time.
+                && (!is_reference_wrapper<T> || !std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>)
                 // NOTE: also require copy constructibility like std::function does.
                 && std::copy_constructible<T>
     struct impl<Base, Holder, T> : base_callable_iface::impl<Base, Holder, T> {
@@ -152,8 +158,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface
 
     // Implementation for const invocable objects.
     template <typename Base, typename Holder, typename T>
-        requires Const && std::is_invocable_r_v<R, const std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
-                 && std::copy_constructible<T>
+        requires Const
+                 && std::is_invocable_r_v<R, const tanuki::unwrap_cvref_t<T> &, Args...> && std::copy_constructible<T>
     struct impl<Base, Holder, T> : base_callable_iface::impl<Base, Holder, T> {
         R operator()(Args... args) const final
         {

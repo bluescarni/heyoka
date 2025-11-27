@@ -193,6 +193,16 @@ TEST_CASE("callable call")
         REQUIRE(c0(3., 1.) == 2.);
     }
 
+    {
+        // Test that we cannot construct a mutable callable from a const ref.
+        foo f0{5};
+        REQUIRE(!std::constructible_from<callable<double(double, double)>, decltype(std::cref(f0))>);
+
+        // A const callable instead works.
+        callable<double(double, double) const> c0 = std::cref(f0);
+        REQUIRE(c0(1, 2) == 8);
+    }
+
     // Test move construction from callable.
     {
         frob f{std::vector{1, 2, 3, 4, 5}};
@@ -362,4 +372,12 @@ TEST_CASE("callable s11n")
 
         REQUIRE(!c);
     }
+}
+
+// A test for a bug in which we would fail to properly detect a const reference to a std function in the implementation
+// of the bool operator, which would lead to consider an empty callable as non-empty.
+TEST_CASE("bug bool const")
+{
+    std::function<void()> f;
+    REQUIRE(!callable<void() const>{std::cref(f)});
 }
