@@ -322,39 +322,4 @@ struct formatter<heyoka::event_direction> : fmt::ostream_formatter {
 
 } // namespace fmt
 
-// Export the s11n keys for default-constructed event callbacks.
-#define HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                      \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, false, void, heyoka::taylor_adaptive<T> &, T, int) \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, false, bool, heyoka::taylor_adaptive<T> &, int)
-
-#define HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, false, void, heyoka::taylor_adaptive_batch<T> &,   \
-                                    T, int, std::uint32_t)                                                             \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, false, bool, heyoka::taylor_adaptive_batch<T> &,   \
-                                    int, std::uint32_t)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(float)
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(double)
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(long double)
-
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(float)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(double)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(mppp::real128)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(mppp::real)
-
-#endif
-
-#undef HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY
-#undef HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY
-
 #endif

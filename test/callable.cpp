@@ -62,10 +62,12 @@ TEST_CASE("callable basics")
 {
     callable<void()> c;
     REQUIRE(!c);
+    REQUIRE(is_invalid(c));
     REQUIRE_THROWS_AS(c(), std::bad_function_call);
 
     callable<void() const> cc;
     REQUIRE(!cc);
+    REQUIRE(is_invalid(cc));
     REQUIRE_THROWS_AS(cc(), std::bad_function_call);
 
     callable<void()> c2 = c;
@@ -249,13 +251,9 @@ TEST_CASE("callable call")
 
 TEST_CASE("callable type idx")
 {
-    callable<void()> c;
-
-    REQUIRE(value_type_index(c) == typeid(detail::empty_callable));
-
     auto f = []() {};
 
-    c = callable<void()>{f};
+    callable<void()> c{f};
 
     REQUIRE(value_type_index(c) == typeid(f));
 }
@@ -276,7 +274,6 @@ struct foo_s11n {
 };
 
 HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, false, int, int)
-HEYOKA_S11N_CALLABLE_EXPORT(heyoka::detail::empty_callable, false, int, int)
 
 struct foo_s11n_const {
     int addval = 0;

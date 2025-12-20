@@ -150,11 +150,11 @@ namespace detail
 
 // NOTE: some member functions of func_iface::impl need to go here because
 // the definition of expression must be available.
-template <typename Base, typename Holder, typename T>
+template <typename Base, typename T>
     requires is_udf<T>
-inline void func_iface::impl<Base, Holder, T>::replace_args(std::vector<expression> new_args)
+inline void func_iface::impl<Base, T>::replace_args(std::vector<expression> new_args)
 {
-    static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
+    static_cast<func_base &>(getval(this)).replace_args(std::move(new_args));
 }
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
