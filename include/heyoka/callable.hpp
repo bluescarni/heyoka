@@ -43,107 +43,124 @@ inline constexpr bool is_any_std_func<std::function<R(Args...)>> = true;
 template <typename>
 inline constexpr bool is_any_callable = false;
 
-// An empty struct used in the default initialisation
-// of callable objects.
-// NOTE: we use this rather than, e.g., a null function
-// pointer so that we can enable serialisation of
-// default-constructed callables.
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable {
-    template <typename Archive>
-    void serialize(Archive &, unsigned)
-    {
-    }
-};
-
-// Default (empty) implementation of the callable interface.
-template <typename, typename, typename, typename, typename...>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl {
-};
-
-// Implementation of the callable interface for invocable objects.
-template <typename Base, typename Holder, typename T, typename R, typename... Args>
-    requires std::is_invocable_r_v<R, std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
-             // NOTE: also require copy constructibility like
-             // std::function does.
-             && std::copy_constructible<T>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Args...> : public Base {
-    explicit operator bool() const noexcept final
-    {
-        using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
-
-        if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
-            return getval<Holder>(this) != nullptr;
-        } else if constexpr (is_any_callable<unrefT> || is_any_std_func<unrefT>) {
-            return static_cast<bool>(getval<Holder>(this));
-        } else {
-            return true;
-        }
-    }
-    R operator()(Args... args) final
-    {
-        using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
-
-        // Check if this is empty before invoking the call operator.
-        // NOTE: no check needed here for std::function or callable: in case
-        // of an empty object, the std::bad_function_call exception will be
-        // thrown by the call operator of the object.
-        if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
-            if (getval<Holder>(this) == nullptr) {
-                throw std::bad_function_call{};
-            }
-        }
-
-        if constexpr (std::is_same_v<R, void>) {
-            static_cast<void>(std::invoke(getval<Holder>(this), std::forward<Args>(args)...));
-        } else {
-            return std::invoke(getval<Holder>(this), std::forward<Args>(args)...);
-        }
-    }
-};
-
-// Implementation of the callable interface for the empty callable.
-template <typename Base, typename Holder, typename R, typename... Args>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, empty_callable, R, Args...> : public Base {
-    // NOTE: the empty callable is always empty and always results
-    // in an exception being thrown if called.
-    explicit operator bool() const noexcept final
-    {
-        return false;
-    }
-    [[noreturn]] R operator()(Args...) final
-    {
-        throw std::bad_function_call{};
-    }
-};
-
-// Definition of the callable interface.
-template <typename R, typename... Args>
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
-    virtual R operator()(Args... args) = 0;
+// Base interface for callable objects.
+//
+// The base interface contains the bool conversion operator.
+//
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS base_callable_iface {
     virtual explicit operator bool() const noexcept = 0;
 
-    template <typename Base, typename Holder, typename T>
-    using impl = callable_iface_impl<Base, Holder, T, R, Args...>;
+    // Default implementation.
+    template <typename Base, typename T>
+    struct impl : public Base {
+        explicit operator bool() const noexcept final
+        {
+            // NOTE: make sure to fully unwrap T (including const qualifiers), otherwise we will misdetect
+            // callable/std::function below if we are wrapping a const reference.
+            using unrefT = tanuki::unwrap_cvref_t<T>;
+
+            if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
+                return getval(this) != nullptr;
+            } else if constexpr (is_any_callable<unrefT> || is_any_std_func<unrefT>) {
+                return static_cast<bool>(getval(this));
+            } else {
+                return true;
+            }
+        }
+    };
+};
+
+// The two interfaces for const and mutable callable objects.
+template <typename R, typename... Args>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS const_callable_iface : base_callable_iface {
+    virtual R operator()(Args... args) const = 0;
+};
+
+template <typename R, typename... Args>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS mutable_callable_iface : base_callable_iface {
+    virtual R operator()(Args... args) = 0;
+};
+
+// Implementation of the call operator for the callable interface. We need both a const and a mutable variant with
+// identical code, so we move the implementation outside.
+template <typename T, typename R, typename Impl, typename... Args>
+R callable_call_operator(Impl *self, Args &&...args)
+{
+    using unrefT = tanuki::unwrap_cvref_t<T>;
+
+    // Check if this is empty before invoking the call operator.
+    //
+    // NOTE: no check needed here for std::function or callable: in case of an empty object, the
+    // std::bad_function_call exception will be thrown by the call operator of the object.
+    if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
+        if (getval(self) == nullptr) [[unlikely]] {
+            throw std::bad_function_call{};
+        }
+    }
+
+    if constexpr (std::is_same_v<R, void>) {
+        static_cast<void>(std::invoke(getval(self), std::forward<Args>(args)...));
+    } else {
+        return std::invoke(getval(self), std::forward<Args>(args)...);
+    }
+}
+
+// Definition of the callable interface.
+//
+// This inherits from either const_callable_iface or mutable_callable_iface, depending on the Const flag.
+template <bool Const, typename R, typename... Args>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface
+    : std::conditional_t<Const, const_callable_iface<R, Args...>, mutable_callable_iface<R, Args...>> {
+    // Default (empty) implementation.
+    template <typename, typename>
+    struct impl {
+    };
+
+    // Implementation for mutable invocable objects.
+    template <typename Base, typename T>
+        requires(!Const)
+                && std::is_invocable_r_v<R, tanuki::unwrap_cvref_t<T> &, Args...>
+                // NOTE: here we are also checking that T is not a const reference wrapper, which would lead to a
+                // runtime exception when invoking getval() in the call operator. Like this, we move the error to
+                // compile time.
+                && (!is_reference_wrapper<T> || !std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>)
+                // NOTE: also require copy constructibility like std::function does.
+                && std::copy_constructible<T>
+    struct impl<Base, T> : base_callable_iface::impl<Base, T> {
+        R operator()(Args... args) final
+        {
+            return callable_call_operator<T, R>(this, std::forward<Args>(args)...);
+        }
+    };
+
+    // Implementation for const invocable objects.
+    template <typename Base, typename T>
+        requires Const
+                 && std::is_invocable_r_v<R, const tanuki::unwrap_cvref_t<T> &, Args...> && std::copy_constructible<T>
+    struct impl<Base, T> : base_callable_iface::impl<Base, T> {
+        R operator()(Args... args) const final
+        {
+            return callable_call_operator<T, R>(this, std::forward<Args>(args)...);
+        }
+    };
 };
 
 // Implementation of the reference interface.
 template <typename R, typename... Args>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
-    template <typename Wrap, typename... FArgs>
-        requires requires(Wrap &&self, FArgs &&...fargs) {
-            {
-                std::forward_like<Wrap> (*iface_ptr(std::forward<Wrap>(self)))(std::forward<FArgs>(fargs)...)
-            } -> std::same_as<R>;
-        }
-    R operator()(this Wrap &&self, FArgs &&...fargs)
+    // NOTE: thanks to the "deducing this" feature, we need just one implementation of the call operator, which works
+    // for both the const and mutable variants.
+    template <typename Wrap>
+    R operator()(this Wrap &&self, Args... args)
     {
         // NOTE: a wrap in invalid state is considered empty.
         if (is_invalid(self)) [[unlikely]] {
             throw std::bad_function_call{};
         }
 
-        return std::forward_like<Wrap>(*iface_ptr(std::forward<Wrap>(self)))(std::forward<FArgs>(fargs)...);
+        return iface_ptr(std::forward<Wrap>(self))->operator()(std::forward<Args>(args)...);
     }
 
     template <typename Wrap>
@@ -159,40 +176,45 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
 };
 
 // Configuration of the callable wrap.
-template <typename R, typename... Args>
-inline constexpr auto callable_wrap_config = tanuki::config<empty_callable, callable_ref_iface<R, Args...>>{
-    // Similarly to std::function, ensure that callable can store
-    // in static storage pointers and reference wrappers.
-    // NOTE: reference wrappers are not guaranteed to have the size
-    // of a pointer, but in practice that should always be the case.
-    // In case this is a concern, static asserts can be added
-    // in the callable interface implementation.
-    .static_size = tanuki::holder_size<R (*)(Args...), callable_iface<R, Args...>>,
+template <bool Const, typename R, typename... Args>
+inline constexpr auto callable_wrap_config = tanuki::config<void, callable_ref_iface<R, Args...>>{
+    // Similarly to std::function, ensure that callable can store in static storage pointers and reference wrappers.
+    //
+    // NOTE: reference wrappers are not guaranteed to have the size of a pointer, but in practice that should always be
+    // the case. In case this is a concern, static asserts can be added in the callable interface implementation.
+    .static_size = tanuki::holder_size<R (*)(Args...), callable_iface<Const, R, Args...>>,
+    .invalid_default_ctor = true,
     .pointer_interface = false,
     .explicit_ctor = tanuki::wrap_ctor::always_implicit};
 
 // Definition of the callable wrap.
-template <typename R, typename... Args>
-using callable_wrap_t = tanuki::wrap<callable_iface<R, Args...>, callable_wrap_config<R, Args...>>;
+template <bool Const, typename R, typename... Args>
+using callable_wrap_t = tanuki::wrap<callable_iface<Const, R, Args...>, callable_wrap_config<Const, R, Args...>>;
 
 // Specialise is_any_callable to detect callables.
-template <typename R, typename... Args>
-inline constexpr bool is_any_callable<detail::callable_wrap_t<R, Args...>> = true;
+template <bool Const, typename R, typename... Args>
+inline constexpr bool is_any_callable<detail::callable_wrap_t<Const, R, Args...>> = true;
 
+// Helper to select the const or mutable callable wrap variant.
 template <typename T>
-struct callable_impl {
+struct callable_impl_selector {
 };
 
 template <typename R, typename... Args>
-struct callable_impl<R(Args...)> {
-    using type = callable_wrap_t<R, Args...>;
+struct callable_impl_selector<R(Args...)> {
+    using type = callable_wrap_t<false, R, Args...>;
+};
+
+template <typename R, typename... Args>
+struct callable_impl_selector<R(Args...) const> {
+    using type = callable_wrap_t<true, R, Args...>;
 };
 
 } // namespace detail
 
 template <typename T>
-    requires(requires() { typename detail::callable_impl<T>::type; })
-using callable = typename detail::callable_impl<T>::type;
+    requires(requires() { typename detail::callable_impl_selector<T>::type; })
+using callable = typename detail::callable_impl_selector<T>::type;
 
 HEYOKA_END_NAMESPACE
 
@@ -203,9 +225,10 @@ HEYOKA_END_NAMESPACE
 #endif
 
 // Serialisation macros.
-// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2.
-// This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
-// would synthesise, and thus to ameliorate the "class name too long" issue.
+//
+// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2. This allows us to reduce the
+// size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY would synthesise, and thus to ameliorate the "class
+// name too long" issue.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, ...)                                                                      \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::callable<" #__VA_ARGS__ ">@" #udc,                                      \
                                  heyoka::detail::callable_iface<__VA_ARGS__>)

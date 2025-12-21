@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.8.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.9.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -132,6 +132,13 @@ if(YACMA_COMPILER_IS_MSVC)
   endif()
 endif()
 
+# Check the presence of the thread-safe variant of strerror() called strerror_r().
+#
+# This function is available both in the POSIX standard and as a GNU extension. Here we check only
+# the presence of the symbol, we will detect and choose the correct variant from within the code.
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
+
 # Mandatory dependency on LLVM.
 #
 # NOTE: do it early so that we can set up
@@ -181,7 +188,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/div.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sub.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vector_math.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/empty_callable_s11n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
@@ -213,6 +219,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_helpers.cpp"
@@ -358,7 +365,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 40)
+set(HEYOKA_ABI_VERSION 41)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -371,6 +378,11 @@ else()
     set_property(TARGET heyoka PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+endif()
+
+if(_HEYOKA_HAVE_STRERROR_R)
+    # strerror_r() is available, signal its presence when compiling the library.
+    target_compile_definitions(heyoka PRIVATE HEYOKA_HAVE_STRERROR_R)
 endif()
 
 # Setup common to both the shared and static variants.
@@ -511,12 +523,8 @@ target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
-set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 11)
-find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION} OR
-   ${fmt_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION})
-   message(FATAL_ERROR "The supported fmt versions are in the range [${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}, ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION}], but version ${fmt_VERSION_MAJOR} was found instead.")
-endif()
+set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 12)
+find_package(fmt ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}...${_HEYOKA_MAX_SUPPORTED_FMT_VERSION} REQUIRED CONFIG)
 message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
@@ -633,6 +641,7 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
+unset(_HEYOKA_HAVE_STRERROR_R)
 if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
 endif()

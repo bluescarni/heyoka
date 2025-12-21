@@ -79,6 +79,7 @@ public:
 
     static eop_data fetch_latest_iers_rapid(const std::string & = "usno", const std::string & = "finals2000A.all");
     static eop_data fetch_latest_iers_long_term();
+    static eop_data fetch_latest_celestrak(bool = false);
 };
 
 namespace detail
@@ -88,6 +89,7 @@ void validate_eop_data_table(const eop_data_table &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_rapid(const std::string &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_long_term(const std::string &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_celestrak(const std::string &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_era(llvm_state &, const eop_data &, llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_eop_data_pm_x(llvm_state &, const eop_data &, llvm::Type *);

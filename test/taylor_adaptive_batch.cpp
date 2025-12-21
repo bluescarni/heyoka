@@ -1066,7 +1066,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, false, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t);
 
 struct s11n_t_cb {
     template <typename T>
@@ -1083,7 +1083,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive_batch<double> &, int, std::uint32_t);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, false, bool, taylor_adaptive_batch<double> &, int, std::uint32_t);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()

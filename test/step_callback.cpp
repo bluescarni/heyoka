@@ -97,8 +97,6 @@ TEST_CASE("step_callback basics")
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, only_ph>);
 
-            REQUIRE(value_type_index(step_cb) == typeid(detail::empty_callable));
-
             // Copy construction of empty callback.
             auto step_cb2 = step_cb;
             REQUIRE(!step_cb2);
@@ -215,13 +213,14 @@ TEST_CASE("step_callback basics")
 
             step_callback<fp_t> step_cb1(cb1{}), step_cb2;
 
+            REQUIRE(!static_cast<bool>(step_cb2));
+
             swap(step_cb1, step_cb2);
 
             REQUIRE(static_cast<bool>(step_cb2));
-            REQUIRE(!static_cast<bool>(step_cb1));
 
             REQUIRE(value_ptr<cb1>(step_cb2) != nullptr);
-            REQUIRE(value_ptr<cb1>(step_cb1) == nullptr);
+            REQUIRE(value_ptr<cb1>(step_cb1) != nullptr);
         }
     };
 
