@@ -1655,7 +1655,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive<double> &, double, int);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, false, void, taylor_adaptive<double> &, double, int);
 
 struct s11n_t_cb {
     bool operator()(taylor_adaptive<double> &, int) const
@@ -1671,7 +1671,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive<double> &, int);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, false, bool, taylor_adaptive<double> &, int);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()

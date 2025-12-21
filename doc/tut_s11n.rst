@@ -156,7 +156,9 @@ it in heyoka's serialisation system. This is accomplished through the use of the
     :lines: 30-31
 
 The ``HEYOKA_S11N_CALLABLE_EXPORT()`` macro takes as first input argument the name of the class
-being registered (``my_callback`` in this case). The remaining arguments are the signature
+being registered (``my_callback`` in this case). The second input argument is a boolean flag that,
+for event callbacks, must always be ``false`` (this flag indicates that the callback has a *mutable* - i.e.,
+non-``const`` - call operator). The remaining arguments are the signature
 of the callback: ``void`` is the return type, ``taylor_adaptive<double> &``, ``double``
 and ``int`` its argument types. Note that this macro must be invoked in the
 root namespace and all arguments should be spelled out as fully-qualified

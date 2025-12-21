@@ -72,4 +72,4 @@ expression delta_tdb_tt(const expression &time_expr)
 HEYOKA_END_NAMESPACE
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::model::detail::delta_tt_tai_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::model::detail::delta_tt_tai_func, true, std::string, unsigned)

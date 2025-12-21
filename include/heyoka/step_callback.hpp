@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <concepts>
 #include <initializer_list>
 #include <type_traits>
 #include <vector>
@@ -43,39 +42,46 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Forward declaration of the step_cb interface.
-template <typename>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface;
-
-// Default implementation of the step_cb interface.
-// If T has an empty (i.e., invalid) callable_iface_impl, this class
-// will be empty too. Otherwise, it will inherit the call
-// operator from callable_iface_impl and the default (no-op)
-// pre_hook() implementation from step_cb_iface.
-template <typename Base, typename Holder, typename T, typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl : callable_iface_impl<Base, Holder, T, bool, TA &> {
-};
-
 // Concept checking for the presence of the
 // pre_hook() member function.
 template <typename T, typename TA>
 concept with_pre_hook = requires(T &x, TA &ta) { static_cast<void>(x.pre_hook(ta)); };
 
-// Implementation of the step_cb interface for
-// objects providing the pre_hook() member function.
-template <typename Base, typename Holder, typename T, typename TA>
-    requires
-    // NOTE: this first concept requirement is needed to prevent objects
-    // implementing pre_hook() *without* a valid callable_iface_impl
-    // triggering a hard error due to pre_hook() being marked final.
-    std::derived_from<callable_iface_impl<Base, Holder, T, bool, TA &>, step_cb_iface<TA>>
-    && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
-    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS
-    step_cb_iface_impl<Base, Holder, T, TA> : callable_iface_impl<Base, Holder, T, bool, TA &> {
-    void pre_hook(TA &ta) final
-    {
-        static_cast<void>(getval<Holder>(this).pre_hook(ta));
-    }
+// Helper to reduce typing below. This accesses the implementation of a callable interface.
+template <typename TA, typename Base, typename T>
+using step_cb_impl_base = callable_iface<false, bool, TA &>::template impl<Base, T>;
+
+// Definition of the step_cb interface.
+//
+// It inherits from the mutable variant of callable_iface.
+template <typename TA>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<false, bool, TA &> {
+    // The default implementation of pre_hook() is a no-op.
+    virtual void pre_hook(TA &) {}
+
+    // Default implementation of the step_cb interface.
+    //
+    // If T has an empty (i.e., invalid) callable_iface implementation, this class will be empty too. Otherwise, it will
+    // inherit the call operator from the callable_iface implementation and the default (no-op) pre_hook()
+    // implementation from step_cb_iface.
+    template <typename Base, typename T>
+    struct impl : step_cb_impl_base<TA, Base, T> {
+    };
+
+    // Implementation of the step_cb interface for callable objects providing the pre_hook() member function.
+    template <typename Base, typename T>
+        requires
+        // NOTE: this first concept requirement is needed to prevent objects implementing pre_hook() *without* a valid
+        // callable_iface implementation triggering a hard error due to pre_hook() being marked final.
+        tanuki::iface_with_impl<callable_iface<false, bool, TA &>, T>
+        && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
+        struct impl<Base, T> : step_cb_impl_base<TA, Base, T> {
+        void pre_hook(TA &ta) final
+        {
+            static_cast<void>(getval(this).pre_hook(ta));
+        }
+    };
 };
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -84,17 +90,6 @@ template <typename Base, typename Holder, typename T, typename TA>
 #pragma GCC diagnostic ignored "-Wsuggest-final-methods"
 
 #endif
-
-// Definition of the step_cb interface.
-template <typename TA>
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<bool, TA &> {
-    // Default implementation of pre_hook() is a no-op.
-    virtual void pre_hook(TA &) {}
-
-    template <typename Base, typename Holder, typename T>
-    using impl = step_cb_iface_impl<Base, Holder, T, TA>;
-};
 
 #if defined(__GNUC__) && !defined(__clang__)
 
@@ -111,14 +106,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface : callable_ref_iface<boo
 
 // Configuration.
 template <typename TA>
-inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_cb_ref_iface<TA>>{
-    // Similarly to std::function, ensure that step_callback can store
-    // in static storage pointers and reference wrappers.
-    // NOTE: reference wrappers are not guaranteed to have the size
-    // of a pointer, but in practice that should always be the case.
-    .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
-    .pointer_interface = false,
-    .explicit_ctor = tanuki::wrap_ctor::always_implicit};
+inline constexpr auto step_cb_wrap_config
+    = tanuki::config<void, step_cb_ref_iface<TA>>{// Similarly to std::function, ensure that step_callback can store
+                                                  // in static storage pointers and reference wrappers.
+                                                  // NOTE: reference wrappers are not guaranteed to have the size
+                                                  // of a pointer, but in practice that should always be the case.
+                                                  .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
+                                                  .invalid_default_ctor = true,
+                                                  .pointer_interface = false,
+                                                  .explicit_ctor = tanuki::wrap_ctor::always_implicit};
 
 // Definition of the step_cb wrap.
 template <typename TA>
@@ -226,9 +222,11 @@ using step_callback_batch_set = detail::step_callback_set_impl<T, true>;
 HEYOKA_END_NAMESPACE
 
 // Serialisation macros.
-// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2.
-// This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
-// would synthesise, and thus to ameliorate the "class name too long" issue.
+//
+// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2. This allows us to reduce the
+// size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY would synthesise, and thus to ameliorate the "class
+// name too long" issue.
+//
 // NOLINTBEGIN
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(udc, F)                                                                   \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::step_callback<" #F ">@" #udc,                                           \
@@ -281,28 +279,6 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp:
 #if defined(HEYOKA_HAVE_REAL)
 
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
-
-#endif
-
-// Export the s11n keys for default-constructed step callbacks.
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, float)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, double)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, long double)
-
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, float)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, double)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real128)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real)
 
 #endif
 

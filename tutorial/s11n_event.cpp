@@ -16,7 +16,7 @@ using namespace heyoka;
 // The callback function object.
 struct my_callback {
     // Leave the callback body empty.
-    void operator()(taylor_adaptive<double> &, double, int) const {}
+    void operator()(taylor_adaptive<double> &, double, int) {}
 
 private:
     // Make the callback serialisable.
@@ -28,7 +28,7 @@ private:
 };
 
 // Register the callback in the serialisation system.
-HEYOKA_S11N_CALLABLE_EXPORT(my_callback, void, taylor_adaptive<double> &, double, int)
+HEYOKA_S11N_CALLABLE_EXPORT(my_callback, false, void, taylor_adaptive<double> &, double, int)
 
 int main()
 {
