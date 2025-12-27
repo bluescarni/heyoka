@@ -1,6 +1,17 @@
 Changelog
 =========
 
+7.9.0 (unreleased)
+------------------
+
+New
+~~~
+
+- New frame transformations to/from the RSW frame
+  (`#522 <https://github.com/bluescarni/heyoka/pull/522>`__).
+- Add CelesTrak as a provider of EOP data
+  (`#519 <https://github.com/bluescarni/heyoka/pull/519>`__).
+
 7.8.1 (2025-10-14)
 ------------------
 
