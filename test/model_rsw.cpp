@@ -43,7 +43,7 @@ TEST_CASE("to_rsw")
 
         cf(output, input);
 
-        REQUIRE(std::ranges::all_of(output, [](const auto x) { return std::abs(x) < 1e-15; }));
+        REQUIRE(std::ranges::all_of(output, [](const auto v) { return std::abs(v) < 1e-15; }));
     }
 
     // Simple test: transform the r defining the RSW frame and the negative v.
@@ -53,7 +53,7 @@ TEST_CASE("to_rsw")
         cf(output, input);
 
         REQUIRE(std::ranges::all_of(std::ranges::subrange(output.data(), output.data() + 3),
-                                    [](const auto x) { return std::abs(x) < 1e-15; }));
+                                    [](const auto v) { return std::abs(v) < 1e-15; }));
         REQUIRE(std::abs(output[3]) < 1e-15);
         REQUIRE(std::abs(output[4] + 2) < 1e-15);
         REQUIRE(std::abs(output[5]) < 1e-15);
@@ -179,8 +179,8 @@ TEST_CASE("from_rsw")
             // Rotate back to the original frame.
             cf_from(output, input);
 
-            for (auto i = 0u; i < 6u; ++i) {
-                REQUIRE(std::abs((output[i] - orig_input[i]) / orig_input[i]) < 1e-12);
+            for (auto j = 0u; j < 6u; ++j) {
+                REQUIRE(std::abs((output[j] - orig_input[j]) / orig_input[j]) < 1e-12);
             }
         }
     }
@@ -255,8 +255,8 @@ TEST_CASE("from_rsw_inertial")
             // Rotate back to the original frame.
             cf_from(output, input);
 
-            for (auto i = 0u; i < 6u; ++i) {
-                REQUIRE(std::abs((output[i] - orig_input[i]) / orig_input[i]) < 1e-12);
+            for (auto j = 0u; j < 6u; ++j) {
+                REQUIRE(std::abs((output[j] - orig_input[j]) / orig_input[j]) < 1e-12);
             }
         }
     }
