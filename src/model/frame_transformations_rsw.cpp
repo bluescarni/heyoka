@@ -78,8 +78,8 @@ std::array<expression, 3> rsw_keplerian_omega(const std::array<expression, 3> &r
 
 } // namespace detail
 
-// Helper to transform a Cartesian state (position=pos, velocity=vel) into the RSW frame defined by the position r and
-// velocity v. Keplerian motion is assumed for the velocity transformation.
+// Transform a Cartesian state (pos, vel), expressed in the same non-rotating Cartesian reference frame as (r, v), into
+// the RSW frame defined by the reference state (r, v). The velocity mapping assumes Keplerian motion.
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::array<std::array<expression, 3>, 2> state_to_rsw(const std::array<expression, 3> &pos,
@@ -97,12 +97,12 @@ std::array<std::array<expression, 3>, 2> state_to_rsw(const std::array<expressio
     const auto [x, y, z] = std::array{pos[0] - r[0], pos[1] - r[1], pos[2] - r[2]};
     const auto [vx, vy, vz] = std::array{vel[0] - v[0], vel[1] - v[1], vel[2] - v[2]};
 
-    // Compute the rotated position.
+    // Compute the rotated relative position.
     auto xp = sum({R[0][0] * x, R[0][1] * y, R[0][2] * z});
     auto yp = sum({R[1][0] * x, R[1][1] * y, R[1][2] * z});
     auto zp = sum({R[2][0] * x, R[2][1] * y, R[2][2] * z});
 
-    // Rotate the relative velocity.
+    // Compute the rotated relative velocity.
     const auto vxp1 = sum({R[0][0] * vx, R[0][1] * vy, R[0][2] * vz});
     const auto vyp1 = sum({R[1][0] * vx, R[1][1] * vy, R[1][2] * vz});
     const auto vzp1 = sum({R[2][0] * vx, R[2][1] * vy, R[2][2] * vz});
@@ -113,13 +113,16 @@ std::array<std::array<expression, 3>, 2> state_to_rsw(const std::array<expressio
     const auto [vxp2, vyp2, vzp2] = detail::cross_product(omega, {xp, yp, zp});
 
     // Assemble and return the result.
-    return {
-        {{std::move(xp), std::move(yp), std::move(zp)}, {vxp1 - vxp2, vyp1 - vyp2, vzp1 - vzp2}},
-    };
+    return {{{std::move(xp), std::move(yp), std::move(zp)}, {vxp1 - vxp2, vyp1 - vyp2, vzp1 - vzp2}}};
 }
 
-// Helper to transform a Cartesian state (position=pos, velocity=vel) into the inertial RSW frame defined by the
-// position r and velocity v. In this context "inertial" means that the frame is not moving and not rotating.
+// Transform a Cartesian state (pos, vel), expressed in the same non-rotating Cartesian reference frame as (r, v), into
+// the *inertial* variant of the RSW frame defined by the reference state (r, v). Contrary to the usual RSW frame, in
+// the inertial RSW frame the axes are fixed in space with no translational or rotational motion.
+//
+// See the RSW_INERTIAL frame here:
+//
+// https://sanaregistry.org/r/orbit_relative_reference_frames/
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::array<std::array<expression, 3>, 2> state_to_rsw_inertial(const std::array<expression, 3> &pos,
@@ -144,9 +147,65 @@ std::array<std::array<expression, 3>, 2> state_to_rsw_inertial(const std::array<
     auto vyp = sum({R[1][0] * vx, R[1][1] * vy, R[1][2] * vz});
     auto vzp = sum({R[2][0] * vx, R[2][1] * vy, R[2][2] * vz});
 
-    return {
-        {{std::move(xp), std::move(yp), std::move(zp)}, {std::move(vxp), std::move(vyp), std::move(vzp)}},
-    };
+    return {{{std::move(xp), std::move(yp), std::move(zp)}, {std::move(vxp), std::move(vyp), std::move(vzp)}}};
+}
+
+// Transform a Cartesian state (pos, vel) expressed in the RSW frame back to the original non-rotating reference frame.
+// The RSW frame is defined by the reference position r and velocity v, which are expressed in the non-rotating frame.
+// The velocity mapping assumes Keplerian motion.
+//
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::array<std::array<expression, 3>, 2> state_from_rsw(const std::array<expression, 3> &pos,
+                                                        const std::array<expression, 3> &vel,
+                                                        const std::array<expression, 3> &r,
+                                                        const std::array<expression, 3> &v)
+{
+    // Fetch the rotation matrix to rsw.
+    const auto R = detail::to_rsw_rotation_matrix(r, v);
+
+    // Fetch the Keplerian angular rotation vector in the RSW basis.
+    const auto omega = detail::rsw_keplerian_omega(r, v);
+
+    // Compute the position.
+    auto xp = sum({R[0][0] * pos[0], R[1][0] * pos[1], R[2][0] * pos[2], r[0]});
+    auto yp = sum({R[0][1] * pos[0], R[1][1] * pos[1], R[2][1] * pos[2], r[1]});
+    auto zp = sum({R[0][2] * pos[0], R[1][2] * pos[1], R[2][2] * pos[2], r[2]});
+
+    // Compute the velocity.
+    const auto omega_pos = detail::cross_product(omega, pos);
+    const auto [t0, t1, t2] = std::array{vel[0] + omega_pos[0], vel[1] + omega_pos[1], vel[2] + omega_pos[2]};
+    const auto u0 = sum({R[0][0] * t0, R[1][0] * t1, R[2][0] * t2});
+    const auto u1 = sum({R[0][1] * t0, R[1][1] * t1, R[2][1] * t2});
+    const auto u2 = sum({R[0][2] * t0, R[1][2] * t1, R[2][2] * t2});
+
+    return {{{std::move(xp), std::move(yp), std::move(zp)}, {u0 + v[0], u1 + v[1], u2 + v[2]}}};
+}
+
+// Transform a Cartesian state (pos, vel) expressed in the *inertial* RSW frame back to the original non-rotating
+// reference frame. The inertial RSW frame is defined by the reference position r and velocity v, which are expressed in
+// the non-rotating frame. Contrary to the usual RSW frame, in the inertial RSW frame the axes are fixed in space with
+// no translational or rotational motion.
+//
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::array<std::array<expression, 3>, 2> state_from_rsw_inertial(const std::array<expression, 3> &pos,
+                                                                 const std::array<expression, 3> &vel,
+                                                                 const std::array<expression, 3> &r,
+                                                                 const std::array<expression, 3> &v)
+{
+    // Fetch the rotation matrix.
+    const auto R = detail::to_rsw_rotation_matrix(r, v);
+
+    // Compute the position.
+    auto xp = sum({R[0][0] * pos[0], R[1][0] * pos[1], R[2][0] * pos[2], r[0]});
+    auto yp = sum({R[0][1] * pos[0], R[1][1] * pos[1], R[2][1] * pos[2], r[1]});
+    auto zp = sum({R[0][2] * pos[0], R[1][2] * pos[1], R[2][2] * pos[2], r[2]});
+
+    // Compute the velocity.
+    auto vxp = sum({R[0][0] * vel[0], R[1][0] * vel[1], R[2][0] * vel[2]});
+    auto vyp = sum({R[0][1] * vel[0], R[1][1] * vel[1], R[2][1] * vel[2]});
+    auto vzp = sum({R[0][2] * vel[0], R[1][2] * vel[1], R[2][2] * vel[2]});
+
+    return {{{std::move(xp), std::move(yp), std::move(zp)}, {std::move(vxp), std::move(vyp), std::move(vzp)}}};
 }
 
 } // namespace model
