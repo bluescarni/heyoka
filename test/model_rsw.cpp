@@ -72,3 +72,36 @@ TEST_CASE("to_rsw")
         }
     }
 }
+
+TEST_CASE("to_rsw_inertial")
+{
+    const auto [pos_x, pos_y, pos_z] = make_vars("pos_x", "pos_y", "pos_z");
+    const auto [vel_x, vel_y, vel_z] = make_vars("vel_x", "vel_y", "vel_z");
+    const auto [x, y, z] = make_vars("x", "y", "z");
+    const auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
+
+    const auto [pos_p, vel_p]
+        = model::state_to_rsw_inertial({pos_x, pos_y, pos_z}, {vel_x, vel_y, vel_z}, {x, y, z}, {vx, vy, vz});
+
+    const auto cf = cfunc<double>({pos_p[0], pos_p[1], pos_p[2], vel_p[0], vel_p[1], vel_p[2]},
+                                  {pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, x, y, z, vx, vy, vz});
+
+    std::array<double, 6> output{};
+
+    // Some tests comparing the results with the orekit library (see notebook in the 'tools' dir).
+    {
+        const std::array<double, 12> input{1.9901598679710650e+06,  -4.3171886347018217e+05, 6.7720686840924025e+06,
+                                           -6.9420492298495501e+03, -2.1395918103707527e+03, 1.9120431913109790e+03,
+                                           1.9990152502378467e+06,  -4.2466313738494366e+05, 6.7714722017919971e+06,
+                                           -6.9397802817958964e+03, -2.1318724003511638e+03, 1.9205549571233923e+03};
+
+        cf(output, input);
+
+        const std::array state_orekit = {-1508.0546801836172, 10340.099985439594, 4400.563621644753,
+                                         -3.0126937116365298, 7511.706686243073,  7.96075541114692};
+
+        for (auto i = 0u; i < 6u; ++i) {
+            REQUIRE(std::abs((state_orekit[i] - output[i]) / state_orekit[i]) < 1e-12);
+        }
+    }
+}

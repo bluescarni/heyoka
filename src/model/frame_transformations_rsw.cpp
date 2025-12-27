@@ -111,6 +111,37 @@ std::array<std::array<expression, 3>, 2> state_to_rsw(const std::array<expressio
     };
 }
 
+// Helper to transform a Cartesian state (position=pos, velocity=vel) into the inertial RSW frame defined by the
+// position r and velocity v. In this context "inertial" means that the frame is not moving and not rotating.
+//
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::array<std::array<expression, 3>, 2> state_to_rsw_inertial(const std::array<expression, 3> &pos,
+                                                               const std::array<expression, 3> &vel,
+                                                               const std::array<expression, 3> &r,
+                                                               const std::array<expression, 3> &v)
+{
+    // Fetch the rotation matrix.
+    const auto [R, _] = detail::to_rsw_rotation_matrix(r, v);
+
+    // Compute the position relative to r.
+    const auto [x, y, z] = std::array{pos[0] - r[0], pos[1] - r[1], pos[2] - r[2]};
+
+    // Rotate the position.
+    auto xp = sum({R[0][0] * x, R[0][1] * y, R[0][2] * z});
+    auto yp = sum({R[1][0] * x, R[1][1] * y, R[1][2] * z});
+    auto zp = sum({R[2][0] * x, R[2][1] * y, R[2][2] * z});
+
+    // Rotate the velocity.
+    const auto &[vx, vy, vz] = vel;
+    auto vxp = sum({R[0][0] * vx, R[0][1] * vy, R[0][2] * vz});
+    auto vyp = sum({R[1][0] * vx, R[1][1] * vy, R[1][2] * vz});
+    auto vzp = sum({R[2][0] * vx, R[2][1] * vy, R[2][2] * vz});
+
+    return {
+        {{std::move(xp), std::move(yp), std::move(zp)}, {std::move(vxp), std::move(vyp), std::move(vzp)}},
+    };
+}
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE
