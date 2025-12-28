@@ -148,6 +148,22 @@ inline constexpr auto rot_teme_itrs = []<typename... KwArgs>
                       std::tuple_cat(std::make_tuple(std::cref(xyz)), detail::itrs_teme_common_opts(kw_args...)));
 };
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<std::array<expression, 3>, 2>
+state_to_rsw(const std::array<expression, 3> &, const std::array<expression, 3> &, const std::array<expression, 3> &,
+             const std::array<expression, 3> &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<std::array<expression, 3>, 2>
+state_to_rsw_inertial(const std::array<expression, 3> &, const std::array<expression, 3> &,
+                      const std::array<expression, 3> &, const std::array<expression, 3> &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<std::array<expression, 3>, 2>
+state_from_rsw(const std::array<expression, 3> &, const std::array<expression, 3> &, const std::array<expression, 3> &,
+               const std::array<expression, 3> &);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::array<std::array<expression, 3>, 2>
+state_from_rsw_inertial(const std::array<expression, 3> &, const std::array<expression, 3> &,
+                        const std::array<expression, 3> &, const std::array<expression, 3> &);
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE
