@@ -12,6 +12,12 @@ New
 - Add CelesTrak as a provider of EOP data
   (`#519 <https://github.com/bluescarni/heyoka/pull/519>`__).
 
+Fix
+~~~
+
+- Allow compilation with all versions of fmt 12.x, not only 12.0
+  (`#523 <https://github.com/bluescarni/heyoka/pull/523>`__).
+
 7.8.1 (2025-10-14)
 ------------------
 
