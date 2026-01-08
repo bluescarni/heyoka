@@ -27,7 +27,7 @@ unset CFLAGS
 # Configure.
 #
 # NOTE: turn off tutorials until the fmt+malloc compilation failure is resolved.
-CXX=$CONDA_PREFIX/clang++ CC=$CONDA_PREFIX/clang cmake -G Ninja ../ \
+CXX=$CONDA_PREFIX/bin/clang++ CC=$CONDA_PREFIX/bin/clang cmake -G Ninja ../ \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
