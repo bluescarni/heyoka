@@ -523,9 +523,11 @@ add_subdirectory(src/detail/erfa)
 target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
+#
+# NOTE: this is used as a half-open range.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
-set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 12)
-find_package(fmt ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}...${_HEYOKA_MAX_SUPPORTED_FMT_VERSION} REQUIRED CONFIG)
+set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 13)
+find_package(fmt ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}...<${_HEYOKA_MAX_SUPPORTED_FMT_VERSION} REQUIRED CONFIG)
 message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
