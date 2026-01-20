@@ -437,7 +437,7 @@ private:
 
     struct impl;
 
-    std::shared_ptr<impl> p_impl;
+    std::shared_ptr<const impl> p_impl;
 
     explicit HEYOKA_DLL_LOCAL dtens(impl);
 
@@ -733,7 +733,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 {
     struct impl;
 
-    std::shared_ptr<impl> m_impl;
+    std::shared_ptr<const impl> m_impl;
 
     // Serialization.
     friend class boost::serialization::access;
