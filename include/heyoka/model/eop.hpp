@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -33,6 +33,15 @@
 // (where the values of the c0 and c1 constants change from interval to interval). In the expression system, we
 // implement, for each EOP quantity, two unary functions which return respectively the EOP quantity and its first-order
 // derivative at the given input time.
+//
+// NOTE: for the computation of angles such as the ERA and gmst82 (which do not show up directly in the EOP data, but
+// rather are derived from it), we use a different approach wrt astropy/ERFA. Specifically, we precompute values at the
+// dates in the eop dataset and then we interpolate directly between these precomputed values. Both the precomputation
+// and the interpolation are performed in extended precision, and the result is cast back to the original precision only
+// at the very end. By contrast, the canonical approach in astropy/ERFA is to first interpolate the ut1-utc difference,
+// and then use the result of the interpolation to compute the desired value. This difference in approach is most likely
+// at the root of the slight discrepancies we see wrt astropy/ERFA, which amount to < 1 part over 1 billion (circa
+// millimetre level in LEO).
 //
 // NOTE: the linear interpolation approach should be adequate for astrodynamical applications. In principle, however,
 // for both the polar motion and the UT1-UTC difference, there are short-term (diurnal and semi-diurnal) variations
@@ -118,6 +127,8 @@ public:
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                        const eop_data &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                             const eop_data &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
 llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, const char *,
@@ -125,6 +136,9 @@ llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, c
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression era_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82_func_impl(expression, eop_data);
+[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82p_func_impl(expression, eop_data);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_x_func_impl(expression, eop_data);
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_xp_func_impl(expression, eop_data);
@@ -141,21 +155,13 @@ llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, c
 template <typename... KwArgs>
 auto eop_common_opts(const KwArgs &...kw_args)
 {
-    igor::parser p{kw_args...};
-
-    static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
+    const igor::parser p{kw_args...};
 
     // Time expression (defaults to heyoka::time).
-    auto time_expr = [&p]() {
-        if constexpr (p.has(kw::time_expr)) {
-            return expression{p(kw::time_expr)};
-        } else {
-            return heyoka::time;
-        }
-    }();
+    auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() -> eop_data {
+    auto data = [&p]() {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {
@@ -168,45 +174,76 @@ auto eop_common_opts(const KwArgs &...kw_args)
 
 } // namespace detail
 
-inline constexpr auto era = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::era_func_impl, detail::eop_common_opts(kw_args...));
+inline constexpr auto eop_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
+                                                kw::descr::same_as<kw::eop_data, eop_data>>{};
+
+inline constexpr auto era = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::era_func_impl, detail::eop_common_opts(kw_args...)); };
+
+inline constexpr auto erap = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...)); };
+
+inline constexpr auto gmst82 = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
+    return std::apply(detail::gmst82_func_impl, detail::eop_common_opts(kw_args...));
 };
 
-inline constexpr auto erap = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...));
+inline constexpr auto gmst82p = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
+    return std::apply(detail::gmst82p_func_impl, detail::eop_common_opts(kw_args...));
 };
 
-inline constexpr auto pm_x = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::pm_x_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto pm_x = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_x_func_impl, detail::eop_common_opts(kw_args...)); };
 
-inline constexpr auto pm_xp = [](const auto &...kw_args) -> expression {
+inline constexpr auto pm_xp = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::pm_xp_func_impl, detail::eop_common_opts(kw_args...));
 };
 
-inline constexpr auto pm_y = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::pm_y_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto pm_y = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_y_func_impl, detail::eop_common_opts(kw_args...)); };
 
-inline constexpr auto pm_yp = [](const auto &...kw_args) -> expression {
+inline constexpr auto pm_yp = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression {
     return std::apply(detail::pm_yp_func_impl, detail::eop_common_opts(kw_args...));
 };
 
-inline constexpr auto dX = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::dX_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto dX = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::dX_func_impl, detail::eop_common_opts(kw_args...)); };
 
-inline constexpr auto dXp = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::dXp_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto dXp = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::dXp_func_impl, detail::eop_common_opts(kw_args...)); };
 
-inline constexpr auto dY = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::dY_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto dY = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::dY_func_impl, detail::eop_common_opts(kw_args...)); };
 
-inline constexpr auto dYp = [](const auto &...kw_args) -> expression {
-    return std::apply(detail::dYp_func_impl, detail::eop_common_opts(kw_args...));
-};
+inline constexpr auto dYp = []<typename... KwArgs>
+    requires igor::validate<eop_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+(KwArgs &&...kw_args) -> expression { return std::apply(detail::dYp_func_impl, detail::eop_common_opts(kw_args...)); };
 
 } // namespace model
 

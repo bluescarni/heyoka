@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -18,15 +18,14 @@
 #include <span>
 #include <stdexcept>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -46,10 +45,9 @@ HEYOKA_DLL_PUBLIC bool gpe_is_deep_space(double, double, double);
 namespace detail
 {
 
-// Small helper struct only used to store the results of sgp4_build_funcs().
-// It contains the init/tprop vector functions and their input variables,
-// plus the derivatives of the Cartesian state wrt the original elements
-// as a dtens object (if derivatives are requested).
+// Small helper struct only used to store the results of sgp4_build_funcs(). It contains the init/tprop vector functions
+// and their input variables, plus the derivatives of the Cartesian state wrt the original elements as a dtens object
+// (if derivatives are requested).
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_prop_funcs {
     std::pair<std::vector<expression>, std::vector<expression>> init;
     std::pair<std::vector<expression>, std::vector<expression>> tprop;
@@ -63,14 +61,12 @@ HEYOKA_DLL_PUBLIC void sgp4_compile_funcs(const std::function<void()> &, const s
 } // namespace detail
 
 // NOTE: a couple of ideas for performance improvements:
+//
 // - simultaneous computation of sin/cos for SLEEF,
-// - partitioning of the satellite list into simplified
-//   (perigee < 220km) and non-simplified dynamics. This would
-//   allow to get rid of the select() calls in the time propagation
-//   function, as we would then have 2 different functions for the simplified
-//   and non-simplified tprop. Getting rid of the select()s would allow
-//   to avoid unnecessary computations. The issue with this approach
-//   is that we would need to alter the original ordering of the satellites.
+// - partitioning of the satellite list into simplified (perigee < 220km) and non-simplified dynamics. This would allow
+//   to get rid of the select() calls in the time propagation function, as we would then have 2 different functions for
+//   the simplified and non-simplified tprop. Getting rid of the select()s would allow to avoid unnecessary
+//   computations. The issue with this approach is that we would need to alter the original ordering of the satellites.
 //   Perhaps a similar approach could work for the deep space part too?
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
@@ -102,36 +98,36 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
             }
         }
 
-        igor::parser p{kw_args...};
+        const igor::parser p{kw_args...};
 
         // Differentiation order (defaults to zero, no derivatives).
-        std::uint32_t order = 0;
-        if constexpr (p.has(kw::diff_order)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::diff_order))>>) {
-                order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
-            } else {
-                static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                              "The diff_order keyword argument must be of integral type.");
-            }
-        }
+        const auto order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order, 0));
 
         // Build the functions to be compiled.
         auto funcs = detail::sgp4_build_funcs(order);
 
         // Compile them.
-        // NOTE: in order to perform parallel compilation, we need to use the sgp4_compile_funcs() helper
-        // because we want to avoid having TBB in the public interface.
+        //
+        // NOTE: in order to perform parallel compilation, we need to use the sgp4_compile_funcs() helper because we
+        // want to avoid having TBB in the public interface.
+        //
+        // NOTE: thanks to the checks in llvm_state and cfunc, we know that the keyword arguments are safe for multiple
+        // and concurrent usages.
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
-            [&]() {
-                // NOTE: it is important here to use as_const_kwarg() so that we don't end up with moved-from
-                // keyword arguments the second time we use kw_args.
-                cf_init = cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second),
-                                   igor::as_const_kwarg(kw_args)...);
+            [&cf_init, &funcs, &kw_args...]() {
+                cf_init = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
+                    [&funcs](const auto &...args) {
+                        return cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), args...);
+                    },
+                    kw_args...);
             },
-            [&]() {
-                cf_prop = cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second),
-                                   igor::as_const_kwarg(kw_args)...);
+            [&cf_prop, &funcs, &kw_args...]() {
+                cf_prop = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
+                    [&funcs](const auto &...args) {
+                        return cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), args...);
+                    },
+                    kw_args...);
             });
 
         return std::make_tuple(std::move(sat_buffer), std::move(cf_init), std::move(cf_prop), std::move(funcs.dt));
@@ -150,8 +146,11 @@ public:
     };
 
     sgp4_propagator() noexcept;
-    // NOTE: the GPE data is expected as a 9 x n span, where n is the number of satellites
-    // and the rows represent:
+
+    // kwargs configuration for the constructor.
+    static constexpr auto ctor_kw_cfg = cfunc<T>::ctor_kw_cfg | igor::config<kw::descr::integral<kw::diff_order>>{};
+
+    // NOTE: the GPE data is expected as a 9 x n span, where n is the number of satellites and the rows represent:
     //
     // - the mean motion (in [rad / min]),
     // - the eccentricity,
@@ -163,10 +162,10 @@ public:
     // - the reference epoch (as a Julian date),
     // - a fractional correction to the epoch (in Julian days).
     //
-    // Julian dates are to be provided in the UTC scale of time. Internal conversion
-    // to TAI will ensure correct propagation across leap seconds.
+    // Julian dates are to be provided in the UTC scale of time. Internal conversion to TAI will ensure correct
+    // propagation across leap seconds.
     template <typename LayoutPolicy, typename AccessorPolicy, typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
+        requires igor::validate<ctor_kw_cfg, KwArgs...>
     explicit sgp4_propagator(
         mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>, LayoutPolicy, AccessorPolicy> sat_list,
         const KwArgs &...kw_args)
@@ -183,14 +182,6 @@ public:
     [[nodiscard]] std::uint32_t get_nouts() const noexcept;
     [[nodiscard]] mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> get_sat_data() const;
 
-    // NOTE: it is important to document the weak exception safety guarantee here:
-    // in the (very unlikely) case that invoking the init cfunc throws (due to TBB primitives
-    // failing), we may end up with inconsistent data in the propagator that will lead to
-    // wrong results for successive invocations of the call operator. I think this is an ok
-    // compromise for the sake of performance: providing strong exception safety is trivial if
-    // we make temp copy of the internal data, but that means allocating. If this becomes
-    // a problem, we may think of a more complicated scheme involving internal temp buffers
-    // in order to provide better exception safety.
     void replace_sat_data(mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>);
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
@@ -205,17 +196,24 @@ public:
     using in_2d = mdspan<const U, dextents<std::size_t, 2>>;
     using out_2d = mdspan<T, dextents<std::size_t, 2>>;
     using out_3d = mdspan<T, dextents<std::size_t, 3>>;
-    // NOTE: it is important to document properly the non-overlapping
-    // memory requirement for the input arguments.
-    // NOTE: because of the use of an internal buffer to convert
-    // dates to tsinces, the date overloads of these operators are
-    // never thread-safe. This needs to be documented properly.
-    // NOTE: Julian dates are to be provided in the UTC scale of time. Internal conversion
-    // to TAI will ensure correct propagation across leap seconds.
-    void operator()(out_2d, in_1d<T>);
-    void operator()(out_2d, in_1d<date>);
-    void operator()(out_3d, in_2d<T>);
-    void operator()(out_3d, in_2d<date>);
+    // NOTE: it is important to document properly the non-overlapping memory requirement for the input arguments.
+    //
+    // NOTE: Julian dates are to be provided in the UTC scale of time. Internal conversion to TAI will ensure correct
+    // propagation across leap seconds.
+    //
+    // NOTE: in principle we could accept here the batch_parallel kwarg in input and pass it down to the evaluation of
+    // the cfunc. Perhaps something to keep in mind for the future, but we should be careful not to complicate the
+    // interface too much. We have two potential parallelisations to think about here: the internal cfunc
+    // parallelisation and the further explicit parallelisation happening in batch propagation (last 2 overloads).
+    //
+    // NOTE: for my future self's sanity: the internal cfunc is SIMD-batching over the satellites and times, with the
+    // assumption that we are doing 1 evaluation per satellite (we refer to this as "scalar mode", a bit confusingly
+    // because there is SIMD batch happening). In "batch mode", we evaluate each satellite for *multiple* time points,
+    // parallelising the internal cfunc evaluations via multithreading.
+    void operator()(out_2d, in_1d<T>) const;
+    void operator()(out_2d, in_1d<date>) const;
+    void operator()(out_3d, in_2d<T>) const;
+    void operator()(out_3d, in_2d<date>) const;
 };
 
 // Prevent implicit instantiations.
@@ -226,8 +224,22 @@ extern template class sgp4_propagator<double>;
 HEYOKA_DLL_PUBLIC std::pair<double, double> jd_utc_to_tai(double, double);
 HEYOKA_DLL_PUBLIC std::pair<double, double> jd_tai_to_utc(double, double);
 
+namespace detail
+{
+
+// Boost s11n class version history for the sgp4 class:
+//
+// - 1: removed the temporary internal buffer in favour of a thread_local cache of buffers.
+inline constexpr int sgp4_propagator_s11n_version = 1;
+
+} // namespace detail
+
 } // namespace model
 
 HEYOKA_END_NAMESPACE
+
+// Set the Boost s11n class version for the sgp4_propagator class.
+BOOST_CLASS_VERSION(heyoka::model::sgp4_propagator<float>, heyoka::model::detail::sgp4_propagator_s11n_version);
+BOOST_CLASS_VERSION(heyoka::model::sgp4_propagator<double>, heyoka::model::detail::sgp4_propagator_s11n_version);
 
 #endif

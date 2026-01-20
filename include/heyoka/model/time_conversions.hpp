@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -51,6 +51,6 @@ HEYOKA_DLL_PUBLIC extern const expression delta_tt_tai;
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::model::detail::delta_tt_tai_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::model::detail::delta_tt_tai_func, true, std::string, unsigned)
 
 #endif

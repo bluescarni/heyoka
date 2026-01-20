@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -300,7 +300,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
-    // of the sum() function.
+    // of the sum_sq() function.
     assert(!sf.args().empty());
 
     auto &md = s.module();

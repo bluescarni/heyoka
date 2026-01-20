@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,7 +20,6 @@
 
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -47,6 +46,7 @@
 #include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -125,7 +125,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     // in the ctor.
     auto *fp_t = detail::internal_llvm_type_like(st, state[0]);
     auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
-    auto *ext_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
+    auto *ext_ptr_t = llvm::PointerType::getUnqual(context);
 
     // Cache the precision.
     const auto prec = [&]() -> long long {
@@ -160,17 +160,17 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, out_ptr);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *in_ptr = out_ptr + 1;
     in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, in_ptr);
     in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *state_ptr = out_ptr + 2;
     state_ptr->setName("state_ptr");
-    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(st, state_ptr);
     state_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     // Create a new basic block to start insertion into.

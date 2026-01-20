@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -184,7 +184,7 @@ llvm::Value *sub_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::v
 namespace
 {
 
-// Derivative of numparam / numparam.
+// Derivative of numparam - numparam.
 template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)

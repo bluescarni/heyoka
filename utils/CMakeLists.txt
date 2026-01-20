@@ -19,7 +19,7 @@ function(ADD_HEYOKA_UTIL arg1)
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
   # Setup the C++ standard.
-  target_compile_features(${arg1} PRIVATE cxx_std_20)
+  target_compile_features(${arg1} PRIVATE cxx_std_23)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
   add_test(${arg1} ${arg1})
 endfunction()

@@ -31,7 +31,7 @@ if its size was less than the correct one.
 General
 ~~~~~~~
 
-- Support for LLVM<15 has been dropped.
+Support for LLVM<15 has been dropped.
 
 .. _bchanges_4_0_0:
 

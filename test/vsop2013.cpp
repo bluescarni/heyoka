@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -59,16 +59,16 @@ TEST_CASE("cart bug arg check")
 {
     using Catch::Matchers::Message;
 
-    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(0, 1), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(0), std::invalid_argument,
                            Message("Invalid planet index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 9] range, but it is 0 instead"));
-    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(10, 1), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian(10), std::invalid_argument,
                            Message("Invalid planet index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 9] range, but it is 10 instead"));
-    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(0, 1), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(0), std::invalid_argument,
                            Message("Invalid planet index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 9] range, but it is 0 instead"));
-    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(10, 1), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(vsop2013_cartesian_icrf(10), std::invalid_argument,
                            Message("Invalid planet index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 9] range, but it is 10 instead"));
 }

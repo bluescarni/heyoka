@@ -11,13 +11,13 @@ target_compile_options(heyoka_test PRIVATE
 )
 
 # Setup the C++ standard.
-target_compile_features(heyoka_test PRIVATE cxx_std_20)
+target_compile_features(heyoka_test PRIVATE cxx_std_23)
 set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
 target_link_libraries(heyoka_test PRIVATE spdlog::spdlog heyoka)
 
 function(ADD_HEYOKA_TESTCASE arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt heyoka_llvm_internal Boost::boost)
+  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt heyoka_llvm_internal Boost::boost Boost::regex)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -26,7 +26,7 @@ function(ADD_HEYOKA_TESTCASE arg1)
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
   # Setup the C++ standard.
-  target_compile_features(${arg1} PRIVATE cxx_std_20)
+  target_compile_features(${arg1} PRIVATE cxx_std_23)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
   add_test(${arg1} ${arg1})
 endfunction()
@@ -155,9 +155,12 @@ ADD_HEYOKA_TESTCASE(model_jb08_tn)
 ADD_HEYOKA_TESTCASE(model_sgp4)
 ADD_HEYOKA_TESTCASE(model_time_conversions)
 ADD_HEYOKA_TESTCASE(model_frame_transformations)
+ADD_HEYOKA_TESTCASE(model_rsw)
 ADD_HEYOKA_TESTCASE(model_era)
+ADD_HEYOKA_TESTCASE(model_gmst82)
 ADD_HEYOKA_TESTCASE(model_eop)
 ADD_HEYOKA_TESTCASE(model_sw)
+ADD_HEYOKA_TESTCASE(model_dayfrac)
 ADD_HEYOKA_TESTCASE(step_callback)
 ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
 ADD_HEYOKA_TESTCASE(angle_reducer)
@@ -169,6 +172,7 @@ ADD_HEYOKA_TESTCASE(dfun)
 ADD_HEYOKA_TESTCASE(var_ode_sys)
 ADD_HEYOKA_TESTCASE(llvm_multi_state)
 ADD_HEYOKA_TESTCASE(make_multi_cfunc)
+ADD_HEYOKA_TESTCASE(iau2006)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)
@@ -190,6 +194,6 @@ if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(taylor_relu_mp)
 endif()
 
-ADD_HEYOKA_TESTCASE(iau2006)
-# NOTE: we use the erfa routines to validate our implementation.
+# NOTE: in these test cases we use the erfa routines to validate our implementation.
 target_link_libraries(iau2006 PRIVATE heyoka_erfa)
+target_link_libraries(eop_data PRIVATE heyoka_erfa)

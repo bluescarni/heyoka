@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -31,7 +31,6 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constant.h>
@@ -63,6 +62,7 @@
 #include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -538,6 +538,7 @@ number sqrt(const number &n)
 }
 
 // Generate an LLVM constant of type tp representing the number n.
+//
 // NOLINTNEXTLINE(misc-no-recursion)
 llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
@@ -550,9 +551,8 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         return detail::vector_splat(s.builder(), llvm_codegen(s, vector_t->getScalarType(), n), vec_size);
     }
 
-    if (tp->isFloatingPointTy() && tp->isIEEE()) {
-        // NOTE: for float and double we can construct
-        // directly an APFloat.
+    if (detail::llvm_is_ieee_like_fp(tp)) {
+        // NOTE: for float and double we can construct directly an APFloat.
         if (tp->isFloatTy() || tp->isDoubleTy()) {
             const auto apf
                 = tp->isFloatTy()
@@ -580,9 +580,8 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 
 #endif
 
-        // Fetch a string representation of n via the stream operator.
-        // Ensure that we use max_d10 digits in the representation, so that
-        // we get the closest approximation possible of n for the type tp.
+        // Fetch a string representation of n via the stream operator. Ensure that we use max_d10 digits in the
+        // representation, so that we get the closest approximation possible of n for the type tp.
         std::ostringstream ss;
         ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         ss.imbue(std::locale::classic());
@@ -597,8 +596,8 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
             n.value());
 
         // Construct the FP constant.
-        // NOTE: llvm will deduce the correct type for the codegen from the supplied
-        // floating-point semantics.
+        //
+        // NOTE: llvm will deduce the correct type for the codegen from the supplied floating-point semantics.
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
 #if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = detail::llvm_is_real(tp)) {
@@ -743,7 +742,7 @@ const auto dl_twopi_dict = make_dl_twopi_dict();
 // of 2pi for an input LLVM floating-point scalar type.
 std::pair<number, number> dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
 {
-    if (fp_t->isFloatingPointTy() && fp_t->isIEEE()) {
+    if (llvm_is_ieee_like_fp(fp_t)) {
 #if !defined(NDEBUG)
         // Sanity check.
         const auto &sem = fp_t->getFltSemantics();

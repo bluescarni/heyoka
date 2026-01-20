@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,6 +20,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <source_location>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -32,13 +33,13 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <llvm/Analysis/VectorUtils.h>
 #include <llvm/Config/llvm-config.h>
+#include <llvm/IR/Argument.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
@@ -58,6 +59,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/ModRef.h>
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -78,6 +80,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -167,10 +170,10 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret = llvm::StructType::create(
-            {to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
-             to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(to_external_llvm_type<mp_limb_t>(c))},
-            "heyoka.real");
+        auto *ret
+            = llvm::StructType::create({to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
+                                        to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(c)},
+                                       "heyoka.real");
 
         assert(ret != nullptr);
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
@@ -1130,10 +1133,8 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 #endif
 
         // Init the return value.
@@ -1151,7 +1152,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Load in a local variable the input pointer to the limbs.
         auto *limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
-        auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), limb_ptr_ptr);
+        auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), limb_ptr_ptr);
 
         // Load and insert the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
@@ -1230,9 +1231,8 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+        llvm_assert(s, builder.CreateICmpEQ(
+                           prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))));
 
 #endif
 
@@ -1246,7 +1246,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // Load in a local variable the output pointer to the limbs.
         auto *out_limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
-        auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), out_limb_ptr_ptr);
+        auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), out_limb_ptr_ptr);
 
         // Store the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
@@ -2268,6 +2268,31 @@ llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpORD(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ord(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ord values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
 // Check if the input floating-point value(s) x is anything other
 // than zero (including NaN).
 llvm::Value *llvm_fnz(llvm_state &s, llvm::Value *x)
@@ -2600,13 +2625,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     const auto fname = fmt::format("heyoka_csc_degree_{}_{}", n, llvm_mangle_type(tp));
 
     // The function arguments:
+    //
     // - pointer to the return value,
     // - pointer to the array of coefficients.
-    // NOTE: both pointers are to the scalar counterparts
-    // of the vector types, so that we can call this from regular
-    // C++ code. The second pointer is to an external type.
-    const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                          llvm::PointerType::getUnqual(ext_fp_t)};
+    //
+    // NOTE: both pointers are to the scalar counterparts of the vector types, so that we can call this from regular C++
+    // code. The second pointer is to an external type.
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(context));
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);
@@ -2626,13 +2651,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
         // Fetch the necessary function arguments.
         auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
-        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, out_ptr);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
         auto *cf_ptr = f->args().begin() + 1;
         cf_ptr->setName("cf_ptr");
-        cf_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, cf_ptr);
         cf_ptr->addAttr(llvm::Attribute::NoAlias);
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -3456,21 +3481,25 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
         }
         // LCOV_EXCL_STOP
 
+        // Assemble the type name.
         const auto name = fmt::format("heyoka.real.{}", prec);
 
+        // Check if we have already defined the type in the current context.
         if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
             return ptr;
         }
 
         // Compute the required number of limbs.
-        // NOTE: this is a computation done in the implementation of mppp::real and
-        // reproduced here. We should consider exposing this functionality in mp++.
+        //
+        // NOTE: this is a computation done in the implementation of mppp::real and reproduced here. We should consider
+        // exposing this functionality in mp++.
         const auto nlimbs = boost::numeric_cast<std::uint64_t>((prec / GMP_NUMB_BITS)
                                                                + static_cast<int>((prec % GMP_NUMB_BITS) != 0));
 
         // Fetch the limb array type.
         auto *limb_arr_t = llvm::ArrayType::get(to_external_llvm_type<mp_limb_t>(c), nlimbs);
 
+        // Define the real type.
         auto *ret = llvm::StructType::create(
             {to_external_llvm_type<mpfr_sign_t>(c), to_external_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 
@@ -3675,9 +3704,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
 // Implementation of the std::upper_bound() algorithm for floating-point types.
 //
-// Given an array of sorted scalar values beginning at ptr and of size arr_size (a 32-bit int), this function
-// will return the index of the first element in the array that is *greater than* v. If no such element exists,
-// arr_size will be returned. v can be a scalar or a vector.
+// Given an array of scalar values sorted in ascending order beginning at ptr and of size arr_size (a 32-bit int), this
+// function will return the index of the first element in the array that is *greater than* v. If no such element exists,
+// arr_size will be returned. v can be a scalar or a vector. No element in the array can be NaN, but v can be NaN. If v
+// is NaN, it is considered greater than any value in the array.
 //
 // The algorithm is short enough to be reproduced here:
 //
@@ -3706,10 +3736,10 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 //     return first;
 // }
 //
-// Particular care must be taken for the vector implementation: while in a scalar implementation
-// the bisection loop is never entered if count == 0, in the vector implementation we will be entering
-// the bisection loop with count == 0 whenever a SIMD lane has finished but the other SIMD lanes have not.
-// In a loop iteration with count == 0, the following happens:
+// Particular care must be taken for the vector implementation: while in a scalar implementation the bisection loop is
+// never entered if count == 0, in the vector implementation we will be entering the bisection loop with count == 0
+// whenever a SIMD lane has finished but the other SIMD lanes have not. In a loop iteration with count == 0, the
+// following happens:
 //
 // - step is set to 0 and 'it' remains inited to 'first';
 // - 'it' may be pointing one past the end of the array, and thus we must take care
@@ -3738,6 +3768,29 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     auto *int32_tp = bld.getInt32Ty();
     // NOTE: this will also check that arr_size is not a vector of values.
     assert(arr_size->getType() == int32_tp);
+
+#if !defined(NDEBUG)
+
+    // Validate the input array.
+    llvm_loop_u32(s, bld.getInt32(0), arr_size, [&bld, &s, scal_t, ptr, arr_size](llvm::Value *cur_idx) {
+        // Load the current value.
+        auto *cur_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {cur_idx}));
+
+        // Check that it is not NaN.
+        llvm_assert(s, llvm_fcmp_ord(s, cur_val, cur_val));
+
+        // Check that it is less than or equal to the next value (if available).
+        auto *next_idx = bld.CreateAdd(cur_idx, bld.getInt32(1));
+        llvm_if_then_else(
+            s, bld.CreateICmpEQ(next_idx, arr_size), []() {},
+            [&bld, &s, cur_val, scal_t, ptr, next_idx]() {
+                auto *next_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {next_idx}));
+
+                llvm_assert(s, llvm_fcmp_ole(s, cur_val, next_val));
+            });
+    });
+
+#endif
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
@@ -3800,6 +3853,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
             llvm::Value *cur_value{}, *mask{};
             if (batch_size == 1u) {
                 // Normal scalar load.
+                HEYOKA_LLVM_ASSERT(s, bld.CreateICmpULT(it, arr_size_splat));
                 cur_value = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, arr_ptr, {it}));
             } else {
                 // NOTE: as explained above, in vector mode we must take care to avoid loading from 'it'
@@ -3884,25 +3938,134 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     return bld.CreateLoad(idx_vec_t, first);
 }
 
+namespace
+{
+
+// Helper to generate a global string constant as a null-terminated char array.
+//
+// A pointer to the beginning of the array will be returned.
+//
+// NOTE: this is similar to the old CreateGlobalStringPtr() LLVM function which has recently been deprecated.
+llvm::Value *llvm_create_global_string_ptr(llvm_state &s, const char *str)
+{
+    auto &bld = s.builder();
+
+    // Create the global variable.
+    auto *gv = bld.CreateGlobalString(str);
+
+    // Fetch and return a pointer to the first element of the array.
+    return bld.CreateInBoundsGEP(gv->getValueType(), gv, {bld.getInt32(0), bld.getInt32(0)});
+}
+
+} // namespace
+
+HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::Value *val,
+                                   [[maybe_unused]] std::source_location loc)
+{
+
+#if !defined(NDEBUG)
+
+    // NOTE: run the assertion check only if we are not optimising the JIT compilation. The idea here is that the
+    // assertion check will result in invoking an external C function, which will likely impede a lot of optimisations
+    // and reduce the diversity of tested IR code.
+    if (s.get_opt_level() > 0u) {
+        return;
+    }
+
+    auto &bld = s.builder();
+
+    assert(val != nullptr);
+    assert(val->getType()->getScalarType() == bld.getInt1Ty());
+
+    // Transfer the file/function name strings into the LLVM world.
+    //
+    // NOTE: it may be possible that the pointers returned by loc refer to strings with static storage duration, in
+    // which case we could just copy the pointers. However I cannot find any conclusive reference at this time that
+    // guarantees this.
+    auto *file_name = llvm_create_global_string_ptr(s, loc.file_name());
+    auto *function_name = llvm_create_global_string_ptr(s, loc.function_name());
+
+    assert(file_name->getType()->isPointerTy());
+    assert(function_name->getType()->isPointerTy());
+
+    // Build the assertion condition.
+    auto *cond = val;
+    if (llvm::isa<llvm::FixedVectorType>(val->getType())) {
+        // val is a vector: the assertion condition is true if all SIMD lanes are true, false otherwise.
+        cond = bld.CreateAndReduce(cond);
+    }
+
+    // Check it.
+    llvm_if_then_else(
+        s, cond, []() {},
+        [&s, &bld, file_name, function_name, &loc]() {
+            llvm_invoke_external(s, "heyoka_llvm_assertion_failure", bld.getVoidTy(),
+                                 {bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
+                                  bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
+                                  function_name});
+        });
+
+#endif
+}
+
+// Helper to add the nocapture attribute to a pointer function argument. The syntax changes in LLVM 21, hence the need
+// for a wrapper.
+void llvm_add_no_capture_argattr([[maybe_unused]] llvm_state &s, llvm::Argument *arg)
+{
+    assert(arg != nullptr);
+    assert(arg->getType()->isPointerTy());
+
+#if LLVM_VERSION_MAJOR <= 20
+
+    arg->addAttr(llvm::Attribute::NoCapture);
+
+#else
+
+    arg->addAttr(llvm::Attribute::getWithCaptureInfo(s.context(), llvm::CaptureInfo::none()));
+
+#endif
+}
+
+// Helper to check if the input type is an IEEE-like floating-point type.
+//
+// NOTE: LLVM<=20 had an isIEEE() method for this, but it got slightly changed in LLVM 21 so that now it is called
+// isIEEELikeFPTy() and it *excludes* 80-bit extended precision. For our internal use, we want to consider 80-bit
+// extended precision as IEEE-like.
+bool llvm_is_ieee_like_fp(llvm::Type *tp)
+{
+    assert(tp != nullptr);
+
+#if LLVM_VERSION_MAJOR <= 20
+
+    return tp->isFloatingPointTy() && tp->isIEEE();
+
+#else
+
+    return tp->isFloatingPointTy() && (tp->isIEEELikeFPTy() || tp->isX86_FP80Ty());
+
+#endif
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
 
 #if !defined(NDEBUG)
 
-#if defined(HEYOKA_HAVE_REAL)
+// LCOV_EXCL_START
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(const std::uint64_t line,
+                                                                             const std::uint64_t column,
+                                                                             const char *file_name,
+                                                                             const char *function_name) noexcept
 {
-    assert(p1 == p2);
+    heyoka::detail::get_logger()->critical("LLVM assertion failure in file '{}', function '{}', line={}, column={}",
+                                           file_name, function_name, line, column);
+
+    assert(false);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
-{
-    assert(p1 == p2);
-}
-
-#endif
+// LCOV_EXCL_STOP
 
 #endif
 

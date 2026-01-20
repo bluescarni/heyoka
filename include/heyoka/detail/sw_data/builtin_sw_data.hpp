@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -19,7 +19,7 @@ namespace detail
 
 extern const char *const builtin_sw_data_ts;
 
-extern const sw_data_row builtin_sw_data[24713];
+extern const sw_data_row builtin_sw_data[24993];
 
 } // namespace detail
 

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -29,7 +29,10 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace model
+{
+
+namespace detail
 {
 
 namespace
@@ -293,6 +296,21 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     return {mu_a2 * sum(std::move(x_terms)), mu_a2 * sum(std::move(y_terms)), mu_a2 * sum(std::move(z_terms))};
 }
 
-} // namespace model::detail
+} // namespace detail
+
+// Default values of the gravitational parameter 'mu' and Earth radius 'a' for the egm2008_*() functions.
+//
+// NOTE: these are in SI units, taken from the official documentation of EGM2008.
+double get_egm2008_mu()
+{
+    return 3986004.415e8;
+}
+
+double get_egm2008_a()
+{
+    return 6378136.3;
+}
+
+} // namespace model
 
 HEYOKA_END_NAMESPACE

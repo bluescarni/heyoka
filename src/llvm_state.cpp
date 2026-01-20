@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,7 +20,6 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -33,12 +32,11 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/format.h>
 
 #include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Analysis/CGSCCPassManager.h>
@@ -78,17 +76,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-
-#if LLVM_VERSION_MAJOR >= 17
-
-// NOTE: this header was moved in LLVM 17.
 #include <llvm/TargetParser/Triple.h>
-
-#else
-
-#include <llvm/ADT/Triple.h>
-
-#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -107,6 +95,8 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -142,11 +132,11 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // NOTE: the pattern reported by LLVM here seems to be pwrN
 // (sample size of 1, on travis...).
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex ppc_regex_pattern("pwr([1-9]*)");
+const boost::regex ppc_regex_pattern("pwr([1-9]*)");
 
 // Regex to check for AMD Zen processors.
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex zen_regex_pattern("znver([1-9]*)");
+const boost::regex zen_regex_pattern("znver([1-9]*)");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -192,8 +182,8 @@ target_features get_target_features_impl()
 
         // Check if we are on Zen version 4 or later.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
-        std::cmatch m;
-        if (std::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
+        boost::cmatch m;
+        if (boost::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "znverN".
@@ -216,9 +206,9 @@ target_features get_target_features_impl()
         // instruction set from the CPU string.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
 
-        std::cmatch m;
+        boost::cmatch m;
 
-        if (std::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
+        if (boost::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
@@ -341,17 +331,15 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 
     // LCOV_EXCL_START
 
-    // NOTE: the code model setup is working only on LLVM>=19 (or at least
-    // LLVM 18 + patches, as in the conda-forge LLVM package), due to this bug:
+    // NOTE: the code model setup is working only on LLVM>=19 (or at least LLVM 18 + patches, as in the conda-forge LLVM
+    // package), due to this bug:
     //
     // https://github.com/llvm/llvm-project/issues/88115
     //
-    // Additionally, there are indications from our CI that attempting to set
-    // the code model before LLVM 17 or on Windows might just be buggy, as we see widespread
-    // ASAN failures all over the place. Thus, let us not do anything with the code
-    // model setting before LLVM 17 or on Windows.
-
-#if LLVM_VERSION_MAJOR >= 17 && !defined(_WIN32)
+    // Additionally, there are indications from our CI that attempting to set the code model on Windows might just be
+    // buggy, as we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model
+    // setting on Windows altogether. We can revisit this at a later stage if needed.
+#if !defined(_WIN32)
 
     // Setup the code model.
     switch (c_model) {
@@ -383,12 +371,17 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
     return std::move(*jtmb);
 }
 
-// This is a helper that will iterate over the functions of a module, decorating them with optimisation attributes
-// inferred from the capabilities of the host cpu. This is used in optimise_module().
-void optimise_module_annotate_cpu_features(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level,
-                                           bool force_avx512)
+// Helper to optimise the input module M. Implemented here for re-use.
+// NOTE: this may end up being invoked concurrently from multiple threads.
+// If that is the case, we make sure before invocation to construct a different
+// TargetMachine per thread, so that we are sure no data races are possible.
+void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
+                     bool slp_vectorize)
 {
-    // NOTE: don't set up any CPU feature at O0.
+    // NOTE: don't run any optimisation pass at O0.
+    // NOTE: it is important to note that this is different from using llvm::OptimizationLevel::O0, which still runs
+    // some optimisation passes. For instance, llvm coroutines do not work out of the box with the current approach,
+    // while they do work with llvm::OptimizationLevel::O0.
     if (opt_level == 0u) {
         return;
     }
@@ -397,8 +390,9 @@ void optimise_module_annotate_cpu_features(llvm::Module &M, llvm::TargetMachine 
     // the implementation of the 'opt' tool. See:
     // https://github.com/llvm/llvm-project/blob/release/10.x/llvm/tools/opt/opt.cpp
 
-    // For every function in the module, setup its attributes so that the codegen uses all the features available on the
-    // host CPU.
+    // For every function in the module, setup its attributes
+    // so that the codegen uses all the features available on
+    // the host CPU.
     const auto cpu = tm.getTargetCPU().str();
     const auto features = tm.getTargetFeatureString().str();
 
@@ -459,17 +453,6 @@ void optimise_module_annotate_cpu_features(llvm::Module &M, llvm::TargetMachine 
 
 #endif
     }
-}
-
-// Helper to optimise the input module M. Implemented here for re-use.
-//
-// NOTE: this may end up being invoked concurrently from multiple threads. If that is the case, we make sure before
-// invocation to construct a different TargetMachine per thread, so that we are sure no data races are possible.
-void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
-                     bool slp_vectorize)
-{
-    // Setup the CPU features on the module's functions.
-    optimise_module_annotate_cpu_features(M, tm, opt_level, force_avx512);
 
     // NOTE: adapted from here:
     // https://llvm.org/docs/NewPassManager.html
@@ -514,10 +497,6 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_leve
     llvm::OptimizationLevel ol{};
 
     switch (opt_level) {
-        case 0u:
-            // NOTE: O0 disables most (but not all) optimisations.
-            ol = llvm::OptimizationLevel::O0;
-            break;
         case 1u:
             ol = llvm::OptimizationLevel::O1;
             break;
@@ -831,7 +810,13 @@ struct llvm_state::jit {
         // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
         // NOTE: these checks need access to the data layout, so we put them here for convenience.
         const auto &dl = m_lljit->getDataLayout();
+#if LLVM_VERSION_MAJOR <= 20
         auto *real_t = llvm::cast<llvm::StructType>(detail::to_external_llvm_type<mppp::real>(*m_ctx->getContext()));
+#else
+        auto *real_t = m_ctx->withContextDo([](llvm::LLVMContext *ctx) {
+            return llvm::cast<llvm::StructType>(detail::to_external_llvm_type<mppp::real>(*ctx));
+        });
+#endif
         const auto *slo = dl.getStructLayout(real_t);
         assert(slo->getSizeInBytes() == sizeof(mppp::real));
         assert(slo->getAlignment().value() == alignof(mppp::real));
@@ -852,10 +837,6 @@ struct llvm_state::jit {
     ~jit() = default;
 
     // Accessors.
-    [[nodiscard]] llvm::LLVMContext &get_context() const
-    {
-        return *m_ctx->getContext();
-    }
     [[nodiscard]] std::string get_target_cpu() const
     {
         return m_tm->getTargetCPU().str();
@@ -998,14 +979,33 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool, code_
       m_fast_math(std::get<2>(tup)), m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)),
       m_c_model(std::get<5>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
+#if LLVM_VERSION_MAJOR <= 20
+
     // Create the module.
-    m_module = std::make_unique<llvm::Module>(m_module_name, context());
+    m_module = std::make_unique<llvm::Module>(m_module_name, *m_jitter->m_ctx->getContext());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(m_jitter->m_lljit->getDataLayout());
     m_module->setTargetTriple(m_jitter->get_target_triple().str());
 
     // Create a new builder for the module.
-    m_builder = std::make_unique<ir_builder>(context());
+    m_builder = std::make_unique<ir_builder>(*m_jitter->m_ctx->getContext());
+
+#else
+
+    // NOTE: in llvm 21 the ability to fetch a context from its thread-safe LLJIT counterpart was removed, in favour of
+    // the thread-safe withContextDo() which gives access to the context with automatic locking.
+    m_jitter->m_ctx->withContextDo([this](llvm::LLVMContext *ctx) {
+        // Create the module.
+        m_module = std::make_unique<llvm::Module>(m_module_name, *ctx);
+        // Setup the data layout and the target triple.
+        m_module->setDataLayout(m_jitter->m_lljit->getDataLayout());
+        m_module->setTargetTriple(m_jitter->get_target_triple());
+
+        // Create a new builder for the module.
+        m_builder = std::make_unique<ir_builder>(*ctx);
+    });
+
+#endif
 
     // Setup the math flags in the builder.
     ctor_setup_math_flags();
@@ -1024,25 +1024,34 @@ llvm_state::llvm_state(const llvm_state &other)
       m_c_model(other.m_c_model), m_module_name(other.m_module_name)
 {
     if (other.is_compiled()) {
-        // 'other' was compiled.
-        // We leave module and builder empty, copy over the
-        // IR/bitcode snapshots and add the compiled module
-        // to the jit.
+        // 'other' was compiled. We leave module and builder empty, copy over the IR/bitcode snapshots and add the
+        // compiled module to the jit.
         m_ir_snapshot = other.m_ir_snapshot;
         m_bc_snapshot = other.m_bc_snapshot;
 
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
-        // 'other' has not been compiled yet.
-        // We will fetch its bitcode and reconstruct
-        // module and builder. The IR/bitcode snapshots
-        // are left in their default-constructed (empty)
-        // state.
-        m_module = detail::bc_to_module(m_module_name, other.get_bc(), context());
+        // 'other' has not been compiled yet. We will fetch its bitcode and reconstruct module and builder. The
+        // IR/bitcode snapshots are left in their default-constructed (empty) state.
+
+#if LLVM_VERSION_MAJOR <= 20
+
+        m_module = detail::bc_to_module(m_module_name, other.get_bc(), *m_jitter->m_ctx->getContext());
 
         // Create a new builder for the module.
-        m_builder = std::make_unique<ir_builder>(context());
+        m_builder = std::make_unique<ir_builder>(*m_jitter->m_ctx->getContext());
+
+#else
+
+        m_jitter->m_ctx->withContextDo([this, &other](llvm::LLVMContext *ctx) {
+            m_module = detail::bc_to_module(m_module_name, other.get_bc(), *ctx);
+
+            // Create a new builder for the module.
+            m_builder = std::make_unique<ir_builder>(*ctx);
+        });
+
+#endif
 
         // Setup the math flags in the builder.
         ctor_setup_math_flags();
@@ -1234,11 +1243,25 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             m_ir_snapshot.clear();
             m_bc_snapshot.clear();
 
+#if LLVM_VERSION_MAJOR <= 20
+
             // Create the module from the bitcode.
-            m_module = detail::bc_to_module(m_module_name, bc_snapshot, context());
+            m_module = detail::bc_to_module(m_module_name, bc_snapshot, *m_jitter->m_ctx->getContext());
 
             // Create a new builder for the module.
-            m_builder = std::make_unique<ir_builder>(context());
+            m_builder = std::make_unique<ir_builder>(*m_jitter->m_ctx->getContext());
+
+#else
+
+            m_jitter->m_ctx->withContextDo([this, &bc_snapshot](llvm::LLVMContext *ctx) {
+                // Create the module from the bitcode.
+                m_module = detail::bc_to_module(m_module_name, bc_snapshot, *ctx);
+
+                // Create a new builder for the module.
+                m_builder = std::make_unique<ir_builder>(*ctx);
+            });
+
+#endif
 
             // Setup the math flags in the builder.
             ctor_setup_math_flags();
@@ -1278,7 +1301,7 @@ ir_builder &llvm_state::builder()
 
 llvm::LLVMContext &llvm_state::context()
 {
-    return m_jitter->get_context();
+    return builder().getContext();
 }
 
 const llvm::Module &llvm_state::module() const
@@ -1295,7 +1318,7 @@ const ir_builder &llvm_state::builder() const
 
 const llvm::LLVMContext &llvm_state::context() const
 {
-    return m_jitter->get_context();
+    return builder().getContext();
 }
 
 unsigned llvm_state::get_opt_level() const
@@ -1352,7 +1375,11 @@ void llvm_state::optimise()
     // just in case.
     assert(m_jitter->m_lljit->getTargetTriple() == m_jitter->m_tm->getTargetTriple());
     // NOTE: the target triple is also available in the module.
+#if LLVM_VERSION_MAJOR <= 20
     assert(m_jitter->m_lljit->getTargetTriple().str() == module().getTargetTriple());
+#else
+    assert(m_jitter->m_lljit->getTargetTriple() == module().getTargetTriple());
+#endif
 
     detail::optimise_module(module(), *m_jitter->m_tm, m_opt_level, m_force_avx512, m_slp_vectorize);
 }
@@ -1669,12 +1696,6 @@ struct multi_jit {
     llvm_multi_state &operator=(const multi_jit &) = delete;
     llvm_multi_state &operator=(multi_jit &&) noexcept = delete;
     ~multi_jit() = default;
-
-    // Helper to fetch the context from its thread-safe counterpart.
-    [[nodiscard]] llvm::LLVMContext &context() const noexcept
-    {
-        return *m_ctx->getContext();
-    }
 };
 
 // NOTE: keep this around as a tentative implementation of a TBB-based dispatcher.
@@ -1682,6 +1703,8 @@ struct multi_jit {
 #if 0
 
 // A task dispatcher class built on top of TBB's task group.
+//
+// NOTE: this needs to be isolated if we ever end up using it.
 class tbb_task_dispatcher : public llvm::orc::TaskDispatcher
 {
     oneapi::tbb::task_group m_tg;
@@ -1763,8 +1786,9 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
-// NOTE: disable parallel compilation altogether for the time being,
-// as of LLVM 20 it just seems to be buggy overall. Reconsider for the future.
+// NOTE: disable parallel compilation altogether for the time being, as of LLVM 21 it just seems to be buggy overall.
+// Reconsider for the future.
+//
 // NOLINTNEXTLINE
 #if 0
 
@@ -1800,7 +1824,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
         assert(obj_buffer);
 
         // Lock down for access to m_object_files.
-        const std::lock_guard lock{m_object_files_mutex};
+        const std::scoped_lock lock{m_object_files_mutex};
 
         assert(m_object_files.size() <= m_n_modules);
 
@@ -1862,8 +1886,12 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
                     // NOTE: lljit.getTargetTriple() just returns a const ref to an internal
                     // object, it should be ok with concurrent invocation.
                     assert(m_lljit->getTargetTriple() == (*tm)->getTargetTriple());
-                    // NOTE: the target triple is also available in the module.
+                // NOTE: the target triple is also available in the module.
+#if LLVM_VERSION_MAJOR <= 20
                     assert(m_lljit->getTargetTriple().str() == M.getTargetTriple());
+#else
+                    assert(m_lljit->getTargetTriple() == M.getTargetTriple());
+#endif
 
                     // Optimise the module.
                     detail::optimise_module(M, **tm, opt_level, force_avx512, slp_vectorize);
@@ -1876,7 +1904,7 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
                 auto ir_snap = detail::ir_from_module(M);
 
                 // NOTE: protect for multi-threaded access.
-                const std::lock_guard lock{m_ir_bc_mutex};
+                const std::scoped_lock lock{m_ir_bc_mutex};
 
                 m_bc_snapshots.push_back(std::move(bc_snap));
                 m_ir_snapshots.push_back(std::move(ir_snap));
@@ -1922,15 +1950,33 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
     // Create the master context.
     m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
 
+#if LLVM_VERSION_MAJOR <= 20
+
     // Create the master module.
-    m_module = std::make_unique<llvm::Module>(master_module_name, context());
+    m_module = std::make_unique<llvm::Module>(master_module_name, *m_ctx->getContext());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(m_lljit->getDataLayout());
     m_module->setTargetTriple(m_lljit->getTargetTriple().str());
 
     // Create a new builder for the master module.
     // NOTE: no need to mess around with fast math flags for this builder.
-    m_builder = std::make_unique<ir_builder>(context());
+    m_builder = std::make_unique<ir_builder>(*m_ctx->getContext());
+
+#else
+
+    m_ctx->withContextDo([this](llvm::LLVMContext *ctx) {
+        // Create the master module.
+        m_module = std::make_unique<llvm::Module>(master_module_name, *ctx);
+        // Setup the data layout and the target triple.
+        m_module->setDataLayout(m_lljit->getDataLayout());
+        m_module->setTargetTriple(m_lljit->getTargetTriple());
+
+        // Create a new builder for the master module.
+        // NOTE: no need to mess around with fast math flags for this builder.
+        m_builder = std::make_unique<ir_builder>(*ctx);
+    });
+
+#endif
 }
 
 } // namespace
@@ -2194,7 +2240,7 @@ void llvm_multi_state::add_obj_triggers()
     // Fetch the master builder/module/context.
     auto &bld = *m_impl->m_jit->m_builder;
     auto &md = *m_impl->m_jit->m_module;
-    auto &ctx = m_impl->m_jit->context();
+    auto &ctx = bld.getContext();
 
     // Add the prototypes of all per-module trigger functions to the master module.
     std::vector<llvm::Function *> callees;
@@ -2370,12 +2416,12 @@ void llvm_multi_state::compile()
     auto *logger = detail::get_logger();
 
     // Verify the modules before compiling.
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
-                              [](const auto &rng) {
-                                  for (const auto &s : rng) {
-                                      detail::verify_module(*s.m_module);
-                                  }
-                              });
+    detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range(m_impl->m_states.begin(), m_impl->m_states.end()),
+                                      [](const auto &rng) {
+                                          for (const auto &s : rng) {
+                                              detail::verify_module(*s.m_module);
+                                          }
+                                      });
 
     logger->trace("llvm_multi_state module verification runtime: {}", sw);
 

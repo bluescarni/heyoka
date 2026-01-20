@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -25,6 +25,11 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+TEST_CASE("mu/a getters")
+{
+    REQUIRE(model::get_egm2008_a() != model::get_egm2008_mu());
+}
 
 TEST_CASE("error handling")
 {

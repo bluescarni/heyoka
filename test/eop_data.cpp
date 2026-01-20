@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -9,12 +9,16 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <initializer_list>
+#include <iostream>
 #include <limits>
+#include <mutex>
 #include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -33,6 +37,7 @@
 #include <llvm/IR/Type.h>
 
 #include <heyoka/detail/eop_sw_helpers.hpp>
+#include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -54,7 +59,9 @@ TEST_CASE("basic")
 
     REQUIRE(!idata.get_table().empty());
     REQUIRE(!idata.get_timestamp().empty());
-    REQUIRE(idata.get_identifier() == "iers_rapid_finals2000A_all");
+    // NOTE: it is important that we make sure this has the correct value, because this name is created manually (unlike
+    // the download functions, which create this name automatically).
+    REQUIRE(idata.get_identifier() == "iers_rapid_usno_finals2000A_all");
 }
 
 TEST_CASE("parse_eop_data_iers_rapid test")
@@ -357,13 +364,6 @@ TEST_CASE("parse_eop_data_iers_rapid test")
         REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
     }
-
-    // A check for wrong filename for the download function.
-    REQUIRE_THROWS_MATCHES(
-        eop_data::fetch_latest_iers_rapid("helloworld"), std::invalid_argument,
-        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file: the valid names "
-                "are {\"finals2000A.all\", "
-                "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
 }
 
 TEST_CASE("parse_eop_data_iers_long_term test")
@@ -485,6 +485,101 @@ TEST_CASE("parse_eop_data_iers_long_term test")
         REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_long_term(str), std::invalid_argument,
                                Message("Error parsing a IERS long term EOP data file: at least 26 fields "
                                        "were expected in a data row, but 25 were found instead"));
+    }
+}
+
+TEST_CASE("parse_eop_data_celestrak test")
+{
+    using Catch::Matchers::Message;
+
+    // Successful parses.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O";
+
+        const auto data = detail::parse_eop_data_celestrak(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 58849);
+        REQUIRE(data[0].delta_ut1_utc == -0.1771665);
+        REQUIRE(data[0].pm_x == 0.076614);
+        REQUIRE(data[0].pm_y == 0.282309);
+        REQUIRE(data[0].dX == 0.000358 * 1000);
+        REQUIRE(data[0].dY == -0.000007 * 1000);
+
+        REQUIRE(data[1].mjd == 58850);
+        REQUIRE(data[1].delta_ut1_utc == -0.1776348);
+        REQUIRE(data[1].pm_x == 0.074686);
+        REQUIRE(data[1].pm_y == 0.282694);
+        REQUIRE(data[1].dX == 0.000397 * 1000);
+        REQUIRE(data[1].dY == 0.000024 * 1000);
+    }
+
+    // With newline at the end.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O\n";
+
+        const auto data = detail::parse_eop_data_celestrak(str);
+
+        REQUIRE(data.size() == 2u);
+
+        REQUIRE(data[0].mjd == 58849);
+        REQUIRE(data[0].delta_ut1_utc == -0.1771665);
+        REQUIRE(data[0].pm_x == 0.076614);
+        REQUIRE(data[0].pm_y == 0.282309);
+        REQUIRE(data[0].dX == 0.000358 * 1000);
+        REQUIRE(data[0].dY == -0.000007 * 1000);
+
+        REQUIRE(data[1].mjd == 58850);
+        REQUIRE(data[1].delta_ut1_utc == -0.1776348);
+        REQUIRE(data[1].pm_x == 0.074686);
+        REQUIRE(data[1].pm_y == 0.282694);
+        REQUIRE(data[1].dX == 0.000397 * 1000);
+        REQUIRE(data[1].dY == 0.000024 * 1000);
+    }
+
+    // Invalid mjd.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849a,0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O\n";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: the string '58849a' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid ut1-utc value.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,b0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596,0.000358,-0.000007,37,O\n2020-01-02,58850,0.074686,0.282694,-0.1776348,0."
+              "0004828,-0.108568,-0.006653,0.000397,0.000024,37,O";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: the string 'b0.076614' could "
+                                       "not be parsed as a valid double-precision value"));
+    }
+
+    // Invalid number of fields.
+    {
+        const std::string str
+            = "DATE,MJD,X,Y,UT1-UTC,LOD,DPSI,DEPS,DX,DY,DAT,DATA_TYPE\n2020-01-01,58849,0.076614,0.282309,-0.1771665,"
+              "0."
+              "0004417,-0.108563,-0.006596";
+
+        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_celestrak(str), std::invalid_argument,
+                               Message("Error parsing a CelesTrak EOP data file: at least 10 fields "
+                                       "were expected in a data row, but 8 were found instead"));
     }
 }
 
@@ -772,9 +867,88 @@ TEST_CASE("eop_data_dX_dY")
 // Test to check the download code. We pick a small file for testing.
 TEST_CASE("download finals2000A.daily")
 {
-    const auto data = eop_data::fetch_latest_iers_rapid("finals2000A.daily");
-    REQUIRE(!data.get_table().empty());
-    REQUIRE(data.get_identifier() == "iers_rapid_finals2000A_daily");
+    // NOTE: need to protect REQUIRE() invocations as Catch is not thread-safe.
+    std::mutex mut;
+
+    std::thread t1([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_iers_rapid("usno", "finals2000A.daily");
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "iers_rapid_usno_finals2000A_daily");
+        } catch (const std::exception &ex) {
+            // NOTE: ignore exceptions here, which are most likely caused by network issues.
+            std::cout << "Exception caught in the usno download test: " << ex.what() << std::endl;
+        }
+    });
+    std::thread t2([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_iers_rapid("iers", "finals.all.iau2000.txt");
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "iers_rapid_iers_finals_all_iau2000_txt");
+        } catch (const std::exception &ex) {
+            std::cout << "Exception caught in the iers download test: " << ex.what() << std::endl;
+        }
+    });
+
+    t1.join();
+    t2.join();
+}
+
+// Test to check the celestrak download code.
+TEST_CASE("download celestrak")
+{
+    // NOTE: need to protect REQUIRE() invocations as Catch is not thread-safe.
+    std::mutex mut;
+
+    std::thread t1([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_celestrak();
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "celestrak_last_5_years");
+        } catch (const std::exception &ex) {
+            // NOTE: ignore exceptions here, which are most likely caused by network issues.
+            std::cout << "Exception caught in the celestrak download test: " << ex.what() << std::endl;
+        }
+    });
+    std::thread t2([&mut]() {
+        try {
+            const auto data = eop_data::fetch_latest_celestrak(true);
+
+            std::scoped_lock lock(mut);
+            REQUIRE(!data.get_table().empty());
+            REQUIRE(data.get_identifier() == "celestrak_long_term");
+        } catch (const std::exception &ex) {
+            std::cout << "Exception caught in the celestrak download test: " << ex.what() << std::endl;
+        }
+    });
+
+    t1.join();
+    t2.join();
+}
+
+TEST_CASE("fetch_latest_iers_rapid error handling")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(eop_data::fetch_latest_iers_rapid("faffo"), std::invalid_argument,
+                           Message("Invalid origin 'faffo' specified for a IERS rapid EOP data file: the valid origins "
+                                   "are 'usno' and 'iers'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data::fetch_latest_iers_rapid("usno", "helloworld"), std::invalid_argument,
+        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file (USNO origin): the valid names "
+                "are {\"finals2000A.all\", "
+                "\"finals2000A.daily\", \"finals2000A.daily.extended\", \"finals2000A.data\"}"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data::fetch_latest_iers_rapid("iers", "helloworld"), std::invalid_argument,
+        Message("Invalid filename 'helloworld' specified for a IERS rapid EOP data file (IERS origin): the valid names "
+                "are {\"finals.all.iau2000.txt\", "
+                "\"finals.daily.iau2000.txt\", \"finals.data.iau2000.txt\"}"));
 }
 
 TEST_CASE("eop_data upper_bound")
@@ -1060,5 +1234,95 @@ TEST_CASE("eop_data locate_date")
     };
 
     tester.operator()<float>();
+    tester.operator()<double>();
+}
+
+TEST_CASE("eop_data_gmst82")
+{
+    // Fetch the default eop_data.
+    const eop_data data;
+
+    auto tester = [&data]<typename T>() {
+        llvm_state s;
+
+        auto &bld = s.builder();
+        auto &ctx = s.context();
+        auto &md = s.module();
+
+        auto *scal_t = detail::to_external_llvm_type<T>(ctx);
+
+        // Add dummy function that uses the array, returning a pointer to the first element.
+        auto *ft = llvm::FunctionType::get(llvm::PointerType::getUnqual(ctx), {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+        bld.CreateRet(detail::llvm_get_eop_data_gmst82(s, data, scal_t));
+
+        // Check the name mangling.
+        REQUIRE(boost::algorithm::contains(s.get_ir(), "eop_data"));
+
+        // Compile and fetch the function pointer.
+        s.compile();
+        using arr_t = T[2];
+        auto *fptr = reinterpret_cast<const arr_t *(*)()>(s.jit_lookup("test"));
+
+        // Fetch the array pointer.
+        const auto *arr_ptr = fptr();
+
+        // We will be loading the double-length gmst82 approximation and reduce it in octuple precision.
+        // Then, we will compare it to values computed with erfa.
+        using oct_t = boost::multiprecision::cpp_bin_float_oct;
+        auto reducer = [](const auto &x) {
+            using std::atan2;
+            using std::sin;
+            using std::cos;
+
+            auto ret = atan2(sin(x), cos(x));
+            if (ret < 0) {
+
+                ret = 2 * boost::math::constants::pi<oct_t>() + ret;
+            }
+            return ret;
+        };
+
+        // The erfa-based implementation.
+        auto erfa_gmst82 = [](double utc_mjd, double dut1) {
+            // Convert the UTC jd into UT1.
+            double ut1_jd1{}, ut1_jd2{};
+            [[maybe_unused]] const auto ret = ::eraUtcut1(2400000.5, utc_mjd, dut1, &ut1_jd1, &ut1_jd2);
+            assert(ret == 0);
+            return ::eraGmst82(ut1_jd1, ut1_jd2);
+        };
+
+        using std::abs;
+        {
+            oct_t gmst82{arr_ptr[0][0]};
+            gmst82 += arr_ptr[0][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(41684, 0.8075)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[6678][0]};
+            gmst82 += arr_ptr[6678][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(48362, 0.37842)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[15024][0]};
+            gmst82 += arr_ptr[15024][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(56708, -0.149055)) < 1e-9);
+        }
+
+        {
+            oct_t gmst82{arr_ptr[16271][0]};
+            gmst82 += arr_ptr[16271][1];
+
+            REQUIRE(abs(reducer(gmst82) - erfa_gmst82(57955, 0.3520877)) < 1e-9);
+        }
+    };
+
+    // NOTE: test only double for the gmst82.
     tester.operator()<double>();
 }

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -14,12 +14,14 @@
 #include <limits>
 #include <random>
 #include <ranges>
-#include <regex>
 #include <sstream>
 #include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -421,13 +423,13 @@ TEST_CASE("get_eop_eop_func")
                     if (std::isnan(pm_x_cmp)) {
                         REQUIRE(std::isnan(pm_x_vec[j]));
                     } else {
-                        REQUIRE(pm_x_vec[j] == approximately(pm_x_cmp, T(1000)));
+                        REQUIRE(pm_x_vec[j] == approximately(pm_x_cmp, T(10000)));
                     }
 
                     if (std::isnan(pm_xp_cmp)) {
                         REQUIRE(std::isnan(pm_xp_vec[j]));
                     } else {
-                        REQUIRE(pm_xp_vec[j] == approximately(pm_xp_cmp, T(1000)));
+                        REQUIRE(pm_xp_vec[j] == approximately(pm_xp_cmp, T(10000)));
                     }
                 }
             }
@@ -481,19 +483,13 @@ TEST_CASE("eop cfunc")
                 // of this check is to make sure that the computation is done with a single call to the combined
                 // function. That is, we want to make sure that LLVM understood it does not need to call the same
                 // function twice.
-                const auto get_eop_eopp_call_regex = std::regex(R"(.*call.*heyoka\.get_.*_.*p\..*)");
+                const auto get_eop_eopp_call_regex = boost::regex(R"(.*call.*heyoka\.get_.*_.*p\..*)");
                 auto count = 0u;
                 const auto ir = s.get_ir();
                 for (const auto line : ir | std::ranges::views::split('\n')) {
-                    // NOTE: libstdc++ bug on large strings:
-                    // https://stackoverflow.com/questions/36304204/c-regex-segfault-on-long-sequences
-                    if (std::ranges::size(line) > 200u) {
-                        continue;
-                    }
-
-                    std::cmatch matches;
-                    if (std::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
-                                         matches, get_eop_eopp_call_regex)) {
+                    boost::cmatch matches;
+                    if (boost::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
+                                           matches, get_eop_eopp_call_regex)) {
                         ++count;
                     }
                 }

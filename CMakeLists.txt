@@ -1,6 +1,5 @@
-# NOTE: the 3.18 requirement comes from here:
-# https://cmake.org/cmake/help/latest/module/CheckLinkerFlag.html
-cmake_minimum_required(VERSION 3.18.0)
+# NOTE: C++23 recognised since 3.20.0.
+cmake_minimum_required(VERSION 3.20.0)
 
 # Set default build type to "Release".
 # NOTE: this should be done before the project command since the latter can set
@@ -11,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 8.0.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.9.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -133,6 +132,13 @@ if(YACMA_COMPILER_IS_MSVC)
   endif()
 endif()
 
+# Check the presence of the thread-safe variant of strerror() called strerror_r().
+#
+# This function is available both in the POSIX standard and as a GNU extension. Here we check only
+# the presence of the symbol, we will detect and choose the correct variant from within the code.
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
+
 # Mandatory dependency on LLVM.
 #
 # NOTE: do it early so that we can set up
@@ -149,8 +155,8 @@ endif()
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 16 OR ${LLVM_VERSION_MAJOR} GREATER 20)
-  message(FATAL_ERROR "LLVM >= 16 and <= 20 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 17 OR ${LLVM_VERSION_MAJOR} GREATER 21)
+  message(FATAL_ERROR "LLVM >= 17 and <= 21 is required.")
 endif()
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
@@ -182,16 +188,15 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/div.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sub.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vector_math.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/empty_callable_s11n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_buffer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/type_traits.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/get_dl_path.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/analytical_theories_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/http_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ex_traversal.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_vector.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -214,6 +219,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_rapid.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_iers_long_term.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/eop_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_helpers.cpp"
@@ -304,10 +310,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sgp4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/time_conversions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/frame_transformations_rsw.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eop.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sw.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2006.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/egm2008.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/dayfrac.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
@@ -358,7 +366,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 36)
+set(HEYOKA_ABI_VERSION 41)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -373,6 +381,11 @@ else()
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
 
+if(_HEYOKA_HAVE_STRERROR_R)
+    # strerror_r() is available, signal its presence when compiling the library.
+    target_compile_definitions(heyoka PRIVATE HEYOKA_HAVE_STRERROR_R)
+endif()
+
 # Setup common to both the shared and static variants.
 target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -381,8 +394,8 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Ensure that C++20 is employed when both compiling and consuming heyoka.
-target_compile_features(heyoka PUBLIC cxx_std_20)
+# Ensure that C++23 is employed when both compiling and consuming heyoka.
+target_compile_features(heyoka PUBLIC cxx_std_23)
 # Enforce vanilla C++ when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
 
@@ -510,13 +523,11 @@ add_subdirectory(src/detail/erfa)
 target_link_libraries(heyoka PRIVATE heyoka_erfa)
 
 # Mandatory dependency on fmt.
+#
+# NOTE: this is used as a half-open range.
 set(_HEYOKA_MIN_SUPPORTED_FMT_VERSION 9)
-set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 11)
-find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION} OR
-   ${fmt_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION})
-   message(FATAL_ERROR "The supported fmt versions are in the range [${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}, ${_HEYOKA_MAX_SUPPORTED_FMT_VERSION}], but version ${fmt_VERSION_MAJOR} was found instead.")
-endif()
+set(_HEYOKA_MAX_SUPPORTED_FMT_VERSION 13)
+find_package(fmt ${_HEYOKA_MIN_SUPPORTED_FMT_VERSION}...<${_HEYOKA_MAX_SUPPORTED_FMT_VERSION} REQUIRED CONFIG)
 message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
@@ -534,17 +545,17 @@ set(_HEYOKA_MIN_BOOST_VERSION "1.85")
 # NOTE: we look for Boost in CONFIG mode first, as that has become the official supported way
 # of locating Boost in recent Boost/CMake versions. If we fail, we try again in
 # MODULE mode as last resort.
-find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv CONFIG)
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS serialization charconv regex CONFIG)
 if(NOT ${Boost_FOUND})
     message(STATUS "Boost not found in CONFIG mode, retrying in MODULE mode.")
-    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv)
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS serialization charconv regex)
 endif()
 if(NOT ${Boost_FOUND})
     message(FATAL_ERROR "Could not locate Boost in either CONFIG or MODULE mode.")
 endif()
 message(STATUS "Found Boost version ${Boost_VERSION}.")
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
-target_link_libraries(heyoka PRIVATE Boost::charconv)
+target_link_libraries(heyoka PRIVATE Boost::charconv Boost::regex)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 # NOTE: make sure we do not use deprecated ASIO bits.
@@ -633,6 +644,7 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
+unset(_HEYOKA_HAVE_STRERROR_R)
 if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
 endif()

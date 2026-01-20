@@ -7,14 +7,14 @@ Introduction
 ------------
 
 heyoka is written in modern C++, and it requires a compiler able to understand
-at least C++20. Specifically, heyoka currently targets GCC>=10, clang>=14 and MSVC>=2022.
+at least C++23. Specifically, heyoka currently targets GCC>=14, clang>=18 and MSVC>=17.4.
 The library is regularly tested on a continuous integration pipeline
 which includes several operating systems (Linux, OSX, Windows)
 and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
 
-* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=16 and <=20),
+* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >=17 and <=21),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.85),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=11),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
@@ -37,7 +37,7 @@ Additionally, heyoka has the following **optional** dependencies:
   libraries (used in the tests and benchmarks, xtensor>=0.26 is required).
 
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
-installing from source (the minimum required version is 3.18).
+installing from source (the minimum required version is 3.20).
 
 .. warning::
 
@@ -117,17 +117,11 @@ to the channels, and then we can immediately install heyoka:
    $ conda config --set channel_priority strict
    $ conda install heyoka
 
-Note that the ``heyoka`` package on conda is built against an unspecified version of LLVM. If you need
-a package built against a *specific* version of LLVM, you can install one of the ``heyoka-llvm-*``
-meta-packages. For instance, in order to install a package built against LLVM 12, you
-could use the following command:
+.. versionchanged:: 7.4.0
 
-.. code-block:: console
-
-   $ conda install heyoka-llvm-12
-
-The list of heyoka meta-packages is available
-`here <https://github.com/conda-forge/heyoka-feedstock>`__.
+   While previously multiple conda meta-packages compiled against different versions of LLVM where available,
+   starting with heyoka 7.4.0 there is a single ``heyoka`` package, statically linked against the latest LLVM version
+   available on conda.
 
 The conda packages for heyoka are maintained by the core development team,
 and they are regularly updated when new heyoka versions are released.
@@ -256,8 +250,8 @@ may look like this:
 
 .. code-block:: cmake
 
-   # heyoka requires at least CMake 3.18.
-   cmake_minimum_required(VERSION 3.18.0)
+   # heyoka requires at least CMake 3.20.
+   cmake_minimum_required(VERSION 3.20.0)
 
    # The name of our project.
    project(sample_project)

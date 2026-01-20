@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -75,13 +75,10 @@ public:
 class HEYOKA_DLL_PUBLIC constant : public func_base
 {
 public:
-    using str_func_t = callable<std::string(unsigned)>;
+    using str_func_t = callable<std::string(unsigned) const>;
 
 private:
-    // NOTE: this mutable is a bit unfortunate but we will
-    // have to live with this for the time being. Fixing this
-    // needs support for const qualified callables.
-    mutable str_func_t m_str_func;
+    str_func_t m_str_func;
     std::optional<std::string> m_repr;
 
     // Serialization.
@@ -121,9 +118,14 @@ HEYOKA_DLL_PUBLIC extern const expression pi;
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, std::string, unsigned)
+// Boost s11n class version history for the constant class:
+//
+// - 1: m_str_func is now a const callable.
+BOOST_CLASS_VERSION(heyoka::constant, 1);
 
-HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::pi_constant_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, true, std::string, unsigned)
+
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::pi_constant_func, true, std::string, unsigned)
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::constant)
 

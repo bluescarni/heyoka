@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -14,7 +14,6 @@
 #include <ios>
 #include <limits>
 #include <locale>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -24,6 +23,7 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/format.h>
 
@@ -127,7 +127,7 @@ namespace
 // Regex to match floating-point numbers. See:
 // https://www.regular-expressions.info/floatingpoint.html
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
+const boost::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
 
 } // namespace
 
@@ -150,8 +150,15 @@ void constant::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_repr;
 }
 
-void constant::load(boost::archive::binary_iarchive &ar, unsigned)
+void constant::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<constant>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a constant object: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ar >> boost::serialization::base_object<func_base>(*this);
     ar >> m_str_func;
     ar >> m_repr;
@@ -192,7 +199,7 @@ std::string constant::operator()(unsigned prec) const
     auto ret = m_str_func(prec);
 
     // Validate the return value.
-    if (!std::regex_match(ret, detail::fp_regex)) {
+    if (!boost::regex_match(ret, detail::fp_regex)) [[unlikely]] {
         throw std::invalid_argument(fmt::format("The string '{}' returned by the implementation of a constant is not a "
                                                 "valid representation of a floating-point number in base 10",
                                                 ret));
@@ -208,7 +215,7 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
 
-    if (tp->isFloatingPointTy() && tp->isIEEE()) {
+    if (detail::llvm_is_ieee_like_fp(tp)) {
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
@@ -340,10 +347,10 @@ const expression pi(func(constant("pi", detail::pi_constant_func{}, "π")));
 HEYOKA_END_NAMESPACE
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, true, std::string, unsigned)
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, std::string, unsigned)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, true, std::string, unsigned)
 
 // NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::constant)

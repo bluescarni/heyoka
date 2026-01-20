@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -11,7 +11,12 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
+#include <functional>
 #include <limits>
+#include <ranges>
+#include <string>
+#include <string_view>
 #include <type_traits>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -141,6 +146,26 @@ inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
 
 template <typename T>
 double get_fp_unit_cost();
+
+// Concept to detect (a subset of) string-like types.
+template <typename T>
+concept string_like = std::same_as<T, std::string> || std::same_as<T, std::string_view> || std::same_as<T, const char *>
+                      || std::same_as<T, char *> || (std::is_array_v<T> && std::same_as<char, std::remove_extent_t<T>>);
+
+// Concept to detect if R is an input range from whose reference type instances of T can be constructed.
+template <typename R, typename T>
+concept constructible_input_range
+    = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
+
+// Concept to detect if T is a std::reference_wrapper.
+template <typename T>
+inline constexpr bool is_reference_wrapper_impl = false;
+
+template <typename T>
+inline constexpr bool is_reference_wrapper_impl<std::reference_wrapper<T>> = true;
+
+template <typename T>
+concept is_reference_wrapper = is_reference_wrapper_impl<T>;
 
 } // namespace detail
 

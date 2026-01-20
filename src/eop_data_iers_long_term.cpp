@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -14,14 +14,13 @@
 #include <system_error>
 #include <utility>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #include <boost/charconv.hpp>
 
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/http_download.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/eop_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -58,16 +57,9 @@ double parse_eop_data_iers_long_term_double(const std::ranges::contiguous_range 
 // https://datacenter.iers.org/versionMetadata.php?filename=latestVersionMeta/234_EOP_C04_20.62-NOW234.txt
 eop_data_table parse_eop_data_iers_long_term(const std::string &str)
 {
-    // Parse line by line, splitting on newlines.
+    // Parse line by line, splitting on newlines and skipping the first line (which contains the header).
     eop_data_table retval;
-    bool past_first_line = false;
-    for (const auto cur_line : str | std::views::split('\n')) {
-        // NOTE: skip the first line which contains the CSV header.
-        if (!past_first_line) {
-            past_first_line = true;
-            continue;
-        }
-
+    for (const auto cur_line : str | std::views::split('\n') | std::views::drop(1)) {
         // NOTE: IERS long term EOP data files may have a newline at the end. When we encounter it, just break out.
         if (std::ranges::empty(cur_line)) {
             break;

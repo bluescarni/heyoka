@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -112,6 +113,7 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     }
 
     // We need to create a new array. Begin with the array type.
+    //
     // NOTE: array size needs a 64-bit int, but we want to guarantee that the array size fits in a 32-bit int.
     auto *arr_type = llvm::ArrayType::get(value_t, boost::numeric_cast<std::uint32_t>(table.size()));
 
@@ -128,8 +130,9 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     }
 
     // Create the array.
-    // NOTE: we use linkonce_odr linkage so that we do not get duplicate definitions of the
-    // same data in multiple llvm modules.
+    //
+    // NOTE: we use linkonce_odr linkage so that we do not get duplicate definitions of the same data in multiple llvm
+    // modules.
     auto *arr = llvm::ConstantArray::get(arr_type, data_init);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_arr = new llvm::GlobalVariable(md, arr_type, true, llvm::GlobalVariable::LinkOnceODRLinkage, arr, name);
@@ -171,6 +174,7 @@ llvm::Value *llvm_get_eop_sw_data_date_tt_cy_j2000(llvm_state &s, const Data &da
 
         // Transform TAI into TT.
         double tt_jd1{}, tt_jd2{};
+        // NOTE: eraTaitt() always returns 0 (success), no need to check.
         ::eraTaitt(tai_jd1, tai_jd2, &tt_jd1, &tt_jd2);
 
         // Normalise.
@@ -305,6 +309,20 @@ llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm:
     // Second step: ret = (ret == arr_size) ? ret : (ret - 1).
     auto *ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
     ret = bld.CreateSelect(ret_eq_arr_size, ret, bld.CreateSub(ret, llvm::ConstantInt::get(ret->getType(), 1)));
+
+#if !defined(NDEBUG)
+
+    // Check ret: either it must be equal to the array size, or ret + 1 must be < arr_size.
+    ret_eq_arr_size = bld.CreateICmpEQ(ret, arr_size_splat);
+    // NOTE: as a corner case, we need to handle the possibility that ret is the max uint32_t. If we don't, ret + 1 will
+    // wrap around and may pass the ret + 1 < arr_size check even if it should not.
+    auto *ret_not_max = bld.CreateICmpNE(ret, llvm::ConstantInt::get(ret_t, std::numeric_limits<std::uint32_t>::max()));
+    auto *retp1_lt_arr_size = bld.CreateICmpULT(bld.CreateAdd(ret, llvm::ConstantInt::get(ret_t, 1)), arr_size_splat);
+    auto *check = bld.CreateAnd(ret_not_max, retp1_lt_arr_size);
+    check = bld.CreateOr(ret_eq_arr_size, check);
+    llvm_assert(s, check);
+
+#endif
 
     // Create the return value.
     bld.CreateRet(ret);

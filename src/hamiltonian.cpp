@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -12,11 +12,10 @@
 #include <variant>
 #include <vector>
 
-#include <boost/safe_numerics/safe_integer.hpp>
-
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/hamiltonian.hpp>
 #include <heyoka/kw.hpp>

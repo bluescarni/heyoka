@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -1040,7 +1040,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_nte_callback, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nte_callback, false, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t)
 
 TEST_CASE("nte s11n")
 {
@@ -1782,7 +1782,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_te_callback, bool, taylor_adaptive_batch<double> &, int, std::uint32_t)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_te_callback, false, bool, taylor_adaptive_batch<double> &, int, std::uint32_t)
 
 TEST_CASE("te s11n")
 {

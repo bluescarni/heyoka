@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -40,6 +40,7 @@ struct dfloat {
     explicit dfloat(F x) : hi(x), lo(0) {}
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit dfloat(F h, F l) : hi(h), lo(l) {}
+    explicit dfloat(std::pair<F, F> p) : dfloat(std::move(p.first), std::move(p.second)) {}
 
     explicit operator F() const
     {

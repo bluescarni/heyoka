@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -42,10 +42,13 @@ llvm::Value *llvm_real_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_one(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_ord(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fnz(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 llvm::Value *llvm_real_sgn(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_isfinite(llvm_state &, llvm::Value *);
+llvm::Value *llvm_real_to_double(llvm_state &, llvm ::Value *);
+llvm::Value *llvm_double_to_real(llvm_state &, llvm::Value *, llvm::Type *);
 
 HEYOKA_DLL_PUBLIC mppp::real eps_from_prec(mpfr_prec_t);
 

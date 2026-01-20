@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -75,7 +75,7 @@ TEST_CASE("polynomial enclosures")
                 auto &context = s.context();
 
                 auto val_t = detail::to_external_llvm_type<fp_t>(context);
-                auto ptr_val_t = llvm::PointerType::getUnqual(val_t);
+                auto *ptr_val_t = llvm::PointerType::getUnqual(context);
 
                 // Fetch the current insertion block.
                 auto *orig_bb = builder.GetInsertBlock();
@@ -210,8 +210,7 @@ TEST_CASE("polynomial enclosures mp")
                 auto &context = s.context();
 
                 auto *val_t = detail::internal_llvm_type_like(s, fp_t{0, prec});
-                auto *ext_val_t = detail::make_external_llvm_type(val_t);
-                auto *ext_ptr_val_t = llvm::PointerType::getUnqual(ext_val_t);
+                auto *ext_ptr_val_t = llvm::PointerType::getUnqual(context);
 
                 // Fetch the current insertion block.
                 auto *orig_bb = builder.GetInsertBlock();

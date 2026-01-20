@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -41,7 +41,6 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
@@ -652,20 +651,18 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    // Fetch the type for external loading.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
     // Init the name.
     auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
 
     // Init the vector of arguments:
+    //
     // - idx of the u variable which is being evaluated,
     // - eval array (pointer to val_t),
     // - par ptr (pointer to scalar),
     // - time ptr (pointer to scalar),
     // - stride value.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(ext_fp_t), llvm::PointerType::getUnqual(ext_fp_t),
+    auto *ptr_t = llvm::PointerType::getUnqual(c);
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), ptr_t, ptr_t, ptr_t,
                                     to_external_llvm_type<std::size_t>(c)};
 
     // Add the mangling and LLVM arg types for the argument types.

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -13,7 +13,8 @@
 #include <cstddef>
 #include <exception>
 #include <memory>
-#include <regex>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -27,6 +28,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -63,7 +65,7 @@ const auto http_download_month_names_map = []() {
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
 // NOLINTNEXTLINE(cert-err58-cpp)
-const auto http_download_date_regexp = std::regex(
+const auto http_download_date_regexp = boost::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
                 fmt::join(http_download_month_names, "|")));
 
@@ -85,8 +87,8 @@ std::string http_download_parse_last_modified(std::string_view lm_field)
         return out;
     };
 
-    std::cmatch matches;
-    if (std::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, http_download_date_regexp))
+    boost::cmatch matches;
+    if (boost::regex_match(lm_field.data(), lm_field.data() + lm_field.size(), matches, http_download_date_regexp))
         [[likely]] {
         // Check if all groups matched.
         // NOTE: 7 + 1 because the first match is the entire string.
@@ -237,6 +239,13 @@ public:
     {
         check_error(ec, "read");
 
+        if (res_.result() != http::status::ok) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(
+                fmt::format("HTTP error {}, the response is: '{}'", res_.result_int(), res_.body()));
+            // LCOV_EXCL_STOP
+        }
+
         // Parse the "last modified field" to construct the timestamp.
         timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
 
@@ -351,6 +360,13 @@ public:
     {
         check_error(ec, "read");
 
+        if (res_.result() != http::status::ok) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(
+                fmt::format("HTTP error {}, the response is: '{}'", res_.result_int(), res_.body()));
+            // LCOV_EXCL_STOP
+        }
+
         // Parse the "last modified field" to construct the timestamp.
         timestamp_ = http_download_parse_last_modified(res_[http::field::last_modified]);
 
@@ -369,7 +385,39 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+HEYOKA_CONSTINIT std::mutex ssl_verify_file_mutex;
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+HEYOKA_CONSTINIT std::optional<std::string> ssl_verify_file;
+
 } // namespace
+
+// Machinery to get/set a global SSL verify file.
+//
+// This can be used in cases where the system's certificate store is not working properly (e.g., this can happen if a
+// vendored SSL library uses a hard-coded certificate store path different from the one in use on the current system).
+std::optional<std::string> get_ssl_verify_file()
+{
+    const std::scoped_lock lock(ssl_verify_file_mutex);
+
+    return ssl_verify_file;
+}
+
+// LCOV_EXCL_START
+
+void set_ssl_verify_file(std::string path)
+{
+    const std::scoped_lock lock(ssl_verify_file_mutex);
+
+    if (path.empty()) {
+        ssl_verify_file.reset();
+    } else {
+        ssl_verify_file.emplace(std::move(path));
+    }
+}
+
+// LCOV_EXCL_STOP
 
 // NOTE: this is a function to download a file from a remote server via https. In addition to the file,
 // its timestamp on the remote server will also be returned in the format year_month_day_hour_minute_second.
@@ -387,6 +435,11 @@ std::pair<std::string, std::string> https_download(const std::string &host, unsi
 
         // Set default verification paths (uses system's certificate store).
         ctx.set_default_verify_paths();
+
+        // Load a custom verify file, if provided by the user.
+        if (const auto vfile = get_ssl_verify_file()) {
+            ctx.load_verify_file(*vfile); // LCOV_EXCL_LINE
+        }
 
         // Set verification mode.
         ctx.set_verify_mode(ssl::verify_peer);

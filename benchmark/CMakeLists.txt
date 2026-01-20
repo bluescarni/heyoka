@@ -25,7 +25,7 @@ function(ADD_HEYOKA_BENCHMARK arg1)
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
   # Setup the C++ standard.
-  target_compile_features(${arg1} PRIVATE cxx_std_20)
+  target_compile_features(${arg1} PRIVATE cxx_std_23)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
 endfunction()
 
@@ -72,6 +72,7 @@ ADD_HEYOKA_BENCHMARK(var_construction)
 ADD_HEYOKA_BENCHMARK(sgp4_dynamics)
 ADD_HEYOKA_BENCHMARK(ann_var_ode_sys)
 ADD_HEYOKA_BENCHMARK(geopot)
+ADD_HEYOKA_BENCHMARK(fixed_centres)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_BENCHMARK(pendulum_mp)

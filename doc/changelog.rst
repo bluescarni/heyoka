@@ -1,18 +1,118 @@
 Changelog
 =========
 
-8.0.0 (unreleased)
+7.9.0 (unreleased)
 ------------------
 
 New
 ~~~
 
+- New frame transformations to/from the RSW frame
+  (`#522 <https://github.com/bluescarni/heyoka/pull/522>`__).
+- Add CelesTrak as a provider of EOP data
+  (`#519 <https://github.com/bluescarni/heyoka/pull/519>`__).
+
+Fix
+~~~
+
+- Allow compilation with all versions of fmt 12.x, not only 12.0
+  (`#523 <https://github.com/bluescarni/heyoka/pull/523>`__).
+
+7.8.1 (2025-10-14)
+------------------
+
+New
+~~~
+
+- Enable support for the newly-released fmt 12
+  (`#517 <https://github.com/bluescarni/heyoka/pull/517>`__).
+
+7.8.0 (2025-10-06)
+------------------
+
+New
+~~~
+
+- The call operators of the ``sgp4_propagator`` class are now ``const``. This implies that it is now possible
+  to use an ``sgp4_propagator`` from multiple threads at the same time
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
+- New ``batch_parallel`` keyword argument, allowing explicit control on the parallelisation
+  strategy for ``cfunc`` evaluation
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+- The call operators of the ``cfunc`` class are now ``const``. This implies that it is now possible
+  to evaluate a ``cfunc`` from multiple threads at the same time
+  (`#513 <https://github.com/bluescarni/heyoka/pull/513>`__).
+
+Changes
+~~~~~~~
+
+- The ``cfunc`` and ``dtens`` classes are now implemented on top of a ``std::shared_ptr``.
+  As a consequence, copy construction/assignment are now ``noexcept`` constant-time operations
+  (`#515 <https://github.com/bluescarni/heyoka/pull/515>`__).
+- The ``replace_sat_data()`` function of the ``sgp4_propagator`` class now provides strong exception safety
+  guarantees
+  (`#514 <https://github.com/bluescarni/heyoka/pull/514>`__).
+
+7.7.0 (2025-09-18)
+------------------
+
+New
+~~~
+
+- Improve the reporting of HTTP errors when downloading datafiles
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+- Add an internal mechanism to specify a custom SSL verify file
+  (`#511 <https://github.com/bluescarni/heyoka/pull/511>`__).
+
+7.6.0 (2025-09-14)
+------------------
+
+New
+~~~
+
+- Allow to select an alternative origin for the IERS rapid EOP data
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+- Add support for LLVM 21
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now requires LLVM >= 17
+  (`#509 <https://github.com/bluescarni/heyoka/pull/509>`__).
+
+
+7.5.0 (2025-08-20)
+------------------
+
+- New frame transformation: ITRS to TEME and viceversa
+  (`#507 <https://github.com/bluescarni/heyoka/pull/507>`__).
+- New ``gmst82()`` model to represent the Greenwich mean sidereal time (IAU 1982 model)
+  (`#506 <https://github.com/bluescarni/heyoka/pull/506>`__).
+
+7.4.0 (2025-08-15)
+------------------
+
+New
+~~~
+
+- New ``dayfrac()`` model to represent in the expression system the number of
+  fractional days elapsed since January 1st
+  (`#501 <https://github.com/bluescarni/heyoka/pull/501>`__).
+- Comprehensive overhaul of keyword arguments, including extensive compile-time validation
+  (`#498 <https://github.com/bluescarni/heyoka/pull/498>`__).
+- Add getters for the gravitational parameter and reference Earth radius in the EGM2008 model
+  (`#493 <https://github.com/bluescarni/heyoka/pull/493>`__).
 - New ``func_args`` class for the management of function arguments in the expression system
   (`#489 <https://github.com/bluescarni/heyoka/pull/489>`__).
 
 Changes
 ~~~~~~~
 
+- heyoka now requires C++23
+  (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
+- heyoka now depends on CMake >= 3.20 when building from source
+  (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
 - General overhaul of several symbolic transformation primitives,
   avoiding recursion in favour of a stack-based iterative approach and taking better
   advantage of shared function arguments sets
@@ -22,11 +122,20 @@ Changes
 Fix
 ~~~
 
-- Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
-  (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
+- Replace ``std::regex`` with ``boost::regex``, which should help preventing potential stack overflow issues
+  with long strings
+  (`#501 <https://github.com/bluescarni/heyoka/pull/501>`__).
+- Ensure to invoke all TBB primitives in isolated contexts in order to prevent cancellation
+  due to exceptions being thrown in faraway tasks. This could potentially lead to violated postconditions
+  after parallel sections
+  (`#500 <https://github.com/bluescarni/heyoka/pull/500>`__).
+- Workaround for a compilation failure with recent Boost versions
+  (`#495 <https://github.com/bluescarni/heyoka/pull/495>`__).
 - Fix a rare occurrence of NaNs being generated when the VSOP2013 theory is used
   in numerical integrations
   (`#492 <https://github.com/bluescarni/heyoka/pull/492>`__).
+- Fix an argument checking bug in the Cartesian routines of the VSOP2013 theory
+  (`#491 <https://github.com/bluescarni/heyoka/pull/491>`__).
 
 7.3.0 (2025-04-21)
 ------------------

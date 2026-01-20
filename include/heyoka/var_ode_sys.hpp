@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -42,7 +42,7 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
 
     struct impl;
-    std::unique_ptr<impl> m_impl;
+    std::shared_ptr<const impl> m_impl;
 
     // Serialisation.
     friend class boost::serialization::access;
@@ -76,5 +76,10 @@ public:
 };
 
 HEYOKA_END_NAMESPACE
+
+// Version changelog:
+//
+// - version 1: switched from unique to shared ptr to manage the pimpl.
+BOOST_CLASS_VERSION(heyoka::var_ode_sys, 1)
 
 #endif

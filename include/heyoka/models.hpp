@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -11,6 +11,7 @@
 
 #include <heyoka/model/cart2geo.hpp>
 #include <heyoka/model/cr3bp.hpp>
+#include <heyoka/model/dayfrac.hpp>
 #include <heyoka/model/egm2008.hpp>
 #include <heyoka/model/elp2000.hpp>
 #include <heyoka/model/eop.hpp>

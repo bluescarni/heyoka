@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -39,7 +39,9 @@ struct vf_info {
     std::uint32_t nargs = 0;
 };
 
-const std::vector<vf_info> &lookup_vf_info(const std::string &);
+// NOTE: annotate the function with HEYOKA_NO_DANGLING because we know that this does not return dangling refs, but GCC
+// gets confused.
+HEYOKA_NO_DANGLING const std::vector<vf_info> &lookup_vf_info(const std::string &);
 
 } // namespace detail
 

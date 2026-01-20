@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <source_location>
 #include <string>
 #include <typeinfo>
 #include <utility>
@@ -147,6 +148,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_olt(llvm_state &, llvm::Value *, llvm::
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_one(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ord(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fnz(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value *);
@@ -238,8 +240,24 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Val
 // std::upper_bound() implementation.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_upper_bound(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
 
+HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
+
+void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
+
+bool llvm_is_ieee_like_fp(llvm::Type *);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+#if !defined(NDEBUG)
+
+#define HEYOKA_LLVM_ASSERT(s, val) heyoka::detail::llvm_assert(s, val)
+
+#else
+
+#define HEYOKA_LLVM_ASSERT(s, val)
+
+#endif
 
 #endif

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -1066,7 +1066,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, false, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t);
 
 struct s11n_t_cb {
     template <typename T>
@@ -1083,7 +1083,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive_batch<double> &, int, std::uint32_t);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, false, bool, taylor_adaptive_batch<double> &, int, std::uint32_t);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()
@@ -2264,4 +2264,26 @@ TEST_CASE("empty init state")
         auto ta = taylor_adaptive_batch<double>{var_ode_sys(dyn, var_args::vars), 2u};
         REQUIRE(ta.get_state() == std::vector{0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0});
     }
+}
+
+TEST_CASE("scalar time ctor")
+{
+    const auto dyn = model::pendulum();
+
+    {
+        auto ta = taylor_adaptive_batch<double>{dyn, 2u, kw::time = 42};
+        REQUIRE(ta.get_time() == std::vector{42., 42.});
+    }
+}
+
+// A test to check that the llvm_state kwargs are correctly propagated.
+TEST_CASE("llvm_state kwargs propagate")
+{
+    const auto dyn = model::pendulum();
+
+    auto ta = taylor_adaptive_batch<double>{dyn, 2u, kw::fast_math = true};
+    REQUIRE(std::get<0>(ta.get_llvm_state()).fast_math());
+
+    ta = taylor_adaptive_batch<double>{dyn, 2u, kw::fast_math = true, kw::compact_mode = true};
+    REQUIRE(std::get<1>(ta.get_llvm_state()).fast_math());
 }

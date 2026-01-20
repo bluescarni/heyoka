@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -9,8 +9,12 @@
 #ifndef HEYOKA_KW_HPP
 #define HEYOKA_KW_HPP
 
+#include <concepts>
+#include <type_traits>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
 
 // NOTE: all keyword arguments are gathered
 // in this file in order to make it easier to
@@ -37,9 +41,9 @@ IGOR_MAKE_NAMED_ARGUMENT(code_model);
 IGOR_MAKE_NAMED_ARGUMENT(parjit);
 
 // cfunc API.
-IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(strided);
 IGOR_MAKE_NAMED_ARGUMENT(check_prec);
+IGOR_MAKE_NAMED_ARGUMENT(batch_parallel);
 
 // taylor_adaptive and friends.
 IGOR_MAKE_NAMED_ARGUMENT(tol);
@@ -60,6 +64,7 @@ IGOR_MAKE_NAMED_ARGUMENT(c_output);
 IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 // Used in several APIs.
+IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(time_expr);
 IGOR_MAKE_NAMED_ARGUMENT(prec);
@@ -75,12 +80,12 @@ IGOR_MAKE_NAMED_ARGUMENT(n_out);
 IGOR_MAKE_NAMED_ARGUMENT(activations);
 IGOR_MAKE_NAMED_ARGUMENT(nn_wb);
 
-// cartesian2geodetic
+// Cartesian<->geodetic conversion.
 IGOR_MAKE_NAMED_ARGUMENT(ecc2);
 IGOR_MAKE_NAMED_ARGUMENT(R_eq);
 IGOR_MAKE_NAMED_ARGUMENT(n_iters);
 
-// thermonets
+// Thermonets.
 IGOR_MAKE_NAMED_ARGUMENT(geodetic);
 IGOR_MAKE_NAMED_ARGUMENT(f107a);
 IGOR_MAKE_NAMED_ARGUMENT(f107);
@@ -109,6 +114,41 @@ IGOR_MAKE_NAMED_ARGUMENT(thresh);
 IGOR_MAKE_NAMED_ARGUMENT(eop_data);
 IGOR_MAKE_NAMED_ARGUMENT(sw_data);
 IGOR_MAKE_NAMED_ARGUMENT(a);
+
+// NOTE: this namespace contains several commonly-used kwargs descriptors.
+namespace descr
+{
+
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto same_as
+    = igor::descr<NArg, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, T>; }>{};
+
+template <auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto boolean = same_as<NArg, bool>;
+
+template <auto NArg, typename T>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto convertible_to = igor::descr<NArg, []<typename U>() { return std::convertible_to<U, T>; }>{};
+
+template <typename T, auto NArg, bool Mandatory = false>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto constructible_from
+    = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{.required = Mandatory};
+
+template <auto NArg, bool Mandatory = false>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto integral
+    = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{.required = Mandatory};
+
+template <auto NArg, typename T, bool Mandatory = false>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto constructible_input_range
+    = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{.required
+                                                                                                      = Mandatory};
+
+} // namespace descr
 
 } // namespace kw
 

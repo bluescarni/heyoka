@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -18,6 +18,9 @@ int eraUtcut1(double, double, double, double *, double *);
 int eraTaiutc(double, double, double *, double *);
 double eraEra00(double, double);
 int eraCal2jd(int, int, int, double *, double *);
+int eraJd2cal(double, double, int *, int *, int *, double *);
+int eraTttai(double, double, double *, double *);
+double eraGmst82(double, double);
 }
 
 #endif

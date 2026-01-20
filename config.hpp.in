@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -103,13 +103,27 @@
 // C++20 constinit.
 // NOTE: this seems to be buggy currently on MSVC:
 // https://github.com/bluescarni/mppp/issues/291
-#if defined(__cpp_constinit) && (!defined(_MSC_VER) || defined(__clang__))
+#if !defined(_MSC_VER) || defined(__clang__)
 
 #define HEYOKA_CONSTINIT constinit
 
 #else
 
 #define HEYOKA_CONSTINIT
+
+#endif
+
+// Setup of the "no dangling" attribute. We use this to quench false positives in GCC. See:
+//
+// https://gcc.gnu.org/onlinedocs/gcc-14.1.0/gcc/C_002b_002b-Attributes.html#index-no_005fdangling-type-attribute
+
+#if __GNUC__ >= 14
+
+#define HEYOKA_NO_DANGLING [[gnu::no_dangling]]
+
+#else
+
+#define HEYOKA_NO_DANGLING
 
 #endif
 

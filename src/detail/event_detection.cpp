@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -12,7 +12,10 @@
 #include <cassert>
 #include <cerrno>
 #include <cmath>
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -26,7 +29,6 @@
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -64,6 +66,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -106,6 +109,48 @@ namespace detail
 
 namespace
 {
+
+// LCOV_EXCL_START
+
+#if defined(HEYOKA_HAVE_STRERROR_R)
+
+// NOTE: the strerror_r() function is the thread-safe counterpart to strerror(), and it can come in 2 flavours with
+// different signatures: POSIX and GNU. We want to be able to use either. See:
+//
+// https://www.man7.org/linux/man-pages/man3/strerror.3.html
+
+// NOTE: we introduce a small wrapper for the invocation of strerror_r(). The reason is that we will need to examine the
+// signature of strerror_r() in order to determine how to call it (see below), but it is underspecified whether or not
+// strerror_r() is marked noexcept, which complicates the logic. Thus, we introduce this wrapper which is explicitly
+// noexcept.
+decltype(auto) strerror_r_wrap(int errnum, char *buf, std::size_t buflen) noexcept
+{
+    return ::strerror_r(errnum, buf, buflen);
+}
+
+// This is the strerror_r() wrapper we will be using in the code below. It will return a pointer to the storage
+// containing the null-terminated error message on success, nullptr on failure. The returned pointer could be buf or a
+// pointer to static storage, depending on the strerror_r() variant being called.
+template <typename T = decltype(&strerror_r_wrap)>
+const char *errno_to_str(int errnum, char *buf, std::size_t buflen, T f = &strerror_r_wrap) noexcept
+{
+    if constexpr (std::same_as<T, int (*)(int, char *, std::size_t) noexcept>) {
+        // POSIX version. This one can fail, if it succeeds the error will be written into buf.
+        if (f(errnum, buf, buflen) == 0) [[likely]] {
+            return buf;
+        } else {
+            return nullptr;
+        }
+    } else {
+        // GNU version. This one never fails, but it could write into and return something other than buf.
+        static_assert(std::same_as<T, char *(*)(int, char *, std::size_t) noexcept>);
+        return f(errnum, buf, buflen);
+    }
+}
+
+#endif
+
+// LCOV_EXCL_STOP
 
 // Given an input polynomial a(x), substitute
 // x with x_1 * scal and write to ret the resulting
@@ -389,10 +434,12 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
+    //
     // No overlap is allowed, all pointers are to external types.
-    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -402,12 +449,12 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -565,13 +612,13 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - two poly coefficients output pointers,
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
+    //
     // No overlap is allowed. The coefficient pointers are to external types.
-    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t,
-                                          llvm::PointerType::getUnqual(builder.getInt32Ty()), ext_fp_ptr_t};
+    const std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -587,23 +634,23 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     // mark them as writeonly.
     auto *out_ptr1 = f->args().begin();
     out_ptr1->setName("out_ptr1");
-    out_ptr1->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr1);
     out_ptr1->addAttr(llvm::Attribute::NoAlias);
 
     auto *out_ptr2 = f->args().begin() + 1;
     out_ptr2->setName("out_ptr2");
-    out_ptr2->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr2);
     out_ptr2->addAttr(llvm::Attribute::NoAlias);
 
     auto *n_sc_ptr = f->args().begin() + 2;
     n_sc_ptr->setName("n_sc_ptr");
-    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, n_sc_ptr);
     n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
     n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *cf_ptr = f->args().begin() + 3;
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -661,21 +708,18 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the external type.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
+    //
     // - pointer to the array of poly coefficients (read-only),
     // - pointer to the timestep value (s) (read-only),
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
+    //
     // No overlap is allowed. All floating-point pointers are to external types.
-    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
-    auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    const std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -685,25 +729,25 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Set the names/attributes of the function arguments.
     auto *cf_ptr = f->args().begin();
     cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, cf_ptr);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *h_ptr = f->args().begin() + 1;
     h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, h_ptr);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
     h_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *back_flag_ptr = f->args().begin() + 2;
     back_flag_ptr->setName("back_flag_ptr");
-    back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, back_flag_ptr);
     back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
     back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *out_ptr = f->args().begin() + 3;
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
@@ -1425,9 +1469,39 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                         detail::get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
-                        detail::get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                                   "errno with error code {}",
-                                                   cflag);
+                        // Helper to log with a default error message.
+                        const auto log_default = [cflag]() {
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection returned a nonzero "
+                                "errno with error code {}",
+                                cflag);
+                        };
+
+#if defined(HEYOKA_HAVE_STRERROR_R)
+                        // We have strerror_r() available, try to use it to produce a better error message.
+
+                        // Buffer for the error message.
+                        char err_msg_buf[256u];
+
+                        // Attempt to produce the error message.
+                        const auto *const err_msg
+                            = detail::errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
+
+                        if (err_msg == nullptr) [[unlikely]] {
+                            // Something went wrong while constructing the error message, log with the default error
+                            // message.
+                            log_default();
+                        } else {
+                            // Log with the descriptive error message.
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection returned a nonzero "
+                                "errno with message '{}'",
+                                err_msg);
+                        }
+#else
+                        // No strerror_r() available, log with the default error message.
+                        log_default();
+#endif
                     }
                     // LCOV_EXCL_STOP
                 }

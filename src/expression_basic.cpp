@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -29,7 +29,6 @@
 #include <vector>
 
 #include <boost/container_hash/hash.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <llvm/IR/Function.h>
@@ -53,6 +52,7 @@
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/expression.hpp>

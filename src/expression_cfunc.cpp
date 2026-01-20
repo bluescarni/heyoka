@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -32,12 +32,9 @@
 #include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
-
-#include <oneapi/tbb/parallel_invoke.h>
 
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
@@ -73,7 +70,9 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -1442,6 +1441,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
+    // Fetch the internal type.
+    auto *fp_t = to_internal_llvm_type<T>(s, prec);
+
     // Prepare the arguments:
     //
     // - a write-only float pointer to the outputs,
@@ -1451,12 +1453,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - the stride (if requested).
     //
     // The pointer arguments cannot overlap.
-
-    // Fetch the internal and external types.
-    auto *fp_t = to_internal_llvm_type<T>(s, prec);
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
-
+    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
     if (strided) {
         fargs.push_back(to_external_llvm_type<std::size_t>(context));
     }
@@ -1473,25 +1470,25 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *in_ptr = out_ptr + 1;
     in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, in_ptr);
     in_ptr->addAttr(llvm::Attribute::NoAlias);
     in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *par_ptr = out_ptr + 2;
     par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, par_ptr);
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     auto *time_ptr = out_ptr + 3;
     time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    llvm_add_no_capture_argattr(s, time_ptr);
     time_ptr->addAttr(llvm::Attribute::NoAlias);
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
@@ -1631,11 +1628,11 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
         auto &ctx = s.context();
 
         // The arguments to the driver are:
+        //
         // - a pointer to the tape,
         // - pointers to par and time,
         // - the stride (if not a constant).
-        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(ctx), llvm::PointerType::getUnqual(ctx),
-                                        llvm::PointerType::getUnqual(ctx)};
+        std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ctx));
         if (!const_stride) {
             fargs.push_back(to_external_llvm_type<std::size_t>(ctx));
         }
@@ -1655,18 +1652,18 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
         // arguments.
         auto *eval_arr_arg = f->args().begin();
         eval_arr_arg->setName("eval_arr_ptr");
-        eval_arr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, eval_arr_arg);
         eval_arr_arg->addAttr(llvm::Attribute::NoAlias);
 
         auto *par_ptr_arg = eval_arr_arg + 1;
         par_ptr_arg->setName("par_ptr");
-        par_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr_arg);
         par_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         par_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr_arg = eval_arr_arg + 2;
         time_ptr_arg->setName("time_ptr");
-        time_ptr_arg->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr_arg);
         time_ptr_arg->addAttr(llvm::Attribute::NoAlias);
         time_ptr_arg->addAttr(llvm::Attribute::ReadOnly);
 
@@ -2171,31 +2168,31 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
         // Set the names/attributes of the function arguments.
         auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
-        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, out_ptr);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
         auto *in_ptr = out_ptr + 1;
         in_ptr->setName("in_ptr");
-        in_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, in_ptr);
         in_ptr->addAttr(llvm::Attribute::NoAlias);
         in_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *par_ptr = out_ptr + 2;
         par_ptr->setName("par_ptr");
-        par_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, par_ptr);
         par_ptr->addAttr(llvm::Attribute::NoAlias);
         par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *time_ptr = out_ptr + 3;
         time_ptr->setName("time_ptr");
-        time_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, time_ptr);
         time_ptr->addAttr(llvm::Attribute::NoAlias);
         time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         auto *tape_ptr = out_ptr + 4;
         tape_ptr->setName("tape_ptr");
-        tape_ptr->addAttr(llvm::Attribute::NoCapture);
+        llvm_add_no_capture_argattr(s, tape_ptr);
         tape_ptr->addAttr(llvm::Attribute::NoAlias);
 
         llvm::Value *stride = nullptr;
@@ -2245,10 +2242,10 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
     // would not be worth it, perhaps we can reconsider in the future. It is also not clear how
     // to deal with thread-unsafe type cloning in this hypothetical scenario.
     if (batch_size == 1u) {
-        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); });
     } else {
-        oneapi::tbb::parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
+        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
                                      [&create_cfunc]() { create_cfunc(true, 1); },
                                      [&create_cfunc, batch_size]() { create_cfunc(true, batch_size); });
     }
@@ -2261,14 +2258,9 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
 
     get_logger()->trace("make_multi_cfunc() IR creation runtime: {}", sw);
 
-    // NOTE: in C++23 we could use std::ranges::views::as_rvalue instead of
-    // the custom transform:
-    //
-    // https://en.cppreference.com/w/cpp/ranges/as_rvalue_view
-    return std::make_tuple(
-        llvm_multi_state(states_lists[0] | std::views::transform([](auto &s) -> auto && { return std::move(s); }),
-                         parjit),
-        std::move(dc), std::move(tape_size_align));
+    // Build the return value.
+    return std::make_tuple(llvm_multi_state(states_lists[0] | std::views::as_rvalue, parjit), std::move(dc),
+                           std::move(tape_size_align));
 }
 
 } // namespace

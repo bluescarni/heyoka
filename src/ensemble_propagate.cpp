@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -18,10 +18,8 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -36,14 +34,16 @@
 #endif
 
 #include <heyoka/continuous_output.hpp>
+#include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
-// NOTE: these actions will be performed concurrently from
-// multiple threads of execution:
+// NOTE: these actions will be performed concurrently from multiple threads of execution:
+//
 // - invocation of the generator's call operator,
 // - copy construction of the event and step callbacks, and
 //   invocation of the call operator on the copies.
@@ -60,22 +60,20 @@ ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_i
                               const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
                               std::size_t max_steps, T max_delta_t, step_callback<T> cb, bool write_tc, bool with_c_out)
 {
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t,
                                          std::optional<continuous_output<T>>, step_callback<T>>>>
         opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
                            step_callback<T>>>
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -110,22 +108,20 @@ ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t
                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
                             std::size_t max_steps, T max_delta_t, step_callback<T> cb, bool write_tc, bool with_c_out)
 {
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t,
                                          std::optional<continuous_output<T>>, step_callback<T>>>>
         opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
                            step_callback<T>>>
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -159,21 +155,19 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
                              std::size_t max_steps, T max_delta_t, step_callback<T> cb)
 {
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>>
         opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -247,21 +241,19 @@ ensemble_propagate_until_batch_impl(
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, std::size_t max_steps,
     const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool write_tc, bool with_c_out)
 {
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<
         std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>>
         opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -296,21 +288,19 @@ ensemble_propagate_for_batch_impl(
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, std::size_t max_steps,
     const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool write_tc, bool with_c_out)
 {
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<
         std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>>
         opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>, step_callback_batch<T>>>
         retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
@@ -358,18 +348,16 @@ ensemble_propagate_grid_batch_impl(
     }
     assert(grid.size() == grid_.size() * batch_size); // LCOV_EXCL_LINE
 
-    // NOTE: store the results into a vector of optionals, so that we avoid
-    // having to init a large number of default-constructed integrators
-    // that are anyway going to be destroyed.
+    // NOTE: store the results into a vector of optionals, so that we avoid having to init a large number of
+    // default-constructed integrators that are anyway going to be destroyed.
     std::vector<std::optional<std::tuple<taylor_adaptive_batch<T>, step_callback_batch<T>, std::vector<T>>>> opt_retval;
     opt_retval.resize(boost::numeric_cast<decltype(opt_retval.size())>(n_iter));
 
-    // The actual return value, into which we will eventually move the results of the
-    // integrations.
+    // The actual return value, into which we will eventually move the results of the integrations.
     std::vector<std::tuple<taylor_adaptive_batch<T>, step_callback_batch<T>, std::vector<T>>> retval;
     retval.reserve(boost::numeric_cast<decltype(retval.size())>(n_iter));
 
-    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
+    tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0u, n_iter), [&](const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
