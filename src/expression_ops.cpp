@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -195,7 +195,7 @@ expression &operator/=(expression &x, const expression &e)
 
 // NOLINTBEGIN
 #define HEYOKA_EX_COMPOUND_OP(op, type)                                                                                \
-    expression &operator op(expression & ex, type x)                                                                   \
+    expression &operator op(expression &ex, type x)                                                                    \
     {                                                                                                                  \
         return ex op expression{std::move(x)};                                                                         \
     }
