@@ -486,7 +486,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         // of the diff arguments.
 
         // Create the vector of arguments for use in the dfuns.
-        const auto dfun_args = std::make_shared<std::vector<expression>>(diff_args);
+        const auto dfun_args = std::make_shared<const std::vector<expression>>(diff_args);
 
         // Create the dfuns.
         std::array<expression, 29> iqs_dfuns;

@@ -368,8 +368,8 @@ cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
     // Construct the impl.
     //
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    m_impl = std::make_shared<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
-                                    compact_mode, parallel_mode, prec, check_prec, parjit);
+    m_impl = std::make_shared<const impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
+                                          compact_mode, parallel_mode, prec, check_prec, parjit);
 }
 
 template <typename T>

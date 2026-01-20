@@ -401,15 +401,15 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
     }
 
     // Init the pimpl.
-    m_impl = std::make_shared<impl>(
+    m_impl = std::make_shared<const impl>(
         impl{.sys = std::move(new_sys), .dt = std::move(dt_vareq), .vargs = std::move(vargs_hr)});
 }
 
-var_ode_sys::var_ode_sys(const var_ode_sys &) = default;
+var_ode_sys::var_ode_sys(const var_ode_sys &) noexcept = default;
 
 var_ode_sys::var_ode_sys(var_ode_sys &&) noexcept = default;
 
-var_ode_sys &var_ode_sys::operator=(const var_ode_sys &) = default;
+var_ode_sys &var_ode_sys::operator=(const var_ode_sys &) noexcept = default;
 
 var_ode_sys &var_ode_sys::operator=(var_ode_sys &&) noexcept = default;
 
