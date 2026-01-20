@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -90,10 +90,16 @@ void var_ode_sys::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_impl;
 }
 
-// NOTE: this will leave the object in the moved-from state. This needs
-// to be documented properly.
-void var_ode_sys::load(boost::archive::binary_iarchive &ar, unsigned)
+// NOTE: this will leave the object in the moved-from state. This needs to be documented properly.
+void var_ode_sys::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<var_ode_sys>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a var_ode_sys: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     try {
         ar >> m_impl;
         // LCOV_EXCL_START
@@ -395,22 +401,15 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
     }
 
     // Init the pimpl.
-    m_impl = std::make_unique<impl>(
+    m_impl = std::make_shared<impl>(
         impl{.sys = std::move(new_sys), .dt = std::move(dt_vareq), .vargs = std::move(vargs_hr)});
 }
 
-var_ode_sys::var_ode_sys(const var_ode_sys &other) : m_impl{std::make_unique<impl>(*other.m_impl)} {}
+var_ode_sys::var_ode_sys(const var_ode_sys &) = default;
 
 var_ode_sys::var_ode_sys(var_ode_sys &&) noexcept = default;
 
-var_ode_sys &var_ode_sys::operator=(const var_ode_sys &other)
-{
-    if (this != &other) {
-        *this = var_ode_sys(other);
-    }
-
-    return *this;
-}
+var_ode_sys &var_ode_sys::operator=(const var_ode_sys &) = default;
 
 var_ode_sys &var_ode_sys::operator=(var_ode_sys &&) noexcept = default;
 
