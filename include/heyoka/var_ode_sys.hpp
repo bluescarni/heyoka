@@ -58,9 +58,9 @@ public:
                          const std::variant<var_args, std::vector<expression>> &, std::uint32_t = 1);
     explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &, std::initializer_list<expression>,
                          std::uint32_t = 1);
-    var_ode_sys(const var_ode_sys &);
+    var_ode_sys(const var_ode_sys &) noexcept;
     var_ode_sys(var_ode_sys &&) noexcept;
-    var_ode_sys &operator=(const var_ode_sys &);
+    var_ode_sys &operator=(const var_ode_sys &) noexcept;
     var_ode_sys &operator=(var_ode_sys &&) noexcept;
     ~var_ode_sys();
 

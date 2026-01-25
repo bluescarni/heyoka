@@ -303,10 +303,9 @@ struct llvm_mc_value {
 std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &, unsigned);
 void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc_value);
 
-// At this time, it seems like parallel compilation in lljit is buggy. It has gotten better with LLVM 20 but we still
-// get occasional "Duplicate definition of symbol" errors in the CI. Thus, for the time being, let us just disable
-// parallel compilation by default.
-inline constexpr bool default_parjit = false;
+// NOTE: although this is set to "true", the parjit functionality is forcibly disabled on older LLVM versions and this
+// setting has no effect.
+inline constexpr bool default_parjit = true;
 
 } // namespace detail
 

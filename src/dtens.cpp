@@ -272,7 +272,7 @@ void dtens::impl::load(boost::archive::binary_iarchive &ar, unsigned version)
     // LCOV_EXCL_STOP
 }
 
-dtens::dtens(impl x) : p_impl(std::make_shared<impl>(std::move(x))) {}
+dtens::dtens(impl x) : p_impl(std::make_shared<const impl>(std::move(x))) {}
 
 dtens::dtens() : dtens(impl{}) {}
 
