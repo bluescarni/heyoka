@@ -1796,9 +1796,11 @@ multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model,
 
 #else
 
-// NOTE: we conservatively enable the parallel JIT functionality only on recent LLVM versions, due to bugs in older LLVM
-// versions.
-#if LLVM_VERSION_MAJOR >= 21
+// NOTE: this results in occasional compilation failures due to multiply-defined symbols. We will have to either wait
+// for an LLVM fix (if this is truly an LLVM bug) or implement our own version of parallel compilation.
+//
+// NOLINTNEXTLINE
+#if 0
 
     if (m_parjit) {
         // Set the number of compilation threads.

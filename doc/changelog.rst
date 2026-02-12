@@ -1,6 +1,14 @@
 Changelog
 =========
 
+7.9.1 (2026-02-12)
+------------------
+
+Fix
+~~~
+
+- Disable the parallel JIT compilation feature, which was previously enabled on LLVM >= 21.
+
 7.9.0 (2026-01-25)
 ------------------
 
