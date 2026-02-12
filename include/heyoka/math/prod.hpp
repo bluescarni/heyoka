@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -34,6 +35,8 @@ class HEYOKA_DLL_PUBLIC prod_impl : public func_base
         ar &boost::serialization::base_object<func_base>(*this);
     }
 
+    HEYOKA_DLL_LOCAL void taylor_check_binary() const;
+
 public:
     prod_impl();
     explicit prod_impl(std::vector<expression>);
@@ -52,6 +55,10 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>> taylor_c_diff_get_n_iters(std::uint32_t) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_get_single_iter_func(llvm_state &, llvm::Type *, std::uint32_t,
+                                                                     std::uint32_t, bool) const;
 };
 
 bool is_negation_prod(const expression &);

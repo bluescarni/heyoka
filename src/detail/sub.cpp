@@ -426,6 +426,290 @@ llvm::Function *sub_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
                       args()[0].value(), args()[1].value());
 }
 
+std::vector<std::pair<std::uint32_t, std::uint32_t>> sub_impl::taylor_c_diff_get_n_iters(std::uint32_t order_) const
+{
+    assert(args().size() == 2u);
+
+    // Prepare the return value.
+    using safe_u32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto order = safe_u32_t(order_);
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> retval;
+    retval.reserve(order + 1);
+
+    std::visit(
+        [&retval, order]<typename T, typename U>(const T &, const U &) {
+            if constexpr (std::same_as<T, variable> || std::same_as<U, variable>) {
+                // At least one of the operands is a variable.
+                retval.resize(safe_u32_t(order) + 1u, std::pair<std::uint32_t, std::uint32_t>{0, 1});
+            } else {
+                // numpar - numpar.
+                retval.emplace_back(0, 1);
+                retval.resize(order + 1, std::pair<std::uint32_t, std::uint32_t>{0, 0});
+            }
+        },
+        args()[0].value(), args()[1].value());
+
+    return retval;
+}
+
+namespace
+{
+
+// Derivative of numparam - numparam.
+template <typename U, typename V>
+    requires(is_num_param_v<U>) && (is_num_param_v<V>)
+llvm::Function *sub_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
+                                                        std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    return taylor_c_diff_single_iter_func_numpar(
+        s, fp_t, n_uvars, batch_size, "sub", 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 2u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_fsub(s, args[0], args[1]);
+        },
+        num0, num1);
+}
+
+// Derivative of numpar - var.
+template <typename U>
+    requires(is_num_param_v<U>)
+llvm::Function *sub_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const U &n,
+                                                        const variable &var,
+                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                        std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "sub", n_uvars, batch_size, {n, var});
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *order = f->args().begin();
+    auto *diff_arr = f->args().begin() + 2;
+    auto *par_ptr = f->args().begin() + 3;
+    auto *num = f->args().begin() + 5;
+    auto *var_idx = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    llvm_if_then_else(
+        s, bld.CreateICmpEQ(order, bld.getInt32(0)),
+        [&]() {
+            // For order zero, run the codegen.
+            auto *num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
+            auto *ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, bld.getInt32(0), var_idx);
+
+            bld.CreateStore(llvm_fsub(s, num_vec, ret), acc_ptr);
+        },
+        [&]() {
+            // Load the derivative.
+            auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
+            // Negate it.
+            ret = llvm_fneg(s, ret);
+
+            // Create the return value.
+            bld.CreateStore(ret, acc_ptr);
+        });
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// Derivative of var - numpar.
+template <typename U>
+    requires(is_num_param_v<U>)
+llvm::Function *sub_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const variable &var,
+                                                        const U &n,
+                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                        std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "sub", n_uvars, batch_size, {var, n});
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary arguments.
+    auto *order = f->args().begin();
+    auto *diff_arr = f->args().begin() + 2;
+    auto *par_ptr = f->args().begin() + 3;
+    auto *var_idx = f->args().begin() + 5;
+    auto *num = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    llvm_if_then_else(
+        s, bld.CreateICmpEQ(order, bld.getInt32(0)),
+        [&]() {
+            // For order zero, run the codegen.
+            auto *ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, bld.getInt32(0), var_idx);
+            auto *num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
+
+            bld.CreateStore(llvm_fsub(s, ret, num_vec), acc_ptr);
+        },
+        [&]() {
+            // Create the return value.
+            bld.CreateStore(taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx), acc_ptr);
+        });
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// Derivative of var - var.
+llvm::Function *sub_taylor_c_diff_single_iter_func_impl(llvm_state &s, llvm::Type *fp_t, const variable &var0,
+                                                        const variable &var1,
+                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                        std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, "sub", n_uvars, batch_size, {var0, var1});
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *order = f->args().begin();
+    auto *diff_arr = f->args().begin() + 2;
+    auto *var_idx0 = f->args().begin() + 5;
+    auto *var_idx1 = f->args().begin() + 6;
+    auto *acc_ptr = f->args().begin() + 7;
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    auto *v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx0);
+    auto *v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx1);
+
+    // Compute the return value and store it in the accumulator.
+    bld.CreateStore(llvm_fsub(s, v0, v1), acc_ptr);
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// All the other cases.
+// LCOV_EXCL_START
+template <typename V1, typename V2>
+llvm::Function *sub_taylor_c_diff_single_iter_func_impl(llvm_state &, llvm::Type *, const V1 &, const V2 &,
+                                                        std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of sub() in compact mode");
+}
+// LCOV_EXCL_STOP
+
+} // namespace
+
+llvm::Function *sub_impl::taylor_c_diff_get_single_iter_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                             std::uint32_t batch_size, bool) const
+{
+    assert(args().size() == 2u);
+
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return sub_taylor_c_diff_single_iter_func_impl(s, fp_t, v1, v2, n_uvars, batch_size);
+        },
+        args()[0].value(), args()[1].value());
+}
+
 expression sub(expression a, expression b)
 {
     return expression{func{sub_impl(std::move(a), std::move(b))}};

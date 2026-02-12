@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -152,6 +153,77 @@ llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
+
+    return f;
+}
+
+// Helper to implement the function for the computation of a single iteration of the Taylor derivative of a function of
+// number(s)/param(s) in compact mode. The function will always return zero, unless the order is 0 (in which case it
+// will return the result of applying the functor cgen to the number(s)/param(s) arguments).
+template <typename F, typename... NumPars>
+llvm::Function *taylor_c_diff_single_iter_func_numpar(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                      std::uint32_t batch_size, const std::string &name,
+                                                      std::uint32_t n_hidden_deps, const F &cgen, const NumPars &...np)
+{
+    static_assert(sizeof...(np) > 0u);
+    static_assert((... && (std::same_as<NumPars, number> || std::same_as<NumPars, param>)));
+
+    auto &md = s.module();
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the function name and arguments.
+    const auto [fname, fargs]
+        = taylor_c_diff_single_iter_func_name_args(ctx, fp_t, name, n_uvars, batch_size, {np...}, n_hidden_deps);
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *ord = f->args().begin();
+    auto *par_ptr = f->args().begin() + 3;
+    auto *numpar_begin = f->args().begin() + 5;
+    auto *acc_ptr = f->args().begin() + 5 + sizeof...(np);
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    llvm_if_then_else(
+        s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
+        [&]() {
+            // Generate the vector of num/param arguments.
+            auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, fp_t, std::make_tuple(std::cref(np)...),
+                                                                  numpar_begin, par_ptr, batch_size,
+                                                                  std::make_index_sequence<sizeof...(np)>{});
+
+            // Run the codegen and store the result into the accumulator.
+            bld.CreateStore(cgen(np_args), acc_ptr);
+        },
+        []() {
+            // Otherwise, there's nothing to do - the accumulator has already been inited to zero.
+        });
+
+    // Return.
+    bld.CreateRetVoid();
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
 
     return f;
 }

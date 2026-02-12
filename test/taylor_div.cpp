@@ -28,6 +28,8 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+#include <fmt/ranges.h>
+
 static std::mt19937 rng;
 
 using namespace heyoka;
