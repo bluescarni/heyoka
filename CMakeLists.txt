@@ -159,6 +159,7 @@ if(${LLVM_VERSION_MAJOR} LESS 17 OR ${LLVM_VERSION_MAJOR} GREATER 22)
   message(FATAL_ERROR "LLVM >= 17 and <= 22 is required.")
 endif()
 
+message(STATUS "LLVM version: ${LLVM_VERSION}")
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
