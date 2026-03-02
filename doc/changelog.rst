@@ -1,6 +1,15 @@
 Changelog
 =========
 
+7.9.2 (unreleased)
+------------------
+
+New
+~~~
+
+- Add support for LLVM 22
+  (`#528 <https://github.com/bluescarni/heyoka/pull/528>`__).
+
 7.9.1 (2026-02-12)
 ------------------
 
