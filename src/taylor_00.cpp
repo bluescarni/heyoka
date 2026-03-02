@@ -699,12 +699,6 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     // Copy the jet of derivatives to jet_ptr.
     taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size, tape_ptr);
 
-    // End the lifetime of the array of derivatives, if we are in compact mode.
-    if (compact_mode) {
-        const auto [sz, al] = std::get<0>(diff_variant).first;
-        builder.CreateLifetimeEnd(tape_ptr, builder.getInt64(boost::numeric_cast<std::uint64_t>(sz)));
-    }
-
     // Create the return value.
     builder.CreateRetVoid();
 
@@ -859,12 +853,6 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
             // Taylor coefficients were not requested,
             // don't do anything in this branch.
         });
-
-    // End the lifetime of the array of derivatives, if we are in compact mode.
-    if (compact_mode) {
-        const auto [sz, al] = std::get<0>(diff_variant).first;
-        builder.CreateLifetimeEnd(tape_ptr, builder.getInt64(boost::numeric_cast<std::uint64_t>(sz)));
-    }
 
     // Create the return value.
     builder.CreateRetVoid();

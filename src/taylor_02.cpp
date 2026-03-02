@@ -1231,14 +1231,6 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
-    // NOTE: tape_ptr is used as temporary storage for the current function, but it is provided externally from
-    // dynamically-allocated memory in order to avoid stack overflow. This creates a situation in which LLVM cannot
-    // elide stores into tape_ptr (even if it figures out a way to avoid storing intermediate results into it) because
-    // LLVM must assume that some other function may use these stored values later. Thus, we declare via an intrinsic
-    // that the lifetime of tape_ptr begins here and ends at the end of the function, so that LLVM can assume that any
-    // value stored in it cannot be possibly used outside this function.
-    main_bld.CreateLifetimeStart(main_tape_ptr, main_bld.getInt64(tape_sz));
-
     // Copy the order-0 derivatives of the state variables into the tape.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(main_state, main_bld.getInt32(0), main_bld.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
