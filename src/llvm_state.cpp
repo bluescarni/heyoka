@@ -1459,6 +1459,7 @@ void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
     if (const auto &dl_path = get_dl_path(); !dl_path.empty()) {
         auto new_dlsg
             = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         if (new_dlsg) [[likely]] {
             lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
         } else {

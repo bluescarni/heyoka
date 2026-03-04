@@ -136,6 +136,8 @@ const char *errno_to_str(int errnum, char *buf, std::size_t buflen, T f = &strer
 {
     if constexpr (std::same_as<T, int (*)(int, char *, std::size_t) noexcept>) {
         // POSIX version. This one can fail, if it succeeds the error will be written into buf.
+        //
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         if (f(errnum, buf, buflen) == 0) [[likely]] {
             return buf;
         } else {
@@ -1487,6 +1489,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                         const auto *const err_msg
                             = detail::errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
 
+                        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
                         if (err_msg == nullptr) [[unlikely]] {
                             // Something went wrong while constructing the error message, log with the default error
                             // message.

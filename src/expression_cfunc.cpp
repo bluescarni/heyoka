@@ -514,6 +514,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
                                                         "appears in the user-provided list of variables twice",
                                                         var_ptr->name()));
             }
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
                                                     "user-provided list of variables contains the expression '{}', "

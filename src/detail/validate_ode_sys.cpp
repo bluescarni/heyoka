@@ -88,6 +88,8 @@ void validate_ode_sys_impl(const std::vector<std::pair<expression, expression>> 
                     }
 
                     // Check if this is a duplicate variable.
+                    //
+                    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
                     if (const auto res = lhs_vars_set.emplace(v.name()); res.second) [[likely]] {
                         // Not a duplicate, add it to lhs_vars.
                         lhs_vars.push_back(v.name());

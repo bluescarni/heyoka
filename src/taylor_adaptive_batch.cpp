@@ -185,6 +185,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     bool auto_ic_setup = false;
     if (m_state.size() / m_batch_size != sys.size()) {
         if (is_variational) {
+            // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
             if (m_state.size() / m_batch_size == n_orig_sv) [[likely]] {
                 // Automatic setup of the initial conditions for the derivatives wrt
                 // variables and parameters.
@@ -199,6 +200,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
                     "(i.e., non-variational) equations, which for this system is {}, times the batch size",
                     m_state.size(), m_batch_size, sys.size(), n_orig_sv));
             }
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
@@ -256,6 +258,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     const auto pars_req_size = su32_t(tot_n_pars) * m_batch_size;
     if (pars.empty()) {
         pars.resize(pars_req_size);
+    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else if (pars.size() != pars_req_size) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Invalid number of parameter values passed to the constructor of an adaptive "

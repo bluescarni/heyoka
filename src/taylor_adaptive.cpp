@@ -314,6 +314,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     bool auto_ic_setup = false;
     if (m_state.size() != sys.size()) {
         if (is_variational) {
+            // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
             if (m_state.size() == n_orig_sv) [[likely]] {
                 // Automatic setup of the initial conditions for the derivatives wrt
                 // variables and parameters.
@@ -327,6 +328,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                     "number of original (i.e., non-variational) equations, which for this system is {}",
                     m_state.size(), sys.size(), n_orig_sv));
             }
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
@@ -376,6 +378,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
+    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else if (pars.size() != tot_n_pars) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid number of parameter values passed to the constructor of an adaptive "
