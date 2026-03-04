@@ -121,7 +121,7 @@ using lru_map_t = boost::unordered_map<lru_key_t, llvm_mc_value, lru_hasher, lru
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 lru_queue_t lru_queue;
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cert-err58-cpp,bugprone-throwing-static-initialization)
 lru_map_t lru_map;
 
 // Size of the cache.

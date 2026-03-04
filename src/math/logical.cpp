@@ -363,8 +363,8 @@ expression logical_or(std::vector<expression> args)
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::logical_and_impl)
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::logical_or_impl)

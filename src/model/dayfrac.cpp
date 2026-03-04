@@ -558,5 +558,5 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_tt_to_dayfrac(double *const inout, cons
     }
 }
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::dayfrac_impl)

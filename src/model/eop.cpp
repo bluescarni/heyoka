@@ -535,7 +535,7 @@ struct eop_impl_funcs {
     llvm::Function *(*llvm_eval)(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &) = nullptr;
 };
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const std::unordered_map<std::string, eop_impl_funcs> eop_impl_funcs_map = {
     {"era",
      {.grad
@@ -1279,8 +1279,8 @@ expression dYp_func_impl(expression time_expr, eop_data data)
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::eop_impl)
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::eopp_impl)

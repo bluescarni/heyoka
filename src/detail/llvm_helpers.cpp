@@ -123,7 +123,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 };
 
 // The global type map to associate a C++ type to an LLVM type.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 

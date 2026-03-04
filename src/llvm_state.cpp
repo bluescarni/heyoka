@@ -131,11 +131,11 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // CPU string.
 // NOTE: the pattern reported by LLVM here seems to be pwrN
 // (sample size of 1, on travis...).
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex ppc_regex_pattern("pwr([1-9]*)");
 
 // Regex to check for AMD Zen processors.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex zen_regex_pattern("znver([1-9]*)");
 
 // Helper function to detect specific features

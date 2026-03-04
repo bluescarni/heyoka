@@ -198,7 +198,7 @@ void sw_check_sw_data(const std::optional<sw_data> &odata)
 // standard OOP patterns.
 using sw_impl_func_t = llvm::Function *(*)(llvm_state &, llvm::Type *, std::uint32_t, const sw_data &);
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const std::unordered_map<std::string, sw_impl_func_t> sw_impl_funcs_map
     = {{"Ap_avg",
         [](llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, const sw_data &data) {
@@ -525,5 +525,5 @@ expression f107a_center81_func_impl(expression time_expr, sw_data data)
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::sw_impl)
