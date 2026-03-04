@@ -78,6 +78,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS const_callable_iface : base_callable_iface
 };
 
 template <typename R, typename... Args>
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS mutable_callable_iface : base_callable_iface {
     virtual R operator()(Args... args) = 0;
 };
@@ -214,7 +215,7 @@ struct callable_impl_selector<R(Args...) const> {
 
 template <typename T>
     requires(requires() { typename detail::callable_impl_selector<T>::type; })
-using callable = typename detail::callable_impl_selector<T>::type;
+using callable = detail::callable_impl_selector<T>::type;
 
 HEYOKA_END_NAMESPACE
 

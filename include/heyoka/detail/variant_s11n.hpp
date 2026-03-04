@@ -38,14 +38,14 @@ void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std::size_t
         constexpr auto N = decltype(val)::value;
 
         if (N == idx) {
-            // NOTE: deserialise into a temporary, then move
-            // it into the variant.
+            // NOTE: deserialise into a temporary, then move it into the variant.
             std::variant_alternative_t<N, std::variant<Args...>> x;
             ar >> x;
             var = std::move(x);
 
-            // Inform the archive of the new address
-            // of the object we just deserialised.
+            // Inform the archive of the new address of the object we just deserialised.
+            //
+            // NOLINTNEXTLINE(bugprone-use-after-move,hicpp-invalid-access-moved)
             ar.reset_object_address(&std::get<N>(var), &x);
 
             return true;

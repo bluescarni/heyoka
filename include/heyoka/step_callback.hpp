@@ -154,8 +154,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl
 
 public:
     using step_cb_t = std::conditional_t<Batch, step_callback_batch<T>, step_callback<T>>;
-    using ta_t = typename step_cb_t::ta_t;
-    using size_type = typename std::vector<step_cb_t>::size_type;
+    using ta_t = step_cb_t::ta_t;
+    using size_type = std::vector<step_cb_t>::size_type;
 
 private:
     std::vector<step_cb_t> m_cbs;

@@ -66,10 +66,10 @@ struct nonesuch {
 };
 
 template <template <class...> class Op, class... Args>
-using is_detected = typename detector<nonesuch, void, Op, Args...>::value_t;
+using is_detected = detector<nonesuch, void, Op, Args...>::value_t;
 
 template <template <class...> class Op, class... Args>
-using detected_t = typename detector<nonesuch, void, Op, Args...>::type;
+using detected_t = detector<nonesuch, void, Op, Args...>::type;
 
 template <template <class...> class Op, class... Args>
 inline constexpr bool is_detected_v = is_detected<Op, Args...>::value;

@@ -20,7 +20,7 @@ namespace detail
 
 const std::string &get_dl_path();
 
-}
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 

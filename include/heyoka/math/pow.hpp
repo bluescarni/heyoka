@@ -80,6 +80,7 @@ public:
 // exponent (for the small integral half optimisation). The 'suffix' member contains a string
 // uniquely encoding the 'algo' and 'exp' data members.
 struct pow_eval_algo {
+    // NOLINTNEXTLINE(performance-enum-size)
     enum class type : int { general, pos_small_int, neg_small_int, pos_small_half, neg_small_half };
 
     using eval_t = std::function<llvm::Value *(llvm_state &, const std::vector<llvm::Value *> &)>;

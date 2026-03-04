@@ -71,7 +71,7 @@ void t_event_impl<T, B>::finalise_ctor(callback_t cb, T cd, event_direction d)
     if (!isfinite(cd)) {
         throw std::invalid_argument("Cannot set a non-finite cooldown value for a terminal event");
     }
-    cooldown = cd;
+    cooldown = std::move(cd);
 
     if (d < event_direction::negative || d > event_direction::positive) {
         throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
@@ -109,13 +109,13 @@ const expression &t_event_impl<T, B>::get_expression() const
 }
 
 template <typename T, bool B>
-typename t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback()
+t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback()
 {
     return callback;
 }
 
 template <typename T, bool B>
-const typename t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback() const
+const t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback() const
 {
     return callback;
 }

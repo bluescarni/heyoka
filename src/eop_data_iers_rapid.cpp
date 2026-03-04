@@ -197,13 +197,13 @@ eop_data_table parse_eop_data_iers_rapid(const std::string &str)
 namespace
 {
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const std::set<std::string> eop_data_iers_rapid_filenames_usno
     = {"finals2000A.all", "finals2000A.daily", "finals2000A.daily.extended", "finals2000A.data"};
 
 // NOTE: on the IERS website, there's no file corresponding to USNO's finals2000A.daily.extended.
 //
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const std::set<std::string> eop_data_iers_rapid_filenames_iers
     = {"finals.all.iau2000.txt", "finals.daily.iau2000.txt", "finals.data.iau2000.txt"};
 

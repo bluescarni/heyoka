@@ -733,7 +733,7 @@ auto make_dl_twopi_dict()
     return retval;
 } // LCOV_EXCL_LINE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto dl_twopi_dict = make_dl_twopi_dict();
 
 } // namespace

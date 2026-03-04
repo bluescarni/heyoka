@@ -55,6 +55,7 @@ public:
     param &operator=(const param &) noexcept;
     param &operator=(param &&) noexcept;
 
+    // NOLINTNEXTLINE(performance-trivially-destructible)
     ~param();
 
     [[nodiscard]] std::uint32_t idx() const noexcept;

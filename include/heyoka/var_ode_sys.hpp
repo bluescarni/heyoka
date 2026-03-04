@@ -25,6 +25,7 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+// NOLINTNEXTLINE(performance-enum-size)
 enum class var_args : unsigned { vars = 0b001, params = 0b010, time = 0b100, all = 0b111 };
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC var_args operator|(var_args, var_args) noexcept;

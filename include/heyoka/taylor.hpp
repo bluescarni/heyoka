@@ -843,11 +843,11 @@ private:
                     return detail::ranges_to<std::vector<T>>(p(kw::time));
                 } else {
                     // The input time is a scalar, splat it out.
-                    return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(p(kw::time)));
+                    return std::vector<T>(static_cast<std::vector<T>::size_type>(batch_size), T(p(kw::time)));
                 }
             } else {
                 // The input time was not provided, return a vector of zeroes.
-                return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
+                return std::vector<T>(static_cast<std::vector<T>::size_type>(batch_size), T(0));
             }
         }();
 

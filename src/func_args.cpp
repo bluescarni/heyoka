@@ -76,6 +76,9 @@ func_args &func_args::operator=(func_args &&) noexcept = default;
 
 func_args::~func_args() = default;
 
+// NOTE: clang-tidy cannot see here that exceptions from std::get<1>() cannot occur.
+//
+// NOLINTNEXTLINE(bugprone-exception-escape)
 const std::vector<expression> &func_args::get_args() const noexcept
 {
     if (const auto *args_ptr = std::get_if<std::vector<expression>>(&m_args)) {
