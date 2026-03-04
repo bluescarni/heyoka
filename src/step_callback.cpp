@@ -71,7 +71,7 @@ template <typename T, bool Batch>
 step_callback_set_impl<T, Batch>::~step_callback_set_impl() = default;
 
 template <typename T, bool Batch>
-typename step_callback_set_impl<T, Batch>::size_type step_callback_set_impl<T, Batch>::size() const noexcept
+step_callback_set_impl<T, Batch>::size_type step_callback_set_impl<T, Batch>::size() const noexcept
 {
     return m_cbs.size();
 }
@@ -84,7 +84,7 @@ constexpr auto scs_index_err_msg = "Out of range index {} when accessing a step 
 } // namespace
 
 template <typename T, bool Batch>
-const typename step_callback_set_impl<T, Batch>::step_cb_t &
+const step_callback_set_impl<T, Batch>::step_cb_t &
 step_callback_set_impl<T, Batch>::operator[](size_type i) const
 {
     if (i >= size()) {
@@ -95,7 +95,7 @@ step_callback_set_impl<T, Batch>::operator[](size_type i) const
 }
 
 template <typename T, bool Batch>
-typename step_callback_set_impl<T, Batch>::step_cb_t &step_callback_set_impl<T, Batch>::operator[](size_type i)
+step_callback_set_impl<T, Batch>::step_cb_t &step_callback_set_impl<T, Batch>::operator[](size_type i)
 {
     if (i >= size()) {
         throw std::out_of_range(fmt::format(scs_index_err_msg, i, size()));

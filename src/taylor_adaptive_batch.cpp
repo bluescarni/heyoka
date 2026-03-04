@@ -346,7 +346,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
     // Fetch the function to compute the dense output.
     m_d_out_f = std::visit(
-        [](auto &s) { return reinterpret_cast<typename i_data::d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+        [](auto &s) { return reinterpret_cast<i_data::d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
@@ -2361,15 +2361,15 @@ void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 
     if (with_events) {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<typename i_data::c_step_f_e_t>(std::get<1>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f = reinterpret_cast<i_data::c_step_f_e_t>(std::get<1>(m_llvm_state).jit_lookup("step_e"));
         } else {
-            m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f = reinterpret_cast<i_data::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
         }
     } else {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<typename i_data::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
+            m_step_f = reinterpret_cast<i_data::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
         } else {
-            m_step_f = reinterpret_cast<typename i_data::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
+            m_step_f = reinterpret_cast<i_data::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
         }
     }
 }

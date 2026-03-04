@@ -188,7 +188,7 @@ void poly_rescale(OutputIt ret, InputIt a, const T &scal, std::uint32_t n)
 template <typename OutputIt, typename InputIt>
 void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
 {
-    using value_type = typename std::iterator_traits<InputIt>::value_type;
+    using value_type = std::iterator_traits<InputIt>::value_type;
 
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<value_type, mppp::real>) {
@@ -1122,7 +1122,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
     // events, 'ev_vec' the input vector of events to detect.
     auto run_detection = [&](auto &out, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = typename detail::uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = detail::uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
@@ -1771,7 +1771,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
     // events, 'ev_vec' the input vector of events to detect.
     auto run_detection = [&](auto &out_vec, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = typename detail::uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = detail::uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
