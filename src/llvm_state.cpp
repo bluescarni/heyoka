@@ -1233,8 +1233,9 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         }
         // LCOV_EXCL_START
     } catch (...) {
-        // Reset to a def-cted state in case of error,
-        // as it looks like there's no way of recovering.
+        // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
+        //
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         *this = []() noexcept { return llvm_state{}; }();
 
         throw;
@@ -1556,8 +1557,9 @@ void llvm_state::compile()
         }
         // LCOV_EXCL_START
     } catch (...) {
-        // Reset to a def-cted state in case of error,
-        // as it looks like there's no way of recovering.
+        // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
+        //
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         *this = []() noexcept { return llvm_state{}; }();
 
         throw;

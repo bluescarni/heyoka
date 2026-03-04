@@ -752,6 +752,8 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
         // Loop over the begin/end range.
         llvm_loop_u32(s, begin_arg, end_arg, [&](llvm::Value *cur_call_idx) {
             // Create the u variable index from the first generator.
+            //
+            // NOLINTNEXTLINE(modernize-type-traits)
             auto *u_idx = gens[0](cur_call_idx);
 
             // Initialise the vector of arguments with which func must be called. The following
@@ -769,6 +771,8 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
             }
 
             // Calculate the derivative and store the result.
+            //
+            // NOLINTNEXTLINE(modernize-type-traits)
             taylor_c_store_diff(s, fp_vec_type, tape_ptr_arg, n_uvars, order_arg, u_idx, bld.CreateCall(func, args));
         });
 

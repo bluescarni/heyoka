@@ -45,9 +45,8 @@ namespace detail
 // sequence of shorter sums and products.
 //
 // NOTE: perhaps in the future we can consider switching to a non-recursive implementation.
-//
-// NOLINTNEXTLINE(misc-no-recursion)
 template <typename UDF>
+// NOLINTNEXTLINE(misc-no-recursion)
 expression udf_split(const expression &e, std::uint32_t split)
 {
     assert(split >= 2u);

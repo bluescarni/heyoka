@@ -1472,6 +1472,8 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
                         // Helper to log with a default error message.
+                        //
+                        // NOLINTNEXTLINE(modernize-type-traits)
                         const auto log_default = [cflag]() {
                             detail::get_logger()->warn(
                                 "polynomial root finding during event detection returned a nonzero "

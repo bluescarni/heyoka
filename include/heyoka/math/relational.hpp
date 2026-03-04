@@ -38,6 +38,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// NOLINTNEXTLINE(performance-enum-size)
 enum class rel_op { eq, neq, lt, gt, lte, gte };
 
 class HEYOKA_DLL_PUBLIC rel_impl : public func_base

@@ -687,10 +687,10 @@ bool gpe_is_deep_space(double n0, double e0, double i0)
     const auto eccsq = e0 * e0;
     const auto omeosq = 1 - eccsq;
     const auto rteosq = sqrt(omeosq);
-    const auto d1 = 0.75 * J2 * (3 * cosio2 - 1) / (rteosq * omeosq);
+    const auto d1 = 0.75 * J2 * ((3 * cosio2) - 1) / (rteosq * omeosq);
     const auto ak = pow(KE / n0, 2. / 3);
     auto del = d1 / (ak * ak);
-    const auto adel = ak * (1 - del * del - del * (1. / 3 + 134 * del * del / 81));
+    const auto adel = ak * (1 - (del * del) - (del * ((1. / 3) + (134 * del * del / 81))));
     del = d1 / (adel * adel);
     const auto no_unkozai = n0 / (1 + del);
 

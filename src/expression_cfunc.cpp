@@ -514,7 +514,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
                                                         "appears in the user-provided list of variables twice",
                                                         var_ptr->name()));
             }
-        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+            // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
                                                     "user-provided list of variables contains the expression '{}', "
@@ -1885,6 +1885,8 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                 llvm_loop_u32(*cur_state, cur_builder.getInt32(0), cur_builder.getInt32(ncalls),
                               [&](llvm::Value *cur_call_idx) {
                                   // Create the u variable index from the first generator.
+                                  //
+                                  // NOLINTNEXTLINE(modernize-type-traits)
                                   auto *u_idx = gens[0](cur_call_idx);
 
                                   // Initialise the vector of arguments with which func must be called. The following
@@ -1902,6 +1904,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
 
                                   // Evaluate and store the result.
                                   cfunc_c_store_eval(*cur_state, fp_vec_type, eval_arr, u_idx,
+                                                     // NOLINTNEXTLINE(modernize-type-traits)
                                                      cur_builder.CreateCall(func, args));
                               });
             } else {

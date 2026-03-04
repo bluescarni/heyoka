@@ -73,6 +73,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS base_callable_iface {
 
 // The two interfaces for const and mutable callable objects.
 template <typename R, typename... Args>
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS const_callable_iface : base_callable_iface {
     virtual R operator()(Args... args) const = 0;
 };

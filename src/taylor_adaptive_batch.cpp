@@ -200,7 +200,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
                     "(i.e., non-variational) equations, which for this system is {}, times the batch size",
                     m_state.size(), m_batch_size, sys.size(), n_orig_sv));
             }
-        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+            // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
@@ -258,7 +258,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     const auto pars_req_size = su32_t(tot_n_pars) * m_batch_size;
     if (pars.empty()) {
         pars.resize(pars_req_size);
-    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else if (pars.size() != pars_req_size) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Invalid number of parameter values passed to the constructor of an adaptive "
@@ -345,8 +345,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     assign_stepper(with_events);
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = std::visit(
-        [](auto &s) { return reinterpret_cast<i_data::d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<i_data::d_out_f_t>(s.jit_lookup("d_out_f")); },
+                           m_llvm_state);
 
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
@@ -458,6 +458,7 @@ bool taylor_adaptive_batch<T>::is_variational() const noexcept
 }
 
 template <typename T>
+// NOLINTNEXTLINE(bugprone-exception-escape)
 std::uint32_t taylor_adaptive_batch<T>::get_n_orig_sv() const noexcept
 {
     return is_variational() ? std::get<1>(m_i_data->m_vsys).get_n_orig_sv() : m_i_data->m_dim;
