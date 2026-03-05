@@ -338,7 +338,7 @@ void setup_variational_ics_varpar(std::vector<T> &, const var_ode_sys &, std::ui
 
 template <typename T>
 void setup_variational_ics_t0(const llvm_state &, std::vector<T> &, const std::vector<T> &, const T *,
-                              const var_ode_sys &, std::uint32_t, bool, bool);
+                              const var_ode_sys &, std::uint32_t, bool);
 
 // Helper to build an llvm_state from a set of keyword arguments.
 //

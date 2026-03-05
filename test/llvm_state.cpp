@@ -145,7 +145,7 @@ TEST_CASE("copy semantics")
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true,
                      kw::code_model = code_model::large};
 
-        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, 0, false);
 
         REQUIRE(s.get_slp_vectorize());
         REQUIRE(!s.is_compiled());
@@ -198,7 +198,7 @@ TEST_CASE("get object code")
     {
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
-        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, 0, false);
 
         REQUIRE_THROWS_MATCHES(
             s.get_object_code(), std::invalid_argument,
@@ -255,7 +255,7 @@ TEST_CASE("s11n")
 
         llvm_state s{kw::mname = "foo", kw::slp_vectorize = true};
 
-        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, 0, false);
 
         s.compile();
 
@@ -304,7 +304,7 @@ TEST_CASE("make_similar")
     llvm_state s{kw::mname = "sample state", kw::opt_level = 2u,       kw::fast_math = true,
                  kw::force_avx512 = true,    kw::slp_vectorize = true, kw::code_model = code_model::large};
 
-    detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
+    detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, 0, false);
 
     s.compile();
 

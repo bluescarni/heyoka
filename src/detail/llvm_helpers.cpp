@@ -1047,24 +1047,6 @@ llvm::Value *to_size_t(llvm_state &s, llvm::Value *n)
     }
 }
 
-// Helper to create a global zero-inited array variable in the module m
-// with type t. The array is mutable and with internal linkage.
-// NOTE: this works with real as well, as long as every element of the global
-// array is written to before being read. I.e., in the case of real, this will result
-// in an array of zero-inited structs, which are not valid real values, but as long
-// as we never read an array element before writing to it, we will be ok.
-llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
-{
-    assert(t != nullptr); // LCOV_EXCL_LINE
-
-    // Make the global array.
-    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::PrivateLinkage,
-                                            llvm::ConstantAggregateZero::get(t));
-
-    // Return it.
-    return gl_arr;
-}
-
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
@@ -2568,8 +2550,8 @@ llvm::Value *llvm_is_finite(llvm_state &s, llvm::Value *x)
         return llvm_real_isfinite(s, x);
 #endif
         // LCOV_EXCL_START
-    //
-    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+        //
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid type '{}' encountered in the LLVM implementation of is_finite()", llvm_type_name(x_t)));

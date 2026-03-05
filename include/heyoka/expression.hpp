@@ -612,13 +612,13 @@ namespace detail
 
 template <typename>
 std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                  const std::vector<expression> &, std::uint32_t, bool, bool, bool, long long, bool);
+                                  const std::vector<expression> &, std::uint32_t, bool, long long, bool);
 
 // Prevent implicit instantiations.
 #define HEYOKA_CFUNC_EXTERN_INST(T)                                                                                    \
     extern template std::vector<expression> add_cfunc<T>(                                                              \
         llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
-        std::uint32_t, bool, bool, bool, long long, bool);
+        std::uint32_t, bool, long long, bool);
 
 HEYOKA_CFUNC_EXTERN_INST(float)
 HEYOKA_CFUNC_EXTERN_INST(double)
@@ -680,7 +680,8 @@ make_multi_cfunc(llvm_state, const std::string &, const std::vector<expression> 
 
 // kwargs configuration for add_cfunc().
 inline constexpr auto add_cfunc_kw_cfg
-    = cfunc_common_opts_kw_cfg | igor::config<kw::descr::integral<kw::batch_size>, kw::descr::boolean<kw::strided>>{};
+    = igor::config<kw::descr::boolean<kw::high_accuracy>, kw::descr::integral<kw::prec>,
+                   kw::descr::integral<kw::batch_size>, kw::descr::boolean<kw::strided>>{};
 
 } // namespace detail
 
@@ -697,11 +698,13 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
     // Strided mode (defaults to false).
     const auto strided = p(kw::strided, false);
 
-    // Common options.
-    const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+    // High accuracy mode (defaults to false).
+    const auto high_accuracy = p(kw::high_accuracy, false);
 
-    return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
-                                strided);
+    // Precision (defaults to zero).
+    const auto prec = boost::numeric_cast<long long>(p(kw::prec, 0));
+
+    return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, prec, strided);
 }
 
 namespace detail

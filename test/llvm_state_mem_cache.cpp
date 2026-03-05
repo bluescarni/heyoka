@@ -187,7 +187,7 @@ TEST_CASE("bug cache miss compact mode")
 
         {
             llvm_state s;
-            add_cfunc<double>(s, "func", {model::pendulum_energy()}, {"v"_var, "x"_var}, kw::compact_mode = true);
+            add_cfunc<double>(s, "func", {model::pendulum_energy()}, {"v"_var, "x"_var});
             s.compile();
             (void)s.jit_lookup("func");
         }
@@ -197,7 +197,7 @@ TEST_CASE("bug cache miss compact mode")
         // Re-create the same cfunc several times and then check the cache size has not changed.
         for (auto i = 0; i < 100; ++i) {
             llvm_state s;
-            add_cfunc<double>(s, "func", {model::pendulum_energy()}, {"v"_var, "x"_var}, kw::compact_mode = true);
+            add_cfunc<double>(s, "func", {model::pendulum_energy()}, {"v"_var, "x"_var});
             s.compile();
             (void)s.jit_lookup("func");
         }

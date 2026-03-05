@@ -80,12 +80,11 @@ int main(int argc, char *argv[])
     set_logger_level_trace();
 
     unsigned N{};
-    bool compact_mode = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("N", po::value<unsigned>(&N)->default_value(20u),
-                                                       "number of segments")("compact_mode", "compact mode");
+                                                       "number of segments");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -94,10 +93,6 @@ int main(int argc, char *argv[])
     if (vm.count("help") != 0u) {
         std::cout << desc << "\n";
         return 0;
-    }
-
-    if (vm.count("compact_mode")) {
-        compact_mode = true;
     }
 
     if (N == 0u) {
@@ -147,7 +142,7 @@ int main(int argc, char *argv[])
 
     logger->trace("Adding cfunc");
 
-    add_cfunc<double>(s, "func", jac, vars_list, kw::compact_mode = compact_mode);
+    add_cfunc<double>(s, "func", jac, vars_list);
 
     s.compile();
 
