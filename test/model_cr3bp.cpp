@@ -12,7 +12,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/model/cr3bp.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -52,23 +51,17 @@ TEST_CASE("basic")
 
         auto [x, y, z, px, py, pz] = make_vars("x", "y", "z", "px", "py", "pz");
 
-        llvm_state s;
+        cfunc<double> cf({model::cr3bp_jacobi()}, {x, y, z, px, py, pz});
 
-        const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi()}, {x, y, z, px, py, pz});
+        REQUIRE(cf.get_dc().size() == 28u);
 
-        REQUIRE(dc.size() == 28u);
+        std::vector<double> outs(1u, 0.);
+        cf(outs, init_state);
+        auto E0 = outs[0];
 
-        s.compile();
+        cf(outs, ta.get_state());
 
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("jac"));
-        double E0 = 0;
-        cf(&E0, init_state.data(), nullptr, nullptr);
-
-        double E = 0;
-        cf(&E, ta.get_state().data(), nullptr, nullptr);
-
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
     }
 
     // With custom mu.
@@ -85,23 +78,17 @@ TEST_CASE("basic")
 
         auto [x, y, z, px, py, pz] = make_vars("x", "y", "z", "px", "py", "pz");
 
-        llvm_state s;
+        cfunc<double> cf({model::cr3bp_jacobi(kw::mu = 1e-2)}, {x, y, z, px, py, pz});
 
-        const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi(kw::mu = 1e-2)}, {x, y, z, px, py, pz});
+        REQUIRE(cf.get_dc().size() == 28u);
 
-        REQUIRE(dc.size() == 28u);
+        std::vector<double> outs(1u, 0.);
+        cf(outs, init_state);
+        auto E0 = outs[0];
 
-        s.compile();
+        cf(outs, ta.get_state());
 
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("jac"));
-        double E0 = 0;
-        cf(&E0, init_state.data(), nullptr, nullptr);
-
-        double E = 0;
-        cf(&E, ta.get_state().data(), nullptr, nullptr);
-
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
     }
 
     // Error modes.

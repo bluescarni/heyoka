@@ -315,40 +315,30 @@ TEST_CASE("basic cmp")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
-        llvm_state s;
-        const auto dc1 = add_cfunc<double>(
-            s, "en",
+        cfunc<double> cf(
             {model::mascon_energy(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
             {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
-        const auto dc2 = add_cfunc<double>(
-            s, "en2",
+        cfunc<double> cf2(
             {0.5 * ("vx"_var * "vx"_var + "vy"_var * "vy"_var + "vz"_var * "vz"_var)
              + model::mascon_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
             {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
-        REQUIRE(dc1.size() == 27u);
-        REQUIRE(dc2.size() == 31u);
+        REQUIRE(cf.get_dc().size() == 27u);
+        REQUIRE(cf2.get_dc().size() == 31u);
 
-        s.compile();
-
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
-        auto *cf2
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en2"));
-
-        double E0 = 0;
-        cf(&E0, ta.get_state().data(), nullptr, nullptr);
+        std::vector<double> outs(1u, 0.);
+        cf(outs, ta.get_state());
+        auto E0 = outs[0];
 
         ta.propagate_until(10.);
 
-        double E = 0;
-        cf(&E, ta.get_state().data(), nullptr, nullptr);
+        cf(outs, ta.get_state());
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
 
-        cf2(&E, ta.get_state().data(), nullptr, nullptr);
+        cf2(outs, ta.get_state());
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
     }
 }
