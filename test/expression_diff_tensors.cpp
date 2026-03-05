@@ -635,13 +635,13 @@ TEST_CASE("speelpenning complexity")
 
         auto prod = heyoka::prod(vars);
 
-        llvm_state s;
         auto dt = diff_tensors({prod}, diff_args::vars, kw::diff_order = 1);
         auto sr = dt.get_derivatives(1);
         assign_sr(sr);
 
         std::ranges::sort(vars, std::less<expression>{});
-        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_vec, vars, kw::compact_mode = true);
+        cfunc<double> cf(diff_vec, vars, kw::compact_mode = true);
+        const auto &dc_reverse = cf.get_dc();
 
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 
@@ -654,8 +654,6 @@ TEST_CASE("speelpenning complexity")
             REQUIRE(std::get<func>(dc_reverse[i].value()).extract<detail::prod_impl>() != nullptr);
             REQUIRE(std::get<func>(dc_reverse[i].value()).extract<detail::prod_impl>()->args().size() == 2u);
         }
-
-        s.compile();
     }
 }
 

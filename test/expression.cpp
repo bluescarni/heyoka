@@ -40,6 +40,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/vsop2013.hpp>
 #include <heyoka/number.hpp>
@@ -1022,8 +1023,6 @@ TEST_CASE("cfunc nbody")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                llvm_state s{kw::opt_level = opt_level};
-
                 outs.resize(36u * batch_size);
                 ins.resize(36u * batch_size);
 
@@ -1033,14 +1032,11 @@ TEST_CASE("cfunc nbody")
                 std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
                 std::ranges::sort(vars, std::less<expression>{});
 
-                add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm);
+                cfunc<double> cf(exs, vars, kw::opt_level = opt_level, kw::batch_size = batch_size,
+                                 kw::compact_mode = cm);
 
-                s.compile();
-
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    s.jit_lookup("cfunc"));
-
-                cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+                cf(mdspan<double, dextents<std::size_t, 2>>(outs.data(), 36u, batch_size),
+                   mdspan<const double, dextents<std::size_t, 2>>(ins.data(), 36u, batch_size));
 
                 for (auto i = 0u; i < 6u; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
@@ -1121,8 +1117,6 @@ TEST_CASE("cfunc nbody mp")
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
-            llvm_state s{kw::opt_level = opt_level};
-
             outs.resize(36u * batch_size);
             ins.resize(36u * batch_size);
 
@@ -1133,15 +1127,9 @@ TEST_CASE("cfunc nbody mp")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec, kw::compact_mode = cm);
+            cfunc<mppp::real> cf(exs, vars, kw::opt_level = opt_level, kw::prec = prec, kw::compact_mode = cm);
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(outs, ins);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -1830,18 +1818,12 @@ TEST_CASE("cfunc vsop2013")
 
     ta.propagate_until(1.);
 
-    llvm_state s;
+    cfunc<double> cf({venus_sol2[0], venus_sol2[1], venus_sol2[2]}, {t}, kw::compact_mode = true);
 
-    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, {t}, kw::compact_mode = true);
+    std::vector<double> out(3u, 0.);
+    const std::vector ins{date};
 
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
-
-    double out[3] = {};
-
-    cf_ptr(out, &date, nullptr, nullptr);
+    cf(out, ins);
 
     REQUIRE(out[0] == approximately(ta.get_state()[0], 100.));
     REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));
