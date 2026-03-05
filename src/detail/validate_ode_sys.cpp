@@ -76,6 +76,7 @@ void validate_ode_sys_impl(const std::vector<std::pair<expression, expression>> 
     for (const auto &[lhs, rhs] : sys) {
         // Infer the variable from the current lhs.
         std::visit(
+            // NOLINTNEXTLINE(modernize-type-traits)
             [&lhs, &lhs_vars, &lhs_vars_set]<typename T>(const T &v) {
                 if constexpr (std::same_as<T, variable>) {
                     // Check if it begins with "__".
@@ -88,6 +89,8 @@ void validate_ode_sys_impl(const std::vector<std::pair<expression, expression>> 
                     }
 
                     // Check if this is a duplicate variable.
+                    //
+                    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
                     if (const auto res = lhs_vars_set.emplace(v.name()); res.second) [[likely]] {
                         // Not a duplicate, add it to lhs_vars.
                         lhs_vars.push_back(v.name());

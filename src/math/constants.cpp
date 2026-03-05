@@ -126,7 +126,7 @@ namespace
 
 // Regex to match floating-point numbers. See:
 // https://www.regular-expressions.info/floatingpoint.html
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
 
 } // namespace
@@ -341,16 +341,16 @@ llvm::Function *constant::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
     return f;
 }
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const expression pi(func(constant("pi", detail::pi_constant_func{}, "π")));
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, true, std::string, unsigned)
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, true, std::string, unsigned)
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::constant)

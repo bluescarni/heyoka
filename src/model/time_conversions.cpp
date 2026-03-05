@@ -33,7 +33,7 @@ std::string delta_tt_tai_func::operator()(unsigned) const
 
 } // namespace detail
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const expression delta_tt_tai(func(constant("delta_tt_tai", detail::delta_tt_tai_func{}, "delta_tt_tai(32.184)")));
 
 // Function to compute the difference between TDB and TT in seconds. The input argument is the number of TDB seconds
@@ -71,5 +71,5 @@ expression delta_tdb_tt(const expression &time_expr)
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::model::detail::delta_tt_tai_func, true, std::string, unsigned)

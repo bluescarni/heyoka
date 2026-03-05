@@ -752,6 +752,8 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
         // Loop over the begin/end range.
         llvm_loop_u32(s, begin_arg, end_arg, [&](llvm::Value *cur_call_idx) {
             // Create the u variable index from the first generator.
+            //
+            // NOLINTNEXTLINE(modernize-type-traits)
             auto *u_idx = gens[0](cur_call_idx);
 
             // Initialise the vector of arguments with which func must be called. The following
@@ -769,6 +771,8 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
             }
 
             // Calculate the derivative and store the result.
+            //
+            // NOLINTNEXTLINE(modernize-type-traits)
             taylor_c_store_diff(s, fp_vec_type, tape_ptr_arg, n_uvars, order_arg, u_idx, bld.CreateCall(func, args));
         });
 
@@ -1230,14 +1234,6 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
-
-    // NOTE: tape_ptr is used as temporary storage for the current function, but it is provided externally from
-    // dynamically-allocated memory in order to avoid stack overflow. This creates a situation in which LLVM cannot
-    // elide stores into tape_ptr (even if it figures out a way to avoid storing intermediate results into it) because
-    // LLVM must assume that some other function may use these stored values later. Thus, we declare via an intrinsic
-    // that the lifetime of tape_ptr begins here and ends at the end of the function, so that LLVM can assume that any
-    // value stored in it cannot be possibly used outside this function.
-    main_bld.CreateLifetimeStart(main_tape_ptr, main_bld.getInt64(tape_sz));
 
     // Copy the order-0 derivatives of the state variables into the tape.
     // NOTE: overflow checking is already done in the parent function.

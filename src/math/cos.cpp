@@ -365,5 +365,5 @@ expression cos(expression e)
 
 HEYOKA_END_NAMESPACE
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::cos_impl)

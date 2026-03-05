@@ -180,7 +180,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     const auto dnp = -0.0642;
     const auto alpha = std::cbrt(m * m * 3.040423956e-6);
     const auto alpha2_m3 = (2 * alpha) / (3 * m);
-    const auto B15_fac = (dnp - m * dnu) / nu;
+    const auto B15_fac = (dnp - (m * dnu)) / nu;
     const auto B2_fac = -0.08066 / 206264.81;
     const auto B3_fac = 0.01789 / 206264.81;
     const auto B4_fac = -0.12879 / 206264.81;
@@ -210,7 +210,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
+                auto corr = ((B1 + (B5 * alpha2_m3)) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr *= arcsec;
 
                 V_terms.push_back((cur_A + corr) * cprod[1]);
@@ -565,7 +565,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
+                auto corr = ((B1 + (B5 * alpha2_m3)) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr *= arcsec;
 
                 U_terms.push_back((cur_A + corr) * cprod[1]);
@@ -920,7 +920,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 // Compute the correction to A.
-                auto corr = ((B1 + B5 * alpha2_m3) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
+                auto corr = ((B1 + (B5 * alpha2_m3)) * B15_fac) + (B2_fac * B2) + (B3_fac * B3) + (B4_fac * B4);
                 corr -= 2 * cur_A * dnu / (3 * nu);
 
                 r_terms.push_back((cur_A + corr) * cprod[0]);

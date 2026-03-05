@@ -131,11 +131,11 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // CPU string.
 // NOTE: the pattern reported by LLVM here seems to be pwrN
 // (sample size of 1, on travis...).
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex ppc_regex_pattern("pwr([1-9]*)");
 
 // Regex to check for AMD Zen processors.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex zen_regex_pattern("znver([1-9]*)");
 
 // Helper function to detect specific features
@@ -1233,8 +1233,9 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         }
         // LCOV_EXCL_START
     } catch (...) {
-        // Reset to a def-cted state in case of error,
-        // as it looks like there's no way of recovering.
+        // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
+        //
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         *this = []() noexcept { return llvm_state{}; }();
 
         throw;
@@ -1459,6 +1460,7 @@ void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
     if (const auto &dl_path = get_dl_path(); !dl_path.empty()) {
         auto new_dlsg
             = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         if (new_dlsg) [[likely]] {
             lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
         } else {
@@ -1555,8 +1557,9 @@ void llvm_state::compile()
         }
         // LCOV_EXCL_START
     } catch (...) {
-        // Reset to a def-cted state in case of error,
-        // as it looks like there's no way of recovering.
+        // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
+        //
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         *this = []() noexcept { return llvm_state{}; }();
 
         throw;

@@ -49,7 +49,7 @@ constexpr std::array<std::string_view, 12> http_download_month_names
     = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 // Map to associate abbreviated month names to [1, 12] indices.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto http_download_month_names_map = []() {
     std::unordered_map<std::string_view, unsigned> retval;
 
@@ -64,7 +64,7 @@ const auto http_download_month_names_map = []() {
 //
 // https://stackoverflow.com/questions/54927845/what-is-valid-rfc1123-date-format
 //
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto http_download_date_regexp = boost::regex(
     fmt::format(R"((Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{{2}}) ({}) (\d{{4}}) (\d{{2}}):(\d{{2}}):(\d{{2}}) GMT)",
                 fmt::join(http_download_month_names, "|")));

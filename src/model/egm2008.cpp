@@ -130,7 +130,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
                 const auto &[V_nm2_m, W_nm2_m] = rec_map.at({n - 2u, m});
                 const auto F2
                     = std::sqrt(((2. * n) + 1) * (static_cast<double>(n) - m - 1) * (static_cast<double>(n) + m - 1)
-                                / ((static_cast<double>(n) - m) * (static_cast<double>(n) + m) * (2. * n - 3)));
+                                / ((static_cast<double>(n) - m) * (static_cast<double>(n) + m) * ((2. * n) - 3)));
 
                 // Add the second part of the recursion formula.
                 V_nm -= F2 * a2_r2 * V_nm2_m;
@@ -146,9 +146,9 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
         const auto &[V_mm, W_mm] = rec_map.at({m, m});
         const auto mp1 = m + 1u;
         const auto F
-            = std::sqrt((2. - egm2008_kdelta(0, mp1)) * (2. * mp1 + 1) / (2. * mp1 * (2. - egm2008_kdelta(0, m))));
-        const auto V_mp1_mp1 = F * (xa_r2 * V_mm - ya_r2 * W_mm);
-        const auto W_mp1_mp1 = F * (xa_r2 * W_mm + ya_r2 * V_mm);
+            = std::sqrt((2. - egm2008_kdelta(0, mp1)) * ((2. * mp1) + 1) / (2. * mp1 * (2. - egm2008_kdelta(0, m))));
+        const auto V_mp1_mp1 = F * ((xa_r2 * V_mm) - (ya_r2 * W_mm));
+        const auto W_mp1_mp1 = F * ((xa_r2 * W_mm) + (ya_r2 * V_mm));
         assert(!rec_map.contains({mp1, mp1}));
         rec_map.try_emplace({mp1, mp1}, std::array{V_mp1_mp1, W_mp1_mp1});
     }
@@ -209,7 +209,7 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
             const auto [C, S] = get_egm2008_sc(i, j);
             const auto &[V, W] = rec_map.at({i, j});
 
-            terms.push_back(C * V + S * W);
+            terms.push_back((C * V) + (S * W));
         }
     }
 
@@ -264,9 +264,9 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
 
             // Compute the numerical coefficients.
             // NOTE: these differ from the original formulae due to the use of normalised geopotential coefficients.
-            auto cxy_0 = std::sqrt((2. - egm2008_kdelta(0, j)) * (2. * i + 1) * (2. + i + j) * (1. + i + j)
-                                   / ((2. - egm2008_kdelta(0, j + 1u)) * (2. * i + 3)));
-            const auto cz = (1. + i - j) * std::sqrt((1. + i + j) * (2. * i + 1) / ((2. * i + 3) * (1. + i - j)));
+            auto cxy_0 = std::sqrt((2. - egm2008_kdelta(0, j)) * ((2. * i) + 1) * (2. + i + j) * (1. + i + j)
+                                   / ((2. - egm2008_kdelta(0, j + 1u)) * ((2. * i) + 3)));
+            const auto cz = (1. + i - j) * std::sqrt((1. + i + j) * ((2. * i) + 1) / (((2. * i) + 3) * (1. + i - j)));
 
             // NOTE: the x and y terms have special-casing for m == 0.
             if (j == 0u) {
@@ -278,8 +278,8 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
                 cxy_0 *= 0.5;
                 const auto cxy_1
                     = 0.5 * (2. + i - j) * (1. + i - j)
-                      * std::sqrt((2. - egm2008_kdelta(0, j)) * (2. * i + 1)
-                                  / ((2. - egm2008_kdelta(0, j - 1u)) * (2. * i + 3) * (2. + i - j) * (1. + i - j)));
+                      * std::sqrt((2. - egm2008_kdelta(0, j)) * ((2. * i) + 1)
+                                  / ((2. - egm2008_kdelta(0, j - 1u)) * ((2. * i) + 3) * (2. + i - j) * (1. + i - j)));
 
                 const auto &[Vp1, Wp1] = rec_map.at({i + 1u, j + 1u});
                 const auto &[Vm1, Wm1] = rec_map.at({i + 1u, j - 1u});

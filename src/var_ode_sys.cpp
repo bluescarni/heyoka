@@ -298,6 +298,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
                 // there cannot be name collisions with the "__{}_0" variables that may have
                 // been added earlier.
                 vargs.emplace_back("____t_0");
+                // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
             } else [[unlikely]] {
                 throw std::invalid_argument(
                     fmt::format("Cannot formulate the variational equations with respect to the expression '{}': the "

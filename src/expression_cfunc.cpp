@@ -514,6 +514,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
                                                         "appears in the user-provided list of variables twice",
                                                         var_ptr->name()));
             }
+            // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         } else [[unlikely]] {
             throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
                                                     "user-provided list of variables contains the expression '{}', "
@@ -1266,20 +1267,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
-    // Compute the size in bytes of eval_arr.
-    const auto eval_arr_size = get_size(md, array_type);
-
-    // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it is declared as a global variable in order to avoid stack overflow.
-    // This creates a situation in which LLVM cannot elide stores into eval_arr
-    // (even if it figures out a way to avoid storing intermediate results into
-    // eval_arr) because LLVM must assume that some other function may
-    // use these stored values later. Thus, we declare via an intrinsic that the
-    // lifetime of eval_arr begins here and ends at the end of the function,
-    // so that LLVM can assume that any value stored in it cannot be possibly
-    // used outside this function.
-    builder.CreateLifetimeStart(eval_arr, builder.getInt64(eval_arr_size));
-
     // Copy over the values of the variables.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
@@ -1355,9 +1342,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 
     // Write the results to the output pointer.
     cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
-
-    // End the lifetime of eval_arr.
-    builder.CreateLifetimeEnd(eval_arr, builder.getInt64(eval_arr_size));
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
@@ -1901,6 +1885,8 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
                 llvm_loop_u32(*cur_state, cur_builder.getInt32(0), cur_builder.getInt32(ncalls),
                               [&](llvm::Value *cur_call_idx) {
                                   // Create the u variable index from the first generator.
+                                  //
+                                  // NOLINTNEXTLINE(modernize-type-traits)
                                   auto *u_idx = gens[0](cur_call_idx);
 
                                   // Initialise the vector of arguments with which func must be called. The following
@@ -1918,6 +1904,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
 
                                   // Evaluate and store the result.
                                   cfunc_c_store_eval(*cur_state, fp_vec_type, eval_arr, u_idx,
+                                                     // NOLINTNEXTLINE(modernize-type-traits)
                                                      cur_builder.CreateCall(func, args));
                               });
             } else {
@@ -1994,17 +1981,6 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
     // Tape alignment.
     const auto al = boost::numeric_cast<std::size_t>(get_alignment(main_md, fp_vec_type));
 
-    // NOTE: eval_arr is used as temporary storage for the current function,
-    // but it is provided externally from dynamically-allocated memory in order to avoid stack overflow.
-    // This creates a situation in which LLVM cannot elide stores into eval_arr
-    // (even if it figures out a way to avoid storing intermediate results into
-    // eval_arr) because LLVM must assume that some other function may
-    // use these stored values later. Thus, we declare via an intrinsic that the
-    // lifetime of eval_arr begins here and ends at the end of the function,
-    // so that LLVM can assume that any value stored in it cannot be possibly
-    // used outside this function.
-    main_builder.CreateLifetimeStart(eval_arr, main_builder.getInt64(sz));
-
     // Copy over the values of the variables.
     llvm_loop_u32(main_state, main_builder.getInt32(0), main_builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
@@ -2024,9 +2000,6 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
 
     // Write the results to the output pointer.
     cfunc_c_write_outputs(main_state, main_fp_t, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
-
-    // End the lifetime of eval_arr.
-    main_builder.CreateLifetimeEnd(eval_arr, main_builder.getInt64(sz));
 
     return {sz, al};
 }

@@ -156,14 +156,13 @@ llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::
     return f;
 }
 
-// Helper to determine the optimal Taylor order for a given tolerance,
-// following Jorba's prescription.
-// NOTE: when T is mppp::real and tol has a low precision, the use
-// of integer operands in these computations might bump up the working
-// precision due to the way precision propagation works in mp++. I don't
-// think there's any negative consequence here.
+// Helper to determine the optimal Taylor order for a given tolerance, following Jorba's prescription.
+//
+// NOTE: when T is mppp::real and tol has a low precision, the use of integer operands in these computations might bump
+// up the working precision due to the way precision propagation works in mp++. I don't think there's any negative
+// consequence here.
 template <typename T>
-std::uint32_t taylor_order_from_tol(T tol)
+std::uint32_t taylor_order_from_tol(const T &tol)
 {
     using std::ceil;
     using std::isfinite;

@@ -67,7 +67,7 @@ inline auto vv_transpose(const std::vector<std::variant<T...>> &v)
                 std::visit(
                     [&x](auto &vv) {
                         // The value type of retval.
-                        using scal_t = typename uncvref_t<decltype(vv)>::value_type;
+                        using scal_t = uncvref_t<decltype(vv)>::value_type;
 
                         // The type of the current element of v.
                         using x_t = uncvref_t<decltype(x)>;

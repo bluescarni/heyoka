@@ -140,13 +140,13 @@ const expression &nt_event_impl<T, B>::get_expression() const
 }
 
 template <typename T, bool B>
-typename nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback()
+nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback()
 {
     return callback;
 }
 
 template <typename T, bool B>
-const typename nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const
+const nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const
 {
     return callback;
 }

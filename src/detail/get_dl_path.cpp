@@ -80,7 +80,8 @@ std::string make_dl_path()
 }
 
 // The path to the heyoka shared library.
-// NOLINTNEXTLINE(cert-err58-cpp)
+//
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const std::string dl_path = make_dl_path();
 
 } // namespace

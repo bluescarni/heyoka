@@ -116,6 +116,8 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 #endif
 
 // Code model.
+//
+// NOLINTNEXTLINE(performance-enum-size)
 enum class code_model : unsigned { tiny, small, kernel, medium, large };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, code_model);

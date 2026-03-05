@@ -81,6 +81,7 @@ template <typename T>
 using is_num_param = std::disjunction<std::is_same<T, number>, std::is_same<T, param>>;
 
 template <typename T>
+// NOLINTNEXTLINE(modernize-type-traits)
 inline constexpr bool is_num_param_v = is_num_param<T>::value;
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam(llvm_state &, llvm::Type *, const number &, llvm::Value *,
@@ -385,6 +386,7 @@ private:
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
@@ -583,7 +585,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }
@@ -598,7 +600,9 @@ private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
     propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T>, bool, bool);
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     propagate_for_impl(T, std::size_t, T, step_callback<T>, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
     propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
@@ -843,11 +847,11 @@ private:
                     return detail::ranges_to<std::vector<T>>(p(kw::time));
                 } else {
                     // The input time is a scalar, splat it out.
-                    return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(p(kw::time)));
+                    return std::vector<T>(static_cast<std::vector<T>::size_type>(batch_size), T(p(kw::time)));
                 }
             } else {
                 // The input time was not provided, return a vector of zeroes.
-                return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
+                return std::vector<T>(static_cast<std::vector<T>::size_type>(batch_size), T(0));
             }
         }();
 
@@ -1015,7 +1019,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }
@@ -1107,7 +1111,7 @@ public:
     // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
         requires igor::validate<propagate_grid_kw_cfg, KwArgs...>
-    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward,performance-unnecessary-value-param)
     std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb]

@@ -163,7 +163,7 @@ inline std::string demangle(const char *s)
     auto deleter = [](void *ptr) { std::free(ptr); };
 
     // NOTE: abi::__cxa_demangle will return a pointer allocated by std::malloc, which we will delete via std::free().
-    std::unique_ptr<char, decltype(deleter)> res{::abi::__cxa_demangle(s, nullptr, nullptr, nullptr), deleter};
+    const std::unique_ptr<char, decltype(deleter)> res{::abi::__cxa_demangle(s, nullptr, nullptr, nullptr), deleter};
 
     // NOTE: return the original string if demangling fails.
     return res ? std::string(res.get()) : std::string(s);
@@ -196,6 +196,7 @@ namespace detail
 //
 // https://en.cppreference.com/w/cpp/utility/forward_like
 template <typename T, typename U>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 [[nodiscard]] constexpr auto &&forward_like(U &&x) noexcept
 {
     constexpr bool is_adding_const = std::is_const_v<std::remove_reference_t<T>>;
@@ -203,12 +204,14 @@ template <typename T, typename U>
         if constexpr (is_adding_const) {
             return std::as_const(x);
         } else {
+            // NOLINTNEXTLINE(readability-redundant-casting)
             return static_cast<U &>(x);
         }
     } else {
         if constexpr (is_adding_const) {
             return std::move(std::as_const(x));
         } else {
+            // NOLINTNEXTLINE(bugprone-move-forwarding-reference)
             return std::move(x);
         }
     }
@@ -279,6 +282,8 @@ struct TANUKI_VISIBLE _tanuki_value_iface : public IFace {
     _tanuki_value_iface &operator=(_tanuki_value_iface &&) noexcept = delete;
     // NOTE: it is important that this is virtual because we will be deleting through pointers to _tanuki_value_iface.
     // Mark it also as noexcept as we do not want to bother supporting values/interfaces which may throw on destruction.
+    //
+    // NOLINTNEXTLINE(hicpp-use-override,modernize-use-override)
     virtual ~_tanuki_value_iface() noexcept = default;
 
     // NOTE: we want to provide an implementation for the virtual functions (instead of keeping them pure virtual). This
@@ -387,6 +392,7 @@ concept noncv_rvalue_reference
 
 // Composite interface.
 template <typename IFace0, typename IFace1, typename... IFaceN>
+// NOLINTNEXTLINE(misc-multiple-inheritance,cppcoreguidelines-virtual-class-destructor)
 struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFaceN... {
 };
 
@@ -458,7 +464,7 @@ struct get_nc_iface_impl<IFace, Base, T> {
 template <typename IFace, typename Base, typename T>
     requires iface_has_intrusive_impl<IFace, Base, T> && (!iface_has_external_impl<IFace, Base, T>)
 struct get_nc_iface_impl<IFace, Base, T> {
-    using type = typename IFace::template impl<Base, T>;
+    using type = IFace::template impl<Base, T>;
 };
 
 template <typename IFace, typename Base, typename T>
@@ -505,8 +511,8 @@ template <typename T, typename CurIFace, typename CurBase, typename NextIFace, t
                                    IFaceN...>::type;
     }
 struct c_iface_assembler<T, CurIFace, CurBase, NextIFace, IFaceN...> {
-    using cur_impl = typename get_nc_iface_impl<CurIFace, CurBase, T>::type;
-    using type = typename c_iface_assembler<T, NextIFace, cur_impl, IFaceN...>::type;
+    using cur_impl = get_nc_iface_impl<CurIFace, CurBase, T>::type;
+    using type = c_iface_assembler<T, NextIFace, cur_impl, IFaceN...>::type;
 };
 
 template <typename T, typename CurIFace, typename CurBase, typename LastIFace>
@@ -515,8 +521,8 @@ template <typename T, typename CurIFace, typename CurBase, typename LastIFace>
         typename get_nc_iface_impl<LastIFace, typename get_nc_iface_impl<CurIFace, CurBase, T>::type, T>::type;
     }
 struct c_iface_assembler<T, CurIFace, CurBase, LastIFace> {
-    using cur_impl = typename get_nc_iface_impl<CurIFace, CurBase, T>::type;
-    using type = typename get_nc_iface_impl<LastIFace, cur_impl, T>::type;
+    using cur_impl = get_nc_iface_impl<CurIFace, CurBase, T>::type;
+    using type = get_nc_iface_impl<LastIFace, cur_impl, T>::type;
 };
 
 template <typename T, wrap_semantics Sem, typename IFace0, typename IFace1, typename... IFaceN>
@@ -526,16 +532,15 @@ template <typename T, wrap_semantics Sem, typename IFace0, typename IFace1, type
                                    IFace1, IFaceN...>::type;
     }
 struct impl_from_iface_impl<composite_iface<IFace0, IFace1, IFaceN...>, T, Sem> {
-    using type =
-        typename c_iface_assembler<T, IFace0,
-                                   _tanuki_typed_value_iface<T, composite_iface<IFace0, IFace1, IFaceN...>, Sem>,
-                                   IFace1, IFaceN...>::type;
+    using type
+        = c_iface_assembler<T, IFace0, _tanuki_typed_value_iface<T, composite_iface<IFace0, IFace1, IFaceN...>, Sem>,
+                            IFace1, IFaceN...>::type;
 };
 
 // Helper alias.
 template <typename IFace, typename T, wrap_semantics Sem>
     requires requires() { typename impl_from_iface_impl<IFace, T, Sem>::type; }
-using impl_from_iface = typename impl_from_iface_impl<IFace, T, Sem>::type;
+using impl_from_iface = impl_from_iface_impl<IFace, T, Sem>::type;
 
 // Concept to check that the interface IFace has an implementation for the value type T.
 template <typename IFace, typename T, wrap_semantics Sem>
@@ -624,7 +629,7 @@ struct TANUKI_VISIBLE _tanuki_holder final : public impl_from_iface<IFace, T, Se
     }
     [[nodiscard]] void *_tanuki_value_ptr() noexcept final
     {
-        return std::addressof(_tanuki_value);
+        return static_cast<void *>(std::addressof(_tanuki_value));
     }
 
     [[nodiscard]] bool _tanuki_value_is_reference() const noexcept final
@@ -681,6 +686,12 @@ struct TANUKI_VISIBLE _tanuki_holder final : public impl_from_iface<IFace, T, Se
     }
     // Move-init a new holder from this into the storage beginning at ptr. Then cast the result to the value interface
     // and return.
+    //
+    // NOTE: currently we mark this as noexcept, which will lead to clang-tidy warnings if the type-erased value throws
+    // on move construction. We do not want to handle the complexity of types with throwing move constructors, hence we
+    // silence the warning.
+    //
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] _tanuki_value_iface<IFace, Sem> *_tanuki_move_init_holder(void *ptr) && noexcept final
     {
         if constexpr (std::is_move_constructible_v<T>) {
@@ -930,6 +941,7 @@ inline constexpr auto holder_align = alignof(detail::_tanuki_holder<T, IFace, wr
 // Default implementation of the reference interface.
 struct TANUKI_VISIBLE no_ref_iface {
     template <typename>
+    // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility)
     struct impl {
     };
 };
@@ -1116,6 +1128,7 @@ inline constexpr bool is_in_place_type_v<std::in_place_type_t<T>> = true;
 
 // Implementation of the pointer interface for the wrap class, conditionally-enabled depending on the configuration.
 template <bool Enable, typename Wrap, typename IFace>
+// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility)
 struct TANUKI_VISIBLE wrap_pointer_iface {
     const IFace *operator->() const noexcept
     {
@@ -1163,7 +1176,7 @@ struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
 };
 
 template <auto Cfg>
-using cfg_ref_t = typename cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::type;
+using cfg_ref_t = cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::type;
 
 template <typename T, typename Wrap>
 struct get_ref_iface {
@@ -1172,7 +1185,7 @@ struct get_ref_iface {
 template <typename T, typename Wrap>
     requires with_impl_tt<T>
 struct get_ref_iface<T, Wrap> {
-    using type = typename T::template impl<Wrap>;
+    using type = T::template impl<Wrap>;
 };
 
 #if defined(TANUKI_HAVE_EXPLICIT_THIS)
@@ -1186,7 +1199,7 @@ struct get_ref_iface<T, Wrap> {
 #endif
 
 template <auto Cfg, typename Wrap>
-using get_ref_iface_t = typename get_ref_iface<cfg_ref_t<Cfg>, Wrap>::type;
+using get_ref_iface_t = get_ref_iface<cfg_ref_t<Cfg>, Wrap>::type;
 
 // Concept to check that a value type T is consistent with the wrap settings in Cfg: if the wrap is using value
 // semantics and it is copy/move-constructible, so must be the value type.
@@ -1200,6 +1213,7 @@ concept copy_move_consistent = (Cfg.semantics == wrap_semantics::reference)
 // The wrap class.
 template <typename IFace, auto Cfg = default_config>
     requires std::is_class_v<IFace> && std::same_as<IFace, std::remove_cv_t<IFace>> && valid_config<Cfg>
+// NOLINTNEXTLINE(misc-multiple-inheritance)
 class TANUKI_VISIBLE wrap : private detail::wrap_storage<IFace, Cfg.static_size, Cfg.static_align, Cfg.semantics>,
                             // NOTE: the reference interface is not supposed to hold any data: it will always be
                             // def-inited (even when copying/moving a wrap object), its assignment operators will never
@@ -1214,7 +1228,7 @@ class TANUKI_VISIBLE wrap : private detail::wrap_storage<IFace, Cfg.static_size,
     using ref_iface_t = detail::get_ref_iface_t<Cfg, wrap<IFace, Cfg>>;
 
     // The default value type.
-    using default_value_t = typename decltype(Cfg)::default_value_type;
+    using default_value_t = decltype(Cfg)::default_value_type;
 
     // Shortcut for the holder type corresponding to the value type T.
     template <typename T>
@@ -1621,10 +1635,14 @@ private:
         if constexpr (Cfg.static_size == 0u) {
             delete this->m_pv_iface;
         } else {
+            // NOTE: the clang-analyzer-cplusplus.NewDelete suppressions are for a clang-tidy false positive emerging
+            // from some tests. clang-tidy complains about double delete/destruction in the random_access_range.cpp
+            // test, but we checked that this is not actually happening.
             if (stype()) {
+                // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
                 this->m_pv_iface->~value_iface_t();
             } else {
-                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory,clang-analyzer-cplusplus.NewDelete)
                 delete this->m_pv_iface;
             }
         }
@@ -1710,6 +1728,10 @@ public:
     //
     // NOTE: if the internal types differ or the internal type does not support copy-assignment, this will be left in
     // the invalid state if an exception is thrown during the copy operation.
+    //
+    // NOTE: clang-tidy does not see that we are handling self-assignment properly.
+    //
+    // NOLINTNEXTLINE(cert-oop54-cpp)
     wrap &operator=(const wrap &other) noexcept(Cfg.semantics == wrap_semantics::reference)
         requires(Cfg.copy_assignable || Cfg.semantics == wrap_semantics::reference)
     {
@@ -1840,13 +1862,14 @@ public:
                 // need to bother with moving) and 2) avoid checking the return value of
                 // _tanuki_copy_assign_value_from() - we know the assignment must succeed.
                 auto *fptr = std::addressof(x);
-                [[maybe_unused]] const auto ret = this->m_pv_iface->_tanuki_copy_assign_value_from(&fptr);
+                [[maybe_unused]] const auto ret
+                    = this->m_pv_iface->_tanuki_copy_assign_value_from(static_cast<const void *>(&fptr));
                 assert(ret);
             } else {
                 // The internal types are the same, attempt to directly copy/move assign.
                 bool ret = false;
                 if constexpr (detail::noncv_rvalue_reference<T &&>) {
-                    ret = this->m_pv_iface->_tanuki_move_assign_value_from(std::addressof(x));
+                    ret = this->m_pv_iface->_tanuki_move_assign_value_from(static_cast<void *>(std::addressof(x)));
                 } else {
                     ret = this->m_pv_iface->_tanuki_copy_assign_value_from(std::addressof(x));
                 }
@@ -2043,6 +2066,9 @@ public:
         if constexpr (Cfg.semantics == wrap_semantics::reference || Cfg.static_size == 0u) {
             return false;
         } else {
+            // NOTE: we are explicitly allowing to call this function on moved-from wraps.
+            //
+            // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
             return w.stype();
         }
     }

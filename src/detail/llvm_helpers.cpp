@@ -123,7 +123,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 };
 
 // The global type map to associate a C++ type to an LLVM type.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 
@@ -2568,6 +2568,8 @@ llvm::Value *llvm_is_finite(llvm_state &s, llvm::Value *x)
         return llvm_real_isfinite(s, x);
 #endif
         // LCOV_EXCL_START
+    //
+    // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid type '{}' encountered in the LLVM implementation of is_finite()", llvm_type_name(x_t)));
@@ -3687,6 +3689,8 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
     if (tp->isVectorTy()) {
         // tp is a vector type.
+        //
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
         if (const auto *vtp = llvm::dyn_cast<llvm::FixedVectorType>(tp)) [[likely]] {
             return make_vector_type(ret_scal_t, boost::numeric_cast<std::uint32_t>(vtp->getNumElements()));
         } else {

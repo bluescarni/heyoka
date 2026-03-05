@@ -630,10 +630,9 @@ namespace detail
 namespace
 {
 
-// The indices vector corresponding
-// to the first derivative of order 1
-// of the first component.
-// NOLINTNEXTLINE(cert-err58-cpp)
+// The indices vector corresponding to the first derivative of order 1 of the first component.
+//
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const dtens_sv_idx_t s_vidx_001{0, {{0, 1}}};
 
 } // namespace
