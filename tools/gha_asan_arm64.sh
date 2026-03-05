@@ -27,6 +27,9 @@ cd build
 unset CXXFLAGS
 unset CFLAGS
 
+# Temporary debug
+sudo cat /proc/sys/vm/mmap_rnd_bits
+
 # Configure.
 cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
