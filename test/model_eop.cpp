@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -44,6 +45,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/eop.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -455,28 +457,32 @@ TEST_CASE("eop cfunc")
 
             std::ranges::fill(ins, fp_t(0));
 
-            llvm_state s{kw::opt_level = opt_level};
-
             // NOTE: here we create one output per eop quantity.
-            add_cfunc<fp_t>(s, "cfunc",
-                            {model::pm_x(kw::time_expr = x), model::pm_xp(kw::time_expr = x),
-                             model::pm_y(kw::time_expr = x), model::pm_yp(kw::time_expr = x),
-                             model::dX(kw::time_expr = x), model::dXp(kw::time_expr = x), model::dY(kw::time_expr = x),
-                             model::dYp(kw::time_expr = x)},
-                            {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {model::pm_x(kw::time_expr = x), model::pm_xp(kw::time_expr = x), model::pm_y(kw::time_expr = x),
+                 model::pm_yp(kw::time_expr = x), model::dX(kw::time_expr = x), model::dXp(kw::time_expr = x),
+                 model::dY(kw::time_expr = x), model::dYp(kw::time_expr = x)},
+                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_pm_x_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_pm_xp_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_pm_y_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_pm_yp_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_dX_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_dXp_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_dY_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_dYp_"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_pm_x_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_pm_xp_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_pm_y_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_pm_yp_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_dX_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_dXp_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_dY_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_dYp_"); }));
             }
-
-            s.compile();
 
             if (opt_level == 3u) {
                 // NOTE: in the compiled function, we are evaluating eop quantities and their derivatives. The purpose
@@ -485,21 +491,35 @@ TEST_CASE("eop cfunc")
                 // function twice.
                 const auto get_eop_eopp_call_regex = boost::regex(R"(.*call.*heyoka\.get_.*_.*p\..*)");
                 auto count = 0u;
-                const auto ir = s.get_ir();
-                for (const auto line : ir | std::ranges::views::split('\n')) {
-                    boost::cmatch matches;
-                    if (boost::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
-                                           matches, get_eop_eopp_call_regex)) {
-                        ++count;
+
+                const auto count_in_ir = [&get_eop_eopp_call_regex, &count](const std::string &ir) {
+                    for (const auto line : ir | std::ranges::views::split('\n')) {
+                        boost::cmatch matches;
+                        if (boost::regex_match(std::ranges::data(line),
+                                               std::ranges::data(line) + std::ranges::size(line), matches,
+                                               get_eop_eopp_call_regex)) {
+                            ++count;
+                        }
+                    }
+                };
+
+                if (compact_mode) {
+                    for (const auto &ir : std::get<1>(cf.get_llvm_states()).get_ir()) {
+                        count_in_ir(ir);
+                    }
+                } else {
+                    for (const auto &ls : std::get<0>(cf.get_llvm_states())) {
+                        count_in_ir(ls.get_ir());
                     }
                 }
-                REQUIRE(count <= 4u);
+
+                // NOTE: in non-compact mode there are 3 internal llvm states, so the count
+                // could be up to 3x.
+                REQUIRE(count <= (compact_mode ? 4u : 12u));
             }
 
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 8u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(static_cast<fp_t>(2.100929642630355e-07)));
@@ -540,25 +560,16 @@ TEST_CASE("eop eopp cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {model::pm_x(kw::time_expr = x), model::pm_x(kw::time_expr = par[0]),
-                                   model::dX(kw::time_expr = expression{0.}), model::dYp()},
-                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf({model::pm_x(kw::time_expr = x), model::pm_x(kw::time_expr = par[0]),
+                                  model::dX(kw::time_expr = expression{0.}), model::dYp()},
+                                 {x}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             const std::vector pars{mppp::real{0, prec}};
             const std::vector tm{mppp::real{0, prec}};
             std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+            cf(outs, ins, kw::pars = pars, kw::time = tm[0]);
 
             auto i = 0u;
             REQUIRE(!isnan(outs[i]));
