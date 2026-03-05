@@ -137,6 +137,8 @@ if(NOT _YACMACompilerLinkerSettingsRun)
         # (de)serialising derived objects through pointers to bases. Thus, we forcibly disable
         # this new flag.
         _YACMA_CHECK_ENABLE_CXX_FLAG(-fno-assume-unique-vtables)
+        # New warnings in clang 21.
+        _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Wundef-true)
     endif()
 
     # Common configuration for GCC, clang and Intel.
@@ -202,6 +204,15 @@ if(NOT _YACMACompilerLinkerSettingsRun)
         # From GCC 12.
         _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Warray-compare)
         _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Wmissing-requires)
+        # From GCC 13.
+        _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Wxor-used-as-pow)
+        # From GCC 14.
+        #
+        # NOTE: this is currently quite chatty, disable it.
+        #
+        # _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Wnrvo)
+        # From GCC 15.
+        _YACMA_CHECK_ENABLE_DEBUG_CXX_FLAG(-Wtrailing-whitespace)
     endif()
 
     # MSVC setup.
