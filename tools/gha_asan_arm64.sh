@@ -42,7 +42,7 @@ cmake ../ -G Ninja \
 ninja -v -j4
 
 # Run the tests.
-ctest -VV -j4
+ctest -VV -j1
 
 set +e
 set +x
