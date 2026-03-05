@@ -15,7 +15,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/model/mascon.hpp>
 
@@ -53,11 +52,5 @@ int main()
 
     auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
 
-    llvm_state s;
-
-    add_cfunc<double>(s, "en", {en}, {x, y, z, vx, vy, vz});
-
-    s.compile();
-
-    [[maybe_unused]] auto fn = s.jit_lookup("en");
+    cfunc<double> cf({en}, {x, y, z, vx, vy, vz}, kw::compact_mode = true);
 }

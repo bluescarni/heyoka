@@ -16,8 +16,10 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <vector>
+
+#include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/model/elp2000.hpp>
 
@@ -53,23 +55,17 @@ int main(int argc, char *argv[])
     auto sol = model::elp2000_cartesian_e2000(kw::thresh = thresh);
     logger->trace("Creating the solution took: {}", sw);
 
-    llvm_state s;
-
     sw.reset();
-    add_cfunc<double>(s, "func", sol, {});
-    s.compile();
+    cfunc<double> cf(sol, {}, kw::compact_mode = true);
     logger->trace("Compiling the solution took: {}", sw);
 
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
-
-    double out[3]{};
+    std::vector<double> out(3u, 0.);
 
     for (auto date : {2469000.5, 2449000.5, 2429000.5, 2409000.5, 2389000.5}) {
         const double tm = (date - 2451545.0) / (36525);
 
         sw.reset();
-        cf_ptr(out, nullptr, nullptr, &tm);
+        cf(out, std::vector<double>{}, kw::time = tm);
         logger->trace("Computing the solution took: {}", sw);
         logger->trace("State for date {}: {}", date, out);
     }
