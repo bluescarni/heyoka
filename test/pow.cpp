@@ -10,12 +10,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/find_iterator.hpp>
@@ -43,6 +45,7 @@
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -261,42 +264,45 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, {x, y},
+            cfunc<fp_t> cf1({pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, {x, y},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
-            add_cfunc<fp_t>(s, "cfunc2",
-                            {expression{func{detail::pow_impl(x, 0_dbl)}}, pow(x, fp_t{-3}),
+            cfunc<fp_t> cf2({expression{func{detail::pow_impl(x, 0_dbl)}}, pow(x, fp_t{-3}),
                              pow(x, -std::numeric_limits<fp_t>::infinity())},
                             {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
-            add_cfunc<fp_t>(s, "cfunc3", {pow(x, fp_t(7)), pow(x, fp_t{-8}), pow(x, fp_t{11} / 2)}, {x, y},
+            cfunc<fp_t> cf3({pow(x, fp_t(7)), pow(x, fp_t{-8}), pow(x, fp_t{11} / 2)}, {x, y},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half_3."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_int_0."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_neg_small_int_3."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half_11."));
+                const auto irs1 = std::get<1>(cf1.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs1, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow.");
+                }));
+                REQUIRE(std::ranges::any_of(irs1, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_half_3.");
+                }));
+
+                const auto irs2 = std::get<1>(cf2.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs2, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_int_0.");
+                }));
+                REQUIRE(std::ranges::any_of(irs2, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_neg_small_int_3.");
+                }));
+
+                const auto irs3 = std::get<1>(cf3.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs3, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_half_11.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr1
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc1"));
-
-            auto *cf_ptr2
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc2"));
-
-            auto *cf_ptr3
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc3"));
-
-            cf_ptr1(outs.data(), ins.data(), pars.data(), nullptr);
+            cf1(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+                mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+                kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(pow(ins[i], ins[i + batch_size]), fp_t(100)));
@@ -304,7 +310,8 @@ TEST_CASE("cfunc")
                 REQUIRE(outs[i + 2u * batch_size] == approximately(pow(ins[i], fp_t(3) / 2), fp_t(100)));
             }
 
-            cf_ptr2(outs.data(), ins.data(), pars.data(), nullptr);
+            cf2(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+                mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(fp_t(1), fp_t(100)));
@@ -313,7 +320,8 @@ TEST_CASE("cfunc")
                          || (!isfinite(outs[i + 2u * batch_size]) && !isnan(outs[i + 2u * batch_size]))));
             }
 
-            cf_ptr3(outs.data(), ins.data(), pars.data(), nullptr);
+            cf3(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+                mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(pow(ins[i], fp_t(7)), fp_t(100)));
@@ -336,11 +344,13 @@ TEST_CASE("cfunc")
     {
         auto x = make_vars("x");
 
-        llvm_state s{kw::opt_level = 0u};
+        cfunc<double> cf({pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)}, {x},
+                         kw::opt_level = 0u);
 
-        add_cfunc<double>(s, "cfunc1", {pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)}, {x});
-
-        REQUIRE(!boost::contains(s.get_ir(), "llvm.pow"));
+        const auto &states = std::get<0>(cf.get_llvm_states());
+        for (const auto &s : states) {
+            REQUIRE(!boost::contains(s.get_ir(), "llvm.pow"));
+        }
     }
 }
 
@@ -354,23 +364,16 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(
-                s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
-                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr1
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc1"));
+            cfunc<mppp::real> cf(
+                {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
+                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
+                kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
             const std::vector pars{mppp::real{"3.1", prec}};
             std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
-            cf_ptr1(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             auto i = 0u;
             REQUIRE(outs[i] == pow(ins[i], ins[i + 1u]));
