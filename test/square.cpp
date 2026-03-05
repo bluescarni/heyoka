@@ -10,12 +10,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -37,6 +39,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/s11n.hpp>
@@ -136,22 +139,20 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(
-                s, "cfunc", {square_wrapper(x), square_wrapper(expression{fp_t(.5)}), square_wrapper(par[0])}, {x},
-                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({square_wrapper(x), square_wrapper(expression{fp_t(.5)}), square_wrapper(par[0])}, {x},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_int_2"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_int_2");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(ins[i] * ins[i], fp_t(100)));
@@ -181,25 +182,27 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
+            cfunc<mppp::real> cf({square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])}, {x},
+                                 kw::compact_mode = compact_mode, kw::prec = prec,
+                                 kw::opt_level = opt_level);
 
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])}, {x},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
-
-            REQUIRE(boost::contains(s.get_ir(), "mpfr_sqr"));
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            if (compact_mode) {
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "mpfr_sqr");
+                }));
+            } else {
+                const auto &states = std::get<0>(cf.get_llvm_states());
+                REQUIRE(std::ranges::any_of(states, [](const auto &s) {
+                    return boost::contains(s.get_ir(), "mpfr_sqr");
+                }));
+            }
 
             const std::vector ins{mppp::real{".7", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
             std::vector<mppp::real> outs(3u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             auto i = 0u;
             REQUIRE(outs[i] == ins[i] * ins[i]);

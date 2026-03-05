@@ -9,12 +9,14 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -37,6 +39,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -136,24 +139,21 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc",
-                            {detail::sub(expression{fp_t{-1}}, x), detail::sub(x, par[0]), detail::sub(1_dbl, par[0]),
-                             detail::sub(x, y)},
-                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({detail::sub(expression{fp_t{-1}}, x), detail::sub(x, par[0]),
+                            detail::sub(1_dbl, par[0]), detail::sub(x, y)},
+                           {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sub."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.sub.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 4u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(-fp_t(1) - ins[i], fp_t(100)));
@@ -184,24 +184,16 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {detail::sub(expression{mppp::real{-1, prec}}, x), detail::sub(x, par[0]),
-                                   detail::sub(expression{mppp::real{1, prec}}, par[0]), detail::sub(x, y)},
-                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf({detail::sub(expression{mppp::real{-1, prec}}, x), detail::sub(x, par[0]),
+                                  detail::sub(expression{mppp::real{1, prec}}, par[0]), detail::sub(x, y)},
+                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
+                                 kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.3", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
             std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             auto i = 0u;
             REQUIRE(outs[i] == approximately(-1 - ins[i]));
