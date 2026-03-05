@@ -15,7 +15,7 @@ export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir c-compiler cxx-compiler cmake \
-    llvmdev tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor \
+    'llvmdev=21.*' tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor \
     xtensor-blas blas blas-devel fmt spdlog ninja openssl
 source activate $deps_dir
 
@@ -42,7 +42,7 @@ cmake ../ -G Ninja \
 ninja -v -j4
 
 # Run the tests.
-ctest -VV -j1
+ctest -VV -j4
 
 set +e
 set +x
