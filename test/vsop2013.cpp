@@ -16,7 +16,6 @@
 #include <heyoka/detail/analytical_theories_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/model/vsop2013.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -833,19 +832,13 @@ TEST_CASE("vsop2013 low prec zero inc")
 {
     auto ex = vsop2013_cartesian(1, kw::time_expr = "tm"_var, kw::thresh = 1e-1)[0];
 
-    llvm_state s;
+    cfunc<double> cf({ex}, {"tm"_var});
 
-    add_cfunc<double>(s, "f", {ex}, {"tm"_var});
+    std::vector<double> outs(1u, 0.);
+    std::vector<double> ins(1u, 0.);
 
-    s.compile();
+    cf(outs, ins);
 
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("f"));
-
-    double out = 0, in = 0;
-
-    cf_ptr(&out, &in, nullptr, nullptr);
-
-    REQUIRE(!std::isnan(out));
-    REQUIRE(out != 0);
+    REQUIRE(!std::isnan(outs[0]));
+    REQUIRE(outs[0] != 0);
 }
