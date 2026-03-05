@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -17,6 +18,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -42,6 +44,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/pow.hpp>
@@ -293,22 +296,21 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(
-                s, "cfunc", {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
-                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
+                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepE."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.kepE.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 5u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(bmt_inv_kep_E(ins[i], ins[i + batch_size]), fp_t(1000)));
@@ -358,22 +360,19 @@ TEST_CASE("cfunc mp")
             std::generate(outs.begin(), outs.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc",
-                            {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
-                            kw::prec = prec, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
+                kw::prec = prec, kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepE."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.kepE.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             REQUIRE(outs[0] - ins[0] * sin(outs[0]) == approximately(ins[1], fp_t(1000)));
             REQUIRE(outs[1] - ins[0] * sin(outs[1]) == approximately(pars[0], fp_t(1000)));
