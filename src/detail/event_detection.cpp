@@ -109,6 +109,15 @@ namespace detail
 namespace
 {
 
+// NOTE: MSVC has a bug in which using declarations from an enclosing function scope are not visible inside nested
+// generic lambda bodies. This wrapper works around the issue for isfinite().
+template <typename T>
+bool adl_isfinite(const T &x)
+{
+    using std::isfinite;
+    return isfinite(x);
+}
+
 // LCOV_EXCL_START
 
 #if defined(HEYOKA_HAVE_STRERROR_R)
@@ -1151,7 +1160,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                 // NOTE: we do one last check on the root in order to
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
-                if (!isfinite(root)) {
+                if (!adl_isfinite(root)) {
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
                                        fp_to_string(root));
@@ -1187,7 +1196,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                 auto abs_der = abs(der);
 
                 // Check it before proceeding.
-                if (!isfinite(der)) {
+                if (!adl_isfinite(der)) {
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
                                        "skipping the event",
@@ -1314,7 +1323,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                 // the wikipedia algorithm also has a special case for this.
                 if (tmp.v[0] == 0 // LCOV_EXCL_LINE
                     && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
-                                   [](const auto &x) { return isfinite(x); })) {
+                                   [](const auto &x) { return adl_isfinite(x); })) {
                     // NOTE: we will have to skip the event if we are dealing
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.
@@ -1840,7 +1849,7 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                     // NOTE: we do one last check on the root in order to
                     // avoid non-finite event times. This guarantees that
                     // sorting the events by time is safe.
-                    if (!isfinite(root)) {
+                    if (!adl_isfinite(root)) {
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced a non-finite root of {} at the batch "
                                            "index {} - skipping the event",
@@ -1878,7 +1887,7 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                     const auto abs_der = abs(der);
 
                     // Check it before proceeding.
-                    if (!isfinite(der)) {
+                    if (!adl_isfinite(der)) {
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} "
                                            "at the batch index {} - skipping the event",
@@ -1995,7 +2004,7 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                     // polynomials.
                     if (tmp.v[0] == 0 // LCOV_EXCL_LINE
                         && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
-                                       [](const auto &x) { return isfinite(x); })) {
+                                       [](const auto &x) { return adl_isfinite(x); })) {
                         // NOTE: we will have to skip the event if we are dealing
                         // with a terminal event on cooldown and the lower bound
                         // falls within the cooldown time.
