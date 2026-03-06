@@ -14,6 +14,8 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
+# NOTE: at the moment there seems to be a regression on linux aarch64 with llvm 22 that results in
+# the test suite being killed as it runs on the CI, apparently due to resource exhaustion.
 conda create -y -p $deps_dir c-compiler cxx-compiler cmake \
     'llvmdev=21.*' tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor \
     xtensor-blas blas blas-devel fmt spdlog ninja openssl
