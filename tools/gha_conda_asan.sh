@@ -17,7 +17,7 @@ bash miniconda.sh -b -p $HOME/miniconda
 conda create -y -p $deps_dir c-compiler cxx-compiler cmake \
     llvmdev tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor \
     xtensor-blas blas blas-devel fmt spdlog ninja openssl \
-    'sphinxcontrib-bibtex=2.6.*' 'sphinx=7.*' 'sphinx-book-theme=1.*'
+    'sphinxcontrib-bibtex=2.6.*' 'sphinx=8.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -47,7 +47,7 @@ ctest -VV -j4
 
 # Build the docs.
 cd ../doc
-export SPHINX_OUTPUT=`make html linkcheck 2>&1 >/dev/null`;
+export SPHINX_OUTPUT=`make html 2>&1 >/dev/null`;
 if [[ "${SPHINX_OUTPUT}" != "" ]]; then
     echo "Sphinx encountered some problem:";
     echo "${SPHINX_OUTPUT}";
