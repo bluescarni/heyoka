@@ -599,10 +599,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 }
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive()
-    : taylor_adaptive({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, kw::tol = static_cast<T>(1e-1))
-{
-}
+taylor_adaptive<T>::taylor_adaptive() = default;
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
