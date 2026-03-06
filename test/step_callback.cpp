@@ -82,7 +82,7 @@ TEST_CASE("step_callback basics")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        taylor_adaptive<fp_t> ta;
+        taylor_adaptive<fp_t> ta({prime("x"_var) = 0_dbl}, {fp_t(0)}, kw::tol = fp_t(1e-1));
 
         {
             step_callback<fp_t> step_cb;

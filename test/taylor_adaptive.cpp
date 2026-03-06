@@ -1831,15 +1831,8 @@ TEST_CASE("def ctor")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
+        // NOTE: nothing to test here, def ctor in invalid state.
         taylor_adaptive<fp_t> ta;
-
-        REQUIRE(ta.get_state() == std::vector{fp_t(0)});
-        REQUIRE(ta.get_time() == 0);
-        REQUIRE(ta.get_high_accuracy() == false);
-        REQUIRE(ta.get_compact_mode() == false);
-
-        REQUIRE(ta.get_state_data() == std::as_const(ta).get_state_data());
-        REQUIRE(ta.get_pars_data() == std::as_const(ta).get_pars_data());
     };
 
     tuple_for_each(fp_types, tester);

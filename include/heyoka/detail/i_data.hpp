@@ -18,7 +18,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <optional>
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -36,28 +36,15 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Data for Taylor map computation.
-template <typename T>
-struct tm_data {
-    using tm_func_t = void (*)(T *, const T *, const T *) noexcept;
-    llvm_state m_state;
-    tm_func_t m_tm_func{};
-    std::vector<T> m_output;
+// Fwd-declarations.
+template <typename>
+struct tm_data;
 
-    // NOTE: this is used only for serialisation.
-    tm_data();
-    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
-    tm_data(const tm_data &);
-    tm_data(tm_data &&) noexcept = delete;
-    tm_data &operator=(const tm_data &) = delete;
-    tm_data &operator=(tm_data &&) noexcept = delete;
-    ~tm_data();
+template <typename>
+struct ed_data;
 
-    // Serialisation.
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-};
+template <typename>
+struct ed_data_batch;
 
 } // namespace detail
 
@@ -113,7 +100,9 @@ struct taylor_adaptive<T>::i_data {
     // The ODE sys.
     sys_t m_vsys;
     // Taylor map data.
-    std::optional<detail::tm_data<T>> m_tm_data;
+    std::unique_ptr<detail::tm_data<T>> m_tm_data;
+    // Event detection data.
+    std::unique_ptr<detail::ed_data<T>> m_ed_data;
 
 private:
     // Serialisation.
@@ -213,7 +202,9 @@ struct taylor_adaptive_batch<T>::i_data {
     // The ODE sys.
     sys_t m_vsys;
     // Taylor map data.
-    std::optional<detail::tm_data<T>> m_tm_data;
+    std::unique_ptr<detail::tm_data<T>> m_tm_data;
+    // Event detection data.
+    std::unique_ptr<detail::ed_data_batch<T>> m_ed_data;
 
 private:
     // Serialisation.
