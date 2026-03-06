@@ -162,8 +162,8 @@ TEST_CASE("copy semantics")
 
     llvm_state s1, s2;
 
-    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
-    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
 
     llvm_multi_state ms{{s1, s2}, false};
 
@@ -299,8 +299,8 @@ TEST_CASE("s11n")
 
     llvm_state s1, s2;
 
-    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
-    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
 
     // Uncompiled.
     llvm_multi_state ms{{s1, s2}, false};
@@ -412,8 +412,8 @@ TEST_CASE("cfunc")
 
     llvm_state s1, s2;
 
-    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
-    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
 
     const auto orig_ir1 = s1.get_ir();
     const auto orig_ir2 = s2.get_ir();
@@ -463,8 +463,8 @@ TEST_CASE("stream op")
 
     llvm_state s1, s2;
 
-    add_cfunc<double>(s1, "f1", {x * y}, {x, y}, kw::compact_mode = true);
-    add_cfunc<double>(s2, "f2", {x / y}, {x, y}, kw::compact_mode = true);
+    add_cfunc<double>(s1, "f1", {x * y}, {x, y});
+    add_cfunc<double>(s2, "f2", {x / y}, {x, y});
 
     const auto orig_ir1 = s1.get_ir();
     const auto orig_ir2 = s2.get_ir();

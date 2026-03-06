@@ -836,169 +836,6 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     return s_dc;
 }
 
-auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<std::vector<expression>> &s_dc,
-                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                               std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy)
-{
-    // Log runtime in trace mode.
-    spdlog::stopwatch sw;
-
-    // Init the return value.
-    // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
-    // functions are invoked is always the same. If we used directly pointer
-    // comparisons instead, the order could vary across different executions and different platforms. The name
-    // mangling we do when creating the function names should ensure that there are no possible name collisions.
-    std::vector<
-        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
-                 llvm_func_name_compare>>
-        retval;
-
-    // Variable to keep track of the u variable
-    // on whose definition we are operating.
-    auto cur_u_idx = nvars;
-    for (const auto &seg : s_dc) {
-        // This structure maps an LLVM function to sets of arguments
-        // with which the function is to be called. For instance, if function
-        // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
-        // will contain {f : [[a, b, c], [d, e, f]]}.
-        // After construction, we have verified that for each function
-        // in the map the sets of arguments have all the same size.
-        // NOTE: again, here and below we use name-based ordered maps for the functions.
-        // This ensures that the invocations of cm_make_arg_gen_*(), which create several
-        // global variables, always happen in a well-defined order. If we used an unordered map instead,
-        // the variables would be created in a "random" order, which would result in a
-        // unnecessary miss for the in-memory cache machinery when two logically-identical
-        // LLVM modules are considered different because of the difference in the order
-        // of declaration of global variables.
-        std::map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>,
-                 llvm_func_name_compare>
-            tmp_map;
-
-        for (const auto &ex : seg) {
-            // Get the evaluation function.
-            auto *func = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
-
-            // Insert the function into tmp_map.
-            const auto [it, is_new_func] = tmp_map.try_emplace(func);
-
-            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
-
-            // Convert the variables/constants in the current dc
-            // element into a set of indices/constants.
-            const auto c_args = udef_to_variants(ex, {});
-
-            // LCOV_EXCL_START
-            if (!is_new_func && it->second.back().size() - 1u != c_args.size()) {
-                throw std::invalid_argument(
-                    fmt::format("Inconsistent arity detected in a compiled function in compact "
-                                "mode: the same function is being called with both {} and {} arguments",
-                                it->second.back().size() - 1u, c_args.size()));
-            }
-            // LCOV_EXCL_STOP
-
-            // Add the new set of arguments.
-            it->second.emplace_back();
-            // Add the idx of the u variable.
-            it->second.back().emplace_back(cur_u_idx);
-            // Add the actual function arguments.
-            it->second.back().insert(it->second.back().end(), c_args.begin(), c_args.end());
-
-            ++cur_u_idx;
-        }
-
-        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
-        // to {f : [[a, d], [b, e], [c, f]]}.
-        std::map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>,
-                 llvm_func_name_compare>
-            tmp_map_transpose;
-        for (const auto &[func, vv] : tmp_map) {
-            assert(!vv.empty()); // LCOV_EXCL_LINE
-
-            // Add the function.
-            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
-            assert(ins_status); // LCOV_EXCL_LINE
-
-            const auto n_calls = vv.size();
-            const auto n_args = vv[0].size();
-            // NOTE: n_args must be at least 1 because the u idx
-            // is prepended to the actual function arguments in
-            // the tmp_map entries.
-            assert(n_args >= 1u); // LCOV_EXCL_LINE
-
-            for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
-                // Build the vector of values corresponding
-                // to the current argument index.
-                std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
-                tmp_c_vec.reserve(n_calls);
-                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
-                    tmp_c_vec.push_back(vv[j][i]);
-                }
-
-                // Turn tmp_c_vec (a vector of variants) into a variant
-                // of vectors, and insert the result.
-                it->second.push_back(vv_transpose(tmp_c_vec));
-            }
-        }
-
-        // Add a new entry in retval for the current segment.
-        retval.emplace_back();
-        auto &a_map = retval.back();
-
-        for (const auto &[func, vv] : tmp_map_transpose) {
-            // NOTE: vv.size() is now the number of arguments. We know it cannot
-            // be zero because the evaluation functions
-            // in compact mode always have at least 1 argument (i.e., the index
-            // of the u variable which is being evaluated).
-            assert(!vv.empty()); // LCOV_EXCL_LINE
-
-            // Add the function.
-            const auto [it, ins_status] = a_map.try_emplace(func);
-            assert(ins_status); // LCOV_EXCL_LINE
-
-            // Set the number of calls for this function.
-            it->second.first
-                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(it->second.first > 0u); // LCOV_EXCL_LINE
-
-            // Create the g functions for each argument.
-            for (const auto &v : vv) {
-                it->second.second.push_back(std::visit(
-                    [&s, fp_t](const auto &x) {
-                        using type = uncvref_t<decltype(x)>;
-
-                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            return cm_make_arg_gen_vidx(s, x);
-                        } else {
-                            return cm_make_arg_gen_vc(s, fp_t, x);
-                        }
-                    },
-                    v));
-            }
-        }
-    }
-
-    get_logger()->trace("cfunc build function maps runtime: {}", sw);
-
-    // LCOV_EXCL_START
-    // Log a breakdown of the return value in trace mode.
-    if (get_logger()->should_log(spdlog::level::trace)) {
-        std::vector<std::vector<std::uint32_t>> fm_bd;
-
-        for (const auto &m : retval) {
-            fm_bd.emplace_back();
-
-            for (const auto &p : m) {
-                fm_bd.back().push_back(p.second.first);
-            }
-        }
-
-        get_logger()->trace("cfunc function maps breakdown: {}", fm_bd);
-    }
-    // LCOV_EXCL_STOP
-
-    return retval;
-}
-
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
@@ -1223,129 +1060,6 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     });
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
-                      llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
-                      const std::vector<expression> &dc, std::uint32_t nvars,
-                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
-{
-    auto &builder = s.builder();
-    auto &md = s.module();
-
-    // Fetch the type for external loading.
-    auto *ext_fp_t = make_external_llvm_type(fp_type);
-
-    // Split dc into segments.
-    const auto s_dc = function_segment_dc(dc, nvars, nuvars);
-
-    // Generate the function maps.
-    const auto f_maps = cfunc_build_function_maps(s, fp_type, s_dc, nvars, batch_size, high_accuracy);
-
-    // Log the runtime of IR construction in trace mode.
-    spdlog::stopwatch sw;
-
-    // Generate the global arrays used to write the outputs at the
-    // end of the computation.
-    const auto cout_gl = cfunc_c_make_output_globals(s, fp_type, dc, nuvars);
-
-    // Prepare the array that will contain the evaluation of all the
-    // elementary subexpressions.
-    // NOTE: the array size is specified as a 64-bit integer in the
-    // LLVM API.
-    // NOTE: fp_type is the original, scalar floating-point type.
-    // It will be turned into a vector type (if necessary) by
-    // make_vector_type() below.
-    auto *fp_vec_type = make_vector_type(fp_type, batch_size);
-    auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
-
-    // Make the global array and fetch a pointer to its first element.
-    // NOTE: we use a global array rather than a local one here because
-    // its size can grow quite large, which can lead to stack overflow issues.
-    // This has of course consequences in terms of thread safety, which
-    // we will have to document.
-    auto *eval_arr_gvar = make_global_zero_array(md, array_type);
-    auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
-
-    // Copy over the values of the variables.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
-        // Fetch the pointer from in_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
-
-        // Load as a vector.
-        auto *vec = ext_load_vector_from_memory(s, fp_type, ptr, batch_size);
-
-        // Store into eval_arr.
-        cfunc_c_store_eval(s, fp_vec_type, eval_arr, cur_var_idx, vec);
-    });
-
-    // Helper to evaluate a block.
-    // func is the LLVM function for evaluation in the block,
-    // ncalls the number of times it must be called and gens the generators for the
-    // function arguments.
-    auto block_eval = [&](llvm::Function *func, std::uint32_t ncalls, const auto &gens) {
-        // LCOV_EXCL_START
-        assert(ncalls > 0u);
-        assert(!gens.empty());
-        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-        // LCOV_EXCL_STOP
-
-        // We will be manually unrolling loops if ncalls is small enough.
-        // This seems to help with compilation times.
-        constexpr auto max_unroll_n = 5u;
-
-        if (ncalls > max_unroll_n) {
-            // Loop over the number of calls.
-            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                // Create the u variable index from the first generator.
-                auto u_idx = gens[0](cur_call_idx);
-
-                // Initialise the vector of arguments with which func must be called. The following
-                // initial arguments are always present:
-                // - eval array,
-                // - pointer to the param values,
-                // - pointer to the time value(s),
-                // - stride.
-                std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
-
-                // Create the other arguments via the generators.
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
-                }
-
-                // Evaluate and store the result.
-                cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
-            });
-        } else {
-            // The manually-unrolled version of the above.
-            for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
-                auto *cur_call_idx = builder.getInt32(idx);
-                auto u_idx = gens[0](cur_call_idx);
-                std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
-
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
-                }
-
-                cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
-            }
-        }
-    };
-
-    // Evaluate all elementary subexpressions by iterating
-    // over all segments and blocks.
-    for (const auto &map : f_maps) {
-        for (const auto &p : map) {
-            block_eval(p.first, p.second.first, p.second.second);
-        }
-    }
-
-    // Write the results to the output pointer.
-    cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
-
-    get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
-}
-
 // NOTE: in strided mode, the compiled function has an extra trailing argument, the stride
 // value, which indicates the distance between consecutive
 // input/output/par values in the buffers. The stride is measured in the number
@@ -1365,7 +1079,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 // coordinate changes between the two functions.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
-                    bool compact_mode, bool parallel_mode, [[maybe_unused]] long long prec, bool strided)
+                    [[maybe_unused]] long long prec, bool strided)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
@@ -1373,14 +1087,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a compiled function cannot be zero");
-    }
-
-    if (parallel_mode && !compact_mode) {
-        throw std::invalid_argument("Parallel mode can only be enabled in conjunction with compact mode");
-    }
-
-    if (parallel_mode) {
-        throw std::invalid_argument("Parallel mode has not been implemented yet");
     }
 
 #if defined(HEYOKA_ARCH_PPC)
@@ -1489,13 +1195,8 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
-    if (compact_mode) {
-        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
-                         high_accuracy);
-    } else {
-        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
-                          high_accuracy);
-    }
+    add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
+                      high_accuracy);
 
     // Finish off the function.
     builder.CreateRetVoid();
@@ -1511,17 +1212,17 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
                                   const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy,
-                                  bool compact_mode, bool parallel_mode, long long prec, bool strided)
+                                  long long prec, bool strided)
 {
     return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
-                                     high_accuracy, compact_mode, parallel_mode, prec, strided);
+                                     high_accuracy, prec, strided);
 }
 
 // Explicit instantiations.
 #define HEYOKA_ADD_CFUNC_INST(T)                                                                                       \
     template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<T>(                                                   \
         llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
-        std::uint32_t, bool, bool, bool, long long, bool);
+        std::uint32_t, bool, long long, bool);
 
 HEYOKA_ADD_CFUNC_INST(float)
 HEYOKA_ADD_CFUNC_INST(double)

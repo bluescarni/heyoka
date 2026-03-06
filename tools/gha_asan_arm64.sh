@@ -14,9 +14,11 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -p $deps_dir cxx-compiler c-compiler cmake \
-    ninja llvmdev tbb-devel tbb libboost-devel sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog 'mppp=2.*' openssl
+# NOTE: at the moment there seems to be a regression on linux aarch64 with llvm 22 that results in
+# the test suite being killed as it runs on the CI, apparently due to resource exhaustion.
+conda create -y -p $deps_dir c-compiler cxx-compiler cmake \
+    'llvmdev=21.*' tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor \
+    xtensor-blas blas blas-devel fmt spdlog ninja openssl
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -32,20 +34,17 @@ cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
+    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DCMAKE_CXX_FLAGS="--coverage" \
+    -DCMAKE_CXX_FLAGS="-fsanitize=address" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"
 
 # Build.
-ninja -v
+ninja -v -j4
 
 # Run the tests.
 ctest -VV -j4
-
-# Upload coverage data.
-bash <(curl -s https://codecov.io/bash) -x $deps_dir/bin/gcov
 
 set +e
 set +x

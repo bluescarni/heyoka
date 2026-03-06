@@ -21,7 +21,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepDE.hpp>
@@ -80,12 +79,11 @@ int main(int argc, char *argv[])
     set_logger_level_trace();
 
     unsigned N{};
-    bool compact_mode = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("N", po::value<unsigned>(&N)->default_value(20u),
-                                                       "number of segments")("compact_mode", "compact mode");
+                                                       "number of segments");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -94,10 +92,6 @@ int main(int argc, char *argv[])
     if (vm.count("help") != 0u) {
         std::cout << desc << "\n";
         return 0;
-    }
-
-    if (vm.count("compact_mode")) {
-        compact_mode = true;
     }
 
     if (N == 0u) {
@@ -140,19 +134,12 @@ int main(int argc, char *argv[])
     auto jac_sr = dt.get_derivatives(1);
     std::transform(jac_sr.begin(), jac_sr.end(), std::back_inserter(jac), [](const auto &p) { return p.second; });
 
-    llvm_state s;
-
     std::vector<expression> vars_list = {x0, y0, z0, vx0, vy0, vz0, mu, tm};
     vars_list.insert(vars_list.end(), Dvs_list.begin(), Dvs_list.end());
 
     logger->trace("Adding cfunc");
 
-    add_cfunc<double>(s, "func", jac, vars_list, kw::compact_mode = compact_mode);
-
-    s.compile();
-
-    [[maybe_unused]] auto *fptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
+    cfunc<double> cf(jac, vars_list, kw::compact_mode = true);
 
     logger->trace("All done");
 }

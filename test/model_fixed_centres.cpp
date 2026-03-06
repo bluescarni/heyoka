@@ -13,7 +13,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
@@ -98,22 +97,17 @@ TEST_CASE("basic")
         REQUIRE(ta_fix.get_state()[5] == approximately(ta_2bp.get_state()[11], 1000.));
 
         // Energy check.
-        llvm_state s;
-        add_cfunc<double>(
-            s, "en",
+        cfunc<double> cf(
             {model::fixed_centres_energy(kw::Gconst = 1.02, kw::masses = {1.01}, kw::positions = {1., 2., 3.})},
             {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
-        s.compile();
 
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
-        double E0 = 0;
-        cf(&E0, init_state.data(), nullptr, nullptr);
+        std::vector<double> outs(1u, 0.);
+        cf(outs, init_state);
+        auto E0 = outs[0];
 
-        double E = 0;
-        cf(&E, ta_fix.get_state().data(), nullptr, nullptr);
+        cf(outs, ta_fix.get_state());
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
     }
 
     // Randomly generate a fixed centres problem and check energy conservation.
@@ -136,28 +130,21 @@ TEST_CASE("basic")
 
         REQUIRE(ta.get_decomposition().size() == 960u);
 
-        llvm_state s;
+        cfunc<double> cf(
+            {model::fixed_centres_energy(kw::masses = masses, kw::positions = pos)},
+            {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
-        const auto dc
-            = add_cfunc<double>(s, "en", {model::fixed_centres_energy(kw::masses = masses, kw::positions = pos)},
-                                {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+        REQUIRE(cf.get_dc().size() == 626u);
 
-        REQUIRE(dc.size() == 626u);
-
-        s.compile();
-
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
-
-        double E0 = 0;
-        cf(&E0, ta.get_state().data(), nullptr, nullptr);
+        std::vector<double> outs(1u, 0.);
+        cf(outs, ta.get_state());
+        auto E0 = outs[0];
 
         ta.propagate_until(100.);
 
-        double E = 0;
-        cf(&E, ta.get_state().data(), nullptr, nullptr);
+        cf(outs, ta.get_state());
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(outs[0] == approximately(E0));
 
         // Test also the fixed_centres_potential implementation.
         auto kin = 0.5_dbl * sum_sq({"vx"_var, "vy"_var, "vz"_var});

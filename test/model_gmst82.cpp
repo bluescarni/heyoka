@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -45,6 +46,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/eop.hpp>
 #include <heyoka/s11n.hpp>
@@ -321,20 +323,22 @@ TEST_CASE("gmst82 gmst82p cfunc")
             std::ranges::fill(pars, fp_t(0));
             std::ranges::fill(tm, fp_t(0));
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc",
-                            {model::gmst82(kw::time_expr = x), model::gmst82(kw::time_expr = par[0]),
-                             model::gmst82p(kw::time_expr = expression{fp_t(0.)}), model::gmst82p(),
-                             model::gmst82p(kw::time_expr = x)},
-                            {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {model::gmst82(kw::time_expr = x), model::gmst82(kw::time_expr = par[0]),
+                 model::gmst82p(kw::time_expr = expression{fp_t(0.)}), model::gmst82p(),
+                 model::gmst82p(kw::time_expr = x)},
+                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_gmst82_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.eop_gmst82p_"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.eop_gmst82_");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.eop_gmst82p_");
+                }));
             }
-
-            s.compile();
 
             if (opt_level == 3u) {
                 // NOTE: in the compiled function, we are evaluating both gmst82(x) and gmst82p(x). The purpose
@@ -343,22 +347,38 @@ TEST_CASE("gmst82 gmst82p cfunc")
                 // not need to call the same function twice.
                 const auto get_gmst82_gmst82p_call_regex = boost::regex(R"(.*call.*heyoka\.get_gmst82_gmst82p\..*)");
                 auto count = 0u;
-                const auto ir = s.get_ir();
-                for (const auto line : ir | std::ranges::views::split('\n')) {
-                    boost::cmatch matches;
-                    if (boost::regex_match(std::ranges::data(line), std::ranges::data(line) + std::ranges::size(line),
-                                           matches, get_gmst82_gmst82p_call_regex)) {
-                        ++count;
+
+                auto count_in_ir = [&](const std::string &ir) {
+                    for (const auto line : ir | std::ranges::views::split('\n')) {
+                        boost::cmatch matches;
+                        if (boost::regex_match(std::ranges::data(line),
+                                               std::ranges::data(line) + std::ranges::size(line), matches,
+                                               get_gmst82_gmst82p_call_regex)) {
+                            ++count;
+                        }
+                    }
+                };
+
+                if (compact_mode) {
+                    for (const auto &ir : std::get<1>(cf.get_llvm_states()).get_ir()) {
+                        count_in_ir(ir);
+                    }
+                } else {
+                    for (const auto &ls : std::get<0>(cf.get_llvm_states())) {
+                        count_in_ir(ls.get_ir());
                     }
                 }
+
                 // NOTE: check <= since inlining could remove function calls altogether.
-                REQUIRE(count <= 4u);
+                // NOTE: in non-compact mode there are 3 internal llvm states, so the count
+                // could be up to 3x.
+                REQUIRE(count <= (compact_mode ? 4u : 12u));
             }
 
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 5u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size),
+               kw::time = mdspan<const fp_t, dextents<std::size_t, 1>>(tm.data(), batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(!isnan(outs[i]));
@@ -392,25 +412,18 @@ TEST_CASE("gmst82 gmst82p cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {model::gmst82(kw::time_expr = x), model::gmst82(kw::time_expr = par[0]),
-                                   model::gmst82p(kw::time_expr = expression{0.}), model::gmst82p()},
-                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf(
+                {model::gmst82(kw::time_expr = x), model::gmst82(kw::time_expr = par[0]),
+                 model::gmst82p(kw::time_expr = expression{0.}), model::gmst82p()},
+                {x}, kw::compact_mode = compact_mode, kw::prec = prec,
+                kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             const std::vector pars{mppp::real{0, prec}};
             const std::vector tm{mppp::real{0, prec}};
             std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+            cf(outs, ins, kw::pars = pars, kw::time = tm[0]);
 
             auto i = 0u;
             REQUIRE(!isnan(outs[i]));

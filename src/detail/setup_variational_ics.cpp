@@ -123,7 +123,7 @@ void setup_variational_ics_varpar(std::vector<T> &state, const var_ode_sys &vsys
 
 template <typename T>
 void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const std::vector<T> &pars, const T *time,
-                              const var_ode_sys &vsys, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                              const var_ode_sys &vsys, std::uint32_t batch_size, bool high_accuracy)
 {
     using state_size_t = decltype(state.size());
 
@@ -187,7 +187,7 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
     }();
 
     // Add the compiled function to st.
-    add_cfunc<T>(st, "f", v_ex, orig_sv, batch_size, high_accuracy, compact_mode, false, prec, false);
+    add_cfunc<T>(st, "f", v_ex, orig_sv, batch_size, high_accuracy, prec, false);
 
     // Compile.
     st.compile();
@@ -231,7 +231,7 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
 #define HEYOKA_INST_SETUP_VARIATIONAL_ICS(F)                                                                           \
     template void setup_variational_ics_varpar(std::vector<F> &, const var_ode_sys &, std::uint32_t);                  \
     template void setup_variational_ics_t0(const llvm_state &, std::vector<F> &, const std::vector<F> &, const F *,    \
-                                           const var_ode_sys &, std::uint32_t, bool, bool);
+                                           const var_ode_sys &, std::uint32_t, bool);
 
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(float)
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(double)

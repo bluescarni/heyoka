@@ -12,7 +12,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/rotating.hpp>
@@ -77,27 +76,20 @@ TEST_CASE("basic")
 
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
 
-        llvm_state s;
-
-        const auto dc = add_cfunc<double>(
-            s, "en",
+        cfunc<double> cf(
             // NOTE: need to add the kinetic energy per unit of mass.
             {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
             {x, y, z, vx, vy, vz});
 
-        REQUIRE(dc.size() == 23u);
+        REQUIRE(cf.get_dc().size() == 23u);
 
-        s.compile();
+        std::vector<double> outs(1u, 0.);
+        cf(outs, init_state);
+        auto E0 = outs[0];
 
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
-        double E0 = 0;
-        cf(&E0, init_state.data(), nullptr, nullptr);
+        cf(outs, ta.get_state());
 
-        double E = 0;
-        cf(&E, ta.get_state().data(), nullptr, nullptr);
-
-        REQUIRE(E == approximately(E0, 1000.));
+        REQUIRE(outs[0] == approximately(E0, 1000.));
 
         REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
                 == model::rotating_energy(kw::omega = {.1, .2, .3}));
@@ -118,27 +110,20 @@ TEST_CASE("basic")
 
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
 
-        llvm_state s;
-
-        const auto dc = add_cfunc<double>(
-            s, "en",
+        cfunc<double> cf(
             // NOTE: need to add the kinetic energy per unit of mass.
             {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
             {x, y, z, vx, vy, vz});
 
-        REQUIRE(dc.size() == 24u);
+        REQUIRE(cf.get_dc().size() == 24u);
 
-        s.compile();
+        std::vector<double> outs(1u, 0.);
+        cf(outs, init_state, kw::pars = omega_vals);
+        auto E0 = outs[0];
 
-        auto *cf
-            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
-        double E0 = 0;
-        cf(&E0, init_state.data(), omega_vals.data(), nullptr);
+        cf(outs, ta.get_state(), kw::pars = omega_vals);
 
-        double E = 0;
-        cf(&E, ta.get_state().data(), omega_vals.data(), nullptr);
-
-        REQUIRE(E == approximately(E0, 1000.));
+        REQUIRE(outs[0] == approximately(E0, 1000.));
 
         REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
                 == model::rotating_energy(kw::omega = {par[0], par[1], par[2]}));

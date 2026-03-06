@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cstddef>
 #include <functional>
 #include <limits>
 #include <random>
@@ -40,6 +41,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/relu.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -368,21 +370,19 @@ TEST_CASE("cfunc")
             ins.resize(batch_size);
             pars.resize(batch_size * 2u);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relu."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relup."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relu.");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relup.");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             for (auto niter = 0; niter < 100; ++niter) {
                 for (auto i = 0u; i < batch_size; ++i) {
@@ -394,7 +394,9 @@ TEST_CASE("cfunc")
                     pars[i + batch_size] = static_cast<fp_t>(x_dist(rng));
                 }
 
-                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+                cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 4u, batch_size),
+                   mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+                   kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 2u, batch_size));
 
                 for (auto i = 0u; i < batch_size; ++i) {
                     REQUIRE(outs[i] == cpp_relu(ins[i]));
@@ -436,21 +438,19 @@ TEST_CASE("cfunc leaky")
             ins.resize(batch_size);
             pars.resize(batch_size * 2u);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relu_0x"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relup_0x"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             for (auto niter = 0; niter < 100; ++niter) {
                 for (auto i = 0u; i < batch_size; ++i) {
@@ -462,7 +462,9 @@ TEST_CASE("cfunc leaky")
                     pars[i + batch_size] = static_cast<fp_t>(x_dist(rng));
                 }
 
-                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+                cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 4u, batch_size),
+                   mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+                   kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 2u, batch_size));
 
                 for (auto i = 0u; i < batch_size; ++i) {
                     REQUIRE(outs[i] == cpp_relu(ins[i], fp_t(0.01)));
@@ -504,27 +506,26 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
-                            kw::compact_mode = compact_mode, kw::prec = prec);
+            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
+                           kw::compact_mode = compact_mode, kw::prec = prec,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relu."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relup."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relu.");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relup.");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             // Generate the x and pars.
             ins[0] = mppp::real{x_dist(rng), prec};
             pars[0] = mppp::real{x_dist(rng), prec};
             pars[1] = mppp::real{x_dist(rng), prec};
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             REQUIRE(outs[0] == cpp_relu(ins[0]));
             REQUIRE(outs[1] == cpp_relu(pars[0]));
@@ -552,27 +553,26 @@ TEST_CASE("cfunc mp leaky")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
-                            kw::compact_mode = compact_mode, kw::prec = prec);
+            cfunc<fp_t> cf({relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
+                           kw::compact_mode = compact_mode, kw::prec = prec,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relu_0x"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relup_0x"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             // Generate the x and pars.
             ins[0] = mppp::real{x_dist(rng), prec};
             pars[0] = mppp::real{x_dist(rng), prec};
             pars[1] = mppp::real{x_dist(rng), prec};
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             REQUIRE(outs[0] == cpp_relu(ins[0], mppp::real(0.01)));
             REQUIRE(outs[1] == cpp_relu(pars[0], mppp::real(0.02)));

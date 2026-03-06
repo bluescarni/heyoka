@@ -8,13 +8,17 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -36,6 +40,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepDE.hpp>
 #include <heyoka/math/pow.hpp>
@@ -319,20 +324,16 @@ TEST_CASE("cfunc")
             ins.resize(batch_size * 3u);
             pars.resize(batch_size * 2u);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
-                            {h, k, lam}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
+                           {h, k, lam}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepDE."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.kepDE.");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             for (auto niter = 0; niter < 100; ++niter) {
                 for (auto i = 0u; i < batch_size; ++i) {
@@ -351,7 +352,9 @@ TEST_CASE("cfunc")
                     pars[i + batch_size] = kval;
                 }
 
-                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+                cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+                   mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 3u, batch_size),
+                   kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 2u, batch_size));
 
                 for (auto i = 0u; i < batch_size; ++i) {
                     using std::cos;
@@ -400,44 +403,28 @@ TEST_CASE("cfunc")
     // Check nan/invalid values handling.
     auto [h, k, lam] = make_vars("h", "k", "lam");
 
-    llvm_state s;
+    cfunc<double> cf({kepDE(h, k, lam)}, {h, k, lam});
 
-    add_cfunc<double>(s, "cfunc", {kepDE(h, k, lam)}, {h, k, lam});
+    std::vector<double> outs(1u, 0.);
+    std::vector<double> ins{.1, .2, std::numeric_limits<double>::quiet_NaN()};
+    cf(outs, ins);
 
-    s.compile();
+    REQUIRE(isnan(outs[0]));
 
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+    ins = {std::numeric_limits<double>::quiet_NaN(), .2, 1.};
+    cf(outs, ins);
 
-    double out = 0;
-    double ins[3] = {.1, .2, std::numeric_limits<double>::quiet_NaN()};
-    cf_ptr(&out, ins, nullptr, nullptr);
+    REQUIRE(isnan(outs[0]));
 
-    REQUIRE(isnan(out));
+    ins = {.2, std::numeric_limits<double>::quiet_NaN(), 1.};
+    cf(outs, ins);
 
-    ins[0] = std::numeric_limits<double>::quiet_NaN();
-    ins[1] = .2;
-    ins[2] = 1.;
+    REQUIRE(isnan(outs[0]));
 
-    cf_ptr(&out, ins, nullptr, nullptr);
+    ins = {.2, 1., 1.};
+    cf(outs, ins);
 
-    REQUIRE(isnan(out));
-
-    ins[0] = .2;
-    ins[1] = std::numeric_limits<double>::quiet_NaN();
-    ins[2] = 1.;
-
-    cf_ptr(&out, ins, nullptr, nullptr);
-
-    REQUIRE(isnan(out));
-
-    ins[0] = .2;
-    ins[1] = 1.;
-    ins[2] = 1.;
-
-    cf_ptr(&out, ins, nullptr, nullptr);
-
-    REQUIRE(isnan(out));
+    REQUIRE(isnan(outs[0]));
 }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -477,19 +464,16 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
-                            {h, k, lam}, kw::compact_mode = compact_mode, kw::prec = prec);
+            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
+                           {h, k, lam}, kw::compact_mode = compact_mode, kw::prec = prec,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepDE."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.kepDE.");
+                }));
             }
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
             // Generate the hs and ks.
             auto [hval, kval] = generate_hk();
@@ -505,7 +489,7 @@ TEST_CASE("cfunc mp")
             pars[0] = hval;
             pars[1] = kval;
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             using std::cos;
             using std::sin;

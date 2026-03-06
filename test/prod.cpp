@@ -9,12 +9,14 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -40,6 +42,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
@@ -423,26 +426,26 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc",
-                            {prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}), prod({expression{fp_t{5}}, x, y}),
-                             // NOTE: test a couple of corner cases as well.
-                             expression{func{detail::prod_impl({x})}}, expression{func{detail::prod_impl{}}}},
-                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}),
+                            prod({expression{fp_t{5}}, x, y}),
+                            // NOTE: test a couple of corner cases as well.
+                            expression{func{detail::prod_impl({x})}}, expression{func{detail::prod_impl{}}}},
+                           {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.prod."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.prod_neg."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.prod.");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.prod_neg.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 5u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(-ins[i], fp_t(100)));
@@ -474,24 +477,16 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {prod({expression{mppp::real{-1, prec}}, x}), prod({par[0], x, y}),
-                                   prod({expression{mppp::real{5, prec}}, x, y})},
-                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf({prod({expression{mppp::real{-1, prec}}, x}), prod({par[0], x, y}),
+                                  prod({expression{mppp::real{5, prec}}, x, y})},
+                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
+                                 kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.3", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
             std::vector<mppp::real> outs(3u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf(outs, ins, kw::pars = pars);
 
             auto i = 0u;
             REQUIRE(outs[i] == approximately(-ins[i]));
@@ -551,8 +546,8 @@ TEST_CASE("prod split")
     s = prod_wrapper({x_vars[0], x_vars[1], x_vars[2], x_vars[3], x_vars[4], x_vars[5], x_vars[6], x_vars[7], x_vars[8],
                       x_vars[9], cos(prod_wrapper(x_vars))});
 
-    llvm_state ls;
-    const auto dc = add_cfunc<double>(ls, "cfunc", {s}, x_vars);
+    cfunc<double> cf({s}, x_vars);
+    const auto &dc = cf.get_dc();
 
     for (const auto &ex : dc) {
         if (const auto *fptr = std::get_if<func>(&ex.value())) {
@@ -562,17 +557,12 @@ TEST_CASE("prod split")
         }
     }
 
-    ls.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ls.jit_lookup("cfunc"));
-
     std::vector<double> inputs = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    double output = 0;
+    std::vector<double> output(1u);
 
-    cf_ptr(&output, inputs.data(), nullptr, nullptr);
+    cf(output, inputs);
 
-    REQUIRE(output
+    REQUIRE(output[0]
             == approximately((1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)
                              * std::cos(1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)));
 }

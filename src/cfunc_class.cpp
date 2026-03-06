@@ -285,11 +285,7 @@ struct cfunc<T>::impl {
                     //
                     // NOTE: we fetch the decomposition from the scalar unstrided invocation of add_cfunc().
                     m_dc = add_cfunc<T>(s_arr[0], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
-                                        kw::prec = prec,
-                                        // NOTE: be explicit about the lack of compact mode, because the default setting
-                                        // for mppp::real is different from the other types and if we leave this unset
-                                        // we will get the wrong function.
-                                        kw::compact_mode = false);
+                                        kw::prec = prec);
 
                     s_arr[0].compile();
 
@@ -297,12 +293,8 @@ struct cfunc<T>::impl {
                 },
                 [&]() {
                     // Scalar strided.
-                    add_cfunc<T>(
-                        s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
-                        kw::strided = true,
-                        // NOTE: be explicit about the lack of compact mode, because the default setting for mppp::real
-                        // is different from the other types and if we leave this unset we will get the wrong function.
-                        kw::compact_mode = false);
+                    add_cfunc<T>(s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
+                                 kw::strided = true);
 
                     s_arr[1].compile();
 
@@ -310,12 +302,8 @@ struct cfunc<T>::impl {
                 },
                 [&]() {
                     // Batch strided.
-                    add_cfunc<T>(
-                        s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
-                        kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true,
-                        // NOTE: be explicit about the lack of compact mode because the default setting for mppp::real
-                        // is different from the other types and if we leave this unset we will get the wrong function.
-                        kw::compact_mode = false);
+                    add_cfunc<T>(s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
+                                 kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true);
 
                     s_arr[2].compile();
 

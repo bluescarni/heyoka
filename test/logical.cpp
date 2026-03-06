@@ -9,11 +9,13 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -36,6 +38,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/logical.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/sin.hpp>
@@ -207,22 +210,21 @@ TEST_CASE("cfunc logical_and")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(time.begin(), time.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {logical_and({x, y}), logical_and({par[0], heyoka::time, y})}, {x, y},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({logical_and({x, y}), logical_and({par[0], heyoka::time, y})}, {x, y},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.logical_and."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.logical_and.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size),
+               kw::time = mdspan<const fp_t, dextents<std::size_t, 1>>(time.data(), batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == (ins[i] && ins[i + batch_size]));
@@ -242,18 +244,12 @@ TEST_CASE("cfunc logical_and")
 
     // A test specific for NaN handling.
     auto [x, y] = make_vars("x", "y");
-    llvm_state s;
     std::vector<double> outs, ins{1., std::numeric_limits<double>::quiet_NaN()};
     outs.resize(1);
 
-    add_cfunc<double>(s, "cfunc", {logical_and({x, y})}, {x, y});
+    cfunc<double> cf({logical_and({x, y})}, {x, y});
 
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
-
-    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+    cf(outs, ins);
 
     REQUIRE(outs[0] == 1.);
 }
@@ -285,22 +281,21 @@ TEST_CASE("cfunc logical_or")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(time.begin(), time.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {logical_or({x, y}), logical_or({par[0], heyoka::time, y})}, {x, y},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf({logical_or({x, y}), logical_or({par[0], heyoka::time, y})}, {x, y},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.logical_or."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.logical_or.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size),
+               kw::time = mdspan<const fp_t, dextents<std::size_t, 1>>(time.data(), batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == (ins[i] || ins[i + batch_size]));
@@ -320,18 +315,12 @@ TEST_CASE("cfunc logical_or")
 
     // A test specific for NaN handling.
     auto [x, y] = make_vars("x", "y");
-    llvm_state s;
     std::vector<double> outs, ins{0., std::numeric_limits<double>::quiet_NaN()};
     outs.resize(1);
 
-    add_cfunc<double>(s, "cfunc", {logical_or({x, y})}, {x, y});
+    cfunc<double> cf({logical_or({x, y})}, {x, y});
 
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
-
-    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+    cf(outs, ins);
 
     REQUIRE(outs[0] == 1.);
 }
@@ -346,46 +335,31 @@ TEST_CASE("cfunc logical_and mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc", {logical_and({x, y}), logical_and({par[0], heyoka::time, y})}, {x, y},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf({logical_and({x, y}), logical_and({par[0], heyoka::time, y})}, {x, y},
+                                 kw::compact_mode = compact_mode, kw::prec = prec,
+                                 kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};
             const std::vector time{mppp::real{".3", prec}};
-            std::vector<mppp::real> outs(8u, mppp::real{0, prec});
+            std::vector<mppp::real> outs(2u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(outs, ins, kw::pars = pars, kw::time = time[0]);
 
-            auto i = 0u;
-            auto batch_size = 1u;
-            REQUIRE(outs[i] == (ins[i] && ins[i + batch_size]));
-            REQUIRE(static_cast<bool>(outs[i]));
-            REQUIRE(outs[i + batch_size] == (pars[i] && time[i] && ins[i + batch_size]));
-            REQUIRE(!static_cast<bool>(outs[i + batch_size]));
+            REQUIRE(outs[0] == (ins[0] && ins[1]));
+            REQUIRE(static_cast<bool>(outs[0]));
+            REQUIRE(outs[1] == (pars[0] && time[0] && ins[1]));
+            REQUIRE(!static_cast<bool>(outs[1]));
         }
     }
 
     // A test specific for NaN handling.
-    llvm_state s;
     std::vector<mppp::real> outs, ins{mppp::real{1., prec}, mppp::real{std::numeric_limits<double>::quiet_NaN(), prec}};
     outs.resize(1, mppp::real{0., prec});
 
-    add_cfunc<mppp::real>(s, "cfunc", {logical_and({x, y})}, {x, y}, kw::prec = prec);
+    cfunc<mppp::real> cf({logical_and({x, y})}, {x, y}, kw::prec = prec);
 
-    s.compile();
-
-    auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-        s.jit_lookup("cfunc"));
-
-    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+    cf(outs, ins);
 
     REQUIRE(outs[0] == 1);
 }
@@ -398,46 +372,31 @@ TEST_CASE("cfunc logical_or mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc", {logical_or({x, y}), logical_or({par[0], heyoka::time, y})}, {x, y},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf({logical_or({x, y}), logical_or({par[0], heyoka::time, y})}, {x, y},
+                                 kw::compact_mode = compact_mode, kw::prec = prec,
+                                 kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};
             const std::vector time{mppp::real{".3", prec}};
-            std::vector<mppp::real> outs(8u, mppp::real{0, prec});
+            std::vector<mppp::real> outs(2u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(outs, ins, kw::pars = pars, kw::time = time[0]);
 
-            auto i = 0u;
-            auto batch_size = 1u;
-            REQUIRE(outs[i] == (ins[i] || ins[i + batch_size]));
-            REQUIRE(static_cast<bool>(outs[i]));
-            REQUIRE(outs[i + batch_size] == (pars[i] || time[i] || ins[i + batch_size]));
-            REQUIRE(static_cast<bool>(outs[i + batch_size]));
+            REQUIRE(outs[0] == (ins[0] || ins[1]));
+            REQUIRE(static_cast<bool>(outs[0]));
+            REQUIRE(outs[1] == (pars[0] || time[0] || ins[1]));
+            REQUIRE(static_cast<bool>(outs[1]));
         }
     }
 
     // A test specific for NaN handling.
-    llvm_state s;
     std::vector<mppp::real> outs, ins{mppp::real{0., prec}, mppp::real{std::numeric_limits<double>::quiet_NaN(), prec}};
     outs.resize(1, mppp::real{0., prec});
 
-    add_cfunc<mppp::real>(s, "cfunc", {logical_or({x, y})}, {x, y}, kw::prec = prec);
+    cfunc<mppp::real> cf({logical_or({x, y})}, {x, y}, kw::prec = prec);
 
-    s.compile();
-
-    auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-        s.jit_lookup("cfunc"));
-
-    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+    cf(outs, ins);
 
     REQUIRE(outs[0] == 1);
 }

@@ -11,10 +11,12 @@
 #include <algorithm>
 #include <cmath>
 #include <concepts>
+#include <cstddef>
 #include <limits>
 #include <ranges>
 #include <sstream>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -35,6 +37,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/dayfrac.hpp>
 #include <heyoka/s11n.hpp>
@@ -177,22 +180,21 @@ TEST_CASE("dayfrac cfunc")
             outs.resize(batch_size);
             ins.resize(batch_size);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc", {model::dayfrac(kw::time_expr = x)}, {x}, kw::batch_size = batch_size,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {model::dayfrac(kw::time_expr = x)}, {x},
+                kw::batch_size = batch_size, kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.dayfrac"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.dayfrac");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
             std::ranges::fill(ins, fp_t(9331.558968320602));
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 1u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 using std::abs;
@@ -220,21 +222,15 @@ TEST_CASE("dayfrac cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc", {model::dayfrac(kw::time_expr = x)}, {x}, kw::compact_mode = compact_mode,
-                                  kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf(
+                {model::dayfrac(kw::time_expr = x)}, {x},
+                kw::compact_mode = compact_mode, kw::prec = prec,
+                kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             std::vector<mppp::real> outs{mppp::real{0, prec}};
 
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(outs, ins);
 
             REQUIRE(abs(outs[0] - 0.49925712962962965) < 1e-11);
         }

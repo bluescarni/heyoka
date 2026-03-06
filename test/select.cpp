@@ -9,11 +9,13 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -36,6 +38,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/math/logical.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/select.hpp>
@@ -172,24 +175,23 @@ TEST_CASE("cfunc")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(time.begin(), time.end(), gen);
 
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<fp_t>(s, "cfunc",
-                            {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
-                             select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
-                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
+                 select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
+                {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.select."));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.select.");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size),
+               kw::time = mdspan<const fp_t, dextents<std::size_t, 1>>(time.data(), batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i]
@@ -223,30 +225,21 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
-                                   select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
-                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf(
+                {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
+                 select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
+                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
+                kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};
             const std::vector time{mppp::real{".3", prec}};
-            std::vector<mppp::real> outs(8u, mppp::real{0, prec});
+            std::vector<mppp::real> outs(2u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), time.data());
+            cf(outs, ins, kw::pars = pars, kw::time = time[0]);
 
-            auto i = 0u;
-            auto batch_size = 1u;
-            REQUIRE(outs[i] == mppp::real{"-.1", prec} * mppp::real{"-.1", prec});
-            REQUIRE(outs[i + batch_size] == mppp::real{".7", prec} / mppp::real{"-.1", prec});
+            REQUIRE(outs[0] == mppp::real{"-.1", prec} * mppp::real{"-.1", prec});
+            REQUIRE(outs[1] == mppp::real{".7", prec} / mppp::real{"-.1", prec});
         }
     }
 }

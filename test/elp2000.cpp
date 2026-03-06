@@ -9,10 +9,10 @@
 #include <array>
 #include <initializer_list>
 #include <stdexcept>
+#include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/model/elp2000.hpp>
 
 #include "catch.hpp"
@@ -31,16 +31,9 @@ TEST_CASE("basic")
                            Message("Invalid threshold value passed to elp2000_spherical(): "
                                    "the value must be finite and non-negative, but it is -1 instead"));
 
-    llvm_state s;
+    cfunc<double> cf(model::elp2000_cartesian_e2000(kw::thresh = 1e-5), {}, kw::compact_mode = true);
 
-    auto dc
-        = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-5), {}, kw::compact_mode = true);
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
-
-    double out[3]{};
+    std::vector<double> outs(3u, 0.);
 
     // NOTE: these values have been computed after having checked
     // that the full solution coincides with the values provided
@@ -57,26 +50,19 @@ TEST_CASE("basic")
         const auto date = *(dates.begin() + i);
 
         const double tm = (date - 2451545.0) / (36525);
-        cf_ptr(out, nullptr, nullptr, &tm);
+        cf(outs, std::vector<double>{}, kw::time = tm);
 
-        REQUIRE(out[0] == approximately(ref[i][0], 100000.));
-        REQUIRE(out[1] == approximately(ref[i][1], 100000.));
-        REQUIRE(out[2] == approximately(ref[i][2], 100000.));
+        REQUIRE(outs[0] == approximately(ref[i][0], 100000.));
+        REQUIRE(outs[1] == approximately(ref[i][1], 100000.));
+        REQUIRE(outs[2] == approximately(ref[i][2], 100000.));
     }
 }
 
 TEST_CASE("fk5")
 {
-    llvm_state s;
+    cfunc<double> cf(model::elp2000_cartesian_fk5(kw::thresh = 1e-5), {}, kw::compact_mode = true);
 
-    auto dc
-        = add_cfunc<double>(s, "func", model::elp2000_cartesian_fk5(kw::thresh = 1e-5), {}, kw::compact_mode = true);
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
-
-    double out[3]{};
+    std::vector<double> outs(3u, 0.);
 
     // NOTE: these values have been computed after having checked
     // that the full solution coincides with the values provided
@@ -93,11 +79,11 @@ TEST_CASE("fk5")
         const auto date = *(dates.begin() + i);
 
         const double tm = (date - 2451545.0) / (36525);
-        cf_ptr(out, nullptr, nullptr, &tm);
+        cf(outs, std::vector<double>{}, kw::time = tm);
 
-        REQUIRE(out[0] == approximately(ref[i][0], 100000.));
-        REQUIRE(out[1] == approximately(ref[i][1], 100000.));
-        REQUIRE(out[2] == approximately(ref[i][2], 100000.));
+        REQUIRE(outs[0] == approximately(ref[i][0], 100000.));
+        REQUIRE(outs[1] == approximately(ref[i][1], 100000.));
+        REQUIRE(outs[2] == approximately(ref[i][2], 100000.));
     }
 }
 

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -35,6 +36,7 @@
 #include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -299,26 +301,28 @@ TEST_CASE("sw cfunc")
 
             std::ranges::fill(ins, fp_t(0));
 
-            llvm_state s{kw::opt_level = opt_level};
-
             // NOTE: here we create one output per sw quantity.
-            add_cfunc<fp_t>(s, "cfunc",
-                            {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = x),
-                             model::f107a_center81(kw::time_expr = x)},
-                            {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode);
+            cfunc<fp_t> cf(
+                {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = x),
+                 model::f107a_center81(kw::time_expr = x)},
+                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sw_Ap_avg_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sw_f107_"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sw_f107a_center81_"));
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_Ap_avg_");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107_");
+                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
+                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107a_center81_");
+                }));
             }
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size));
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(static_cast<fp_t>(30)));
@@ -346,25 +350,17 @@ TEST_CASE("sw cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            llvm_state s{kw::opt_level = opt_level};
-
-            add_cfunc<mppp::real>(s, "cfunc",
-                                  {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = par[0]),
-                                   model::f107a_center81(kw::time_expr = expression{0.})},
-                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
-
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+            cfunc<mppp::real> cf(
+                {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = par[0]),
+                 model::f107a_center81(kw::time_expr = expression{0.})},
+                {x}, kw::compact_mode = compact_mode, kw::prec = prec,
+                kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             const std::vector pars{mppp::real{0, prec}};
-            const std::vector tm{mppp::real{0, prec}};
             std::vector<mppp::real> outs(3u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), tm.data());
+            cf(outs, ins, kw::pars = pars);
 
             auto i = 0u;
             REQUIRE(!isnan(outs[i]));

@@ -40,6 +40,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/vsop2013.hpp>
 #include <heyoka/number.hpp>
@@ -1022,8 +1023,6 @@ TEST_CASE("cfunc nbody")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                llvm_state s{kw::opt_level = opt_level};
-
                 outs.resize(36u * batch_size);
                 ins.resize(36u * batch_size);
 
@@ -1033,14 +1032,11 @@ TEST_CASE("cfunc nbody")
                 std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
                 std::ranges::sort(vars, std::less<expression>{});
 
-                add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm);
+                cfunc<double> cf(exs, vars, kw::opt_level = opt_level, kw::batch_size = batch_size,
+                                 kw::compact_mode = cm);
 
-                s.compile();
-
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    s.jit_lookup("cfunc"));
-
-                cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+                cf(mdspan<double, dextents<std::size_t, 2>>(outs.data(), 36u, batch_size),
+                   mdspan<const double, dextents<std::size_t, 2>>(ins.data(), 36u, batch_size));
 
                 for (auto i = 0u; i < 6u; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
@@ -1121,8 +1117,6 @@ TEST_CASE("cfunc nbody mp")
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
-            llvm_state s{kw::opt_level = opt_level};
-
             outs.resize(36u * batch_size);
             ins.resize(36u * batch_size);
 
@@ -1133,15 +1127,9 @@ TEST_CASE("cfunc nbody mp")
             std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
             std::ranges::sort(vars, std::less<expression>{});
 
-            add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec, kw::compact_mode = cm);
+            cfunc<mppp::real> cf(exs, vars, kw::opt_level = opt_level, kw::prec = prec, kw::compact_mode = cm);
 
-            s.compile();
-
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
-
-            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf(outs, ins);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -1213,155 +1201,149 @@ TEST_CASE("cfunc nbody par")
     auto gen = [&rdist]() { return rdist(rng); };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                llvm_state s{kw::opt_level = opt_level};
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            llvm_state s{kw::opt_level = opt_level};
 
-                outs.resize(36u * batch_size);
-                ins.resize(36u * batch_size);
-                pars.resize(6u * batch_size);
+            outs.resize(36u * batch_size);
+            ins.resize(36u * batch_size);
+            pars.resize(6u * batch_size);
 
-                for (auto i = 0u; i < 6u; ++i) {
-                    for (auto j = 0u; j < batch_size; ++j) {
-                        pars[i * batch_size + j] = masses[i];
-                    }
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    pars[i * batch_size + j] = masses[i];
                 }
+            }
 
-                std::generate(ins.begin(), ins.end(), gen);
+            std::generate(ins.begin(), ins.end(), gen);
 
-                std::vector<expression> vars;
-                std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
-                std::ranges::sort(vars, std::less<expression>{});
+            std::vector<expression> vars;
+            std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+            std::ranges::sort(vars, std::less<expression>{});
 
-                add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm);
-                add_cfunc<double>(s, "cfunc.strided", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm,
-                                  kw::strided = true);
+            add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size);
+            add_cfunc<double>(s, "cfunc.strided", exs, vars, kw::batch_size = batch_size, kw::strided = true);
 
-                s.compile();
+            s.compile();
 
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    s.jit_lookup("cfunc"));
+            auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
-                for (auto i = 0u; i < 6u; ++i) {
-                    for (auto j = 0u; j < batch_size; ++j) {
-                        // x_i' == vx_i.
-                        REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], 100.));
-                        // y_i' == vy_i.
-                        REQUIRE(outs[i * batch_size * 6u + batch_size + j]
-                                == approximately(ins[i * batch_size + batch_size * 6u + j], 100.));
-                        // z_i' == vz_i.
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
-                                == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], 100.));
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    // x_i' == vx_i.
+                    REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], 100.));
+                    // y_i' == vy_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u + j], 100.));
+                    // z_i' == vz_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], 100.));
 
-                        // Accelerations.
-                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+                    // Accelerations.
+                    auto acc_x = 0., acc_y = 0., acc_z = 0.;
 
-                        const auto xi = ins[18u * batch_size + i * batch_size + j];
-                        const auto yi = ins[24u * batch_size + i * batch_size + j];
-                        const auto zi = ins[30u * batch_size + i * batch_size + j];
+                    const auto xi = ins[18u * batch_size + i * batch_size + j];
+                    const auto yi = ins[24u * batch_size + i * batch_size + j];
+                    const auto zi = ins[30u * batch_size + i * batch_size + j];
 
-                        for (auto k = 0u; k < 6u; ++k) {
-                            if (k == i) {
-                                continue;
-                            }
-
-                            const auto xk = ins[18u * batch_size + k * batch_size + j];
-                            const auto dx = xk - xi;
-
-                            const auto yk = ins[24u * batch_size + k * batch_size + j];
-                            const auto dy = yk - yi;
-
-                            const auto zk = ins[30u * batch_size + k * batch_size + j];
-                            const auto dz = zk - zi;
-
-                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
-
-                            acc_x += dx * G * masses[k] * rm3;
-                            acc_y += dy * G * masses[k] * rm3;
-                            acc_z += dz * G * masses[k] * rm3;
+                    for (auto k = 0u; k < 6u; ++k) {
+                        if (k == i) {
+                            continue;
                         }
 
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 1000.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 1000.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 1000.));
+                        const auto xk = ins[18u * batch_size + k * batch_size + j];
+                        const auto dx = xk - xi;
+
+                        const auto yk = ins[24u * batch_size + k * batch_size + j];
+                        const auto dy = yk - yi;
+
+                        const auto zk = ins[30u * batch_size + k * batch_size + j];
+                        const auto dz = zk - zi;
+
+                        const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                        acc_x += dx * G * masses[k] * rm3;
+                        acc_y += dy * G * masses[k] * rm3;
+                        acc_z += dz * G * masses[k] * rm3;
                     }
+
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 1000.));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 1000.));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 1000.));
                 }
+            }
 
-                // Run the test on the strided function too.
-                const std::size_t extra_stride = 3;
-                outs.resize(36u * (batch_size + extra_stride));
-                ins.resize(36u * (batch_size + extra_stride));
-                pars.resize(6u * (batch_size + extra_stride));
+            // Run the test on the strided function too.
+            const std::size_t extra_stride = 3;
+            outs.resize(36u * (batch_size + extra_stride));
+            ins.resize(36u * (batch_size + extra_stride));
+            pars.resize(6u * (batch_size + extra_stride));
 
-                for (auto i = 0u; i < 6u; ++i) {
-                    for (auto j = 0u; j < batch_size; ++j) {
-                        pars[i * (batch_size + extra_stride) + j] = masses[i];
-                    }
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    pars[i * (batch_size + extra_stride) + j] = masses[i];
                 }
+            }
 
-                std::generate(ins.begin(), ins.end(), gen);
+            std::generate(ins.begin(), ins.end(), gen);
 
-                auto *cfs_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                        s.jit_lookup("cfunc.strided"));
+            auto *cfs_ptr
+                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
 
-                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
 
-                for (auto i = 0u; i < 6u; ++i) {
-                    for (auto j = 0u; j < batch_size; ++j) {
-                        // x_i' == vx_i.
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
-                                == approximately(ins[i * (batch_size + extra_stride) + j], 100.));
-                        // y_i' == vy_i.
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
-                                == approximately(
-                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j], 100.));
-                        // z_i' == vz_i.
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
-                                == approximately(
-                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
-                                    100.));
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    // x_i' == vx_i.
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
+                            == approximately(ins[i * (batch_size + extra_stride) + j], 100.));
+                    // y_i' == vy_i.
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
+                            == approximately(
+                                ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j], 100.));
+                    // z_i' == vz_i.
+                    REQUIRE(
+                        outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
+                        == approximately(
+                            ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j], 100.));
 
-                        // Accelerations.
-                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+                    // Accelerations.
+                    auto acc_x = 0., acc_y = 0., acc_z = 0.;
 
-                        const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
-                        const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
-                        const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                    const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                    const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                    const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
 
-                        for (auto k = 0u; k < 6u; ++k) {
-                            if (k == i) {
-                                continue;
-                            }
-
-                            const auto xk
-                                = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                            const auto dx = xk - xi;
-
-                            const auto yk
-                                = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                            const auto dy = yk - yi;
-
-                            const auto zk
-                                = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                            const auto dz = zk - zi;
-
-                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
-
-                            acc_x += dx * G * masses[k] * rm3;
-                            acc_y += dy * G * masses[k] * rm3;
-                            acc_z += dz * G * masses[k] * rm3;
+                    for (auto k = 0u; k < 6u; ++k) {
+                        if (k == i) {
+                            continue;
                         }
 
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
-                                == approximately(acc_x, 1000.));
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
-                                == approximately(acc_y, 1000.));
-                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
-                                == approximately(acc_z, 1000.));
+                        const auto xk = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dx = xk - xi;
+
+                        const auto yk = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dy = yk - yi;
+
+                        const auto zk = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dz = zk - zi;
+
+                        const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                        acc_x += dx * G * masses[k] * rm3;
+                        acc_y += dy * G * masses[k] * rm3;
+                        acc_z += dz * G * masses[k] * rm3;
                     }
+
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
+                            == approximately(acc_x, 1000.));
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
+                            == approximately(acc_y, 1000.));
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
+                            == approximately(acc_z, 1000.));
                 }
             }
         }
@@ -1395,154 +1377,150 @@ TEST_CASE("cfunc nbody par mp")
     const auto batch_size = 1u;
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
-            llvm_state s{kw::opt_level = opt_level};
+        llvm_state s{kw::opt_level = opt_level};
 
-            outs.resize(36u * batch_size);
-            ins.resize(36u * batch_size);
-            pars.resize(6u * batch_size);
+        outs.resize(36u * batch_size);
+        ins.resize(36u * batch_size);
+        pars.resize(6u * batch_size);
 
-            for (auto i = 0u; i < 6u; ++i) {
-                for (auto j = 0u; j < batch_size; ++j) {
-                    pars[i * batch_size + j] = mppp::real{masses[i], prec};
-                }
+        for (auto i = 0u; i < 6u; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                pars[i * batch_size + j] = mppp::real{masses[i], prec};
             }
+        }
 
-            std::generate(ins.begin(), ins.end(), gen);
-            std::generate(outs.begin(), outs.end(), gen);
+        std::generate(ins.begin(), ins.end(), gen);
+        std::generate(outs.begin(), outs.end(), gen);
 
-            std::vector<expression> vars;
-            std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
-            std::ranges::sort(vars, std::less<expression>{});
+        std::vector<expression> vars;
+        std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+        std::ranges::sort(vars, std::less<expression>{});
 
-            add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec, kw::compact_mode = cm);
-            add_cfunc<mppp::real>(s, "cfunc.strided", exs, vars, kw::prec = prec, kw::compact_mode = cm,
-                                  kw::strided = true);
+        add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec);
+        add_cfunc<mppp::real>(s, "cfunc.strided", exs, vars, kw::prec = prec, kw::strided = true);
 
-            s.compile();
+        s.compile();
 
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+        cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
-            for (auto i = 0u; i < 6u; ++i) {
-                for (auto j = 0u; j < batch_size; ++j) {
-                    // x_i' == vx_i.
-                    REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], mppp::real{100.}));
-                    // y_i' == vy_i.
-                    REQUIRE(outs[i * batch_size * 6u + batch_size + j]
-                            == approximately(ins[i * batch_size + batch_size * 6u + j], mppp::real{100.}));
-                    // z_i' == vz_i.
-                    REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
-                            == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], mppp::real{100.}));
+        for (auto i = 0u; i < 6u; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                // x_i' == vx_i.
+                REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], mppp::real{100.}));
+                // y_i' == vy_i.
+                REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                        == approximately(ins[i * batch_size + batch_size * 6u + j], mppp::real{100.}));
+                // z_i' == vz_i.
+                REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                        == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], mppp::real{100.}));
 
-                    // Accelerations.
-                    mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
+                // Accelerations.
+                mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
 
-                    const auto xi = ins[18u * batch_size + i * batch_size + j];
-                    const auto yi = ins[24u * batch_size + i * batch_size + j];
-                    const auto zi = ins[30u * batch_size + i * batch_size + j];
+                const auto xi = ins[18u * batch_size + i * batch_size + j];
+                const auto yi = ins[24u * batch_size + i * batch_size + j];
+                const auto zi = ins[30u * batch_size + i * batch_size + j];
 
-                    for (auto k = 0u; k < 6u; ++k) {
-                        if (k == i) {
-                            continue;
-                        }
-
-                        const auto xk = ins[18u * batch_size + k * batch_size + j];
-                        const auto dx = xk - xi;
-
-                        const auto yk = ins[24u * batch_size + k * batch_size + j];
-                        const auto dy = yk - yi;
-
-                        const auto zk = ins[30u * batch_size + k * batch_size + j];
-                        const auto dz = zk - zi;
-
-                        const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
-
-                        acc_x += dx * G * masses[k] * rm3;
-                        acc_y += dy * G * masses[k] * rm3;
-                        acc_z += dz * G * masses[k] * rm3;
+                for (auto k = 0u; k < 6u; ++k) {
+                    if (k == i) {
+                        continue;
                     }
 
-                    REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, mppp::real{1000.}));
-                    REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, mppp::real{1000.}));
-                    REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, mppp::real{1000.}));
+                    const auto xk = ins[18u * batch_size + k * batch_size + j];
+                    const auto dx = xk - xi;
+
+                    const auto yk = ins[24u * batch_size + k * batch_size + j];
+                    const auto dy = yk - yi;
+
+                    const auto zk = ins[30u * batch_size + k * batch_size + j];
+                    const auto dz = zk - zi;
+
+                    const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
+
+                    acc_x += dx * G * masses[k] * rm3;
+                    acc_y += dy * G * masses[k] * rm3;
+                    acc_z += dz * G * masses[k] * rm3;
                 }
+
+                REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, mppp::real{1000.}));
+                REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, mppp::real{1000.}));
+                REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, mppp::real{1000.}));
             }
+        }
 
-            // Run the test on the strided function too.
-            const std::size_t extra_stride = 3;
-            outs.resize(36u * (batch_size + extra_stride));
-            ins.resize(36u * (batch_size + extra_stride));
-            pars.resize(6u * (batch_size + extra_stride));
+        // Run the test on the strided function too.
+        const std::size_t extra_stride = 3;
+        outs.resize(36u * (batch_size + extra_stride));
+        ins.resize(36u * (batch_size + extra_stride));
+        pars.resize(6u * (batch_size + extra_stride));
 
-            for (auto i = 0u; i < 6u; ++i) {
-                for (auto j = 0u; j < batch_size; ++j) {
-                    pars[i * (batch_size + extra_stride) + j] = mppp::real{masses[i], prec};
-                }
+        for (auto i = 0u; i < 6u; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                pars[i * (batch_size + extra_stride) + j] = mppp::real{masses[i], prec};
             }
+        }
 
-            std::generate(ins.begin(), ins.end(), gen);
-            std::generate(outs.begin(), outs.end(), gen);
+        std::generate(ins.begin(), ins.end(), gen);
+        std::generate(outs.begin(), outs.end(), gen);
 
-            auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
-                                                      const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
+        auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
+                                                  const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
+        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
 
-            for (auto i = 0u; i < 6u; ++i) {
-                for (auto j = 0u; j < batch_size; ++j) {
-                    // x_i' == vx_i.
-                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
-                            == approximately(ins[i * (batch_size + extra_stride) + j], mppp::real{100.}));
-                    // y_i' == vy_i.
-                    REQUIRE(
-                        outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
+        for (auto i = 0u; i < 6u; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                // x_i' == vx_i.
+                REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
+                        == approximately(ins[i * (batch_size + extra_stride) + j], mppp::real{100.}));
+                // y_i' == vy_i.
+                REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
                         == approximately(ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j],
                                          mppp::real{100.}));
-                    // z_i' == vz_i.
-                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
-                            == approximately(
-                                ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
-                                mppp::real{100.}));
+                // z_i' == vz_i.
+                REQUIRE(
+                    outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
+                    == approximately(ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
+                                     mppp::real{100.}));
 
-                    // Accelerations.
-                    mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
+                // Accelerations.
+                mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
 
-                    const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
-                    const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
-                    const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
 
-                    for (auto k = 0u; k < 6u; ++k) {
-                        if (k == i) {
-                            continue;
-                        }
-
-                        const auto xk = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                        const auto dx = xk - xi;
-
-                        const auto yk = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                        const auto dy = yk - yi;
-
-                        const auto zk = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
-                        const auto dz = zk - zi;
-
-                        const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
-
-                        acc_x += dx * G * masses[k] * rm3;
-                        acc_y += dy * G * masses[k] * rm3;
-                        acc_z += dz * G * masses[k] * rm3;
+                for (auto k = 0u; k < 6u; ++k) {
+                    if (k == i) {
+                        continue;
                     }
 
-                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
-                            == approximately(acc_x, mppp::real{1000.}));
-                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
-                            == approximately(acc_y, mppp::real{1000.}));
-                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
-                            == approximately(acc_z, mppp::real{1000.}));
+                    const auto xk = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                    const auto dx = xk - xi;
+
+                    const auto yk = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                    const auto dy = yk - yi;
+
+                    const auto zk = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                    const auto dz = zk - zi;
+
+                    const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
+
+                    acc_x += dx * G * masses[k] * rm3;
+                    acc_y += dy * G * masses[k] * rm3;
+                    acc_z += dz * G * masses[k] * rm3;
                 }
+
+                REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
+                        == approximately(acc_x, mppp::real{1000.}));
+                REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
+                        == approximately(acc_y, mppp::real{1000.}));
+                REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
+                        == approximately(acc_z, mppp::real{1000.}));
             }
         }
     }
@@ -1560,48 +1538,45 @@ TEST_CASE("cfunc numparams")
     auto gen = [&rdist]() { return rdist(rng); };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                llvm_state s{kw::opt_level = opt_level};
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            llvm_state s{kw::opt_level = opt_level};
 
-                outs.resize(2u * batch_size);
-                pars.resize(batch_size);
+            outs.resize(2u * batch_size);
+            pars.resize(batch_size);
 
-                std::generate(pars.begin(), pars.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = batch_size, kw::compact_mode = cm);
-                add_cfunc<double>(s, "cfunc.strided", {1_dbl, par[0]}, {}, kw::batch_size = batch_size,
-                                  kw::compact_mode = cm, kw::strided = true);
+            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = batch_size);
+            add_cfunc<double>(s, "cfunc.strided", {1_dbl, par[0]}, {}, kw::batch_size = batch_size, kw::strided = true);
 
-                s.compile();
+            s.compile();
 
-                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-                    s.jit_lookup("cfunc"));
+            auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
+            cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
 
-                for (auto j = 0u; j < batch_size; ++j) {
-                    REQUIRE(outs[j] == 1);
-                    REQUIRE(outs[j + batch_size] == pars[j]);
-                }
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(outs[j] == 1);
+                REQUIRE(outs[j + batch_size] == pars[j]);
+            }
 
-                // Run the test on the strided function too.
-                const std::size_t extra_stride = 3;
-                outs.resize(2u * (batch_size + extra_stride));
-                pars.resize(batch_size + extra_stride);
+            // Run the test on the strided function too.
+            const std::size_t extra_stride = 3;
+            outs.resize(2u * (batch_size + extra_stride));
+            pars.resize(batch_size + extra_stride);
 
-                std::generate(pars.begin(), pars.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
 
-                auto *cfs_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                        s.jit_lookup("cfunc.strided"));
+            auto *cfs_ptr
+                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
 
-                cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
+            cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
 
-                for (auto j = 0u; j < batch_size; ++j) {
-                    REQUIRE(outs[j] == 1);
-                    REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
-                }
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(outs[j] == 1);
+                REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
             }
         }
     }
@@ -1622,55 +1597,51 @@ TEST_CASE("cfunc numparams mp")
     auto gen = [&]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
+        llvm_state s{kw::opt_level = opt_level};
 
-            llvm_state s{kw::opt_level = opt_level};
+        outs.resize(4u * batch_size);
+        pars.resize(2u * batch_size);
 
-            outs.resize(4u * batch_size);
-            pars.resize(2u * batch_size);
+        std::generate(pars.begin(), pars.end(), gen);
+        std::generate(outs.begin(), outs.end(), gen);
 
-            std::generate(pars.begin(), pars.end(), gen);
-            std::generate(outs.begin(), outs.end(), gen);
+        add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec);
+        add_cfunc<mppp::real>(s, "cfunc.strided", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec,
+                              kw::strided = true);
 
-            add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec,
-                                  kw::compact_mode = cm);
-            add_cfunc<mppp::real>(s, "cfunc.strided", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec,
-                                  kw::compact_mode = cm, kw::strided = true);
+        s.compile();
 
-            s.compile();
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
 
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+        cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
 
-            cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
+        for (auto j = 0u; j < batch_size; ++j) {
+            REQUIRE(outs[j] == 1);
+            REQUIRE(outs[j + batch_size] == pars[j]);
+            REQUIRE(outs[j + 2u * batch_size] == pars[j + 1u]);
+            REQUIRE(outs[j + 3u * batch_size] == -2);
+        }
 
-            for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(outs[j] == 1);
-                REQUIRE(outs[j + batch_size] == pars[j]);
-                REQUIRE(outs[j + 2u * batch_size] == pars[j + 1u]);
-                REQUIRE(outs[j + 3u * batch_size] == -2);
-            }
+        // Run the test on the strided function too.
+        const std::size_t extra_stride = 3;
+        outs.resize(4u * (batch_size + extra_stride));
+        pars.resize(2u * (batch_size + extra_stride));
 
-            // Run the test on the strided function too.
-            const std::size_t extra_stride = 3;
-            outs.resize(4u * (batch_size + extra_stride));
-            pars.resize(2u * (batch_size + extra_stride));
+        std::generate(pars.begin(), pars.end(), gen);
+        std::generate(outs.begin(), outs.end(), gen);
 
-            std::generate(pars.begin(), pars.end(), gen);
-            std::generate(outs.begin(), outs.end(), gen);
+        auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
+                                                  const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
 
-            auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
-                                                      const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
+        cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
 
-            cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
-
-            for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(outs[j] == 1);
-                REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
-                REQUIRE(outs[j + 2u * (batch_size + extra_stride)] == pars[j + batch_size + extra_stride]);
-                REQUIRE(outs[j + 3u * (batch_size + extra_stride)] == -2);
-            }
+        for (auto j = 0u; j < batch_size; ++j) {
+            REQUIRE(outs[j] == 1);
+            REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
+            REQUIRE(outs[j + 2u * (batch_size + extra_stride)] == pars[j + batch_size + extra_stride]);
+            REQUIRE(outs[j + 3u * (batch_size + extra_stride)] == -2);
         }
     }
 }
@@ -1710,46 +1681,44 @@ TEST_CASE("cfunc bogus stride")
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    for (auto cm : {false, true}) {
-        for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            llvm_state s;
+    for (auto batch_size : {1u, 2u, 4u, 5u}) {
+        llvm_state s;
 
-            outs.resize(2u * batch_size);
-            ins.resize(3u * batch_size);
-            pars.resize(2u * batch_size);
+        outs.resize(2u * batch_size);
+        ins.resize(3u * batch_size);
+        pars.resize(2u * batch_size);
 
-            std::generate(ins.begin(), ins.end(), gen);
-            std::generate(pars.begin(), pars.end(), gen);
+        std::generate(ins.begin(), ins.end(), gen);
+        std::generate(pars.begin(), pars.end(), gen);
 
-            add_cfunc<double>(s, "cfunc.strided", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
-                              kw::batch_size = batch_size, kw::compact_mode = cm, kw::strided = true);
+        add_cfunc<double>(s, "cfunc.strided", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
+                          kw::batch_size = batch_size, kw::strided = true);
 
-            s.compile();
+        s.compile();
 
-            auto *cfs_ptr
-                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
-                    s.jit_lookup("cfunc.strided"));
+        auto *cfs_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                s.jit_lookup("cfunc.strided"));
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size - 1u);
+        cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size - 1u);
 
-            if (batch_size > 1u) {
-                for (auto j = 0u; j < batch_size - 1u; ++j) {
-                    REQUIRE(outs[j]
-                            == approximately(ins[j] + 2. * ins[(batch_size - 1u) + j]
-                                                 + pars[j] * ins[(batch_size - 1u) * 2u + j],
-                                             100.));
-                    REQUIRE(outs[(batch_size - 1u) + j]
-                            == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
-                }
-
-                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, 0);
-
-                for (auto j = 0u; j < batch_size; ++j) {
-                    REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
-                }
-            } else {
-                REQUIRE(outs[0] == approximately(pars[0] - ins[0] * ins[0], 100.));
+        if (batch_size > 1u) {
+            for (auto j = 0u; j < batch_size - 1u; ++j) {
+                REQUIRE(outs[j]
+                        == approximately(ins[j] + 2. * ins[(batch_size - 1u) + j]
+                                             + pars[j] * ins[(batch_size - 1u) * 2u + j],
+                                         100.));
+                REQUIRE(outs[(batch_size - 1u) + j]
+                        == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
             }
+
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, 0);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
+            }
+        } else {
+            REQUIRE(outs[0] == approximately(pars[0] - ins[0] * ins[0], 100.));
         }
     }
 }
@@ -1772,22 +1741,6 @@ TEST_CASE("cfunc failure modes")
 
         REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = 0u),
                                std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
-    }
-
-    {
-        llvm_state s;
-
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::parallel_mode = true),
-                               std::invalid_argument,
-                               Message("Parallel mode can only be enabled in conjunction with compact mode"));
-    }
-
-    {
-        llvm_state s;
-
-        REQUIRE_THROWS_MATCHES(
-            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::parallel_mode = true, kw::compact_mode = true),
-            std::invalid_argument, Message("Parallel mode has not been implemented yet"));
     }
 
 #if defined(HEYOKA_ARCH_PPC)
@@ -1830,18 +1783,12 @@ TEST_CASE("cfunc vsop2013")
 
     ta.propagate_until(1.);
 
-    llvm_state s;
+    cfunc<double> cf({venus_sol2[0], venus_sol2[1], venus_sol2[2]}, {t}, kw::compact_mode = true);
 
-    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, {t}, kw::compact_mode = true);
+    std::vector<double> out(3u, 0.);
+    const std::vector ins{date};
 
-    s.compile();
-
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
-
-    double out[3] = {};
-
-    cf_ptr(out, &date, nullptr, nullptr);
+    cf(out, ins);
 
     REQUIRE(out[0] == approximately(ta.get_state()[0], 100.));
     REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));

@@ -406,7 +406,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
         // Finish the automatic setup of the ics for a variational
         // integrator.
         detail::setup_variational_ics_t0(m_tplt_state, m_state, m_pars, m_time_hi.data(), std::get<1>(vsys),
-                                         m_batch_size, m_high_accuracy, m_compact_mode);
+                                         m_batch_size, m_high_accuracy);
     }
 
     if (is_variational) {
