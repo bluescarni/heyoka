@@ -30,6 +30,16 @@
 #include <utility>
 #include <vector>
 
+// NOTE: we need dlfcn.h to dlopen the heyoka library with RTLD_LOCAL, so that its symbols (and its dependencies'
+// symbols) are not promoted to global visibility. See setup_dynlib_search_generators().
+#if __has_include(<dlfcn.h>)
+
+#define HEYOKA_LLVM_STATE_HAVE_DLFCN
+
+#include <dlfcn.h>
+
+#endif
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/regex.hpp>
@@ -71,6 +81,7 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/CodeGen.h>
+#include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/TargetSelect.h>
@@ -900,6 +911,64 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
     return std::move(ret.get());
 }
 
+// NOTE: this is a helper that sets up the dynamic library search generators for an lljit instance.
+//
+// These are necessary in order to allow access to C/C++ functions from within the LLVM IR.
+//
+// NOTE: this function is not exception safe, proper cleanup needs to be handled externally.
+void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
+{
+    // Setup the jit so that it can look up symbols from the current process.
+    auto dlsg
+        = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(lljit->getDataLayout().getGlobalPrefix());
+    // LCOV_EXCL_START
+    if (!dlsg) [[unlikely]] {
+        throw std::invalid_argument("Could not create the dynamic library search generator");
+    }
+    // LCOV_EXCL_STOP
+    lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
+
+    // NOTE: we also want to manually inject the symbols from the heyoka shared library into the JIT runtime.
+    //
+    // The reason for this is that if heyoka is loaded with dlopen() and the RTLD_LOCAL flag, then the JIT runtime will
+    // not be able to resolve symbols defined either in heyoka or in its dependencies. This will happen for instance in
+    // heyoka.py. By manually injecting the heyoka library into the JIT, heyoka's symbols (and, transitively, its
+    // dependencies' symbols) become available to JIT-compiled code.
+    //
+    // NOTE: on platforms with dlfcn.h, we use dlopen() with RTLD_LOCAL to avoid promoting heyoka's symbols (and those
+    // of its dependencies) to global visibility. This is critical in Python environments where global symbol promotion
+    // could cause collisions with other extension modules that bundle their own versions of these libraries. On other
+    // platforms, we fall back to DynamicLibrarySearchGenerator::Load() which uses RTLD_GLOBAL internally.
+    if (const auto &dl_path = get_dl_path(); !dl_path.empty()) {
+#if defined(HEYOKA_LLVM_STATE_HAVE_DLFCN)
+
+        auto *handle = ::dlopen(dl_path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+        if (handle == nullptr) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::invalid_argument("Could not dlopen the heyoka library for the JIT runtime");
+            // LCOV_EXCL_STOP
+        }
+
+        lljit->getMainJITDylib().addGenerator(std::make_unique<llvm::orc::DynamicLibrarySearchGenerator>(
+            llvm::sys::DynamicLibrary(handle), lljit->getDataLayout().getGlobalPrefix()));
+
+#else
+
+        auto new_dlsg
+            = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
+        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+        if (new_dlsg) [[likely]] {
+            lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
+        } else {
+            // LCOV_EXCL_START
+            throw std::invalid_argument("Could not create the dynamic library search generator for the heyoka library");
+            // LCOV_EXCL_STOP
+        }
+
+#endif
+    }
+}
+
 } // namespace
 
 } // namespace detail
@@ -989,11 +1058,16 @@ llvm_state::llvm_state(const llvm_state &other)
       m_c_model(other.m_c_model), m_module_name(other.m_module_name)
 {
     if (other.is_compiled()) {
-        // 'other' was compiled. We leave module and builder empty, copy over the IR/bitcode snapshots and add the
-        // compiled module to the jit.
+        // 'other' was compiled. We leave module and builder empty and copy over the IR/bitcode snapshots.
         m_ir_snapshot = other.m_ir_snapshot;
         m_bc_snapshot = other.m_bc_snapshot;
 
+        // NOTE: we need to setup the dynamic library search generators - this is normally done in the compilation step,
+        // but here the code has been compiled already.
+        detail::setup_dynlib_search_generators(m_jitter->m_lljit);
+
+        // Add the compiled module to the JIT.
+        //
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
@@ -1200,7 +1274,12 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             m_ir_snapshot = std::move(ir_snapshot);
             m_bc_snapshot = std::move(bc_snapshot);
 
+            // NOTE: we need to setup the dynamic library search generators - this is normally done in the compilation
+            // step, but here the code has been compiled already.
+            detail::setup_dynlib_search_generators(m_jitter->m_lljit);
+
             // Add the object code to the jit.
+            //
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(*obj_file));
         } else {
@@ -1427,48 +1506,6 @@ unsigned assemble_comp_flag(unsigned opt_level, bool force_avx512, bool slp_vect
 
     return opt_level + (static_cast<unsigned>(force_avx512) << 2) + (static_cast<unsigned>(slp_vectorize) << 3)
            + (static_cast<unsigned>(c_model) << 4);
-}
-
-// NOTE: this is a helper that sets up the dynamic library search generators for an lljit instance.
-//
-// These are necessary in order to allow access to C/C++ functions from within the LLVM IR.
-//
-// NOTE: this function is not exception safe, proper cleanup needs to be handled externally.
-void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
-{
-    // Setup the jit so that it can look up symbols from the current process.
-    auto dlsg
-        = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(lljit->getDataLayout().getGlobalPrefix());
-    // LCOV_EXCL_START
-    if (!dlsg) [[unlikely]] {
-        throw std::invalid_argument("Could not create the dynamic library search generator");
-    }
-    // LCOV_EXCL_STOP
-    lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
-
-    // NOTE: we also want to manually inject the symbols from the heyoka shared library into the JIT runtime.
-    //
-    // The reason for this is that if heyoka is loaded with dlopen() and the RTLD_LOCAL flag, then the JIT runtime will
-    // not be able to resolve symbols defined either in heyoka or in its dependencies. This will happen for instance in
-    // heyoka.py.
-    //
-    // With the following contraption, as far as I have understood, we are manually injecting all the symbols from
-    // heyoka (and, transitively, its dependencies) into the JIT runtime, and the symbols are thus made available to JIT
-    // code despite the use of RTLD_LOCAL.
-    //
-    // This approach was suggested by lhames on the LLVM discord.
-    if (const auto &dl_path = get_dl_path(); !dl_path.empty()) {
-        auto new_dlsg
-            = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
-        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
-        if (new_dlsg) [[likely]] {
-            lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
-        } else {
-            // LCOV_EXCL_START
-            throw std::invalid_argument("Could not create the dynamic library search generator for the heyoka library");
-            // LCOV_EXCL_STOP
-        }
-    }
 }
 
 } // namespace
@@ -2016,12 +2053,14 @@ struct llvm_multi_state::impl {
         ar >> m_jit->m_bc_snapshots;
 
         if (cmp) {
-            // If the stored state was compiled, we need to reset
-            // master builder and module. Otherwise, the empty default-constructed
-            // master module is ok (the master module remains empty until compilation
-            // is triggered).
+            // If the stored state was compiled, we need to clear out master builder and module. Otherwise, the empty
+            // default-constructed master module is ok (the master module remains empty until compilation is triggered).
             m_jit->m_module.reset();
             m_jit->m_builder.reset();
+
+            // NOTE: we need to setup the dynamic library search generators - this is normally done in the compilation
+            // step, but here the code has been compiled already.
+            detail::setup_dynlib_search_generators(m_jit->m_lljit);
 
             // We also need to add all the object files to the jit.
             for (const auto &obj : m_jit->m_object_files) {
@@ -2138,6 +2177,10 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
         m_impl->m_jit->m_object_files = other.m_impl->m_jit->m_object_files;
         m_impl->m_jit->m_ir_snapshots = other.m_impl->m_jit->m_ir_snapshots;
         m_impl->m_jit->m_bc_snapshots = other.m_impl->m_jit->m_bc_snapshots;
+
+        // NOTE: we need to setup the dynamic library search generators - this is normally done in the compilation step,
+        // but here the code has been compiled already.
+        detail::setup_dynlib_search_generators(m_impl->m_jit->m_lljit);
 
         // Add the files to the jit.
         for (const auto &obj : m_impl->m_jit->m_object_files) {
