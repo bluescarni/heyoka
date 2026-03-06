@@ -368,12 +368,8 @@ private:
     // Struct storing the integrator data.
     struct HEYOKA_DLL_PUBLIC i_data;
 
-    // Struct implementing the data/logic for event detection.
-    struct HEYOKA_DLL_PUBLIC ed_data;
-
-    // Pimpls.
+    // Pimpl.
     std::unique_ptr<i_data> m_i_data;
-    std::unique_ptr<ed_data> m_ed_data;
 
     // Serialization.
     template <typename Archive>
@@ -792,12 +788,8 @@ private:
     // Struct storing the integrator data.
     struct HEYOKA_DLL_PUBLIC i_data;
 
-    // Struct implementing the data/logic for event detection.
-    struct HEYOKA_DLL_PUBLIC ed_data;
-
-    // Pimpls.
+    // Pimpl.
     std::unique_ptr<i_data> m_i_data;
-    std::unique_ptr<ed_data> m_ed_data;
 
     // Serialization.
     template <typename Archive>
@@ -1217,6 +1209,7 @@ namespace detail
 {
 
 // Boost s11n class version history for taylor_adaptive:
+//
 // - 1: added base class to taylor_adaptive.
 // - 2: added the m_state_vars and m_rhs members.
 // - 3: removed the mr flag from the terminal event callback siganture,
@@ -1225,9 +1218,11 @@ namespace detail
 // - 5: removed m_state_vars/m_rhs, variational ODE data.
 // - 6: added parallel JIT compilation for compact mode.
 // - 7: replaced aligned_buffer with aligned_vector.
-inline constexpr int taylor_adaptive_s11n_version = 7;
+// - 8: re-organised internal layout.
+inline constexpr int taylor_adaptive_s11n_version = 8;
 
 // Boost s11n class version history for taylor_adaptive_batch:
+//
 // - 1: added the m_state_vars and m_rhs members.
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
@@ -1235,7 +1230,8 @@ inline constexpr int taylor_adaptive_s11n_version = 7;
 // - 4: removed m_state_vars/m_rhs, variational ODE data.
 // - 5: added parallel JIT compilation for compact mode.
 // - 6: replaced aligned_buffer with aligned_vector.
-inline constexpr int taylor_adaptive_batch_s11n_version = 6;
+// - 7: re-organised internal layout.
+inline constexpr int taylor_adaptive_batch_s11n_version = 7;
 
 } // namespace detail
 

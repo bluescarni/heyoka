@@ -50,6 +50,7 @@
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
+#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -142,6 +143,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -395,11 +397,12 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     m_d_out_time.resize(m_batch_size);
 
     // Init the event data structure if needed.
-    // NOTE: in principle this can be done in parallel with the rest of the constructor,
-    // once we have m_order/m_dim/m_batch_size and we are done using tes/ntes.
+    //
+    // NOTE: in principle this can be done in parallel with the rest of the constructor, once we have
+    // m_order/m_dim/m_batch_size and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(m_tplt_state.make_similar(), std::move(tes), std::move(ntes), m_order,
-                                              m_dim, m_batch_size);
+        m_ed_data = std::make_unique<detail::ed_data_batch<T>>(m_tplt_state.make_similar(), std::move(tes),
+                                                               std::move(ntes), m_order, m_dim, m_batch_size);
     }
 
     if (auto_ic_setup) {
@@ -410,7 +413,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     }
 
     if (is_variational) {
-        m_tm_data.emplace(std::get<1>(vsys), 0, m_tplt_state, m_batch_size);
+        m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, m_batch_size);
     }
 
     // Move vsys in.
@@ -426,10 +429,9 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch()
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
-    : m_i_data(std::make_unique<i_data>(*other.m_i_data)),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+    : m_i_data(std::make_unique<i_data>(*other.m_i_data))
 {
-    assign_stepper(static_cast<bool>(m_ed_data));
+    assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
 }
 
 template <typename T>
@@ -470,7 +472,6 @@ template <typename Archive>
 void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
 {
     ar << m_i_data;
-    ar << m_ed_data;
 }
 
 template <typename T>
@@ -487,10 +488,9 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 
     try {
         ar >> m_i_data;
-        ar >> m_ed_data;
 
         // Recover the stepper.
-        assign_stepper(static_cast<bool>(m_ed_data));
+        assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
         // LCOV_EXCL_START
     } catch (...) {
         // Reset to def-cted state in case of exceptions.
@@ -641,6 +641,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
     using std::abs;
     using std::isfinite;
@@ -2184,37 +2185,37 @@ const std::vector<T> &taylor_adaptive_batch<T>::get_d_output() const
 template <typename T>
 bool taylor_adaptive_batch<T>::with_events() const
 {
-    return static_cast<bool>(m_ed_data);
+    return static_cast<bool>(m_i_data->m_ed_data);
 }
 
 template <typename T>
 const std::vector<typename taylor_adaptive_batch<T>::t_event_t> &taylor_adaptive_batch<T>::get_t_events() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_tes;
+    return m_i_data->m_ed_data->m_tes;
 }
 
 template <typename T>
 const std::vector<std::vector<std::optional<std::pair<T, T>>>> &taylor_adaptive_batch<T>::get_te_cooldowns() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_te_cooldowns;
+    return m_i_data->m_ed_data->m_te_cooldowns;
 }
 
 template <typename T>
 const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptive_batch<T>::get_nt_events() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_ntes;
+    return m_i_data->m_ed_data->m_ntes;
 }
 
 template <typename T>
@@ -2326,7 +2327,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
 
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
@@ -2336,7 +2337,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
                         i, m_batch_size));
     }
 
-    for (auto &cd : m_ed_data->m_te_cooldowns[i]) {
+    for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns[i]) {
         cd.reset();
     }
 }

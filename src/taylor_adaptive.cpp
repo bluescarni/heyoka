@@ -54,6 +54,7 @@
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
+#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -136,9 +137,9 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
     }
 
     // Same goes for the event detection jet data, if present.
-    if (dthis->m_ed_data) {
-        assert(std::all_of(dthis->m_ed_data->m_ev_jet.begin(), dthis->m_ed_data->m_ev_jet.end(),
-                           [prec](const auto &x) { return x.get_prec() == prec; }));
+    const auto &ed_data = dthis->m_i_data->m_ed_data;
+    if (ed_data) {
+        assert(std::ranges::all_of(ed_data->m_ev_jet, [prec](const auto &x) { return x.get_prec() == prec; }));
     }
 
 #endif
@@ -197,6 +198,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -546,11 +548,12 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 #endif
 
     // Init the event data structure if needed.
-    // NOTE: in principle this can be done in parallel with the rest of the constructor,
-    // once we have m_order/m_dim and we are done using tes/ntes.
+    //
+    // NOTE: in principle this can be done in parallel with the rest of the constructor, once we have m_order/m_dim and
+    // we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(m_tplt_state.make_similar(), std::move(tes), std::move(ntes), m_order,
-                                              m_dim, m_state[0]);
+        m_ed_data = std::make_unique<detail::ed_data<T>>(m_tplt_state.make_similar(), std::move(tes), std::move(ntes),
+                                                         m_order, m_dim, m_state[0]);
     }
 
     if (auto_ic_setup) {
@@ -563,10 +566,11 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     if (is_variational) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tm_data.emplace(std::get<1>(vsys), static_cast<long long>(this->get_prec()), m_tplt_state, 1);
+            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys),
+                                                             static_cast<long long>(this->get_prec()), m_tplt_state, 1);
         } else {
 #endif
-            m_tm_data.emplace(std::get<1>(vsys), 0, m_tplt_state, 1);
+            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1);
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -602,10 +606,9 @@ taylor_adaptive<T>::taylor_adaptive()
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
-    : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data)),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+    : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data))
 {
-    assign_stepper(static_cast<bool>(m_ed_data));
+    assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
 }
 
 template <typename T>
@@ -646,9 +649,7 @@ template <typename Archive>
 void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
     ar << boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
-
     ar << m_i_data;
-    ar << m_ed_data;
 }
 
 template <typename T>
@@ -665,12 +666,10 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
 
     try {
         ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
-
         ar >> m_i_data;
-        ar >> m_ed_data;
 
         // Recover the stepper.
-        assign_stepper(static_cast<bool>(m_ed_data));
+        assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
         // LCOV_EXCL_START
     } catch (...) {
         // Reset to def-cted state in case of exceptions.
@@ -694,33 +693,25 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 }
 
 // Implementation detail to make a single integration timestep.
-// The magnitude of the timestep is automatically deduced, but it will
-// always be not greater than abs(max_delta_t). The propagation
-// is done forward in time if max_delta_t >= 0, backwards in
-// time otherwise.
 //
-// The function will return a pair, containing
-// a flag describing the outcome of the integration,
-// and the integration timestep that was used.
+// The magnitude of the timestep is automatically deduced, but it will always be not greater than abs(max_delta_t). The
+// propagation is done forward in time if max_delta_t >= 0, backwards in time otherwise.
+//
+// The function will return a pair, containing a flag describing the outcome of the integration, and the integration
+// timestep that was used.
 //
 // NOTE: for the docs:
+//
 // - outcome:
 //   - if nf state is detected, err_nf_state, else
-//   - if terminal events trigger, return the index
-//     of the first event triggering, else
-//   - either time_limit or success, depending on whether
-//     max_delta_t was used as a timestep or not;
-// - event detection happens in the [0, h) half-open range (that is,
-//   all detected events are guaranteed to trigger within
-//   the [0, h) range). Thus, if the timestep ends up being zero
-//   (either because max_delta_t == 0
-//   or the inferred timestep is zero), then event detection is skipped
-//   altogether;
-// - the execution of the events' callbacks is guaranteed to proceed in
-//   chronological order;
-// - a timestep h == 0 will still result in m_last_h being updated (to zero)
-//   and the Taylor coefficients being recorded in the internal array
-//   (if wtc == true). That is, h == 0 is not treated in any special way.
+//   - if terminal events trigger, return the index of the first event triggering, else
+//   - either time_limit or success, depending on whether max_delta_t was used as a timestep or not;
+// - event detection happens in the [0, h) half-open range (that is, all detected events are guaranteed to trigger
+//   within the [0, h) range). Thus, if the timestep ends up being zero (either because max_delta_t == 0 or the inferred
+//   timestep is zero), then event detection is skipped altogether;
+// - the execution of the events' callbacks is guaranteed to proceed in chronological order;
+// - a timestep h == 0 will still result in m_last_h being updated (to zero) and the Taylor coefficients being recorded
+//   in the internal array (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
 {
@@ -757,6 +748,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
     auto h = max_delta_t;
 
@@ -1077,11 +1069,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 template <typename T>
 void taylor_adaptive<T>::reset_cooldowns()
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    for (auto &cd : m_ed_data->m_te_cooldowns) {
+    for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns) {
         cd.reset();
     }
 }
@@ -1850,37 +1842,37 @@ const std::vector<T> &taylor_adaptive<T>::get_d_output() const
 template <typename T>
 bool taylor_adaptive<T>::with_events() const
 {
-    return static_cast<bool>(m_ed_data);
+    return static_cast<bool>(m_i_data->m_ed_data);
 }
 
 template <typename T>
 const std::vector<typename taylor_adaptive<T>::t_event_t> &taylor_adaptive<T>::get_t_events() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_tes;
+    return m_i_data->m_ed_data->m_tes;
 }
 
 template <typename T>
 const std::vector<std::optional<std::pair<T, T>>> &taylor_adaptive<T>::get_te_cooldowns() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_te_cooldowns;
+    return m_i_data->m_ed_data->m_te_cooldowns;
 }
 
 template <typename T>
 const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::get_nt_events() const
 {
-    if (!m_ed_data) {
+    if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
     }
 
-    return m_ed_data->m_ntes;
+    return m_i_data->m_ed_data->m_ntes;
 }
 
 template <typename T>

@@ -31,28 +31,22 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// A RAII helper to extract polys from a cache and
-// return them to the cache upon destruction. Used
-// during event detection.
+// A RAII helper to extract polys from a cache and return them to the cache upon destruction. Used during event
+// detection.
 template <typename>
 class taylor_pwrap;
 
-// Polynomial cache type. Each entry is a polynomial
-// represented as a vector of coefficients, in ascending
-// order. Used during event detection.
+// Polynomial cache type. Each entry is a polynomial represented as a vector of coefficients, in ascending order. Used
+// during event detection.
 //
-// NOTE: a cache must not contain empty coefficient
-// vectors and all polynomials in the cache must have
-// the same order.
+// NOTE: a cache must not contain empty coefficient vectors and all polynomials in the cache must have the same order.
 template <typename T>
 using taylor_poly_cache = std::vector<std::vector<T>>;
 
-} // namespace detail
-
 template <typename T>
-struct taylor_adaptive<T>::ed_data {
+struct ed_data {
     // The working list type used during real root isolation.
-    using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
+    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
     // The type used to store the list of isolating intervals.
     using isol_t = std::vector<std::tuple<T, T>>;
     // Polynomial translation function type.
@@ -61,6 +55,10 @@ struct taylor_adaptive<T>::ed_data {
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
     // fex_check function type.
     using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
+
+    // Recover the event typedefs.
+    using t_event_t = taylor_adaptive<T>::t_event_t;
+    using nt_event_t = taylor_adaptive<T>::nt_event_t;
 
     // The vector of terminal events.
     std::vector<t_event_t> m_tes;
@@ -94,7 +92,7 @@ struct taylor_adaptive<T>::ed_data {
     // to and interact with m_poly_cache during destruction,
     // and we must be sure that m_wlist is destroyed *before*
     // m_poly_cache.
-    detail::taylor_poly_cache<T> m_poly_cache;
+    taylor_poly_cache<T> m_poly_cache;
     // The working list.
     wlist_t m_wlist;
     // The list of isolating intervals.
@@ -125,9 +123,9 @@ private:
 };
 
 template <typename T>
-struct taylor_adaptive_batch<T>::ed_data {
+struct ed_data_batch {
     // The working list type used during real root isolation.
-    using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
+    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
     // The type used to store the list of isolating intervals.
     using isol_t = std::vector<std::tuple<T, T>>;
     // Polynomial translation function type.
@@ -136,6 +134,10 @@ struct taylor_adaptive_batch<T>::ed_data {
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
     // fex_check function type.
     using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
+
+    // Recover the event typedefs.
+    using t_event_t = taylor_adaptive_batch<T>::t_event_t;
+    using nt_event_t = taylor_adaptive_batch<T>::nt_event_t;
 
     // The vector of terminal events.
     std::vector<t_event_t> m_tes;
@@ -179,35 +181,38 @@ struct taylor_adaptive_batch<T>::ed_data {
     // to and interact with m_poly_cache during destruction,
     // and we must be sure that m_wlist is destroyed *before*
     // m_poly_cache.
-    detail::taylor_poly_cache<T> m_poly_cache;
+    taylor_poly_cache<T> m_poly_cache;
     // The working list.
     wlist_t m_wlist;
     // The list of isolating intervals.
     isol_t m_isol;
 
     // Constructors.
-    ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
-    ed_data(const ed_data &);
-    ~ed_data();
+    ed_data_batch(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
+                  std::uint32_t);
+    ed_data_batch(const ed_data_batch &);
+    ~ed_data_batch();
 
     // Delete unused bits.
-    ed_data(ed_data &&) = delete;
-    ed_data &operator=(const ed_data &) = delete;
-    ed_data &operator=(ed_data &&) = delete;
+    ed_data_batch(ed_data_batch &&) = delete;
+    ed_data_batch &operator=(const ed_data_batch &) = delete;
+    ed_data_batch &operator=(ed_data_batch &&) = delete;
 
     // The event detection function.
     void detect_events(const T *, std::uint32_t, std::uint32_t, std::uint32_t);
 
 private:
     // Serialisation.
-    // NOTE: the def ctor is used only during deserialisation
-    // via pointer.
-    ed_data();
+    //
+    // NOTE: the def ctor is used only during deserialisation via pointer.
+    ed_data_batch();
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &, unsigned) const;
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 

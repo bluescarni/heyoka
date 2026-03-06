@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <memory>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -30,8 +31,9 @@
 #endif
 
 #include <heyoka/detail/aligned_vector.hpp>
+#include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/i_data.hpp>
-#include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
@@ -144,6 +146,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_d_out;
     ar << m_vsys;
     ar << m_tm_data;
+    ar << m_ed_data;
 }
 
 template <typename T>
@@ -166,6 +169,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_d_out;
     ar >> m_vsys;
     ar >> m_tm_data;
+    ar >> m_ed_data;
 
     // Recover the function pointers.
     //
@@ -195,7 +199,8 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
       m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
       m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa),
       m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
-      m_tm_data(other.m_tm_data)
+      m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
+      m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data<T>>(*other.m_ed_data) : nullptr)
 {
     // Recover the function pointers.
     //
@@ -274,6 +279,7 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
     ar << m_d_out_time;
     ar << m_vsys;
     ar << m_tm_data;
+    ar << m_ed_data;
 }
 
 template <typename T>
@@ -314,6 +320,7 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_d_out_time;
     ar >> m_vsys;
     ar >> m_tm_data;
+    ar >> m_ed_data;
 
     // Recover the function pointers.
     // NOTE: here we are recovering only the dense output function pointer because recovering
@@ -349,12 +356,14 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time), m_vsys(other.m_vsys),
-      m_tm_data(other.m_tm_data)
+      m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
+      m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data_batch<T>>(*other.m_ed_data) : nullptr)
 {
     // Recover the function pointers.
-    // NOTE: here we are recovering only the dense output function pointer because recovering
-    // the correct stepper requires information which is available only from the integrator
-    // class (hence, we do it from there).
+    //
+    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
+    // requires information which is available only from the integrator class (hence, we do it from there).
+    //
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 

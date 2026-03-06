@@ -43,10 +43,10 @@
 
 #endif
 
-#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
