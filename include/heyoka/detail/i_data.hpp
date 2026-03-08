@@ -59,7 +59,7 @@ struct taylor_adaptive<T>::i_data {
     // JIT data.
     std::shared_ptr<detail::ta_jit_data<T>> m_ta_jit_data;
     // A template LLVM state we keep around to create states similar to m_ta_jit_data->m_llvm_state as needed. This is
-    // created with the same settings as m_llvm_state.
+    // created with the same settings as m_ta_jit_data->m_llvm_state.
     llvm_state m_tplt_state;
     // Dimension of the system.
     std::uint32_t m_dim{};
@@ -127,7 +127,7 @@ struct taylor_adaptive_batch<T>::i_data {
     // JIT data.
     std::shared_ptr<detail::ta_jit_data<T>> m_ta_jit_data;
     // A template LLVM state we keep around to create states similar to m_ta_jit_data->m_llvm_state as needed. This is
-    // created with the same settings as m_llvm_state.
+    // created with the same settings as m_ta_jit_data->m_llvm_state.
     llvm_state m_tplt_state;
     // Dimension of the system.
     std::uint32_t m_dim{};
