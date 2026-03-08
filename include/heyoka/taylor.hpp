@@ -366,6 +366,8 @@ public:
 
 private:
     // Struct storing the integrator data.
+    //
+    // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
     struct HEYOKA_DLL_PUBLIC i_data;
 
     // Pimpl.
@@ -466,7 +468,7 @@ public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
 
-    taylor_adaptive();
+    taylor_adaptive() noexcept;
 
     // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
     // be reused in other invocations.
@@ -886,7 +888,7 @@ public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
 
-    taylor_adaptive_batch();
+    taylor_adaptive_batch() noexcept;
 
     // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
     // be reused in other invocations.

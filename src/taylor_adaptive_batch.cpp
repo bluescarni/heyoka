@@ -49,6 +49,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -116,10 +117,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
@@ -144,6 +144,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
+
+    auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -347,8 +350,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     assign_stepper(with_events);
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<i_data::d_out_f_t>(s.jit_lookup("d_out_f")); },
-                           m_llvm_state);
+    m_d_out_f = std::visit(
+        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
+        m_llvm_state);
 
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
@@ -421,13 +425,12 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 }
 
 template <typename T>
-taylor_adaptive_batch<T>::taylor_adaptive_batch() = default;
+taylor_adaptive_batch<T>::taylor_adaptive_batch() noexcept = default;
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
     : m_i_data(std::make_unique<i_data>(*other.m_i_data))
 {
-    assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
 }
 
 template <typename T>
@@ -486,6 +489,13 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
         ar >> m_i_data;
 
         // Recover the stepper.
+        //
+        // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same
+        // m_ta_jit_data are serialised into the same archive, upon deserialisation Boost will deserialise the object
+        // once and give all integrators a shared_ptr to the same instance. Each integrator's load path will then
+        // redundantly re-assign the same function pointers to the same object. This is harmless because Boost
+        // deserialisation is strictly sequential (so no thread-safety concerns) and the re-assigned values are
+        // identical.
         assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
         // LCOV_EXCL_START
     } catch (...) {
@@ -619,6 +629,9 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 template <typename T>
 void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    using std::abs;
+    using std::isfinite;
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -627,7 +640,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_delta_ts);
@@ -635,12 +648,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
-    using std::abs;
-    using std::isfinite;
+    auto &m_step_f = m_ta_jit_data->m_step_f;
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     // LCOV_EXCL_START
     // Check preconditions.
@@ -2043,7 +2055,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
 template <typename T>
 const std::variant<llvm_state, llvm_multi_state> &taylor_adaptive_batch<T>::get_llvm_state() const
 {
-    return m_i_data->m_llvm_state;
+    return m_i_data->m_ta_jit_data->m_llvm_state;
 }
 
 template <typename T>
@@ -2243,7 +2255,9 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vecto
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
@@ -2285,7 +2299,9 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
@@ -2354,20 +2370,25 @@ template <typename T>
 void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+
+    auto &m_step_f = m_ta_jit_data->m_step_f;
+    auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
 
     if (with_events) {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<i_data::c_step_f_e_t>(std::get<1>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f = reinterpret_cast<detail::ta_jit_data<T>::c_step_f_e_t>(
+                std::get<1>(m_llvm_state).jit_lookup("step_e"));
         } else {
-            m_step_f = reinterpret_cast<i_data::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f
+                = reinterpret_cast<detail::ta_jit_data<T>::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
         }
     } else {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<i_data::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
+            m_step_f
+                = reinterpret_cast<detail::ta_jit_data<T>::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
         } else {
-            m_step_f = reinterpret_cast<i_data::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
+            m_step_f = reinterpret_cast<detail::ta_jit_data<T>::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
         }
     }
 }

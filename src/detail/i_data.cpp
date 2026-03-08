@@ -33,6 +33,7 @@
 #include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/i_data.hpp>
+#include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -131,7 +132,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
 {
     ar << m_state;
     ar << m_time;
-    ar << m_llvm_state;
+    ar << m_ta_jit_data;
     ar << m_tplt_state;
     ar << m_dim;
     ar << m_dc;
@@ -154,7 +155,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
 {
     ar >> m_state;
     ar >> m_time;
-    ar >> m_llvm_state;
+    ar >> m_ta_jit_data;
     ar >> m_tplt_state;
     ar >> m_dim;
     ar >> m_dc;
@@ -175,7 +176,15 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     //
     // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
     // requires information which is available only from the integrator class (hence, we do it from there).
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+    //
+    // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same m_ta_jit_data
+    // are serialised into the same archive, upon deserialisation Boost will deserialise the object once and give all
+    // integrators a shared_ptr to the same instance. Each integrator's load path will then redundantly re-assign the
+    // same function pointers to the same object. This is harmless because Boost deserialisation is strictly sequential
+    // (so no thread-safety concerns) and the re-assigned values are identical.
+    m_ta_jit_data->m_d_out_f = std::visit(
+        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
+        m_ta_jit_data->m_llvm_state);
 
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();
@@ -185,31 +194,27 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
 // NOTE: this ctor provides only partial initialisation of the data members. The rest of the initialisation is performed
 // from the integrator ctor.
 //
-// NOTE: m_llvm_state is inited as a single llvm_state regardless of the use of compact mode. It will be converted into
-// a multi state if needed at a later stage.
+// NOTE: m_ta_jit_data->m_llvm_state is inited as a single llvm_state regardless of the use of compact mode. It will be
+// converted into a multi state if needed at a later stage.
 template <typename T>
 taylor_adaptive<T>::i_data::i_data(llvm_state s)
-    : m_llvm_state(std::move(s)), m_tplt_state(std::get<0>(m_llvm_state).make_similar())
+    : m_ta_jit_data(std::make_shared<typename detail::ta_jit_data<T>>(
+          typename detail::ta_jit_data<T>{.m_llvm_state = std::move(s)})),
+      m_tplt_state(std::get<0>(m_ta_jit_data->m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
 taylor_adaptive<T>::i_data::i_data(const i_data &other)
-    : m_state(other.m_state), m_time(other.m_time), m_llvm_state(other.m_llvm_state), m_tplt_state(other.m_tplt_state),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa),
-      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
+    : m_state(other.m_state), m_time(other.m_time),
+      // NOTE: this will produce a correct shallow copy, no need to re-assign the pointers.
+      m_ta_jit_data(other.m_ta_jit_data), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
+      m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
+      m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
+      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
       m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
       m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data<T>>(*other.m_ed_data) : nullptr)
 {
-    // Recover the function pointers.
-    //
-    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
-    // requires information which is available only from the integrator class (hence, we do it from there).
-    //
-    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
-
     // Init the compact mode tape, if necessary.
     detail::init_cm_tape(*this);
 }
@@ -248,7 +253,7 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
     ar << m_state;
     ar << m_time_hi;
     ar << m_time_lo;
-    ar << m_llvm_state;
+    ar << m_ta_jit_data;
     ar << m_tplt_state;
     ar << m_dim;
     ar << m_dc;
@@ -289,7 +294,7 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_state;
     ar >> m_time_hi;
     ar >> m_time_lo;
-    ar >> m_llvm_state;
+    ar >> m_ta_jit_data;
     ar >> m_tplt_state;
     ar >> m_dim;
     ar >> m_dc;
@@ -323,31 +328,42 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_ed_data;
 
     // Recover the function pointers.
-    // NOTE: here we are recovering only the dense output function pointer because recovering
-    // the correct stepper requires information which is available only from the integrator
-    // class (hence, we do it from there).
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
+    //
+    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
+    // requires information which is available only from the integrator class (hence, we do it from there).
+    //
+    // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same m_ta_jit_data
+    // are serialised into the same archive, upon deserialisation Boost will deserialise the object once and give all
+    // integrators a shared_ptr to the same instance. Each integrator's load path will then redundantly re-assign the
+    // same function pointers to the same object. This is harmless because Boost deserialisation is strictly sequential
+    // (so no thread-safety concerns) and the re-assigned values are identical.
+    m_ta_jit_data->m_d_out_f = std::visit(
+        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
+        m_ta_jit_data->m_llvm_state);
 
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();
     detail::init_cm_tape(*this);
 }
 
-// NOTE: this ctor provides only partial initialisation of the data members.
-// The rest of the initialisation is performed from the integrator ctor.
-// NOTE: m_llvm_state is inited as a single llvm_state regardless of the use
-// of compact mode. It will be converted into a multi state if needed at a
-// later stage.
+// NOTE: this ctor provides only partial initialisation of the data members. The rest of the initialisation is performed
+// from the integrator ctor.
+//
+// NOTE: m_ta_jit_data->m_llvm_state is inited as a single llvm_state regardless of the use of compact mode.
+// It will be converted into a multi state if needed at a later stage.
 template <typename T>
 taylor_adaptive_batch<T>::i_data::i_data(llvm_state s)
-    : m_llvm_state(std::move(s)), m_tplt_state(std::get<0>(m_llvm_state).make_similar())
+    : m_ta_jit_data(std::make_shared<typename detail::ta_jit_data<T>>(
+          typename detail::ta_jit_data<T>{.m_llvm_state = std::move(s)})),
+      m_tplt_state(std::get<0>(m_ta_jit_data->m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
 taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm_state(other.m_llvm_state), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
+      // NOTE: this will produce a correct shallow copy, no need to re-assign the pointers.
+      m_ta_jit_data(other.m_ta_jit_data), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
       m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
@@ -359,14 +375,6 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
       m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data_batch<T>>(*other.m_ed_data) : nullptr)
 {
-    // Recover the function pointers.
-    //
-    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
-    // requires information which is available only from the integrator class (hence, we do it from there).
-    //
-    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
-
     // Init the compact mode tape, if necessary.
     detail::init_cm_tape(*this);
 }
