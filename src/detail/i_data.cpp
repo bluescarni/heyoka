@@ -172,20 +172,6 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_tm_data;
     ar >> m_ed_data;
 
-    // Recover the function pointers.
-    //
-    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
-    // requires information which is available only from the integrator class (hence, we do it from there).
-    //
-    // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same m_ta_jit_data
-    // are serialised into the same archive, upon deserialisation Boost will deserialise the object once and give all
-    // integrators a shared_ptr to the same instance. Each integrator's load path will then redundantly re-assign the
-    // same function pointers to the same object. This is harmless because Boost deserialisation is strictly sequential
-    // (so no thread-safety concerns) and the re-assigned values are identical.
-    m_ta_jit_data->m_d_out_f = std::visit(
-        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
-        m_ta_jit_data->m_llvm_state);
-
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();
     detail::init_cm_tape(*this);
@@ -326,20 +312,6 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_vsys;
     ar >> m_tm_data;
     ar >> m_ed_data;
-
-    // Recover the function pointers.
-    //
-    // NOTE: here we are recovering only the dense output function pointer because recovering the correct stepper
-    // requires information which is available only from the integrator class (hence, we do it from there).
-    //
-    // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same m_ta_jit_data
-    // are serialised into the same archive, upon deserialisation Boost will deserialise the object once and give all
-    // integrators a shared_ptr to the same instance. Each integrator's load path will then redundantly re-assign the
-    // same function pointers to the same object. This is harmless because Boost deserialisation is strictly sequential
-    // (so no thread-safety concerns) and the re-assigned values are identical.
-    m_ta_jit_data->m_d_out_f = std::visit(
-        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
-        m_ta_jit_data->m_llvm_state);
 
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();

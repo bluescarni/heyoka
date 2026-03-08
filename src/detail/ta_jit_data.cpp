@@ -8,6 +8,8 @@
 
 #include <heyoka/config.hpp>
 
+#include <variant>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -38,9 +40,12 @@ void ta_jit_data<T>::save(boost::archive::binary_oarchive &oa, unsigned) const
 template <typename T>
 void ta_jit_data<T>::load(boost::archive::binary_iarchive &ia, unsigned)
 {
-    // NOTE: here we are recovering only the JIT state, recovery of the function pointers is performed in parent
-    // classes.
     ia >> m_llvm_state;
+
+    // NOTE: here we are recovering only the dense output function pointer. In order to recover the correct steppers, we
+    // would need information not available in this class. Hence, the steppers are recovered in the Taylor integrator
+    // classes instead.
+    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<d_out_f_t>(s.jit_lookup("d_out_f")); }, m_llvm_state);
 }
 
 // Explicit instantiations.
