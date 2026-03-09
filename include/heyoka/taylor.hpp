@@ -575,6 +575,8 @@ public:
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
     [[nodiscard]] std::uint32_t get_vorder() const;
 
+    // NOTE: we must document the requirement that the input range must not overlap with integrator data (specifically,
+    // the state and tstate vectors).
     template <typename R>
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
@@ -1005,6 +1007,8 @@ public:
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
     [[nodiscard]] std::uint32_t get_vorder() const;
 
+    // NOTE: we must document the requirement that the input range must not overlap with integrator data (specifically,
+    // the state and tstate vectors).
     template <typename R>
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>

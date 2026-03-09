@@ -2454,12 +2454,12 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     (void)static_cast<std::size_t>(nv * bs);
     (void)static_cast<std::size_t>(np * bs);
 
-    using out_2d = typename cfunc<T>::out_2d;
-    using in_2d = typename cfunc<T>::in_2d;
+    using out_2d = cfunc<T>::out_2d;
+    using in_2d = cfunc<T>::in_2d;
 
-    out_2d out(tm_data.m_output.data(), static_cast<std::size_t>(nouts), static_cast<std::size_t>(bs));
-    in_2d in(s.data_handle(), static_cast<std::size_t>(nv), static_cast<std::size_t>(bs));
-    in_2d pars(m_i_data->m_state.data(), static_cast<std::size_t>(np), static_cast<std::size_t>(bs));
+    const out_2d out(tm_data.m_output.data(), static_cast<std::size_t>(nouts), static_cast<std::size_t>(bs));
+    const in_2d in(s.data_handle(), static_cast<std::size_t>(nv), static_cast<std::size_t>(bs));
+    const in_2d pars(m_i_data->m_state.data(), static_cast<std::size_t>(np), static_cast<std::size_t>(bs));
 
     // NOTE: disable batch parallelism. cfunc parallelises over the batch size, which, in typical usages of the batch
     // integrator, will be the same native SIMD size used by default in cfunc. As a consequence, no parallelisation is
