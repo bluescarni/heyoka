@@ -16,6 +16,7 @@
 #endif
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -43,18 +44,34 @@ class taylor_pwrap;
 template <typename T>
 using taylor_poly_cache = std::vector<std::vector<T>>;
 
+// The JIT bits for ed_data. Used both in scalar and batch variants.
 template <typename T>
-struct ed_data {
-    // The working list type used during real root isolation.
-    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
-    // The type used to store the list of isolating intervals.
-    using isol_t = std::vector<std::tuple<T, T>>;
+struct ed_jit_data {
     // Polynomial translation function type.
     using pt_t = void (*)(T *, const T *) noexcept;
     // rtscc function type.
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
     // fex_check function type.
     using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
+
+    // The LLVM state.
+    llvm_state m_state;
+    // The JIT compiled functions used during root finding.
+    pt_t m_pt = nullptr;
+    rtscc_t m_rtscc = nullptr;
+    fex_check_t m_fex_check = nullptr;
+
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+};
+
+template <typename T>
+struct ed_data {
+    // The working list type used during real root isolation.
+    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
+    // The type used to store the list of isolating intervals.
+    using isol_t = std::vector<std::tuple<T, T>>;
 
     // Recover the event typedefs.
     using t_event_t = taylor_adaptive<T>::t_event_t;
@@ -77,15 +94,8 @@ struct ed_data {
     std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
-    // The LLVM state.
-    llvm_state m_state;
-    // The JIT compiled functions used during root finding.
-    // NOTE: use default member initializers to ensure that
-    // these are zero-inited by the default constructor
-    // (which is defaulted).
-    pt_t m_pt = nullptr;
-    rtscc_t m_rtscc = nullptr;
-    fex_check_t m_fex_check = nullptr;
+    // The JIT data.
+    std::shared_ptr<ed_jit_data<T>> m_jit_data;
     // The polynomial cache.
     // NOTE: it is *really* important that this is declared
     // *before* m_wlist, because m_wlist will contain references
@@ -128,12 +138,6 @@ struct ed_data_batch {
     using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
     // The type used to store the list of isolating intervals.
     using isol_t = std::vector<std::tuple<T, T>>;
-    // Polynomial translation function type.
-    using pt_t = void (*)(T *, const T *) noexcept;
-    // rtscc function type.
-    using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
-    // fex_check function type.
-    using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
 
     // Recover the event typedefs.
     using t_event_t = taylor_adaptive_batch<T>::t_event_t;
@@ -162,19 +166,12 @@ struct ed_data_batch {
     std::vector<std::vector<std::optional<std::pair<T, T>>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
     std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
-    // The LLVM state.
-    llvm_state m_state;
+    // The JIT data.
+    std::shared_ptr<ed_jit_data<T>> m_jit_data;
     // Flags to signal if we are integrating backwards in time.
     std::vector<std::uint32_t> m_back_int;
     // Output of the fast exclusion check.
     std::vector<std::uint32_t> m_fex_check_res;
-    // The JIT compiled functions used during root finding.
-    // NOTE: use default member initializers to ensure that
-    // these are zero-inited by the default constructor
-    // (which is defaulted).
-    pt_t m_pt = nullptr;
-    rtscc_t m_rtscc = nullptr;
-    fex_check_t m_fex_check = nullptr;
     // The polynomial cache.
     // NOTE: it is *really* important that this is declared
     // *before* m_wlist, because m_wlist will contain references

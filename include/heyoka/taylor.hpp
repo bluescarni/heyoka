@@ -366,6 +366,8 @@ public:
 
 private:
     // Struct storing the integrator data.
+    //
+    // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
     struct HEYOKA_DLL_PUBLIC i_data;
 
     // Pimpl.
@@ -459,14 +461,14 @@ private:
     HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
-    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
 
-    taylor_adaptive();
+    taylor_adaptive() noexcept;
 
     // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
     // be reused in other invocations.
@@ -573,6 +575,8 @@ public:
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
     [[nodiscard]] std::uint32_t get_vorder() const;
 
+    // NOTE: we must document the requirement that the input range must not overlap with integrator data (specifically,
+    // the state and tstate vectors).
     template <typename R>
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
@@ -581,7 +585,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::size_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }
@@ -879,14 +883,14 @@ private:
     HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
-    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
 
-    taylor_adaptive_batch();
+    taylor_adaptive_batch() noexcept;
 
     // NOTE: in these constructors, we accept the kwargs as forwarding references in order to highlight that they cannot
     // be reused in other invocations.
@@ -1003,6 +1007,8 @@ public:
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
     [[nodiscard]] std::uint32_t get_vorder() const;
 
+    // NOTE: we must document the requirement that the input range must not overlap with integrator data (specifically,
+    // the state and tstate vectors).
     template <typename R>
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
@@ -1011,7 +1017,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::size_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }

@@ -53,6 +53,7 @@
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -174,17 +175,17 @@ taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std
 template <typename T>
 void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                            std::optional<T> time, std::optional<T> tol, bool high_accuracy,
-                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                            std::vector<nt_event_t> ntes, bool parallel_mode,
-                                            [[maybe_unused]] std::optional<long long> prec, bool parjit)
+                                            std::optional<T> time, std::optional<T> tol, const bool high_accuracy,
+                                            const bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+                                            std::vector<nt_event_t> ntes, const bool parallel_mode,
+                                            [[maybe_unused]] std::optional<long long> prec, const bool parjit)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
@@ -193,12 +194,14 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
+
+    auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -518,8 +521,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     assign_stepper(with_events);
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = std::visit([](auto &s) { return reinterpret_cast<i_data::d_out_f_t>(s.jit_lookup("d_out_f")); },
-                           m_llvm_state);
+    m_d_out_f = std::visit(
+        [](auto &s) { return reinterpret_cast<detail::ta_jit_data<T>::d_out_f_t>(s.jit_lookup("d_out_f")); },
+        m_llvm_state);
 
     // Setup the vector for the Taylor coefficients.
     using su32_t = boost::safe_numerics::safe<std::uint32_t>;
@@ -566,11 +570,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     if (is_variational) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys),
-                                                             static_cast<long long>(this->get_prec()), m_tplt_state, 1);
+            m_tm_data
+                = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), static_cast<long long>(this->get_prec()),
+                                                       m_tplt_state, 1, high_accuracy, compact_mode, parjit);
         } else {
 #endif
-            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1);
+            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1, high_accuracy,
+                                                             compact_mode, parjit);
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -599,13 +605,12 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 }
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive() = default;
+taylor_adaptive<T>::taylor_adaptive() noexcept = default;
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data))
 {
-    assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
 }
 
 template <typename T>
@@ -666,6 +671,13 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
         ar >> m_i_data;
 
         // Recover the stepper.
+        //
+        // NOTE: Boost serialisation tracks shared_ptr instances - if multiple integrators sharing the same
+        // m_ta_jit_data are serialised into the same archive, upon deserialisation Boost will deserialise the object
+        // once and give all integrators a shared_ptr to the same instance. Each integrator's load path will then
+        // redundantly re-assign the same function pointers to the same object. This is harmless because Boost
+        // deserialisation is strictly sequential (so no thread-safety concerns) and the re-assigned values are
+        // identical.
         assign_stepper(static_cast<bool>(m_i_data->m_ed_data));
         // LCOV_EXCL_START
     } catch (...) {
@@ -734,7 +746,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
 #endif
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
@@ -743,9 +755,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
+
+    auto &m_step_f = m_ta_jit_data->m_step_f;
+    auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
     auto h = max_delta_t;
 
@@ -1719,7 +1733,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 template <typename T>
 const std::variant<llvm_state, llvm_multi_state> &taylor_adaptive<T>::get_llvm_state() const
 {
-    return m_i_data->m_llvm_state;
+    return m_i_data->m_ta_jit_data->m_llvm_state;
 }
 
 template <typename T>
@@ -1931,12 +1945,12 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
         // Time coordinate relative to the current time.
         const auto h = m_i_data->m_last_h + std::move(time);
 
-        m_i_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h);
+        m_i_data->m_ta_jit_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h);
     } else {
         // Absolute time coordinate.
         const auto h = std::move(time) - (m_i_data->m_time - m_i_data->m_last_h);
 
-        m_i_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h.hi);
+        m_i_data->m_ta_jit_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h.hi);
     }
 
     return m_i_data->m_d_out;
@@ -1956,20 +1970,25 @@ template <typename T>
 void taylor_adaptive<T>::assign_stepper(bool with_events)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+
+    auto &m_step_f = m_ta_jit_data->m_step_f;
+    auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
 
     if (with_events) {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<i_data::c_step_f_e_t>(std::get<1>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f = reinterpret_cast<detail::ta_jit_data<T>::c_step_f_e_t>(
+                std::get<1>(m_llvm_state).jit_lookup("step_e"));
         } else {
-            m_step_f = reinterpret_cast<i_data::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
+            m_step_f
+                = reinterpret_cast<detail::ta_jit_data<T>::step_f_e_t>(std::get<0>(m_llvm_state).jit_lookup("step_e"));
         }
     } else {
         if (m_compact_mode) {
-            m_step_f = reinterpret_cast<i_data::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
+            m_step_f
+                = reinterpret_cast<detail::ta_jit_data<T>::c_step_f_t>(std::get<1>(m_llvm_state).jit_lookup("step"));
         } else {
-            m_step_f = reinterpret_cast<i_data::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
+            m_step_f = reinterpret_cast<detail::ta_jit_data<T>::step_f_t>(std::get<0>(m_llvm_state).jit_lookup("step"));
         }
     }
 }
@@ -1995,9 +2014,10 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 {
     check_variational("eval_taylor_map");
 
-    // Cache the number of variational arguments.
+    // Check the shape of s.
+    //
+    // NOTE: this check is redundant with the checks already performed by cfunc, but it provides better UX.
     const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
-
     if (s.extent(0) != nvargs) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Unable to compute the Taylor map: the input range of values has a "
                                                 "size of {}, but the number of variational arguments is {}",
@@ -2027,7 +2047,7 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
     assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto &tm_data = *m_i_data->m_tm_data;
-    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+    tm_data.m_tm_cfunc(tm_data.m_output, s, kw::pars = m_i_data->m_state);
 
     return tm_data.m_output;
 }

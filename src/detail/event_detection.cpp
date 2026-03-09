@@ -19,6 +19,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -941,13 +942,17 @@ ed_data<T>::ed_data() = default;
 template <typename T>
 ed_data<T>::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
                     std::uint32_t dim, const T &s0)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes)), m_state(std::move(s))
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes)),
+      m_jit_data(std::make_shared<ed_jit_data<T>>(ed_jit_data<T>{.m_state = std::move(s)}))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
 
+    auto &m_state = m_jit_data->m_state;
+
     // Fetch the scalar FP type.
-    // NOTE: s0 is the first value in the state vector of the integrator,
-    // from which the internal floating-point type is deduced.
+    //
+    // NOTE: s0 is the first value in the state vector of the integrator, from which the internal floating-point type is
+    // deduced.
     auto *fp_t = internal_llvm_type_like(m_state, s0);
 
     // NOTE: the numeric cast will also ensure that we can
@@ -987,25 +992,20 @@ ed_data<T>::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_eve
     m_state.compile();
 
     // Fetch the function pointers.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
+    m_jit_data->m_pt = reinterpret_cast<ed_jit_data<T>::pt_t>(m_state.jit_lookup("poly_translate_1"));
+    m_jit_data->m_rtscc = reinterpret_cast<ed_jit_data<T>::rtscc_t>(m_state.jit_lookup("poly_rtscc"));
+    m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(m_state.jit_lookup("fex_check"));
 }
 
 template <typename T>
 ed_data<T>::ed_data(const ed_data &o)
-    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state),
-      m_poly_cache(o.m_poly_cache)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns),
+      m_jit_data(o.m_jit_data), m_poly_cache(o.m_poly_cache)
 {
     // For the vectors of detected events, just reserve the same amount of space.
     // These vectors are cleared out anyway during event detection.
     m_d_tes.reserve(o.m_d_tes.capacity());
     m_d_ntes.reserve(o.m_d_ntes.capacity());
-
-    // Fetch the function pointers from the copied LLVM state.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
 
     // Reserve space in m_wlist and m_isol.
     m_wlist.reserve(o.m_wlist.capacity());
@@ -1022,7 +1022,7 @@ void ed_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_ntes;
     ar << m_ev_jet;
     ar << m_te_cooldowns;
-    ar << m_state;
+    ar << m_jit_data;
     ar << m_poly_cache;
 
     // Save the capacities of the vectors of detected events and
@@ -1040,7 +1040,7 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_ntes;
     ar >> m_ev_jet;
     ar >> m_te_cooldowns;
-    ar >> m_state;
+    ar >> m_jit_data;
     ar >> m_poly_cache;
 
     // Fetch the capacities.
@@ -1062,11 +1062,6 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     m_wlist.reserve(wlist_cap);
     m_isol.clear();
     m_isol.reserve(isol_cap);
-
-    // Fetch the function pointers from the LLVM state.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
 }
 
 // Implementation of event detection.
@@ -1120,6 +1115,11 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
 
     // Determine if we are integrating backwards in time.
     const std::uint32_t back_int = h < 0;
+
+    // Fetch the function pointers.
+    auto *m_fex_check = m_jit_data->m_fex_check;
+    auto *m_rtscc = m_jit_data->m_rtscc;
+    auto *m_pt = m_jit_data->m_pt;
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
@@ -1539,10 +1539,13 @@ ed_data_batch<T>::ed_data_batch() = default;
 template <typename T>
 ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
                                 std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes)), m_state(std::move(s))
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes)),
+      m_jit_data(std::make_shared<ed_jit_data<T>>(ed_jit_data<T>{.m_state = std::move(s)}))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
     assert(batch_size != 0u);                  // LCOV_EXCL_LINE
+
+    auto &m_state = m_jit_data->m_state;
 
     // Fetch the scalar FP type.
     auto *fp_t = to_external_llvm_type<T>(m_state.context());
@@ -1610,15 +1613,15 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     m_state.compile();
 
     // Fetch the function pointers.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
+    m_jit_data->m_pt = reinterpret_cast<ed_jit_data<T>::pt_t>(m_state.jit_lookup("poly_translate_1"));
+    m_jit_data->m_rtscc = reinterpret_cast<ed_jit_data<T>::rtscc_t>(m_state.jit_lookup("poly_rtscc"));
+    m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(m_state.jit_lookup("fex_check"));
 }
 
 template <typename T>
 ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps),
-      m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state), m_back_int(o.m_back_int),
+      m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data), m_back_int(o.m_back_int),
       m_fex_check_res(o.m_fex_check_res), m_poly_cache(o.m_poly_cache)
 {
     // Fetch the batch size.
@@ -1635,11 +1638,6 @@ ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_ntes[i].reserve(o.m_d_ntes[i].capacity());
     }
-
-    // Fetch the function pointers from the copied LLVM state.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
 
     // Reserve space in m_wlist and m_isol.
     m_wlist.reserve(o.m_wlist.capacity());
@@ -1658,7 +1656,7 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_max_abs_state;
     ar << m_g_eps;
     ar << m_te_cooldowns;
-    ar << m_state;
+    ar << m_jit_data;
     ar << m_back_int;
     ar << m_fex_check_res;
     ar << m_poly_cache;
@@ -1690,7 +1688,7 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_max_abs_state;
     ar >> m_g_eps;
     ar >> m_te_cooldowns;
-    ar >> m_state;
+    ar >> m_jit_data;
     ar >> m_back_int;
     ar >> m_fex_check_res;
     ar >> m_poly_cache;
@@ -1728,11 +1726,6 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     m_wlist.reserve(wlist_cap);
     m_isol.clear();
     m_isol.reserve(isol_cap);
-
-    // Fetch the function pointers from the LLVM state.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
 }
 
 // Implementation of event detection.
@@ -1762,6 +1755,11 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
     // The temporary polynomial used when extracting a specific batch element
     // from a polynomial of batches.
     taylor_pwrap<T> scal_poly(m_poly_cache, order, poly_init);
+
+    // Fetch the function pointers.
+    auto *m_fex_check = m_jit_data->m_fex_check;
+    auto *m_rtscc = m_jit_data->m_rtscc;
+    auto *m_pt = m_jit_data->m_pt;
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out_vec' is the vector of detected
