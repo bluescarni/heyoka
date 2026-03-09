@@ -461,7 +461,7 @@ private:
     HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
-    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
@@ -583,7 +583,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::size_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }
@@ -881,7 +881,7 @@ private:
     HEYOKA_DLL_LOCAL void assign_stepper(bool);
 
     // Input type for Taylor map computation.
-    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
@@ -1013,7 +1013,7 @@ public:
     const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        const tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::size_t>(std::ranges::size(r)));
 
         return eval_taylor_map_impl(s);
     }

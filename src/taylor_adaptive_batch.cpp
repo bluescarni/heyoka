@@ -75,10 +75,11 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
 }
 
 template <typename T>
-void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, std::uint32_t batch_size,
-                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
-                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                                  std::vector<nt_event_t> ntes, bool parallel_mode, bool parjit)
+void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, const std::uint32_t batch_size,
+                                                  std::vector<T> time, std::optional<T> tol, const bool high_accuracy,
+                                                  const bool compact_mode, std::vector<T> pars,
+                                                  std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                                  const bool parallel_mode, const bool parjit)
 {
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -417,7 +418,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     }
 
     if (is_variational) {
-        m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, m_batch_size);
+        m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, m_batch_size,
+                                                         high_accuracy, compact_mode, parjit);
     }
 
     // Move vsys in.
@@ -2437,7 +2439,33 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto &tm_data = *m_i_data->m_tm_data;
-    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+
+    // Reshape the 1D data into 2D mdspans for cfunc's multi_eval interface.
+    //
+    // NOTE: we need to ensure that the extents and their products are representable as std::size_t, otherwise the
+    // mdspan construction would be UB.
+    using safe_size_t = boost::safe_numerics::safe<std::size_t>;
+    const auto bs = safe_size_t(batch_size);
+    const auto nouts = safe_size_t(get_n_orig_sv());
+    const auto nv = safe_size_t(nvargs);
+    const auto np = safe_size_t(m_i_data->m_dim);
+
+    (void)static_cast<std::size_t>(nouts * bs);
+    (void)static_cast<std::size_t>(nv * bs);
+    (void)static_cast<std::size_t>(np * bs);
+
+    using out_2d = typename cfunc<T>::out_2d;
+    using in_2d = typename cfunc<T>::in_2d;
+
+    out_2d out(tm_data.m_output.data(), static_cast<std::size_t>(nouts), static_cast<std::size_t>(bs));
+    in_2d in(s.data_handle(), static_cast<std::size_t>(nv), static_cast<std::size_t>(bs));
+    in_2d pars(m_i_data->m_state.data(), static_cast<std::size_t>(np), static_cast<std::size_t>(bs));
+
+    // NOTE: disable batch parallelism. cfunc parallelises over the batch size, which, in typical usages of the batch
+    // integrator, will be the same native SIMD size used by default in cfunc. As a consequence, no parallelisation is
+    // possible, and explicitly disabling it increases performance by avoiding the parallelisation heuristic and the
+    // overhead of the TBB scheduling system.
+    tm_data.m_tm_cfunc(out, in, kw::pars = pars, kw::batch_parallel = false);
 
     return tm_data.m_output;
 }

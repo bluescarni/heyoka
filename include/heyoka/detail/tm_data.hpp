@@ -19,6 +19,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/var_ode_sys.hpp>
@@ -31,14 +32,14 @@ namespace detail
 // Data for Taylor map computation.
 template <typename T>
 struct tm_data {
-    using tm_func_t = void (*)(T *, const T *, const T *) noexcept;
-    llvm_state m_state;
-    tm_func_t m_tm_func{};
+    // Compiled function for the evaluation of the Taylor map.
+    cfunc<T> m_tm_cfunc;
+    // Buffer storing the result of the evaluation of the Taylor map.
     std::vector<T> m_output;
 
     // NOTE: this is used only for serialisation.
     tm_data();
-    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
+    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t, bool, bool, bool);
     tm_data(const tm_data &);
     tm_data(tm_data &&) noexcept = delete;
     tm_data &operator=(const tm_data &) = delete;

@@ -8,7 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -21,15 +20,7 @@
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
+#include <fmt/core.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -43,13 +34,13 @@
 
 #endif
 
-#include <heyoka/detail/llvm_func_create.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/tm_data.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
+#include <heyoka/math/prod.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/var_ode_sys.hpp>
 
@@ -107,77 +98,21 @@ mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
 
 #endif
 
-// Non-compact mode implementation of the function for the evaluation
-// of the Taylor map.
+// Function to formulate the expressions for the evaluation of the Taylor map in a variational integrator.
+//
+// The first element of the return value are the expressions evaluating the Taylor map for each original state variable.
+// The second element of the return value are the inputs, that is, the variations in initial conditions / parameters /
+// initial time. The evaluation of the Taylor map requires also the values of the derivatives of the original state
+// variables, which are passed in via the array of parameters. The indexing into the array of parameters mirrors the
+// indexing into the 'dt' object - that is, the first par[0], par[1], ..., par[n_orig_sv - 1] parameters contain the
+// values of the state variables, followed by the order-1 derivatives, and so on.
+//
+// NOTE: this needs to be templated on T due to the necessity of computing the compile-time factorial. Perhaps at one
+// point we can have a dedicated constant-like factorial func that would allow us to make this a non-template function.
 template <typename T>
-void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_ode_sys &sys, const dtens &dt,
-                         std::uint32_t batch_size)
+std::pair<std::vector<expression>, std::vector<expression>>
+tm_data_create_tm_expr(const var_ode_sys &sys, const dtens &dt, const long long prec)
 {
-    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
-
-    auto &builder = st.builder();
-    auto &context = st.context();
-    auto &md = st.module();
-
-    // Fetch the internal and external floating-point types.
-    assert(!state.empty()); // LCOV_EXCL_LINE
-    // NOTE: 'state' has been set up with the correct precision
-    // in the ctor.
-    auto *fp_t = detail::internal_llvm_type_like(st, state[0]);
-    auto *ext_fp_t = detail::to_external_llvm_type<T>(context);
-    auto *ext_ptr_t = llvm::PointerType::getUnqual(context);
-
-    // Cache the precision.
-    const auto prec = [&]() -> long long {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::same_as<T, mppp::real>) {
-            return static_cast<long long>(state[0].get_prec());
-        } else {
-#endif
-            return 0;
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
-    }();
-
-    // The function arguments:
-    // - the output pointer (write-only),
-    // - the input pointer (read-only),
-    // - the pointer to the state vector (read-only).
-    // All pointers are external. There might be overlap between input,
-    // output and state vector pointers.
-    const std::vector<llvm::Type *> fargs(3u, ext_ptr_t);
-
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-
-    // Now create the function.
-    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, "tm_func", &md);
-    // NOTE: a Taylor map eval function cannot call itself.
-    f->addFnAttr(llvm::Attribute::NoRecurse);
-
-    // Set the names/attributes of the function arguments.
-    auto *out_ptr = f->args().begin();
-    out_ptr->setName("out_ptr");
-    llvm_add_no_capture_argattr(st, out_ptr);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    auto *in_ptr = out_ptr + 1;
-    in_ptr->setName("in_ptr");
-    llvm_add_no_capture_argattr(st, in_ptr);
-    in_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto *state_ptr = out_ptr + 2;
-    state_ptr->setName("state_ptr");
-    llvm_add_no_capture_argattr(st, state_ptr);
-    state_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
     // Cache the number of variational arguments. This is the number of input arguments.
     using vargs_size_t = decltype(sys.get_vargs().size());
     const auto nvargs = sys.get_vargs().size();
@@ -190,47 +125,45 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     const auto n_orig_sv = sys.get_n_orig_sv();
     assert(n_orig_sv > 0u); // LCOV_EXCL_LINE
 
-    // NOTE: there is a lot of literature about efficient multivariate polynomial evaluation.
-    // Here we are adopting the simple approach of proceeding order by order and iteratively
-    // building up the powers of the input variables by repeated multiplications. If necessary
-    // we can look into more optimised (and more complicated) ways of doing this, such as
-    // multivariate Horner schemes.
+    // NOTE: there is a lot of literature about efficient multivariate polynomial evaluation. Here we are adopting the
+    // simple approach of proceeding order by order and iteratively building up the powers of the input variables by
+    // repeated multiplications. If necessary we can look into more optimised (and more complicated) ways of doing this,
+    // such as multivariate Horner schemes.
 
-    // Create the table of powers of the input values and init
-    // it with the order-1 powers (i.e., the original input values).
-    // NOTE: this will end up being a table with nvargs rows and
-    // order columns. Each row will contains the natural powers
-    // of an input value from 1 up to order.
-    std::vector<std::vector<llvm::Value *>> in_pows;
+    // Create the table of powers of the input values and init it with the order-1 powers (i.e., the original input
+    // values).
+    //
+    // NOTE: this will end up being a table with nvargs rows and order columns. Each row will contains the
+    // natural powers of an input value from 1 up to order.
+    std::vector<std::vector<expression>> in_pows;
     in_pows.resize(boost::numeric_cast<decltype(in_pows.size())>(nvargs));
+    // NOTE: create the vector of inputs at the same time.
+    std::vector<expression> inputs;
+    inputs.reserve(nvargs);
     for (vargs_size_t i = 0; i < nvargs; ++i) {
-        // NOTE: we do not store the order-0 powers explicitly (as they are just 1s).
-        // Thus, we reserve only order and not order + 1.
+        // NOTE: we do not store the order-0 powers explicitly (as they are just 1s). Thus, we reserve only order and
+        // not order + 1.
         in_pows[i].reserve(order);
 
-        // Compute the pointer to load the inputs from.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.getInt32(su32_t(i) * batch_size));
+        // Add the order-1 power of the input value.
+        in_pows[i].emplace_back(fmt::format("delta_{}", i));
 
-        // Load the value.
-        in_pows[i].push_back(ext_load_vector_from_memory(st, fp_t, ptr, batch_size));
+        // Store the input value.
+        inputs.push_back(in_pows[i].back());
     }
 
-    // Create the table of Taylor series terms for the state variables.
-    // This will end up being a table with n_orig_sv rows and order + 1
-    // columns. Each row will contain, order by order, the terms of the Taylor
-    // series for each state variable.
-    std::vector<std::vector<llvm::Value *>> t_terms;
+    // Create the table of Taylor series terms for the state variables. This will end up being a table with n_orig_sv
+    // rows and order + 1 columns. Each row will contain, order by order, the terms of the Taylor series for each state
+    // variable.
+    std::vector<std::vector<expression>> t_terms;
     t_terms.resize(boost::numeric_cast<decltype(t_terms.size())>(n_orig_sv));
     // Fill-in the order-0 terms (that is, the current values of the state variables).
     for (std::uint32_t i = 0; i < n_orig_sv; ++i) {
         // NOTE: overflow checking was done in the ctor.
         t_terms[i].reserve(order + 1u);
 
-        // Compute the pointer to load from.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, state_ptr, builder.getInt32(su32_t(i) * batch_size));
-
-        // Load the value.
-        t_terms[i].push_back(ext_load_vector_from_memory(st, fp_t, ptr, batch_size));
+        // NOTE: the first n_orig_sv params are the current values of the state variables.
+        t_terms[i].push_back(par[i]);
     }
 
     // Build up the Taylor series terms order by order.
@@ -238,8 +171,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
         // For orders higher than 1 we need to update the table of powers.
         if (cur_order > 1u) {
             for (auto &cur_in_pow : in_pows) {
-                auto *next_pow = llvm_fmul(st, cur_in_pow[0], cur_in_pow.back());
-                cur_in_pow.push_back(next_pow);
+                cur_in_pow.push_back(cur_in_pow[0] * cur_in_pow.back());
             }
         }
 
@@ -249,10 +181,9 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
             const auto mrng = dt.get_derivatives(sv_idx, cur_order);
             assert(!mrng.empty()); // LCOV_EXCL_LINE
 
-            // Iterate over the subrange and compute the Taylor series terms
-            // for the current state variable and order. The terms will be stored
-            // in 'terms'.
-            std::vector<llvm::Value *> terms;
+            // Iterate over the subrange and compute the Taylor series terms for the current state variable and order.
+            // The terms will be stored in 'terms'.
+            std::vector<expression> terms;
             terms.reserve(std::ranges::size(mrng));
             for (auto m_it = mrng.begin(); m_it != mrng.end(); ++m_it) {
                 const auto &[key, ex] = *m_it;
@@ -261,12 +192,11 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
                 assert(comp == sv_idx); // LCOV_EXCL_LINE
                 assert(!sv.empty());    // LCOV_EXCL_LINE
 
-                // Iterate over sv to compute the divisor and the product
-                // of input powers.
+                // Iterate over sv to compute the divisor and the product of input powers.
                 auto div = factorial<T>(sv[0].second, prec);
                 assert(sv[0].first < in_pows.size());                    // LCOV_EXCL_LINE
                 assert(sv[0].second - 1u < in_pows[sv[0].first].size()); // LCOV_EXCL_LINE
-                std::vector<llvm::Value *> prod_terms{in_pows[sv[0].first][sv[0].second - 1u]};
+                std::vector<expression> prod_terms{in_pows[sv[0].first][sv[0].second - 1u]};
 
                 for (auto it = sv.begin() + 1; it != sv.end(); ++it) {
                     div *= factorial<T>(it->second, prec);
@@ -284,58 +214,53 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
 #endif
 
                 // Compute the current term of the Taylor series and add it to terms.
-                auto *prod = pairwise_prod(st, prod_terms);
+                auto prod = heyoka::prod(std::move(prod_terms));
 
                 // Multiply by the value of the derivative.
+                //
+                // NOTE: the indexing into the parameters array mirrors the indexing of derivatives in dt.
                 const auto didx = dt.index_of(m_it);
-                auto *dptr
-                    = builder.CreateInBoundsGEP(ext_fp_t, state_ptr, builder.getInt32(su32_t(didx) * batch_size));
-                auto *dval = ext_load_vector_from_memory(st, fp_t, dptr, batch_size);
-                prod = llvm_fmul(st, prod, dval);
+                prod *= par[boost::numeric_cast<std::uint32_t>(didx)];
 
                 // NOTE: avoid doing the division if not necessary.
                 if (div == 1) {
                     terms.push_back(prod);
                 } else {
-                    auto *div_splat = vector_splat(builder, llvm_codegen(st, fp_t, number{std::move(div)}), batch_size);
-                    terms.push_back(llvm_fdiv(st, prod, div_splat));
+                    terms.push_back(prod / div);
                 }
             }
 
-            // Sum the components in terms and add the result to t_terms.
+            // Sum the components in 'terms' and add the result to t_terms.
             assert(sv_idx < t_terms.size()); // LCOV_EXCL_LINE
-            t_terms[sv_idx].push_back(pairwise_sum(st, terms));
+            t_terms[sv_idx].push_back(sum(std::move(terms)));
         }
     }
 
-    // Compute and write out the result.
+    // Compute and write out the outputs.
+    std::vector<expression> outs;
+    outs.reserve(n_orig_sv);
     for (std::uint32_t i = 0; i < n_orig_sv; ++i) {
-        // Compute the pointer to store the result to.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(su32_t(i) * batch_size));
-
-        // Sum the Taylor series terms.
-        auto *ret = pairwise_sum(st, t_terms[i]);
-
-        // Store it.
-        ext_store_vector_to_memory(st, ptr, ret);
+        // Sum the Taylor series terms and append the result to outs.
+        outs.push_back(sum(std::move(t_terms[i])));
     }
 
-    // Create the return value.
-    builder.CreateRetVoid();
+    return std::make_pair(std::move(outs), std::move(inputs));
 }
 
 } // namespace
 
 template <typename T>
-tm_data<T>::tm_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, const llvm_state &orig_s,
-                    std::uint32_t batch_size)
+tm_data<T>::tm_data(const var_ode_sys &sys, const long long prec, const llvm_state &tplt,
+                    const std::uint32_t batch_size, const bool high_accuracy, const bool compact_mode,
+                    const bool parjit)
 {
     // Fetch the dtens from sys.
     const auto &dt = sys.get_dtens();
 
     // Overflow check.
-    // NOTE: as usual with polynomials, we need to be able to compute order + 1
-    // without overflowing.
+    //
+    // NOTE: as usual with polynomials, we need to be able to compute order + 1 without overflowing.
+    //
     // LCOV_EXCL_START
     if (dt.get_order() == std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
         throw std::overflow_error(
@@ -358,27 +283,29 @@ tm_data<T>::tm_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, con
     }
 #endif
 
-    // Create a new llvm state similar to orig_s.
-    auto st = orig_s.make_similar();
+    // Create the Taylor map expressions.
+    auto [tm_outs, tm_ins] = tm_data_create_tm_expr<T>(sys, dt, prec);
 
-    // Add the Taylor map function.
-    add_tm_func_nc_mode(st, m_output, sys, dt, batch_size);
-
-    // Compile.
-    st.compile();
-
-    // Fetch the function.
-    m_tm_func = reinterpret_cast<tm_func_t>(st.jit_lookup("tm_func"));
-
-    // Move in the state.
-    m_state = std::move(st);
+    // Create the Taylor map cfunc.
+    //
+    // NOTE: we are ignoring the parallel_mode kwarg even if in principle we should forward it from the parallel_mode
+    // setting of the Taylor integrator. The reason is that we are not implementing parallel_mode yet in cfunc, and we
+    // do not want the cfunc constructor to error out if parallel_mode is passed down from the integrator.
+    //
+    // NOTE: we set the cfunc kwarg check_prec to false because we are checking the precision of the input
+    // multiprecision arguments in the Taylor integrators code.
+    m_tm_cfunc = cfunc<T>{std::move(tm_outs), std::move(tm_ins),
+                          // cfunc-specific kwargs.
+                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec,
+                          kw::check_prec = false, kw::parjit = parjit,
+                          // llvm_state-specific kwargs.
+                          kw::opt_level = tplt.get_opt_level(), kw::fast_math = tplt.fast_math(),
+                          kw::force_avx512 = tplt.force_avx512(), kw::slp_vectorize = tplt.get_slp_vectorize(),
+                          kw::code_model = tplt.get_code_model()};
 }
 
 template <typename T>
-tm_data<T>::tm_data(const tm_data &other) : m_state(other.m_state), m_output(other.m_output)
-{
-    m_tm_func = reinterpret_cast<tm_func_t>(m_state.jit_lookup("tm_func"));
-}
+tm_data<T>::tm_data(const tm_data &) = default;
 
 template <typename T>
 tm_data<T>::~tm_data() = default;
@@ -386,17 +313,15 @@ tm_data<T>::~tm_data() = default;
 template <typename T>
 void tm_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
-    ar << m_state;
+    ar << m_tm_cfunc;
     ar << m_output;
 }
 
 template <typename T>
 void tm_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
-    ar >> m_state;
+    ar >> m_tm_cfunc;
     ar >> m_output;
-
-    m_tm_func = reinterpret_cast<tm_func_t>(m_state.jit_lookup("tm_func"));
 }
 
 // Explicit instantiations.

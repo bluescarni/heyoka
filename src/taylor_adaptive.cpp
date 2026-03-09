@@ -175,10 +175,10 @@ taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std
 template <typename T>
 void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                            std::optional<T> time, std::optional<T> tol, bool high_accuracy,
-                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                            std::vector<nt_event_t> ntes, bool parallel_mode,
-                                            [[maybe_unused]] std::optional<long long> prec, bool parjit)
+                                            std::optional<T> time, std::optional<T> tol, const bool high_accuracy,
+                                            const bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+                                            std::vector<nt_event_t> ntes, const bool parallel_mode,
+                                            [[maybe_unused]] std::optional<long long> prec, const bool parjit)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
@@ -570,11 +570,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     if (is_variational) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys),
-                                                             static_cast<long long>(this->get_prec()), m_tplt_state, 1);
+            m_tm_data
+                = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), static_cast<long long>(this->get_prec()),
+                                                       m_tplt_state, 1, high_accuracy, compact_mode, parjit);
         } else {
 #endif
-            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1);
+            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1, high_accuracy,
+                                                             compact_mode, parjit);
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -2012,9 +2014,10 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 {
     check_variational("eval_taylor_map");
 
-    // Cache the number of variational arguments.
+    // Check the shape of s.
+    //
+    // NOTE: this check is redundant with the checks already performed by cfunc, but it provides better UX.
     const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
-
     if (s.extent(0) != nvargs) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Unable to compute the Taylor map: the input range of values has a "
                                                 "size of {}, but the number of variational arguments is {}",
@@ -2044,7 +2047,7 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
     assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     auto &tm_data = *m_i_data->m_tm_data;
-    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+    tm_data.m_tm_cfunc(tm_data.m_output, s, kw::pars = m_i_data->m_state);
 
     return tm_data.m_output;
 }
