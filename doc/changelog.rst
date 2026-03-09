@@ -13,6 +13,14 @@ New
 Changes
 ~~~~~~~
 
+- Copying Taylor integrators now results in shallow copies of the internal
+  JIT-compiled code, rather than in (unnecessary) deep copies
+  (`#532 <https://github.com/bluescarni/heyoka/pull/532>`__,
+  `#530 <https://github.com/bluescarni/heyoka/pull/530>`__).
+- When injecting symbols from the C++ runtime into the JIT states,
+  make sure to employ ``RTLD_LOCAL`` (where supported) rather than
+  ``RTLD_GLOBAL``. This should improve resilience against symbol collisions
+  (`#531 <https://github.com/bluescarni/heyoka/pull/531>`__).
 - The Taylor integrators now default-construct into the invalid state
   (`#530 <https://github.com/bluescarni/heyoka/pull/530>`__).
 
