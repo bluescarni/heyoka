@@ -55,8 +55,8 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
-#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -130,10 +130,10 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
 #if !defined(NDEBUG)
 
-    // The data in tm_data is supposed to be set up correctly once and for all.
+    // The data in vsys_data is supposed to be set up correctly once and for all.
     if (dthis->is_variational()) {
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        assert(std::ranges::all_of(dthis->m_i_data->m_tm_data->m_output,
+        assert(std::ranges::all_of(dthis->m_i_data->m_vsys_data->m_tm_output,
                                    [prec](const auto &x) { return x.get_prec() == prec; }));
     }
 
@@ -195,7 +195,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
@@ -570,13 +570,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     if (is_variational) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tm_data
-                = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), static_cast<long long>(this->get_prec()),
-                                                       m_tplt_state, 1, high_accuracy, compact_mode, parjit);
+            m_vsys_data
+                = std::make_unique<detail::vsys_data<T>>(std::get<1>(vsys), static_cast<long long>(this->get_prec()),
+                                                         m_tplt_state, 1, high_accuracy, compact_mode, parjit);
         } else {
 #endif
-            m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1, high_accuracy,
-                                                             compact_mode, parjit);
+            m_vsys_data = std::make_unique<detail::vsys_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1, high_accuracy,
+                                                                 compact_mode, parjit);
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
@@ -2044,12 +2044,12 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 #endif
 
     // Run the compiled function.
-    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    assert(m_i_data->m_vsys_data); // LCOV_EXCL_LINE
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto &tm_data = *m_i_data->m_tm_data;
-    tm_data.m_tm_cfunc(tm_data.m_output, s, kw::pars = m_i_data->m_state);
+    auto &vsys_data = *m_i_data->m_vsys_data;
+    vsys_data.m_tm_cfunc(vsys_data.m_tm_output, s, kw::pars = m_i_data->m_state);
 
-    return tm_data.m_output;
+    return vsys_data.m_tm_output;
 }
 
 template <typename T>
@@ -2064,7 +2064,7 @@ const std::vector<T> &taylor_adaptive<T>::get_tstate() const
     check_variational(__func__);
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    return m_i_data->m_tm_data->m_output;
+    return m_i_data->m_vsys_data->m_tm_output;
 }
 
 template <typename T>

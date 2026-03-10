@@ -34,8 +34,8 @@
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
-#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
+#include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -146,7 +146,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_last_h;
     ar << m_d_out;
     ar << m_vsys;
-    ar << m_tm_data;
+    ar << m_vsys_data;
     ar << m_ed_data;
 }
 
@@ -169,7 +169,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_last_h;
     ar >> m_d_out;
     ar >> m_vsys;
-    ar >> m_tm_data;
+    ar >> m_vsys_data;
     ar >> m_ed_data;
 
     // Reconstruct the compact mode tape, if necessary.
@@ -198,7 +198,7 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
       m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
-      m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
+      m_vsys_data(other.m_vsys_data ? std::make_unique<detail::vsys_data<T>>(*other.m_vsys_data) : nullptr),
       m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data<T>>(*other.m_ed_data) : nullptr)
 {
     // Init the compact mode tape, if necessary.
@@ -269,7 +269,7 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
     ar << m_nf_detected;
     ar << m_d_out_time;
     ar << m_vsys;
-    ar << m_tm_data;
+    ar << m_vsys_data;
     ar << m_ed_data;
 }
 
@@ -310,7 +310,7 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_nf_detected;
     ar >> m_d_out_time;
     ar >> m_vsys;
-    ar >> m_tm_data;
+    ar >> m_vsys_data;
     ar >> m_ed_data;
 
     // Reconstruct the compact mode tape, if necessary.
@@ -344,7 +344,7 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time), m_vsys(other.m_vsys),
-      m_tm_data(other.m_tm_data ? std::make_unique<detail::tm_data<T>>(*other.m_tm_data) : nullptr),
+      m_vsys_data(other.m_vsys_data ? std::make_unique<detail::vsys_data<T>>(*other.m_vsys_data) : nullptr),
       m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data_batch<T>>(*other.m_ed_data) : nullptr)
 {
     // Init the compact mode tape, if necessary.

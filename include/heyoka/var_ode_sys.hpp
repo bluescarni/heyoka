@@ -34,7 +34,7 @@ enum class var_args : unsigned { vars = 0b001, params = 0b010, time = 0b100, all
 class HEYOKA_DLL_PUBLIC var_ode_sys
 {
     template <typename>
-    friend struct detail::tm_data;
+    friend struct detail::vsys_data;
 
     template <typename>
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;

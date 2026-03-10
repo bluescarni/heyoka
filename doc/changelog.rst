@@ -24,6 +24,14 @@ Changes
 - The Taylor integrators now default-construct into the invalid state
   (`#530 <https://github.com/bluescarni/heyoka/pull/530>`__).
 
+Fix
+~~~
+
+- Fix excessively long compile times for large variational integrators (e.g., neural ODEs).
+  The slowness was due to the JIT-compiled code for Taylor map evaluation not employing
+  compact mode
+  (`#532 <https://github.com/bluescarni/heyoka/pull/532>`__).
+
 7.9.1 (2026-02-12)
 ------------------
 

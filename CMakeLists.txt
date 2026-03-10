@@ -190,7 +190,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sub.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vector_math.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsys_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ta_jit_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ed_jit_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
