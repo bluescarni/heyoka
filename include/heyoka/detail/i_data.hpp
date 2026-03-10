@@ -37,9 +37,6 @@ namespace detail
 
 // Fwd-declarations.
 template <typename>
-struct tm_data;
-
-template <typename>
 struct ed_data;
 
 template <typename>
@@ -89,8 +86,8 @@ struct taylor_adaptive<T>::i_data {
     std::vector<T> m_d_out;
     // The ODE sys.
     sys_t m_vsys;
-    // Taylor map data.
-    std::unique_ptr<detail::tm_data<T>> m_tm_data;
+    // Variational data.
+    std::unique_ptr<detail::vsys_data<T>> m_vsys_data;
     // Event detection data.
     std::unique_ptr<detail::ed_data<T>> m_ed_data;
 
@@ -179,8 +176,8 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<T> m_d_out_time;
     // The ODE sys.
     sys_t m_vsys;
-    // Taylor map data.
-    std::unique_ptr<detail::tm_data<T>> m_tm_data;
+    // Variational data.
+    std::unique_ptr<detail::vsys_data<T>> m_vsys_data;
     // Event detection data.
     std::unique_ptr<detail::ed_data_batch<T>> m_ed_data;
 

@@ -66,7 +66,7 @@ namespace detail
 {
 
 template <typename>
-struct tm_data;
+struct vsys_data;
 
 } // namespace detail
 

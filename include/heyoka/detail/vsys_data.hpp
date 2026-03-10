@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_TM_DATA_HPP
-#define HEYOKA_DETAIL_TM_DATA_HPP
+#ifndef HEYOKA_DETAIL_VSYS_DATA_HPP
+#define HEYOKA_DETAIL_VSYS_DATA_HPP
 
 #if !defined(HEYOKA_BUILD_LIBRARY)
 
@@ -29,22 +29,22 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Data for Taylor map computation.
+// Struct encapsulating data pertaining variational systems in Taylor integrators.
 template <typename T>
-struct tm_data {
+struct vsys_data {
     // Compiled function for the evaluation of the Taylor map.
     cfunc<T> m_tm_cfunc;
     // Buffer storing the result of the evaluation of the Taylor map.
-    std::vector<T> m_output;
+    std::vector<T> m_tm_output;
 
     // NOTE: this is used only for serialisation.
-    tm_data();
-    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t, bool, bool, bool);
-    tm_data(const tm_data &);
-    tm_data(tm_data &&) noexcept = delete;
-    tm_data &operator=(const tm_data &) = delete;
-    tm_data &operator=(tm_data &&) noexcept = delete;
-    ~tm_data();
+    vsys_data();
+    explicit vsys_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t, bool, bool, bool);
+    vsys_data(const vsys_data &);
+    vsys_data(vsys_data &&) noexcept = delete;
+    vsys_data &operator=(const vsys_data &) = delete;
+    vsys_data &operator=(vsys_data &&) noexcept = delete;
+    ~vsys_data();
 
     // Serialisation.
     void save(boost::archive::binary_oarchive &, unsigned) const;

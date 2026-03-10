@@ -35,7 +35,7 @@
 #endif
 
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/tm_data.hpp>
+#include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -50,7 +50,7 @@ namespace detail
 {
 
 template <typename T>
-tm_data<T>::tm_data() = default;
+vsys_data<T>::vsys_data() = default;
 
 namespace
 {
@@ -111,7 +111,7 @@ mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
 // point we can have a dedicated constant-like factorial func that would allow us to make this a non-template function.
 template <typename T>
 std::pair<std::vector<expression>, std::vector<expression>>
-tm_data_create_tm_expr(const var_ode_sys &sys, const dtens &dt, const long long prec)
+vsys_data_create_tm_expr(const var_ode_sys &sys, const dtens &dt, const long long prec)
 {
     // Cache the number of variational arguments. This is the number of input arguments.
     using vargs_size_t = decltype(sys.get_vargs().size());
@@ -250,9 +250,9 @@ tm_data_create_tm_expr(const var_ode_sys &sys, const dtens &dt, const long long 
 } // namespace
 
 template <typename T>
-tm_data<T>::tm_data(const var_ode_sys &sys, const long long prec, const llvm_state &tplt,
-                    const std::uint32_t batch_size, const bool high_accuracy, const bool compact_mode,
-                    const bool parjit)
+vsys_data<T>::vsys_data(const var_ode_sys &sys, const long long prec, const llvm_state &tplt,
+                        const std::uint32_t batch_size, const bool high_accuracy, const bool compact_mode,
+                        const bool parjit)
 {
     // Fetch the dtens from sys.
     const auto &dt = sys.get_dtens();
@@ -268,23 +268,23 @@ tm_data<T>::tm_data(const var_ode_sys &sys, const long long prec, const llvm_sta
     }
     // LCOV_EXCL_STOP
 
-    // Prepare m_output.
+    // Prepare m_tm_output.
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::same_as<mppp::real, T>) {
-        m_output.resize(boost::safe_numerics::safe<decltype(m_output.size())>(sys.get_n_orig_sv()) * batch_size,
-                        // NOTE: static cast is fine here, the precision value has
-                        // already been validated.
-                        mppp::real{mppp::real_kind::zero, static_cast<mpfr_prec_t>(prec)});
+        m_tm_output.resize(boost::safe_numerics::safe<decltype(m_tm_output.size())>(sys.get_n_orig_sv()) * batch_size,
+                           // NOTE: static cast is fine here, the precision value has
+                           // already been validated.
+                           mppp::real{mppp::real_kind::zero, static_cast<mpfr_prec_t>(prec)});
     } else {
 #endif
-        m_output.resize(boost::safe_numerics::safe<decltype(m_output.size())>(sys.get_n_orig_sv()) * batch_size,
-                        static_cast<T>(0));
+        m_tm_output.resize(boost::safe_numerics::safe<decltype(m_tm_output.size())>(sys.get_n_orig_sv()) * batch_size,
+                           static_cast<T>(0));
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
 
     // Create the Taylor map expressions.
-    auto [tm_outs, tm_ins] = tm_data_create_tm_expr<T>(sys, dt, prec);
+    auto [tm_outs, tm_ins] = vsys_data_create_tm_expr<T>(sys, dt, prec);
 
     // Create the Taylor map cfunc.
     //
@@ -305,39 +305,39 @@ tm_data<T>::tm_data(const var_ode_sys &sys, const long long prec, const llvm_sta
 }
 
 template <typename T>
-tm_data<T>::tm_data(const tm_data &) = default;
+vsys_data<T>::vsys_data(const vsys_data &) = default;
 
 template <typename T>
-tm_data<T>::~tm_data() = default;
+vsys_data<T>::~vsys_data() = default;
 
 template <typename T>
-void tm_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
+void vsys_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_tm_cfunc;
-    ar << m_output;
+    ar << m_tm_output;
 }
 
 template <typename T>
-void tm_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+void vsys_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_tm_cfunc;
-    ar >> m_output;
+    ar >> m_tm_output;
 }
 
 // Explicit instantiations.
-template struct tm_data<float>;
-template struct tm_data<double>;
-template struct tm_data<long double>;
+template struct vsys_data<float>;
+template struct vsys_data<double>;
+template struct vsys_data<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template struct tm_data<mppp::real128>;
+template struct vsys_data<mppp::real128>;
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template struct tm_data<mppp::real>;
+template struct vsys_data<mppp::real>;
 
 #endif
 

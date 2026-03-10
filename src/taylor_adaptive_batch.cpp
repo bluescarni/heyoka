@@ -51,8 +51,8 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
-#include <heyoka/detail/tm_data.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -141,7 +141,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tape_sa);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
@@ -418,8 +418,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     }
 
     if (is_variational) {
-        m_tm_data = std::make_unique<detail::tm_data<T>>(std::get<1>(vsys), 0, m_tplt_state, m_batch_size,
-                                                         high_accuracy, compact_mode, parjit);
+        m_vsys_data = std::make_unique<detail::vsys_data<T>>(std::get<1>(vsys), 0, m_tplt_state, m_batch_size,
+                                                             high_accuracy, compact_mode, parjit);
     }
 
     // Move vsys in.
@@ -2436,9 +2436,9 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     }
 
     // Run the compiled function.
-    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    assert(m_i_data->m_vsys_data); // LCOV_EXCL_LINE
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto &tm_data = *m_i_data->m_tm_data;
+    auto &vsys_data = *m_i_data->m_vsys_data;
 
     // Reshape the 1D data into 2D mdspans for cfunc's multi_eval interface.
     //
@@ -2457,7 +2457,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     using out_2d = cfunc<T>::out_2d;
     using in_2d = cfunc<T>::in_2d;
 
-    const out_2d out(tm_data.m_output.data(), static_cast<std::size_t>(nouts), static_cast<std::size_t>(bs));
+    const out_2d out(vsys_data.m_tm_output.data(), static_cast<std::size_t>(nouts), static_cast<std::size_t>(bs));
     const in_2d in(s.data_handle(), static_cast<std::size_t>(nv), static_cast<std::size_t>(bs));
     const in_2d pars(m_i_data->m_state.data(), static_cast<std::size_t>(np), static_cast<std::size_t>(bs));
 
@@ -2465,9 +2465,9 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     // integrator, will be the same native SIMD size used by default in cfunc. As a consequence, no parallelisation is
     // possible, and explicitly disabling it increases performance by avoiding the parallelisation heuristic and the
     // overhead of the TBB scheduling system.
-    tm_data.m_tm_cfunc(out, in, kw::pars = pars, kw::batch_parallel = false);
+    vsys_data.m_tm_cfunc(out, in, kw::pars = pars, kw::batch_parallel = false);
 
-    return tm_data.m_output;
+    return vsys_data.m_tm_output;
 }
 
 template <typename T>
@@ -2482,7 +2482,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
     check_variational(__func__);
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    return m_i_data->m_tm_data->m_output;
+    return m_i_data->m_vsys_data->m_tm_output;
 }
 
 template <typename T>
