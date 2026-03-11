@@ -27,26 +27,21 @@
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/llvm_state.hpp>
 
-// This in-memory cache maps the bitcode
-// of one or more LLVM modules and an integer flag
-// (representing several compilation settings) to:
+// This in-memory cache maps the bitcode of one or more LLVM modules and an integer flag (representing several
+// compilation settings) to:
 //
 // - the optimised version of the bitcode,
-// - the textual IR corresponding
-//   to the optimised bitcode,
+// - the textual IR corresponding to the optimised bitcode,
 // - the object code of the optimised bitcode.
 //
-// The cache invalidation policy is LRU, implemented
-// by pairing a linked list to an unordered_map.
+// The cache invalidation policy is LRU, implemented by pairing a linked list to an unordered_map.
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-// Helper to compute the total size in bytes
-// of the data contained in an llvm_mc_value.
-// Will throw on overflow.
+// Helper to compute the total size in bytes of the data contained in an llvm_mc_value. Will throw on overflow.
 std::size_t llvm_mc_value::total_size() const
 {
     assert(!opt_bc.empty());
@@ -68,7 +63,9 @@ namespace
 {
 
 // Global mutex for thread-safe operations.
+//
 // NOTE: std::mutex constructor not constexpr on MinGW:
+//
 // https://github.com/bluescarni/heyoka/issues/403
 #if !defined(__MINGW32__)
 HEYOKA_CONSTINIT
@@ -81,8 +78,7 @@ using lru_queue_t = std::list<std::pair<std::vector<std::string>, unsigned>>;
 
 using lru_key_t = lru_queue_t::iterator;
 
-// Implementation of hashing for std::pair<std::vector<std::string>, unsigned> and
-// its heterogeneous counterpart.
+// Implementation of hashing for std::pair<std::vector<std::string>, unsigned> and its heterogeneous counterpart.
 template <typename T>
 auto cache_key_hasher(const T &k) noexcept
 {
@@ -118,6 +114,7 @@ struct lru_cmp {
 using lru_map_t = boost::unordered_map<lru_key_t, llvm_mc_value, lru_hasher, lru_cmp>;
 
 // Global variables for the implementation of the cache.
+//
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 lru_queue_t lru_queue;
 
@@ -125,14 +122,17 @@ lru_queue_t lru_queue;
 lru_map_t lru_map;
 
 // Size of the cache.
+//
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 HEYOKA_CONSTINIT std::size_t mem_cache_size = 0;
 
 // NOTE: default cache size limit is 2GB.
+//
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 HEYOKA_CONSTINIT std::uint64_t mem_cache_limit = 2147483648ull;
 
 // Machinery for heterogeneous lookup into the cache.
+//
 // NOTE: this function MUST be invoked while holding the global lock.
 auto llvm_state_mem_cache_hl(const std::vector<std::string> &bc, unsigned comp_flag)
 {
@@ -162,6 +162,7 @@ auto llvm_state_mem_cache_hl(const std::vector<std::string> &bc, unsigned comp_f
 }
 
 // Debug function to run sanity checks on the cache.
+//
 // NOTE: this function MUST be invoked while holding the global lock.
 void llvm_state_mem_cache_sanity_checks()
 {
@@ -207,9 +208,8 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
 
-    // Do a first lookup to check if bc is already in the cache.
-    // This could happen, e.g., if two threads are compiling the same
-    // code concurrently.
+    // Do a first lookup to check if bc is already in the cache. This could happen, e.g., if two threads are compiling
+    // the same code concurrently.
     if (const auto it = llvm_state_mem_cache_hl(bc, comp_flag); it != lru_map.end()) {
         assert(val.opt_bc == it->second.opt_bc);
         assert(val.opt_ir == it->second.opt_ir);
@@ -221,19 +221,16 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
     // Compute the new cache size.
     auto new_cache_size = boost::safe_numerics::safe<std::size_t>(mem_cache_size) + val.total_size();
 
-    // Remove items from the cache if we are exceeding
-    // the limit.
+    // Remove items from the cache if we are exceeding the limit.
     while (new_cache_size > mem_cache_limit && !lru_queue.empty()) {
         // Compute the size of the last item in the queue.
         const auto cur_it = lru_map.find(std::prev(lru_queue.end()));
         assert(cur_it != lru_map.end());
         const auto &cur_val = cur_it->second;
-        // NOTE: no possibility of overflow here, as cur_size is guaranteed
-        // not to be greater than mem_cache_size.
+        // NOTE: no possibility of overflow here, as cur_size is guaranteed not to be greater than mem_cache_size.
         const auto cur_size = cur_val.total_size();
 
-        // NOTE: the next 4 lines cannot throw, which ensures that the
-        // cache cannot be left in an inconsistent state.
+        // NOTE: the next 4 lines cannot throw, which ensures that the cache cannot be left in an inconsistent state.
 
         // Remove the last item in the queue.
         lru_map.erase(cur_it);
@@ -245,8 +242,7 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
     }
 
     if (new_cache_size > mem_cache_limit) {
-        // We cleared out the cache and yet insertion of
-        // bc would still exceed the limit. Exit.
+        // We cleared out the cache and yet insertion of bc would still exceed the limit. Exit.
         assert(lru_queue.empty());
         assert(mem_cache_size == 0u);
 
@@ -254,8 +250,8 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
     }
 
     // Add the new item to the front of the queue.
-    // NOTE: if this throws, we have not modified lru_map yet,
-    // no cleanup needed.
+    //
+    // NOTE: if this throws, we have not modified lru_map yet, no cleanup needed.
     lru_queue.emplace_front(std::move(bc), comp_flag);
 
     // Add the new item to the map.
@@ -268,8 +264,7 @@ void llvm_state_mem_cache_try_insert(std::vector<std::string> bc, unsigned comp_
 
         // LCOV_EXCL_START
     } catch (...) {
-        // Emplacement in lru_map failed, make sure to remove
-        // the item we just added to lru_queue before re-throwing.
+        // Emplacement in lru_map failed, make sure to remove the item we just added to lru_queue before re-throwing.
         lru_queue.pop_front();
 
         throw;
