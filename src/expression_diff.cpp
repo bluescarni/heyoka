@@ -743,7 +743,7 @@ struct diff_map_hasher {
         // in which the pairs are stored in the dictionary.
         for (const auto &p : s.second) {
             std::size_t p_hash = std::hash<std::uint32_t>{}(p.first);
-            boost::hash_combine(p_hash, std::hash<std::uint32_t>{}(p.second));
+            boost::hash_combine(p_hash, p.second);
 
             // NOTE: make sure there's not funny promotion business going
             // on with std::size_t.
