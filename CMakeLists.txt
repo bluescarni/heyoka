@@ -607,6 +607,17 @@ endif()
 find_package(OpenSSL REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
+# Mandatory dependency on sqlite. See:
+#
+# https://cmake.org/cmake/help/latest/module/FindSQLite3.html
+find_package(SQLite3 REQUIRED)
+# CMake < 4.3
+if(NOT TARGET SQLite3::SQLite3)
+    add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
+target_link_libraries(heyoka PRIVATE SQLite3::SQLite3)
+message(STATUS "SQLite version: ${SQLite3_VERSION}")
+
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
 
