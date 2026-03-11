@@ -136,8 +136,7 @@ HEYOKA_CONSTINIT std::uint64_t mem_cache_limit = 2147483648ull;
 // NOTE: this function MUST be invoked while holding the global lock.
 auto llvm_state_mem_cache_hl(const std::vector<std::string> &bc, unsigned comp_flag)
 {
-    // NOTE: the heterogeneous version of the key replaces std::vector<std::string>
-    // with a const reference.
+    // NOTE: the heterogeneous version of the key replaces std::vector<std::string> with a const reference.
     using compat_key_t = std::pair<const std::vector<std::string> &, unsigned>;
 
     struct compat_hasher {
