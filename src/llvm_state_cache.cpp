@@ -19,7 +19,6 @@
 #include <list>
 #include <memory>
 #include <mutex>
-#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -182,6 +181,18 @@ auto llvm_state_memcache_hl(const std::vector<std::string> &bc, const std::uint3
     return lru_map.find(std::make_pair(std::cref(bc), comp_flag), compat_hasher{}, compat_cmp{});
 }
 
+// Small helper to safely compute the total size (in bytes) of a vector of bitcodes.
+auto llvm_state_memcache_bc_size(const std::vector<std::string> &bc)
+{
+    boost::safe_numerics::safe<std::size_t> size = 0;
+
+    for (const auto &s : bc) {
+        size += s.size();
+    }
+
+    return size;
+}
+
 // Debug function to run sanity checks on the in-memory cache.
 //
 // NOTE: this function MUST be invoked while holding the global lock.
@@ -189,10 +200,18 @@ void llvm_state_memcache_sanity_checks()
 {
     assert(lru_queue.size() == lru_map.size());
 
+#if !defined(NDEBUG)
+
     // Check that the computed size of the cache is consistent with memcache_size.
-    assert(std::accumulate(lru_map.begin(), lru_map.end(), boost::safe_numerics::safe<std::size_t>(0),
-                           [](const auto &a, const auto &p) { return a + p.second.total_size(); })
-           == memcache_size);
+    boost::safe_numerics::safe<std::size_t> size = 0;
+    for (const auto &[it, val] : std::as_const(lru_map)) {
+        size += llvm_state_memcache_bc_size(it->first);
+        size += val.total_size();
+    }
+
+    assert(size == memcache_size);
+
+#endif
 }
 
 // Implementation of the insertion of an entry into the in-memory cache.
@@ -201,17 +220,23 @@ void llvm_state_memcache_sanity_checks()
 // cache already.
 void llvm_state_memcache_insert_impl(std::vector<std::string> bc, const std::uint32_t comp_flag, llvm_mc_value val)
 {
-    // Compute the new cache size.
-    auto new_cache_size = boost::safe_numerics::safe<std::size_t>(memcache_size) + val.total_size();
+    // Compute the new cache size (i.e., the size after insertion of the new entry).
+    auto new_cache_size
+        = boost::safe_numerics::safe<std::size_t>(memcache_size) + val.total_size() + llvm_state_memcache_bc_size(bc);
 
     // Remove items from the cache if we are exceeding the limit.
     while (new_cache_size > memcache_limit && !lru_queue.empty()) {
-        // Compute the size of the last item in the queue.
-        const auto cur_it = lru_map.find(std::prev(lru_queue.end()));
+        // Fetch an iterator to the last item in the queue.
+        const auto last_queue_it = std::prev(lru_queue.end());
+
+        // Locate it in lru_map.
+        const auto cur_it = lru_map.find(last_queue_it);
         assert(cur_it != lru_map.end());
-        const auto &cur_val = cur_it->second;
-        // NOTE: no possibility of overflow here, as cur_size is guaranteed not to be greater than memcache_size.
-        const auto cur_size = cur_val.total_size();
+
+        // Compute the total size of the last item in the queue.
+        //
+        // NOTE: cur_size is computed with safe arithmetics.
+        const auto cur_size = cur_it->second.total_size() + llvm_state_memcache_bc_size(last_queue_it->first);
 
         // NOTE: the next 4 lines cannot throw, which ensures that the cache cannot be left in an inconsistent state.
 
