@@ -14,6 +14,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <ostream>
 #include <ranges>
@@ -285,10 +286,21 @@ public:
     [[nodiscard]] llvm_state make_similar() const;
 
     // Cache management.
+    //
+    // In-memory cache.
     static std::size_t get_memcache_size();
     static std::size_t get_memcache_limit();
     static void set_memcache_limit(std::size_t);
     static void clear_memcache();
+    // On-disk cache.
+    static std::filesystem::path get_diskcache_path();
+    static void set_diskcache_path(std::filesystem::path);
+    static bool get_diskcache_enabled();
+    static void set_diskcache_enabled(bool);
+    static std::int64_t get_diskcache_limit();
+    static void set_diskcache_limit(std::int64_t);
+    static std::int64_t get_diskcache_size();
+    static void clear_diskcache();
 };
 
 namespace detail
@@ -302,8 +314,8 @@ struct llvm_mc_value {
 };
 
 // Cache lookup and insertion.
-std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::vector<std::string> &, unsigned);
-void llvm_state_mem_cache_try_insert(std::vector<std::string>, unsigned, llvm_mc_value);
+std::optional<llvm_mc_value> llvm_state_memcache_lookup(const std::vector<std::string> &, std::uint32_t);
+void llvm_state_memcache_try_insert(std::vector<std::string>, std::uint32_t, llvm_mc_value);
 
 // NOTE: although this is set to "true", the parjit functionality is currently disabled and this setting has no effect.
 inline constexpr bool default_parjit = true;

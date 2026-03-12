@@ -2,6 +2,16 @@
 find_package(xtensor REQUIRED CONFIG)
 find_package(xtensor-blas REQUIRED CONFIG)
 
+# NOTE: need Boost.filesystem for some tests.
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET COMPONENTS filesystem CONFIG)
+if(NOT ${Boost_FOUND})
+    message(STATUS "Boost.filesystem not found in CONFIG mode, retrying in MODULE mode.")
+    find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} QUIET MODULE COMPONENTS filesystem)
+endif()
+if(NOT ${Boost_FOUND})
+    message(FATAL_ERROR "Could not locate Boost.filesystem in either CONFIG or MODULE mode.")
+endif()
+
 add_library(heyoka_test STATIC catch_main.cpp spdlog_oss.cpp test_utils.cpp)
 target_compile_options(heyoka_test PRIVATE
   "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -162,7 +172,8 @@ ADD_HEYOKA_TESTCASE(model_eop)
 ADD_HEYOKA_TESTCASE(model_sw)
 ADD_HEYOKA_TESTCASE(model_dayfrac)
 ADD_HEYOKA_TESTCASE(step_callback)
-ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
+ADD_HEYOKA_TESTCASE(llvm_state_memcache)
+ADD_HEYOKA_TESTCASE(llvm_state_diskcache)
 ADD_HEYOKA_TESTCASE(angle_reducer)
 ADD_HEYOKA_TESTCASE(lagrangian)
 ADD_HEYOKA_TESTCASE(hamiltonian)
@@ -197,3 +208,6 @@ endif()
 # NOTE: in these test cases we use the erfa routines to validate our implementation.
 target_link_libraries(iau2006 PRIVATE heyoka_erfa)
 target_link_libraries(eop_data PRIVATE heyoka_erfa)
+
+target_link_libraries(llvm_state_diskcache PRIVATE Boost::filesystem)
+
