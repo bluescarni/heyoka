@@ -979,6 +979,9 @@ private:
     // transaction. The connection will be lazily re-opened as needed.
     void rollback_with_reset()
     {
+        assert(conn);
+
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         if (sqlite3_exec(conn->m_db.get(), "ROLLBACK", nullptr, nullptr, nullptr) != SQLITE_OK) [[unlikely]] {
             conn.reset();
         }
