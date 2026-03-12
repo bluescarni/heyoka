@@ -469,7 +469,12 @@ struct diskcache_state {
                  "obj BLOB NOT NULL, "
                  // Approximate total size (in bytes) of the data stored in the entry.
                  "size INTEGER NOT NULL, "
-                 // An integer signalling when the entry was last looked up.
+                 // An integer signalling when the entry was inserted or last looked up.
+                 //
+                 // NOTE: this value monotonically increases as entries are added to or looked up in the cache. If this
+                 // ever becomes an issue, we could consider a strategy in which, on connection open, we check the
+                 // maximum last_access value and, if it is above a certain threshold, we subtract the minimum
+                 // last_access value from all entries in the table.
                  "last_access INTEGER NOT NULL)");
             exec("CREATE INDEX IF NOT EXISTS idx_last_access ON cache(last_access)");
 
@@ -504,6 +509,18 @@ struct diskcache_state {
             m_lookup_stmt = prepare("WITH new_lru AS (SELECT COALESCE(MAX(last_access), 0) + 1 AS val FROM cache) "
                                     "UPDATE cache SET last_access = (SELECT val FROM new_lru) WHERE hash = ? RETURNING "
                                     "bitcode, comp_flag, env_fingerprint, opt_bc, opt_ir, obj");
+
+            // Insert statement: adds a new entry to the cache. INSERT OR IGNORE means that if the hash already exists
+            // (either a duplicate or a collision), the insertion is silently skipped - a harmless pessimisation. The
+            // last_access value is set to MAX(last_access) + 1, making the new entry the most recently accessed.
+            m_insert_stmt = prepare(
+                "INSERT OR IGNORE INTO cache (hash, bitcode, comp_flag, env_fingerprint, opt_bc, opt_ir, obj, "
+                "size, last_access) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "
+                "(SELECT COALESCE(MAX(last_access), 0) + 1 FROM cache))");
+
+            // Eviction statement: deletes the least recently accessed entry and returns its size.
+            m_evict_stmt = prepare("DELETE FROM cache WHERE rowid = "
+                                   "(SELECT rowid FROM cache ORDER BY last_access ASC LIMIT 1) RETURNING size");
         }
 
         // Helper to execute a simple SQL statement with no parameters or results.
@@ -644,6 +661,7 @@ struct diskcache_state {
     // simultaneously when bound with SQLITE_STATIC.
     std::array<std::vector<char>, 4> s11n_bufs;
 
+    // Lookup an entry in the on-disk cache.
     [[nodiscard]] std::optional<llvm_mc_value> lookup(const std::vector<std::string> &bc, const std::uint32_t comp_flag)
     {
         if (!enabled) {
@@ -752,6 +770,145 @@ struct diskcache_state {
         // LCOV_EXCL_STOP
     }
 
+    // Insert an entry in the on-disk cache.
+    void insert(const std::vector<std::string> &bc, const std::uint32_t comp_flag, const llvm_mc_value &val)
+    {
+        using safe_int64_t = boost::safe_numerics::safe<std::int64_t>;
+
+        if (!enabled) {
+            return;
+        }
+
+        try {
+            // Establish the database connection, if needed.
+            if (!conn) {
+                conn.emplace(dir);
+            }
+
+            // Serialize the 4 blobs into scratch buffers.
+            const auto [bc_data, bc_len] = serialize_vec_str(s11n_bufs[0], bc);
+            const auto [opt_bc_data, opt_bc_len] = serialize_vec_str(s11n_bufs[1], val.opt_bc);
+            const auto [opt_ir_data, opt_ir_len] = serialize_vec_str(s11n_bufs[2], val.opt_ir);
+            const auto [obj_data, obj_len] = serialize_vec_str(s11n_bufs[3], val.obj);
+
+            // Compute the hash.
+            const auto hash = compute_hash(bc, comp_flag);
+
+            // Compute the entry size (total bytes of all blob data).
+            const auto entry_size = safe_int64_t(bc_len) + opt_bc_len + opt_ir_len + obj_len;
+
+            // Begin the transaction.
+            conn->exec("BEGIN IMMEDIATE");
+            try {
+                // Read the current size limit and total size from the config table.
+                const auto stmt_limit = conn->prepare("SELECT value FROM config WHERE key = 'size_limit'");
+                if (sqlite3_step(stmt_limit.get()) != SQLITE_ROW) [[unlikely]] {
+                    throw std::runtime_error("Failed to read size_limit from the llvm_state on-disk cache config");
+                }
+                const auto total_limit = sqlite3_column_int64(stmt_limit.get(), 0);
+
+                const auto stmt_size = conn->prepare("SELECT value FROM config WHERE key = 'total_size'");
+                if (sqlite3_step(stmt_size.get()) != SQLITE_ROW) [[unlikely]] {
+                    throw std::runtime_error("Failed to read total_size from the llvm_state on-disk cache config");
+                }
+                safe_int64_t total_size = sqlite3_column_int64(stmt_size.get(), 0);
+
+                // Eviction loop: remove LRU entries until the new entry fits.
+                auto *const evict_stmt = conn->m_evict_stmt.get();
+                // NOTE: the scope guard ensures sqlite3_reset() on all exit paths, including exceptions.
+                const boost::scope::scope_exit evict_reset([evict_stmt]() noexcept { sqlite3_reset(evict_stmt); });
+                while (total_size + entry_size > total_limit) {
+                    const auto erc = sqlite3_step(evict_stmt);
+                    if (erc == SQLITE_DONE) {
+                        // Cache is empty, nothing left to evict.
+                        break;
+                    }
+                    if (erc != SQLITE_ROW) [[unlikely]] {
+                        throw std::runtime_error(
+                            fmt::format("Failed to evict an entry from the llvm_state on-disk cache: {}",
+                                        sqlite3_errmsg_non_null(conn->m_db.get())));
+                    }
+
+                    // Read the evicted entry's size and update total_size.
+                    total_size -= sqlite3_column_int64(evict_stmt, 0);
+
+                    // Complete the DELETE...RETURNING statement.
+                    if (sqlite3_step(evict_stmt) != SQLITE_DONE) [[unlikely]] {
+                        throw std::runtime_error(
+                            fmt::format("Failed to complete eviction in the llvm_state on-disk cache: {}",
+                                        sqlite3_errmsg_non_null(conn->m_db.get())));
+                    }
+
+                    // Reset for the next iteration.
+                    sqlite3_reset(evict_stmt);
+                }
+
+                // Insert the new entry if it fits.
+                if (total_size + entry_size <= total_limit) {
+                    auto *const insert_stmt = conn->m_insert_stmt.get();
+                    // NOTE: the scope guard ensures sqlite3_reset() on all exit paths, including exceptions.
+                    const boost::scope::scope_exit insert_reset(
+                        [insert_stmt]() noexcept { sqlite3_reset(insert_stmt); });
+
+                    // Bind the 8 parameters.
+                    if (sqlite3_bind_int64(insert_stmt, 1, static_cast<sqlite3_int64>(hash)) != SQLITE_OK
+                        || sqlite3_bind_blob(insert_stmt, 2, bc_data, bc_len, SQLITE_STATIC) != SQLITE_OK
+                        || sqlite3_bind_int64(insert_stmt, 3, static_cast<sqlite3_int64>(comp_flag)) != SQLITE_OK
+                        // NOTE: no need for null termination here, we are passing in the size explicitly.
+                        //
+                        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
+                        || sqlite3_bind_text(insert_stmt, 4, diskcache_fingerprint.data(),
+                                             boost::numeric_cast<int>(diskcache_fingerprint.size()), SQLITE_STATIC)
+                               != SQLITE_OK
+                        || sqlite3_bind_blob(insert_stmt, 5, opt_bc_data, opt_bc_len, SQLITE_STATIC) != SQLITE_OK
+                        || sqlite3_bind_blob(insert_stmt, 6, opt_ir_data, opt_ir_len, SQLITE_STATIC) != SQLITE_OK
+                        || sqlite3_bind_blob(insert_stmt, 7, obj_data, obj_len, SQLITE_STATIC) != SQLITE_OK
+                        || sqlite3_bind_int64(insert_stmt, 8, static_cast<sqlite3_int64>(entry_size)) != SQLITE_OK)
+                        [[unlikely]] {
+                        throw std::runtime_error(
+                            fmt::format("Failed to bind parameters for insertion in the llvm_state on-disk cache: {}",
+                                        sqlite3_errmsg_non_null(conn->m_db.get())));
+                    }
+
+                    // Execute the INSERT.
+                    if (sqlite3_step(insert_stmt) != SQLITE_DONE) [[unlikely]] {
+                        throw std::runtime_error(
+                            fmt::format("Failed to execute insertion in the llvm_state on-disk cache: {}",
+                                        sqlite3_errmsg_non_null(conn->m_db.get())));
+                    }
+
+                    // Update total_size if a row was actually inserted (not ignored due to hash collision).
+                    //
+                    // NOTE: if the insertion did not take place, we may have evicted entries which should have not been
+                    // evicted. This is a slight performance pessimisation but harmless.
+                    if (sqlite3_changes(conn->m_db.get()) > 0) {
+                        total_size += entry_size;
+                    }
+                }
+
+                // Update the total_size in the config table.
+                conn->exec(fmt::format("UPDATE config SET value = {} WHERE key = 'total_size'",
+                                       static_cast<std::int64_t>(total_size))
+                               .c_str());
+
+                conn->exec("COMMIT");
+            } catch (...) {
+                rollback_with_reset();
+
+                throw;
+            }
+
+            // LCOV_EXCL_START
+        } catch (const std::exception &ex) {
+            get_logger()->warn("exception thrown while attempting an insertion in the llvm_state on-disk cache: {}",
+                               ex.what());
+        } catch (...) {
+            get_logger()->warn("exception thrown while attempting an insertion in the llvm_state on-disk cache: "
+                               "unknown error message");
+        }
+        // LCOV_EXCL_STOP
+    }
+
     [[nodiscard]] std::int64_t get_limit()
     {
         // Establish the database connection, if needed.
@@ -810,18 +967,23 @@ struct diskcache_state {
             conn->exec("UPDATE config SET value = 0 WHERE key = 'total_size'");
             conn->exec("COMMIT");
         } catch (...) {
-            // NOTE: if ROLLBACK fails, destroy the connection to ensure cleanup. sqlite3_close_v2() always succeeds
-            // (returns SQLITE_OK regardless) and automatically rolls back any open transaction. The connection will be
-            // lazily re-opened as needed.
-            if (sqlite3_exec(conn->m_db.get(), "ROLLBACK", nullptr, nullptr, nullptr) != SQLITE_OK) {
-                conn.reset();
-            }
+            rollback_with_reset();
 
             throw;
         }
     }
 
 private:
+    // Small helper to issue a ROLLBACK command. If the rollback fails, destroys the connection to ensure cleanup.
+    // sqlite3_close_v2() always succeeds (returns SQLITE_OK regardless) and automatically rolls back any open
+    // transaction. The connection will be lazily re-opened as needed.
+    void rollback_with_reset()
+    {
+        if (sqlite3_exec(conn->m_db.get(), "ROLLBACK", nullptr, nullptr, nullptr) != SQLITE_OK) [[unlikely]] {
+            conn.reset();
+        }
+    }
+
     // Helper to compute the hash for a cache lookup.
     //
     // NOTE: here we are using Boost's hashing primitives on the hope/assumption that they are deterministic across
@@ -1006,7 +1168,11 @@ void llvm_state_memcache_try_insert(std::vector<std::string> bc, const std::uint
     // Lock down.
     const std::scoped_lock lock(llvm_state_cache_mutex);
 
-    // Sanity checks.
+    // Do the insertion into the on-disk cache first and foremost. The reason is that we can do this with const refs to
+    // bc and val, while for in-memory cache insertion we will move.
+    diskcache_st.insert(bc, comp_flag, val);
+
+    // Sanity checks for the in-memory cache.
     llvm_state_memcache_sanity_checks();
 
     // Do a first lookup to check if bc is already in the cache. This could happen, e.g., if two threads are compiling
@@ -1019,7 +1185,7 @@ void llvm_state_memcache_try_insert(std::vector<std::string> bc, const std::uint
         return;
     }
 
-    // Do the insertion.
+    // Do the insertion in the in-memory cache.
     llvm_state_memcache_insert_impl(std::move(bc), comp_flag, std::move(val));
 }
 
