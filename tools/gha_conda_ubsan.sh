@@ -14,7 +14,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -p $deps_dir c-compiler cxx-compiler cmake llvmdev \
+conda create -y -p $deps_dir c-compiler cxx-compiler cmake llvmdev sqlite \
     tbb-devel tbb libboost-devel 'mppp=2.*' sleef xtensor xtensor-blas \
     blas blas-devel fmt spdlog ninja openssl
 source activate $deps_dir

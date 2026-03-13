@@ -200,6 +200,10 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/http_download.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/ex_traversal.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/aligned_vector.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_cache.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -353,10 +357,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/relational.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/logical.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/select.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_mem_cache.cpp"
 )
 
 if(HEYOKA_WITH_SLEEF)
@@ -606,6 +606,19 @@ endif()
 # Mandatory private dependency on openssl.
 find_package(OpenSSL REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+
+# Mandatory dependency on sqlite. See:
+#
+# https://cmake.org/cmake/help/latest/module/FindSQLite3.html
+#
+# NOTE: need at least version 3.37.0 due to our use of SQLITE_OPEN_EXRESCODE.
+find_package(SQLite3 3.37.0 REQUIRED)
+# CMake < 4.3
+if(NOT TARGET SQLite3::SQLite3)
+    add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
+target_link_libraries(heyoka PRIVATE SQLite3::SQLite3)
+message(STATUS "SQLite version: ${SQLite3_VERSION}")
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)

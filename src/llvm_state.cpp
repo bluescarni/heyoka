@@ -278,7 +278,7 @@ void init_native_target()
 }
 
 // Helper to create a builder for target machines.
-llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model c_model)
+llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, const code_model c_model)
 {
     // NOTE: codegen opt level changed in LLVM 18.
 #if LLVM_VERSION_MAJOR < 18
@@ -386,8 +386,8 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(unsigned opt_level, code_model
 // NOTE: this may end up being invoked concurrently from multiple threads.
 // If that is the case, we make sure before invocation to construct a different
 // TargetMachine per thread, so that we are sure no data races are possible.
-void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, unsigned opt_level, bool force_avx512,
-                     bool slp_vectorize)
+void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned opt_level, const bool force_avx512,
+                     const bool slp_vectorize)
 {
     // NOTE: don't run any optimisation pass at O0.
     // NOTE: it is important to note that this is different from using llvm::OptimizationLevel::O0, which still runs
@@ -705,7 +705,7 @@ struct llvm_state::jit {
     std::optional<std::string> m_object_file;
 
     // NOTE: make sure to coordinate changes in this constructor with multi_jit.
-    explicit jit(unsigned opt_level, code_model c_model)
+    explicit jit(const unsigned opt_level, const code_model c_model)
     {
         // NOTE: we assume here that the input arguments have
         // been validated already.
@@ -1188,7 +1188,7 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
 // *after* loading. I don't think this is an issue at the moment, but if needed
 // we can always implement the feature at a later stage.
 template <typename Archive>
-void llvm_state::load_impl(Archive &ar, unsigned version)
+void llvm_state::load_impl(Archive &ar, const unsigned version)
 {
     // LCOV_EXCL_START
     if (version < static_cast<unsigned>(boost::serialization::version<llvm_state>::type::value)) [[unlikely]] {
@@ -1322,12 +1322,12 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     }
 }
 
-void llvm_state::save(boost::archive::binary_oarchive &ar, unsigned v) const
+void llvm_state::save(boost::archive::binary_oarchive &ar, const unsigned v) const
 {
     save_impl(ar, v);
 }
 
-void llvm_state::load(boost::archive::binary_iarchive &ar, unsigned v)
+void llvm_state::load(boost::archive::binary_iarchive &ar, const unsigned v)
 {
     load_impl(ar, v);
 }
@@ -1391,7 +1391,7 @@ code_model llvm_state::get_code_model() const
     return m_c_model;
 }
 
-unsigned llvm_state::clamp_opt_level(unsigned opt_level)
+unsigned llvm_state::clamp_opt_level(const unsigned opt_level)
 {
     return std::min<unsigned>(opt_level, 3u);
 }
@@ -1498,14 +1498,16 @@ namespace
 // - 3 bits for c_model,
 //
 // for a total of 7 bits.
-unsigned assemble_comp_flag(unsigned opt_level, bool force_avx512, bool slp_vectorize, code_model c_model)
+std::uint32_t assemble_comp_flag(const unsigned opt_level, const bool force_avx512, const bool slp_vectorize,
+                                 const code_model c_model)
 {
     assert(opt_level <= 3u);
     assert(static_cast<unsigned>(c_model) <= 7u);
     static_assert(std::numeric_limits<unsigned>::digits >= 7u);
 
-    return opt_level + (static_cast<unsigned>(force_avx512) << 2) + (static_cast<unsigned>(slp_vectorize) << 3)
-           + (static_cast<unsigned>(c_model) << 4);
+    return static_cast<std::uint32_t>(opt_level + (static_cast<unsigned>(force_avx512) << 2)
+                                      + (static_cast<unsigned>(slp_vectorize) << 3)
+                                      + (static_cast<unsigned>(c_model) << 4));
 }
 
 } // namespace
@@ -1553,7 +1555,7 @@ void llvm_state::compile()
         const auto comp_flag = detail::assemble_comp_flag(m_opt_level, m_force_avx512, m_slp_vectorize, m_c_model);
 
         // Lookup in the cache.
-        if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
+        if (auto cached_data = detail::llvm_state_memcache_lookup(obc, comp_flag)) {
             // Cache hit.
 
             // Assign the optimised snapshots.
@@ -1587,7 +1589,7 @@ void llvm_state::compile()
             logger->trace("materialisation runtime: {}", sw);
 
             // Try to insert obc into the cache.
-            detail::llvm_state_mem_cache_try_insert(
+            detail::llvm_state_memcache_try_insert(
                 std::move(obc), comp_flag,
                 // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
                 {.opt_bc = {m_bc_snapshot}, .opt_ir = {m_ir_snapshot}, .obj = {*m_jitter->m_object_file}});
@@ -1780,10 +1782,12 @@ public:
 constexpr auto master_module_name = "heyoka.master";
 
 // NOTE: this largely replicates the logic from the constructors of llvm_state and llvm_state::jit.
+//
 // NOTE: make sure to coordinate changes in this constructor with llvm_state::jit.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-multi_jit::multi_jit(unsigned n_modules, unsigned opt_level, code_model c_model, bool force_avx512, bool slp_vectorize,
-                     bool parjit)
+multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const code_model c_model,
+                     const bool force_avx512, const bool slp_vectorize, const bool parjit)
     : m_n_modules(n_modules), m_parjit(parjit)
 {
     assert(n_modules >= 2u);
@@ -2475,7 +2479,7 @@ void llvm_multi_state::compile()
             = detail::assemble_comp_flag(get_opt_level(), force_avx512(), get_slp_vectorize(), get_code_model());
 
         // Lookup in the cache.
-        if (auto cached_data = detail::llvm_state_mem_cache_lookup(obc, comp_flag)) {
+        if (auto cached_data = detail::llvm_state_memcache_lookup(obc, comp_flag)) {
             // Cache hit.
 
             // Assign the optimised snapshots.
@@ -2528,10 +2532,10 @@ void llvm_multi_state::compile()
             std::ranges::sort(m_impl->m_jit->m_object_files);
 
             // Try to insert obc into the cache.
-            detail::llvm_state_mem_cache_try_insert(std::move(obc), comp_flag,
-                                                    {.opt_bc = m_impl->m_jit->m_bc_snapshots,
-                                                     .opt_ir = m_impl->m_jit->m_ir_snapshots,
-                                                     .obj = m_impl->m_jit->m_object_files});
+            detail::llvm_state_memcache_try_insert(std::move(obc), comp_flag,
+                                                   {.opt_bc = m_impl->m_jit->m_bc_snapshots,
+                                                    .opt_ir = m_impl->m_jit->m_ir_snapshots,
+                                                    .obj = m_impl->m_jit->m_object_files});
             // LCOV_EXCL_START
         }
     } catch (...) {
