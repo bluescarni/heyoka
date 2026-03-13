@@ -409,10 +409,12 @@ struct diskcache_state {
             }
         };
         struct errmsg_freer {
+            // LCOV_EXCL_START
             void operator()(char *p) const noexcept
             {
                 sqlite3_free(p);
             }
+            // LCOV_EXCL_STOP
         };
 
         using db_ptr = std::unique_ptr<sqlite3, db_closer>;
@@ -565,8 +567,8 @@ struct diskcache_state {
             // NOTE: SQLITE_PREPARE_PERSISTENT hints that these statements are long-lived, preventing SQLite from using
             // lookaside memory (a limited per-connection fast allocator) for them.
             if (sqlite3_prepare_v3(m_db.get(), sql, -1, SQLITE_PREPARE_PERSISTENT, &stmt_raw, nullptr) != SQLITE_OK)
-                [[unlikely]] {
                 // LCOV_EXCL_START
+                [[unlikely]] {
                 throw std::runtime_error(
                     fmt::format("SQLite prepare failed for '{}': {}", sql, sqlite3_errmsg_non_null(m_db.get())));
                 // LCOV_EXCL_STOP
@@ -632,8 +634,8 @@ struct diskcache_state {
             {
                 sqlite3_stmt *stmt_raw = nullptr;
                 if (sqlite3_prepare_v3(m_db.get(), "PRAGMA journal_mode = WAL", -1, 0, &stmt_raw, nullptr) != SQLITE_OK)
-                    [[unlikely]] {
                     // LCOV_EXCL_START
+                    [[unlikely]] {
                     throw std::runtime_error(fmt::format("Failed to prepare the WAL pragma for the llvm_state on-disk "
                                                          "cache database at the path '{}': {}",
                                                          db_path, sqlite3_errmsg_non_null(m_db.get())));
@@ -672,13 +674,15 @@ struct diskcache_state {
             sqlite3_stmt *stmt_raw = nullptr;
             // NOTE: quick_check is faster than integrity_check (skips index verification).
             if (sqlite3_prepare_v3(m_db.get(), "PRAGMA quick_check", -1, 0, &stmt_raw, nullptr) != SQLITE_OK)
+                // LCOV_EXCL_START
                 [[unlikely]] {
                 return false;
+                // LCOV_EXCL_STOP
             }
             const stmt_ptr stmt(stmt_raw);
 
             if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
-                return false;
+                return false; // LCOV_EXCL_LINE
             }
 
             // quick_check returns "ok" as the first row if the database is healthy.
@@ -888,6 +892,7 @@ struct diskcache_state {
 
                     // Read the evicted entry's size and update total_size.
                     total_size -= sqlite3_column_int64(evict_stmt, 0);
+                    assert(total_size >= 0);
 
                     // Complete the DELETE...RETURNING statement.
                     if (sqlite3_step(evict_stmt) != SQLITE_DONE) [[unlikely]] {
@@ -923,8 +928,8 @@ struct diskcache_state {
                         || sqlite3_bind_blob(insert_stmt, 6, opt_ir_data, opt_ir_len, SQLITE_STATIC) != SQLITE_OK
                         || sqlite3_bind_blob(insert_stmt, 7, obj_data, obj_len, SQLITE_STATIC) != SQLITE_OK
                         || sqlite3_bind_int64(insert_stmt, 8, static_cast<sqlite3_int64>(entry_size)) != SQLITE_OK)
-                        [[unlikely]] {
                         // LCOV_EXCL_START
+                        [[unlikely]] {
                         throw std::runtime_error(
                             fmt::format("Failed to bind parameters for insertion in the llvm_state on-disk cache: {}",
                                         sqlite3_errmsg_non_null(conn->m_db.get())));

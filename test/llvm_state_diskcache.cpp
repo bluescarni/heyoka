@@ -326,6 +326,9 @@ TEST_CASE("diskcache clear")
     llvm_state::set_diskcache_enabled(true);
     llvm_state::clear_memcache();
 
+    // Empty clear to test the lazy init of the connection on clear.
+    llvm_state::clear_diskcache();
+
     // Populate the disk cache.
     cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
     REQUIRE(llvm_state::get_diskcache_size() > 0);
