@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include <boost/filesystem/operations.hpp>
@@ -419,4 +420,103 @@ TEST_CASE("diskcache lru order")
     llvm_state::clear_memcache();
     cf1 = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
     REQUIRE(llvm_state::get_diskcache_size() == size1 + size3);
+}
+
+TEST_CASE("diskcache concurrent")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    constexpr auto n_threads = 4u;
+    std::vector<cfunc<double>> cfs(n_threads);
+    std::vector<std::thread> threads;
+    threads.reserve(n_threads);
+
+    // Phase 1: concurrent compilation populates disk cache.
+    threads.emplace_back([&]() { cfs[0] = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[1] = cfunc<double>({"x"_var * "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[2] = cfunc<double>({"x"_var - "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[3] = cfunc<double>({"x"_var + "y"_var * "y"_var}, {"x"_var, "y"_var}); });
+
+    for (auto &t : threads) {
+        t.join();
+    }
+
+    REQUIRE(llvm_state::get_diskcache_size() > 0);
+
+    // Verify correctness: x=3, y=5.
+    auto check = [](cfunc<double> &cf, double expected) {
+        double out[] = {0};
+        cf(out, std::vector{3., 5.});
+        REQUIRE(out[0] == expected);
+    };
+
+    check(cfs[0], 8.);  // 3 + 5
+    check(cfs[1], 15.); // 3 * 5
+    check(cfs[2], -2.); // 3 - 5
+    check(cfs[3], 28.); // 3 + 5*5
+
+    // Phase 2: clear memcache, hit disk cache concurrently.
+    const auto disk_size = llvm_state::get_diskcache_size();
+    llvm_state::clear_memcache();
+
+    threads.clear();
+    threads.emplace_back([&]() { cfs[0] = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[1] = cfunc<double>({"x"_var * "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[2] = cfunc<double>({"x"_var - "y"_var}, {"x"_var, "y"_var}); });
+    threads.emplace_back([&]() { cfs[3] = cfunc<double>({"x"_var + "y"_var * "y"_var}, {"x"_var, "y"_var}); });
+
+    for (auto &t : threads) {
+        t.join();
+    }
+
+    // Size unchanged - all hits.
+    REQUIRE(llvm_state::get_diskcache_size() == disk_size);
+
+    // Verify correctness again.
+    check(cfs[0], 8.);
+    check(cfs[1], 15.);
+    check(cfs[2], -2.);
+    check(cfs[3], 28.);
+}
+
+TEST_CASE("diskcache disabled")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(false);
+    llvm_state::clear_memcache();
+
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() == 0);
+
+    // Enable and recompile - now the entry should appear.
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    cfunc<double> cf2({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() > 0);
+
+    // Verify correctness.
+    double out[] = {0};
+    cf2(out, std::vector{1., 2.});
+    REQUIRE(out[0] == 3);
+}
+
+TEST_CASE("diskcache entry too large")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // Set limit to 1 byte - no entry can possibly fit.
+    llvm_state::set_diskcache_limit(1);
+
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() == 0);
+
+    // Verify the cfunc still works (memcache path unaffected).
+    double out[] = {0};
+    cf(out, std::vector{1., 2.});
+    REQUIRE(out[0] == 3);
 }
