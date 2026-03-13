@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add an on-disk cache for JIT-compiled data
+  (`#534 <https://github.com/bluescarni/heyoka/pull/534>`__).
 - Add support for LLVM 22
   (`#528 <https://github.com/bluescarni/heyoka/pull/528>`__).
 
