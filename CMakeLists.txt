@@ -610,7 +610,9 @@ target_link_libraries(heyoka PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 # Mandatory dependency on sqlite. See:
 #
 # https://cmake.org/cmake/help/latest/module/FindSQLite3.html
-find_package(SQLite3 REQUIRED)
+#
+# NOTE: need at least version 3.37.0 due to our use of SQLITE_OPEN_EXRESCODE.
+find_package(SQLite3 3.37.0 REQUIRED)
 # CMake < 4.3
 if(NOT TARGET SQLite3::SQLite3)
     add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
