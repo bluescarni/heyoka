@@ -332,9 +332,13 @@ std::filesystem::path get_default_diskcache_dir()
     }
 #else
     if (const auto *p = std::getenv("XDG_CACHE_HOME")) {
+        // NOTE: XDG_CACHE_HOME does not seem to be very widespread, it is not present in our current CI setup.
+        //
+        // LCOV_EXCL_START
         if (*p != '\0') {
             return std::filesystem::path(p) / "heyoka";
         }
+        // LCOV_EXCL_STOP
     }
     if (const auto *p = std::getenv("HOME")) {
         if (*p != '\0') {
@@ -343,8 +347,12 @@ std::filesystem::path get_default_diskcache_dir()
     }
 #endif
 
+    // LCOV_EXCL_START
+
     // Empty fallback.
     return {};
+
+    // LCOV_EXCL_STOP
 }
 
 // Helper to determine the on-disk cache dir on startup. It will use the HEYOKA_CACHE_DIR env variable if provided,
@@ -362,6 +370,8 @@ std::filesystem::path get_initial_diskcache_dir()
 
 // NOLINTEND(concurrency-mt-unsafe)
 
+// LCOV_EXCL_START
+
 // Small wrapper to safely call sqlite3_errmsg(). It will always return a non-null pointer.
 [[nodiscard]] const char *sqlite3_errmsg_non_null(sqlite3 *db)
 {
@@ -375,16 +385,22 @@ std::filesystem::path get_initial_diskcache_dir()
     return (ret == nullptr) ? def_msg : ret;
 }
 
+// LCOV_EXCL_STOP
+
 // Struct encapsulating the state necessary to manage the on-disk cache.
 struct diskcache_state {
     // RAII wrapper for a SQLite database connection.
     struct diskcache_connection {
         // Custom deleters for SQLite resources.
         struct db_closer {
+            // NOTE: for some reason coverage does not pick this up, even though it's definitely executed.
+            //
+            // LCOV_EXCL_START
             void operator()(sqlite3 *db) const noexcept
             {
                 sqlite3_close_v2(db);
             }
+            // LCOV_EXCL_STOP
         };
         struct stmt_finalizer {
             void operator()(sqlite3_stmt *s) const noexcept
@@ -442,10 +458,12 @@ struct diskcache_state {
             // Integrity check: if the database is corrupt, throw. The user will need to manually delete the corrupt
             // cache directory in order to restore disk caching.
             if (!integrity_check()) [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(
                     fmt::format("The llvm_state on-disk cache database '{}' is corrupt. Please delete "
                                 "the cache directory to restore disk caching.",
                                 db_path));
+                // LCOV_EXCL_STOP
             }
 
             // Create the tables.
@@ -530,9 +548,11 @@ struct diskcache_state {
 
             char *err_msg = nullptr;
             if (sqlite3_exec(m_db.get(), sql, nullptr, nullptr, &err_msg) != SQLITE_OK) [[unlikely]] {
+                // LCOV_EXCL_START
                 const errmsg_ptr msg_guard(err_msg);
                 throw std::runtime_error(fmt::format("SQLite exec failed for '{}': {}", sql,
                                                      (err_msg == nullptr) ? "unknown error" : err_msg));
+                // LCOV_EXCL_STOP
             }
         }
 
@@ -546,8 +566,10 @@ struct diskcache_state {
             // lookaside memory (a limited per-connection fast allocator) for them.
             if (sqlite3_prepare_v3(m_db.get(), sql, -1, SQLITE_PREPARE_PERSISTENT, &stmt_raw, nullptr) != SQLITE_OK)
                 [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(
                     fmt::format("SQLite prepare failed for '{}': {}", sql, sqlite3_errmsg_non_null(m_db.get())));
+                // LCOV_EXCL_STOP
             }
             return stmt_ptr(stmt_raw);
         }
@@ -559,11 +581,14 @@ struct diskcache_state {
             sqlite3 *db_raw = nullptr;
             // NOTE: even on failure, sqlite3_open_v2() may allocate a handle that needs closing.
             if (sqlite3_open_v2(db_path.c_str(), &db_raw, open_flags, nullptr) != SQLITE_OK) [[unlikely]] {
+                // LCOV_EXCL_START
+                //
                 // NOTE: this takes care of cleanup.
                 const db_ptr tmp(db_raw);
                 throw std::runtime_error(
                     fmt::format("Failed to open the llvm_state on-disk cache database at the path '{}': {}", db_path,
                                 sqlite3_errmsg_non_null(db_raw)));
+                // LCOV_EXCL_STOP
             }
             m_db.reset(db_raw);
         }
@@ -575,9 +600,11 @@ struct diskcache_state {
 
             // Enable defensive mode: prevents SQL from deliberately corrupting the database.
             if (sqlite3_db_config(m_db.get(), SQLITE_DBCONFIG_DEFENSIVE, 1, nullptr) != SQLITE_OK) [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(fmt::format("Unable to set the SQLITE_DBCONFIG_DEFENSIVE option for the "
                                                      "llvm_state on-disk cache database at the path '{}'",
                                                      db_path));
+                // LCOV_EXCL_STOP
             }
 
             // Set a busy timeout for cross-process WAL contention.
@@ -587,9 +614,11 @@ struct diskcache_state {
             // finished. In case of a timeout, we will throw and catch the exception in the outer layer and treat it as
             // a cache miss.
             if (sqlite3_busy_timeout(m_db.get(), 5000) != SQLITE_OK) [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(fmt::format("Unable to set the busy timeout for the "
                                                      "llvm_state on-disk cache database at the path '{}'",
                                                      db_path));
+                // LCOV_EXCL_STOP
             }
 
             // Enable WAL mode and verify it was actually activated.
@@ -604,23 +633,29 @@ struct diskcache_state {
                 sqlite3_stmt *stmt_raw = nullptr;
                 if (sqlite3_prepare_v3(m_db.get(), "PRAGMA journal_mode = WAL", -1, 0, &stmt_raw, nullptr) != SQLITE_OK)
                     [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error(fmt::format("Failed to prepare the WAL pragma for the llvm_state on-disk "
                                                          "cache database at the path '{}': {}",
                                                          db_path, sqlite3_errmsg_non_null(m_db.get())));
+                    // LCOV_EXCL_STOP
                 }
                 const stmt_ptr stmt(stmt_raw);
                 if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error(fmt::format(
                         "Failed to set the WAL journal mode for the llvm_state on-disk cache database at the path '{}'",
                         db_path));
+                    // LCOV_EXCL_STOP
                 }
 
                 // NOTE: this is the extra step we perform - we check the return value of the statement.
                 const auto *const mode = reinterpret_cast<const char *>(sqlite3_column_text(stmt.get(), 0));
                 if (mode == nullptr || std::string_view(mode) != "wal") [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error(fmt::format("Failed to enable the WAL journal mode for the llvm_state "
                                                          "on-disk cache database at the path '{}' (got '{}')",
                                                          db_path, mode == nullptr ? "null" : mode));
+                    // LCOV_EXCL_STOP
                 }
             }
 
@@ -687,8 +722,10 @@ struct diskcache_state {
 
             // Bind the statement.
             if (sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(hash)) != SQLITE_OK) [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(fmt::format("Failed to bind hash in the llvm_state on-disk cache lookup: {}",
                                                      sqlite3_errmsg_non_null(conn->m_db.get())));
+                // LCOV_EXCL_STOP
             }
 
             // Start execution.
@@ -700,8 +737,10 @@ struct diskcache_state {
                 return {};
             }
             if (rc != SQLITE_ROW) [[unlikely]] {
+                // LCOV_EXCL_START
                 throw std::runtime_error(fmt::format("Failed to execute lookup in the llvm_state on-disk cache: {}",
                                                      sqlite3_errmsg_non_null(conn->m_db.get())));
+                // LCOV_EXCL_STOP
             }
 
             // Helper to complete the statement by stepping to SQLITE_DONE. This is necessary because the first step
@@ -709,9 +748,11 @@ struct diskcache_state {
             // (the last_access bump) and releases the write lock.
             const auto finish = [stmt, this]() {
                 if (sqlite3_step(stmt) != SQLITE_DONE) [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error(
                         fmt::format("Failed to complete the lookup statement in the llvm_state on-disk cache: {}",
                                     sqlite3_errmsg_non_null(conn->m_db.get())));
+                    // LCOV_EXCL_STOP
                 }
             };
 
@@ -733,8 +774,13 @@ struct diskcache_state {
             if (db_comp_flag != comp_flag || std::string_view(db_fp) != diskcache_fingerprint
                 || !vec_str_matches_blob(bc_blob, bc_blob_len, bc)) {
                 // Hashes match but the full key does not. Cache miss.
+                //
+                // NOTE: this is very difficult to cover - it would require crafting a collision by hand.
+                //
+                // LCOV_EXCL_START
                 finish();
                 return {};
+                // LCOV_EXCL_STOP
             }
 
             // Key matches. Deserialize the cached value.
@@ -782,7 +828,12 @@ struct diskcache_state {
         try {
             // Establish the database connection, if needed.
             if (!conn) {
+                // NOTE: this is unlikely to happen because insertion is usually done right after a lookup, which also
+                // lazily creates the connection.
+                //
+                // LCOV_EXCL_START
                 conn.emplace(dir);
+                // LCOV_EXCL_STOP
             }
 
             // Serialize the 4 blobs into scratch buffers.
@@ -803,13 +854,17 @@ struct diskcache_state {
                 // Read the current size limit and total size from the config table.
                 const auto stmt_limit = conn->prepare("SELECT value FROM config WHERE key = 'size_limit'");
                 if (sqlite3_step(stmt_limit.get()) != SQLITE_ROW) [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error("Failed to read size_limit from the llvm_state on-disk cache config");
+                    // LCOV_EXCL_STOP
                 }
                 const auto total_limit = sqlite3_column_int64(stmt_limit.get(), 0);
 
                 const auto stmt_size = conn->prepare("SELECT value FROM config WHERE key = 'total_size'");
                 if (sqlite3_step(stmt_size.get()) != SQLITE_ROW) [[unlikely]] {
+                    // LCOV_EXCL_START
                     throw std::runtime_error("Failed to read total_size from the llvm_state on-disk cache config");
+                    // LCOV_EXCL_STOP
                 }
                 safe_int64_t total_size = sqlite3_column_int64(stmt_size.get(), 0);
 
@@ -824,9 +879,11 @@ struct diskcache_state {
                         break;
                     }
                     if (erc != SQLITE_ROW) [[unlikely]] {
+                        // LCOV_EXCL_START
                         throw std::runtime_error(
                             fmt::format("Failed to evict an entry from the llvm_state on-disk cache: {}",
                                         sqlite3_errmsg_non_null(conn->m_db.get())));
+                        // LCOV_EXCL_STOP
                     }
 
                     // Read the evicted entry's size and update total_size.
@@ -834,9 +891,11 @@ struct diskcache_state {
 
                     // Complete the DELETE...RETURNING statement.
                     if (sqlite3_step(evict_stmt) != SQLITE_DONE) [[unlikely]] {
+                        // LCOV_EXCL_START
                         throw std::runtime_error(
                             fmt::format("Failed to complete eviction in the llvm_state on-disk cache: {}",
                                         sqlite3_errmsg_non_null(conn->m_db.get())));
+                        // LCOV_EXCL_STOP
                     }
 
                     // Reset for the next iteration.
@@ -865,16 +924,20 @@ struct diskcache_state {
                         || sqlite3_bind_blob(insert_stmt, 7, obj_data, obj_len, SQLITE_STATIC) != SQLITE_OK
                         || sqlite3_bind_int64(insert_stmt, 8, static_cast<sqlite3_int64>(entry_size)) != SQLITE_OK)
                         [[unlikely]] {
+                        // LCOV_EXCL_START
                         throw std::runtime_error(
                             fmt::format("Failed to bind parameters for insertion in the llvm_state on-disk cache: {}",
                                         sqlite3_errmsg_non_null(conn->m_db.get())));
+                        // LCOV_EXCL_STOP
                     }
 
                     // Execute the INSERT.
                     if (sqlite3_step(insert_stmt) != SQLITE_DONE) [[unlikely]] {
+                        // LCOV_EXCL_START
                         throw std::runtime_error(
                             fmt::format("Failed to execute insertion in the llvm_state on-disk cache: {}",
                                         sqlite3_errmsg_non_null(conn->m_db.get())));
+                        // LCOV_EXCL_STOP
                     }
 
                     // Update total_size if a row was actually inserted (not ignored due to hash collision).
@@ -892,13 +955,12 @@ struct diskcache_state {
                                .c_str());
 
                 conn->exec("COMMIT");
+                // LCOV_EXCL_START
             } catch (...) {
                 rollback_with_reset();
 
                 throw;
             }
-
-            // LCOV_EXCL_START
         } catch (const std::exception &ex) {
             get_logger()->warn("exception thrown while attempting an insertion in the llvm_state on-disk cache: {}",
                                ex.what());
@@ -918,7 +980,9 @@ struct diskcache_state {
 
         const auto stmt = conn->prepare("SELECT value FROM config WHERE key = 'size_limit'");
         if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
+            // LCOV_EXCL_START
             throw std::runtime_error("Failed to read size_limit from the llvm_state on-disk cache config");
+            // LCOV_EXCL_STOP
         }
 
         return sqlite3_column_int64(stmt.get(), 0);
@@ -948,7 +1012,9 @@ struct diskcache_state {
 
         const auto stmt = conn->prepare("SELECT value FROM config WHERE key = 'total_size'");
         if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
+            // LCOV_EXCL_START
             throw std::runtime_error("Failed to read total_size from the llvm_state on-disk cache config");
+            // LCOV_EXCL_STOP
         }
 
         return sqlite3_column_int64(stmt.get(), 0);
@@ -966,17 +1032,21 @@ struct diskcache_state {
             conn->exec("DELETE FROM cache");
             conn->exec("UPDATE config SET value = 0 WHERE key = 'total_size'");
             conn->exec("COMMIT");
+            // LCOV_EXCL_START
         } catch (...) {
             rollback_with_reset();
 
             throw;
         }
+        // LCOV_EXCL_STOP
     }
 
 private:
     // Small helper to issue a ROLLBACK command. If the rollback fails, destroys the connection to ensure cleanup.
     // sqlite3_close_v2() always succeeds (returns SQLITE_OK regardless) and automatically rolls back any open
     // transaction. The connection will be lazily re-opened as needed.
+    //
+    // LCOV_EXCL_START
     void rollback_with_reset()
     {
         assert(conn);
@@ -986,6 +1056,7 @@ private:
             conn.reset();
         }
     }
+    // LCOV_EXCL_STOP
 
     // Helper to compute the hash for a cache lookup.
     //
@@ -1056,7 +1127,10 @@ private:
         for (const auto &s : bc) {
             if (blob_rem == 0u) {
                 // NOTE: we have finished reading from the blob but not from bc - they cannot be equal.
+                //
+                // LCOV_EXCL_START
                 return false;
+                // LCOV_EXCL_STOP
             }
 
             // Extract the size of the current blob chunk.
@@ -1074,7 +1148,10 @@ private:
             if (!std::ranges::equal(s, std::ranges::subrange(blob_char, blob_char + cur_blob_len))) {
                 // NOTE: the sizes or the contents do not match between s and the current blob chunk - blob and bc must
                 // differ.
+                //
+                // LCOV_EXCL_START
                 return false;
+                // LCOV_EXCL_STOP
             }
 
             // We have read the content of the current blob chunk, update blob_char and blob_rem.
@@ -1152,7 +1229,7 @@ std::optional<llvm_mc_value> llvm_state_memcache_lookup(const std::vector<std::s
         }
 
         return diskcache_value;
-    } else {
+    } else { // LCOV_EXCL_LINE
         // Cache hit.
 
         // Move the item to the front of the queue, if needed.
