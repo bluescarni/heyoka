@@ -29,6 +29,8 @@ Changes
 Fix
 ~~~
 
+- Make the memory utilisation accounting more accurate for the in-memory cache
+  (`#534 <https://github.com/bluescarni/heyoka/pull/534>`__).
 - Fix excessively long compile times for large variational integrators (e.g., neural ODEs).
   The slowness was due to the JIT-compiled code for Taylor map evaluation not employing
   compact mode
