@@ -15,6 +15,7 @@
 #include <boost/filesystem/path.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #include "catch.hpp"
@@ -131,8 +132,6 @@ TEST_CASE("diskcache limit")
         // Negative limit throws.
         REQUIRE_THROWS_MATCHES(llvm_state::set_diskcache_limit(-1), std::invalid_argument,
                                Message("Invalid negative size limit for the llvm_state on-disk cache: -1"));
-
-        REQUIRE_THROWS_AS(llvm_state::set_diskcache_limit(-1), std::invalid_argument);
     }
 }
 
@@ -238,4 +237,186 @@ TEST_CASE("diskcache eviction")
         // cf1 was evicted but cf2 didn't fit either - cache is empty.
         REQUIRE(llvm_state::get_diskcache_size() == 0);
     }
+}
+
+// Test to check that compilation flags are correctly hashed, leading to distinct entries.
+TEST_CASE("diskcache compflags")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    cfunc<double> cf1({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    const auto size1 = llvm_state::get_diskcache_size();
+    REQUIRE(size1 > 0);
+
+    cfunc<double> cf2({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::opt_level = 0);
+    const auto size2 = llvm_state::get_diskcache_size();
+    REQUIRE(size2 > size1);
+
+    cfunc<double> cf3({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::slp_vectorize = true);
+    const auto size3 = llvm_state::get_diskcache_size();
+    REQUIRE(size3 > size2);
+
+    cfunc<double> cf4({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::slp_vectorize = true, kw::opt_level = 1);
+    const auto size4 = llvm_state::get_diskcache_size();
+    REQUIRE(size4 > size3);
+}
+
+TEST_CASE("diskcache empty path")
+{
+    using Catch::Matchers::Message;
+
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    llvm_state::set_diskcache_path({});
+    REQUIRE_THROWS_MATCHES(
+        llvm_state::get_diskcache_size(), std::invalid_argument,
+        Message("Unable to open the llvm_state on-disk cache: the path to the database dir is empty"));
+}
+
+TEST_CASE("diskcache hit")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // Compile a cfunc - populates both memcache and diskcache.
+    cfunc<double> cf1({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    const auto disk_size = llvm_state::get_diskcache_size();
+    REQUIRE(disk_size > 0);
+
+    // Clear the memcache. The entry survives only in the disk cache.
+    llvm_state::clear_memcache();
+    REQUIRE(llvm_state::get_memcache_size() == 0);
+
+    // Recompile the same cfunc. This should hit the disk cache and promote to memcache.
+    cfunc<double> cf2({"x"_var + "y"_var}, {"x"_var, "y"_var});
+
+    // Disk cache size unchanged (hit, not a new insert).
+    REQUIRE(llvm_state::get_diskcache_size() == disk_size);
+
+    // Memcache now has the entry (promoted from disk).
+    REQUIRE(llvm_state::get_memcache_size() > 0);
+
+    // Verify correctness - the cached code actually works.
+    double out[] = {0};
+    cf2(out, std::vector{1., 2.});
+    REQUIRE(out[0] == 3);
+}
+
+TEST_CASE("diskcache limit zero")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    llvm_state::set_diskcache_limit(0);
+
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() == 0);
+}
+
+TEST_CASE("diskcache clear")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // Populate the disk cache.
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() > 0);
+
+    // Clear it.
+    llvm_state::clear_diskcache();
+    REQUIRE(llvm_state::get_diskcache_size() == 0);
+
+    // Clear the memcache too, so the next compilation must go through full compilation + disk insert.
+    llvm_state::clear_memcache();
+
+    // Recompile - should create a fresh disk entry.
+    cfunc<double> cf2({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() > 0);
+
+    // Verify correctness - the cached code actually works.
+    double out[] = {0};
+    cf2(out, std::vector{1., 2.});
+    REQUIRE(out[0] == 3);
+}
+
+TEST_CASE("diskcache persistence")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // Compile and record the disk cache size.
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    const auto disk_size = llvm_state::get_diskcache_size();
+    REQUIRE(disk_size > 0);
+
+    // Force a reconnection by setting the path to itself.
+    llvm_state::set_diskcache_path(llvm_state::get_diskcache_path());
+    llvm_state::clear_memcache();
+
+    // The entry should still be there after reconnection.
+    REQUIRE(llvm_state::get_diskcache_size() == disk_size);
+
+    // And a disk cache hit should still work.
+    cfunc<double> cf2({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() == disk_size);
+
+    double out[] = {0};
+    cf2(out, std::vector{1., 2.});
+    REQUIRE(out[0] == 3);
+}
+
+// NOTE: we have to use compact_mode in this test because otherwise cfuncs in non-compact mode lead to parallel
+// non-deterministic cache insertions.
+TEST_CASE("diskcache lru order")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // First pass: determine all three sizes.
+    cfunc<double> cf1({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+    const auto size1 = llvm_state::get_diskcache_size();
+
+    cfunc<double> cf2({"x"_var * "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+    const auto size2 = llvm_state::get_diskcache_size() - size1;
+
+    cfunc<double> cf3({"x"_var - "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+    const auto size3 = llvm_state::get_diskcache_size() - size1 - size2;
+
+    // Reset.
+    llvm_state::clear_diskcache();
+    llvm_state::clear_memcache();
+
+    // Set limit to size1 + size2 + size3 - 1. This guarantees:
+    // - cf1 + cf2 fit (because size3 >= 1),
+    // - cf1 + cf2 + cf3 don't fit (by construction),
+    // - after evicting one entry, the remaining two fit (because each size >= 1).
+    llvm_state::set_diskcache_limit(size1 + size2 + size3 - 1);
+
+    // Insert cf1 then cf2 (cf1 is LRU).
+    cf1 = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+    cf2 = cfunc<double>({"x"_var * "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+
+    // Touch cf1 via a disk cache hit - bumps cf1's LRU counter, making cf2 the LRU.
+    llvm_state::clear_memcache();
+    cf1 = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+
+    // Insert cf3 - evicts cf2 (the LRU), keeps cf1.
+    llvm_state::clear_memcache();
+    cf3 = cfunc<double>({"x"_var - "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+
+    REQUIRE(llvm_state::get_diskcache_size() == size1 + size3);
+
+    // Verify cf1 survived: disk cache hit means size doesn't grow.
+    llvm_state::clear_memcache();
+    cf1 = cfunc<double>({"x"_var + "y"_var}, {"x"_var, "y"_var}, kw::compact_mode = true);
+    REQUIRE(llvm_state::get_diskcache_size() == size1 + size3);
 }

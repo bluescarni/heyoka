@@ -425,7 +425,7 @@ struct diskcache_state {
         explicit diskcache_connection(const std::filesystem::path &dir)
         {
             if (dir.empty()) [[unlikely]] {
-                throw std::runtime_error(
+                throw std::invalid_argument(
                     "Unable to open the llvm_state on-disk cache: the path to the database dir is empty");
             }
 
@@ -1019,8 +1019,6 @@ private:
     //
     // [uint64_t len_0][bytes_0][uint64_t len_1][bytes_1]...
     //
-    // I.e., no element count prefix - the number of elements is implicit from reading until the end of the blob.
-    //
     // NOTE: endianness is not a concern because the cache is local to the machine.
 
     // Serialize a vector<string> into buf. Returns a pointer+size pair suitable for sqlite3_bind_blob().
@@ -1041,7 +1039,8 @@ private:
 
     // Check if a serialized blob matches a vector<string>, comparing element-by-element without allocating.
     //
-    // NOTE: here we are assuming that the data in blob was created by serialize_vec_str().
+    // NOTE: here we are assuming that the data in blob was created by serialize_vec_str() and it is not corrupted in
+    // any way.
     [[nodiscard]] static bool vec_str_matches_blob(const void *const blob, const int blob_len,
                                                    const std::vector<std::string> &bc)
     {
