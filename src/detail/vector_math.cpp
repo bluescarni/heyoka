@@ -151,7 +151,7 @@ void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_n
     assert(sleef_tp == "d" || sleef_tp == "f");
     assert(idx == 0u || idx == 1u);
 
-    const auto scalar_name = fmt::format("heyoka.combined.{}.{}", scalar_base_name, sleef_tp == "f" ? "f32" : "f64");
+    const auto scalar_name = fmt::format("heyoka.combined_{}.{}", scalar_base_name, sleef_tp == "f" ? "f32" : "f64");
 
     assert(!retval.contains(scalar_name));
 

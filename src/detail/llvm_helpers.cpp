@@ -770,6 +770,13 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
 
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
         if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
@@ -794,7 +801,17 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     // NOTE: this handles both the scalar and vector cases.
     if (scal_t == to_external_llvm_type<mppp::real128>(s.context(), false)) {
-        return llvm_scalarise_ext_math_vector_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
+        // Lookup the vector info.
+        const auto &vfi = lookup_vf_info(f128_name);
+
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
+        return llvm_scalarise_ext_math_vector_call(s, {args...}, f128_name, vfi,
                                                    // NOTE: use the standard math function attributes.
                                                    llvm_ext_math_func_attrs(s));
     }
@@ -889,6 +906,13 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
 
         // Lookup the scalar name in the vector function info map.
         const auto &vfi = lookup_vf_info(scal_name);
+
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
 
         // Fetch the math function attributes.
         // NOTE: these will be used in all math function invocations
