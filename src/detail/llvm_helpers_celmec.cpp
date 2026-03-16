@@ -45,7 +45,6 @@
 
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 

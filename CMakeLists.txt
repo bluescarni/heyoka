@@ -155,8 +155,8 @@ check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 17 OR ${LLVM_VERSION_MAJOR} GREATER 22)
-  message(FATAL_ERROR "LLVM >= 17 and <= 22 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 18 OR ${LLVM_VERSION_MAJOR} GREATER 22)
+  message(FATAL_ERROR "LLVM >= 18 and <= 22 is required.")
 endif()
 
 message(STATUS "LLVM version: ${LLVM_VERSION}")
@@ -181,6 +181,14 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_arith.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_cmp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_dl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_math.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_flow.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_ed.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_algo.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_type.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_celmec.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/dfloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_utils.cpp"

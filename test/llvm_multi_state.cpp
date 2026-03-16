@@ -17,8 +17,6 @@
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <llvm/Config/llvm-config.h>
-
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>

@@ -280,16 +280,7 @@ void init_native_target()
 // Helper to create a builder for target machines.
 llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, const code_model c_model)
 {
-    // NOTE: codegen opt level changed in LLVM 18.
-#if LLVM_VERSION_MAJOR < 18
-
-    using cg_opt_level = llvm::CodeGenOpt::Level;
-
-#else
-
     using cg_opt_level = llvm::CodeGenOptLevel;
-
-#endif
 
     // Try creating the target machine builder.
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
@@ -448,21 +439,13 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
             }
         }
 
-#if LLVM_VERSION_MAJOR >= 18
-
-        // NOTE: explicitly disable scatter/gather when auto-vectorising
-        // as they can currently result in slowdowns:
+        // NOTE: explicitly disable scatter/gather when auto-vectorising as they can currently result in slowdowns:
         //
         // https://github.com/llvm/llvm-project/issues/91370
-        //
-        // NOTE: it seems like -mno-gather/scatter are available since
-        // LLVM 18.
         for (auto &f : M) {
             f.addFnAttr("no-gather");
             f.addFnAttr("no-scatter");
         }
-
-#endif
     }
 
     // NOTE: adapted from here:
