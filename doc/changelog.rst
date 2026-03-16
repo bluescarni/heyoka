@@ -15,6 +15,8 @@ New
 Changes
 ~~~~~~~
 
+- Remove support for LLVM 17
+  (`#535 <https://github.com/bluescarni/heyoka/pull/535>`__).
 - Copying Taylor integrators now results in shallow copies of the internal
   JIT-compiled code, rather than in (unnecessary) deep copies
   (`#532 <https://github.com/bluescarni/heyoka/pull/532>`__,
