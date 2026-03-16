@@ -13,8 +13,6 @@
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <llvm/Config/llvm-config.h>
-
 #include <heyoka/config.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/model/nbody.hpp>

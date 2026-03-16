@@ -155,8 +155,8 @@ check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 17 OR ${LLVM_VERSION_MAJOR} GREATER 22)
-  message(FATAL_ERROR "LLVM >= 17 and <= 22 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 18 OR ${LLVM_VERSION_MAJOR} GREATER 22)
+  message(FATAL_ERROR "LLVM >= 18 and <= 22 is required.")
 endif()
 
 message(STATUS "LLVM version: ${LLVM_VERSION}")
