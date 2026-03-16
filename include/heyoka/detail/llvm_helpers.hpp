@@ -21,7 +21,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -29,7 +29,23 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Type-related helpers.
 HEYOKA_DLL_PUBLIC llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type(llvm_state &, long long = 0);
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like(llvm_state &, const T &);
+HEYOKA_DLL_PUBLIC llvm::Type *make_external_llvm_type(llvm::Type *);
+HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
+HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
+HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
+std::uint32_t gl_arr_size(llvm::Value *);
+HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
+HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
+bool llvm_is_ieee_like_fp(llvm::Type *);
 
 // Helper to fetch the external llvm type corresponding to the C++ type T.
 //
@@ -41,44 +57,10 @@ HEYOKA_DLL_PUBLIC llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &, co
 // In case no llvm type can be associated to T, if err_throw is true, an exception
 // will be thrown, otherwise nullptr will be returned.
 template <typename T>
-inline llvm::Type *to_external_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
+llvm::Type *to_external_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
     return to_external_llvm_type_impl(c, typeid(T), err_throw);
 }
-
-// Helper to fetch the internal llvm type corresponding to the C++ type T.
-//
-// The internal type is the type used in the JITted code to manipulate
-// values which in C++ are of type T. It coincides with the external llvm
-// type for all supported types apart for mppp::real, which has a
-// representation in the JITted code different from its C++ representation.
-//
-// Because mppp::real's precision is a runtime property (i.e., not encoded
-// in the type), if T is mppp::real then the precision must be passed as
-// second argument to this function.
-template <typename T>
-HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type(llvm_state &, long long = 0);
-
-template <typename T>
-HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like(llvm_state &, const T &);
-
-HEYOKA_DLL_PUBLIC llvm::Type *make_external_llvm_type(llvm::Type *);
-
-HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
-
-HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
-
-HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
-
-HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
-
-HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
-
-std::uint32_t gl_arr_size(llvm::Value *);
-
-HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
-
-HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t);
@@ -95,11 +77,6 @@ HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(ir_builder &, llv
 
 HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(ir_builder &, const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
-                                               const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &);
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm_state &, std::vector<llvm::Value *> &);
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_prod(llvm_state &, std::vector<llvm::Value *> &);
-
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &,
                                                         const std::vector<llvm::Type *> &,
                                                         const std::vector<llvm::Value *> &);
@@ -109,24 +86,30 @@ HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
                                                        const std::vector<llvm::Value *> &, const llvm::AttributeList &);
 
-HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
-                                     const std::function<void(llvm::Value *)> &,
-                                     const std::function<llvm::Value *(llvm::Value *)> & = {});
+HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
 
-HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::Value *()> &,
-                                       const std::function<void()> &);
+void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
 
-HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
-                                         const std::function<void()> &);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 
-HEYOKA_DLL_PUBLIC void llvm_switch_u32(llvm_state &, llvm::Value *, const std::function<void()> &,
-                                       const std::map<std::uint32_t, std::function<void()>> &);
+llvm::Value *llvm_math_intr(llvm_state &, const std::string &,
+#if defined(HEYOKA_HAVE_REAL128)
+                            const std::string &,
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                            const std::string &,
+#endif
 
-HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
+                            const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
+llvm::Value *llvm_invoke_vector_impl(llvm_state &, const std::vector<vf_info> &, const llvm::AttributeList &,
+                                     const std::vector<llvm::Value *> &);
 
-// Math helpers.
+llvm::Value *llvm_math_cmath(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
+
+HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
+
+// Arithmetic.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fsub(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fmul(llvm_state &, llvm::Value *, llvm::Value *);
@@ -134,9 +117,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_fdiv(llvm_state &, llvm::Value *, llvm::Valu
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fneg(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
-
+// Comparisons.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ult(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_uge(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ule(llvm_state &, llvm::Value *, llvm::Value *);
@@ -153,16 +136,12 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
-
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
-
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_trunc(llvm_state &, llvm::Value *);
-
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_is_finite(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_is_natural(llvm_state &, llvm::Value *);
 
+// Math functions.
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_trunc(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
@@ -184,65 +163,54 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
+// Primitives for double-length arithmetic.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_sub(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                          llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &, llvm::Type *, llvm::Value *,
-                                                                             std::uint32_t, llvm::Value *,
-                                                                             llvm::Value *, std::uint32_t);
+// Flow control.
+HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
+                                     const std::function<void(llvm::Value *)> &,
+                                     const std::function<llvm::Value *(llvm::Value *)> & = {});
+HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::Value *()> &,
+                                       const std::function<void()> &);
+HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
+                                         const std::function<void()> &);
+HEYOKA_DLL_PUBLIC void llvm_switch_u32(llvm_state &, llvm::Value *, const std::function<void()> &,
+                                       const std::map<std::uint32_t, std::function<void()>> &);
 
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
+// Celestial mechanics.
 llvm::Function *llvm_add_inv_kep_E(llvm_state &, llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, llvm::Type *, std::uint32_t, const std::string &);
-
 llvm::Function *llvm_add_inv_kep_F(llvm_state &, llvm::Type *, std::uint32_t);
 llvm::Function *llvm_add_inv_kep_DE(llvm_state &, llvm::Type *, std::uint32_t);
 
+// Event-detection helpers.
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &, llvm::Type *, llvm::Value *,
+                                                                             std::uint32_t, llvm::Value *,
+                                                                             llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
-// Primitives for double-length arithmetic.
-
-// Error-free product transform.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);
-
-// Addition.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                      llvm::Value *, llvm::Value *);
-
-// Subtraction.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_sub(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                      llvm::Value *, llvm::Value *);
-
-// Multiplication.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                      llvm::Value *, llvm::Value *);
-
-// Division.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                      llvm::Value *, llvm::Value *);
-
-// Floor.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &, llvm::Value *, llvm::Value *);
-
-// Modulus.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                          llvm::Value *, llvm::Value *);
-
-// Less-than.
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
-
-// Greater-than.
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
-
-// std::upper_bound() implementation.
+// Algorithms.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_upper_bound(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
-
-HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
-
-void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
-
-bool llvm_is_ieee_like_fp(llvm::Type *);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
+                                               const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm_state &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_prod(llvm_state &, std::vector<llvm::Value *> &);
 
 } // namespace detail
 
