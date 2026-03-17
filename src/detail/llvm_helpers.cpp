@@ -366,8 +366,9 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 assert(vf_ptr->getAttributes() == f->getAttributes());
             }
 
-            // Ensure that the variant is not optimised out because it is not
-            // explicitly used in the code.
+            // Ensure that the variant is not optimised out because it is not explicitly used in the code.
+            //
+            // NOTE: llvm_append_used() will not insert vf_ptr if it is in the llvm.used array already.
             llvm_append_used(s, vf_ptr);
         }
 
