@@ -35,7 +35,9 @@ struct vf_info {
     std::uint32_t width = 0;
     // Number of arguments.
     std::uint32_t nargs = 0;
-    // An optional function to emit IR code necessary to the invocation of the vector variants.
+    // An optional function to emit IR code necessary to the invocation of the vector variants. If present, the
+    // implication is that the vector variants are defined as functions in the IR. If absent, it means that the vector
+    // variants are externally-defined.
     using gen_t = std::function<void(llvm_state &)>;
     gen_t gen;
 };
