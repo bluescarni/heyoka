@@ -273,10 +273,16 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 }
 
 // Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
-// The necessary vfabi information is stored in vfi. The function returns "call".
-// The attributes of the scalar function will be attached to the vector variants.
-// NOTE: this will insert the declarations of the vector variants into the module, if needed
-// (plus all the boilerplate necessary for preventing the declarations from being optimised out).
+//
+// The necessary vfabi information is stored in vfi.
+//
+// If the vector variants are external functions, then this function will also:
+//
+// - insert the declarations of the vector variants into the module, if needed, and
+// - attach to the vector variants the attributes of the scalar function.
+//
+// This function will also add boilerplate necessary to ensure that the vector variants are not optimised out *before*
+// the autovectorizer runs.
 llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const std::vector<vf_info> &vfi)
 {
     assert(call != nullptr);
@@ -307,8 +313,7 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
         std::vector<std::string> vf_abi_strs;
         vf_abi_strs.reserve(vfi.size());
         for (const auto &el : vfi) {
-            // Fetch the vf_abi attr string (either the low-precision
-            // or standard version).
+            // Fetch the vf_abi attr string (either the low-precision or standard version).
             const auto &vf_abi_attr
                 = (use_fast_math && !el.lp_vf_abi_attr.empty()) ? el.lp_vf_abi_attr : el.vf_abi_attr;
             vf_abi_strs.push_back(vf_abi_attr);
@@ -317,21 +322,19 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                                              fmt::format("{}", fmt::join(vf_abi_strs, ","))));
 
         // Now we need to:
-        // - add the declarations of the vector variants to the module,
-        // - ensure that these declarations are not removed by the optimiser,
-        //   otherwise the vector variants will not be picked up.
+        //
+        // - add the declarations of the vector variants to the module (if the variants are external functions),
+        // - ensure that the variants are not removed by the optimiser, otherwise the vector variants will not be picked
+        //   up.
 
         // Remember the original insertion block.
         auto *orig_bb = builder.GetInsertBlock();
 
-        // Add the vector variants and the boilerplate
-        // to prevent them from being removed.
         for (const auto &el : vfi) {
             assert(el.width > 0u);
             assert(el.nargs == num_args);
 
-            // Fetch the vector function name from el (either the low-precision
-            // or standard version).
+            // Fetch the vector function name from el (either the low-precision or standard version).
             const auto &el_name = (use_fast_math && !el.lp_name.empty()) ? el.lp_name : el.name;
 
             // The vector type for the current variant.
@@ -348,22 +351,27 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
             auto *vf_ptr = md.getFunction(el_name);
 
             if (vf_ptr == nullptr) {
+                // NOTE: if the variant is not in the module, it means it must be an external function.
+                assert(!el.gen);
+
                 // The declaration of the variant is not there yet, create it.
                 vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el_name, &md);
 
-                // NOTE: setting the attributes on the vector variant is not strictly required
-                // for the auto-vectorizer to work. However, in other parts of the code, the vector
-                // variants are invoked directly (via llvm_invoke_external()) and in those cases
-                // proper attributes do help the optimiser. Thus, we want to make sure
-                // that the attributes are set consistently regardless of where the declarations
-                // of the vector variants are created. The convention we follow is that the attributes
-                // of the vector variants must match the attributes of the scalar counterpart.
+                // NOTE: setting the attributes on the vector variant is not strictly required for the auto-vectorizer
+                // to work. However, in other parts of the code, the vector variants are invoked directly (via
+                // llvm_invoke_external()) and in those cases proper attributes do help the optimiser. Thus, we want to
+                // make sure that the attributes are set consistently regardless of where the declarations of the vector
+                // variants are created. The convention we follow is that the attributes of the vector variants must
+                // match the attributes of the scalar counterpart.
                 vf_ptr->setAttributes(f->getAttributes());
-            } else {
-                // The declaration of the variant is already there.
-                // Check that the signatures and attributes match.
+            } else if (vf_ptr->isDeclaration()) {
+                assert(!el.gen);
+
+                // The declaration of the variant is already there. Check that the signatures and attributes match.
                 assert(vf_ptr->getFunctionType() == vec_ft);
                 assert(vf_ptr->getAttributes() == f->getAttributes());
+            } else {
+                assert(el.gen);
             }
 
             // Ensure that the variant is not optimised out because it is not explicitly used in the code.
