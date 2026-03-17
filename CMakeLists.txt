@@ -376,8 +376,8 @@ if(HEYOKA_WITH_SLEEF)
 
     # Detect available SIMD ISA levels and their compiler flags,
     # then add the corresponding SLEEF wrapper files.
-    include(HeyokaSleefConfigs)
-    heyoka_get_sleef_configs(_HEYOKA_SLEEF_SUFFIXES _HEYOKA_SLEEF_FLAGS)
+    include(HeyokaSIMDConfigs)
+    heyoka_get_simd_configs(_HEYOKA_SLEEF_SUFFIXES _HEYOKA_SLEEF_FLAGS)
 
     foreach(_HEYOKA_SLEEF_SUFFIX _HEYOKA_SLEEF_FLAG IN ZIP_LISTS _HEYOKA_SLEEF_SUFFIXES _HEYOKA_SLEEF_FLAGS)
         set(_HEYOKA_SLEEF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_wrappers/${_HEYOKA_SLEEF_SUFFIX}.cpp")

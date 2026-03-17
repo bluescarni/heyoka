@@ -1,6 +1,6 @@
 include(CheckCXXCompilerFlag)
 
-function(heyoka_get_sleef_configs OUT_SUFFIXES OUT_FLAGS)
+function(heyoka_get_simd_configs OUT_SUFFIXES OUT_FLAGS)
     set(_suffixes "")
     set(_flags "")
 
