@@ -132,6 +132,12 @@ constexpr bool sleef_sse2 = true;
 constexpr bool sleef_sse2 = false;
 #endif
 
+#ifdef HEYOKA_SLEEF_AVX
+constexpr bool sleef_avx = true;
+#else
+constexpr bool sleef_avx = false;
+#endif
+
 #ifdef HEYOKA_SLEEF_AVX2
 constexpr bool sleef_avx2 = true;
 #else
@@ -191,6 +197,9 @@ void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_n
     } else if (features.avx2 && sleef_avx2) {
         retval[scalar_name]
             = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2")};
+    } else if (features.avx && sleef_avx) {
+        retval[scalar_name]
+            = {make_sleef_vfinfo(base_simd_width, "sse4"), make_sleef_vfinfo(base_simd_width * 2u, "avx")};
     } else if (features.sse2 && sleef_sse2) {
         retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "sse2")};
     }

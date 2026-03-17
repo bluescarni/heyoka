@@ -4,13 +4,25 @@ function(heyoka_get_simd_configs OUT_SUFFIXES OUT_FLAGS)
     set(_suffixes "")
     set(_flags "")
 
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _proc)
+
     # x86.
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|X86|AMD64|amd64")
+    if(_proc MATCHES "x86|amd64")
         # SSE2.
         foreach(_candidate "-msse2" "/arch:SSE2")
             check_cxx_compiler_flag("${_candidate}" _HEYOKA_HAS_SSE2)
             if(_HEYOKA_HAS_SSE2)
                 list(APPEND _suffixes "sse2")
+                list(APPEND _flags "${_candidate}")
+                break()
+            endif()
+        endforeach()
+
+        # AVX.
+        foreach(_candidate "-mavx" "/arch:AVX")
+            check_cxx_compiler_flag("${_candidate}" _HEYOKA_HAS_AVX)
+            if(_HEYOKA_HAS_AVX)
+                list(APPEND _suffixes "avx")
                 list(APPEND _flags "${_candidate}")
                 break()
             endif()
@@ -37,14 +49,14 @@ function(heyoka_get_simd_configs OUT_SUFFIXES OUT_FLAGS)
         endforeach()
 
         # Sanity checks: higher ISA levels imply lower ones.
-        if(_HEYOKA_HAS_AVX2 AND NOT _HEYOKA_HAS_SSE2)
-            message(FATAL_ERROR "AVX2 detected but SSE2 is not available - this should not happen.")
+        if(_HEYOKA_HAS_AVX AND NOT _HEYOKA_HAS_SSE2)
+            message(FATAL_ERROR "AVX detected but SSE2 is not available - this should not happen.")
+        endif()
+        if(_HEYOKA_HAS_AVX2 AND NOT _HEYOKA_HAS_AVX)
+            message(FATAL_ERROR "AVX2 detected but AVX is not available - this should not happen.")
         endif()
         if(_HEYOKA_HAS_AVX512 AND NOT _HEYOKA_HAS_AVX2)
             message(FATAL_ERROR "AVX-512 detected but AVX2 is not available - this should not happen.")
-        endif()
-        if(_HEYOKA_HAS_AVX512 AND NOT _HEYOKA_HAS_SSE2)
-            message(FATAL_ERROR "AVX-512 detected but SSE2 is not available - this should not happen.")
         endif()
     endif()
 
