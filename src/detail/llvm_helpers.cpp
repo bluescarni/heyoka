@@ -169,6 +169,24 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     return f;
 }
 
+// Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for overloaded
+// intrinsics.
+//
+// NOTE: types and args are needed independently of each other. For instance, llvm.pow() is an intrinsic with 2
+// arguments but the types argument has only 1 element because both arguments always have the same type. I.e., the
+// intrinsic is type-dependent on a single type only (not 2).
+llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
+                                      const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
+{
+    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
+
+    // Create the function call.
+    auto *r = builder.CreateCall(callee_f, args);
+    assert(r != nullptr);
+
+    return r;
+}
+
 // Generate a set of function attributes to be used when invoking
 // external math functions.
 //
@@ -1207,23 +1225,6 @@ llvm::Value *scalars_to_vector(ir_builder &builder, const std::vector<llvm::Valu
     }
 
     return vec;
-}
-
-// Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
-// overloaded intrinsics.
-// NOTE: types and args are needed independently of each other. For instance, llvm.pow() is an
-// intrinsic with 2 arguments but the types argument has only 1 element because both arguments
-// always have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
-llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
-                                      const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
-{
-    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
-
-    // Create the function call.
-    auto *r = builder.CreateCall(callee_f, args);
-    assert(r != nullptr);
-
-    return r;
 }
 
 // Helper to invoke an external function called 'name' with arguments args and return type ret_type.
