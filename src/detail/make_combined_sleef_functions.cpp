@@ -70,6 +70,10 @@ llvm::Function *make_combined_sleef_array_wrapper(llvm_state &s, const std::stri
     // NOTE: we are reading from memory in this function, but only from a local alloca and this is allowed by the
     // semantics of memory(none).
     arr_wrapper_f->setMemoryEffects(llvm::MemoryEffects::none());
+    // NOTE: it is important that we prevent inlining - if the array wrapper is inlined, the information about its
+    // pureness is lost and CSE won't work. This is a minor pessimisation but it should hopefully have a very small
+    // impact.
+    arr_wrapper_f->addFnAttr(llvm::Attribute::NoInline);
 
     // Fetch the function argument.
     auto *x = arr_wrapper_f->args().begin();
