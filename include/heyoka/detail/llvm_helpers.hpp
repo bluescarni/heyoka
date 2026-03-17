@@ -21,7 +21,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -97,9 +96,6 @@ llvm::Value *llvm_math_intr(llvm_state &, const std::string &,
 #endif
 
                             const std::vector<llvm::Value *> &);
-
-llvm::Value *llvm_invoke_vector_impl(llvm_state &, const std::vector<vf_info> &, const llvm::AttributeList &,
-                                     const std::vector<llvm::Value *> &);
 
 llvm::Value *llvm_math_cmath(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
 

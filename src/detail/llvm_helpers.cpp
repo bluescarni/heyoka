@@ -519,90 +519,6 @@ std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal
     return {};
 }
 
-} // namespace
-
-// Implementation of an LLVM math function built on top of a function from the C math library, if possible.
-//
-// base_name is the name of the double-precision variant of the C math function. base_name will also be used to create
-// the MPFR name for the real implementation.
-llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const std::vector<llvm::Value *> &args)
-{
-    assert(!args.empty());
-    assert(!base_name.empty());
-
-    // Check that all arguments are non-null.
-    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
-
-    // Check that all arguments are of the same type.
-    assert(std::ranges::all_of(args.begin() + 1, args.end(),
-                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
-
-    const auto nargs = args.size();
-
-    auto &builder = s.builder();
-
-    // Determine the type and scalar type of the arguments.
-    auto *x_t = args[0]->getType();
-    auto *scal_t = x_t->getScalarType();
-
-    // Check if we have a cmath function available for the implementation.
-    if (const auto suffix = get_cmath_func_suffix(s, scal_t)) {
-        // Build the function name.
-        const auto scal_name = base_name + *suffix;
-
-        // Lookup the scalar name in the vector function info map.
-        const auto &vfi = lookup_vf_info(scal_name);
-
-        // Execute the generators, if available.
-        for (const auto &vf : vfi) {
-            if (vf.gen) {
-                vf.gen(s);
-            }
-        }
-
-        // Fetch the math function attributes.
-        // NOTE: these will be used in all math function invocations
-        // to ensure that scalar and vector versions are declared consistently
-        // with the same attributes.
-        const auto attrs = llvm_ext_math_func_attrs(s);
-
-        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
-            // The inputs are vectors. Fetch their SIMD width.
-            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-
-            if (vector_width == 1u || vfi.empty()) {
-                // If the vector width is 1, or we do not have any vector implementation available,
-                // we scalarise the function call.
-                return llvm_scalarise_ext_math_vector_call(s, args, scal_name, vfi, attrs);
-            } else {
-                // The vector width is > 1 and we have one or more vector implementations available. Use them.
-                return llvm_invoke_vector_impl(s, vfi, attrs, args);
-            }
-        } else {
-            // The input is **not** a vector. Invoke the scalar function attaching vector
-            // variants if available.
-            auto *ret = llvm_invoke_external(s, scal_name, scal_t, args, attrs);
-            return llvm_add_vfabi_attrs(s, ret, vfi);
-        }
-    }
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    // NOTE: this handles only the scalar case.
-    if (llvm_is_real(x_t) != 0) {
-        auto *f = real_nary_op(s, x_t, "mpfr_" + base_name, boost::numeric_cast<unsigned>(nargs));
-        return builder.CreateCall(f, args);
-    }
-
-#endif
-
-    // LCOV_EXCL_START
-    throw std::invalid_argument(
-        fmt::format("Invalid type '{}' encountered in the LLVM implementation of the C math function '{}'",
-                    llvm_type_name(x_t), base_name));
-    // LCOV_EXCL_STOP
-}
-
 // Helper to invoke an external vector function with arguments args, automatically handling mismatches between the width
 // of the vector function and the width of the arguments.
 //
@@ -766,6 +682,90 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
         mask.resize(vector_width);
         return bld.CreateShuffleVector(ret, mask);
     }
+}
+
+} // namespace
+
+// Implementation of an LLVM math function built on top of a function from the C math library, if possible.
+//
+// base_name is the name of the double-precision variant of the C math function. base_name will also be used to create
+// the MPFR name for the real implementation.
+llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const std::vector<llvm::Value *> &args)
+{
+    assert(!args.empty());
+    assert(!base_name.empty());
+
+    // Check that all arguments are non-null.
+    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
+
+    // Check that all arguments are of the same type.
+    assert(std::ranges::all_of(args.begin() + 1, args.end(),
+                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+
+    const auto nargs = args.size();
+
+    auto &builder = s.builder();
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = args[0]->getType();
+    auto *scal_t = x_t->getScalarType();
+
+    // Check if we have a cmath function available for the implementation.
+    if (const auto suffix = get_cmath_func_suffix(s, scal_t)) {
+        // Build the function name.
+        const auto scal_name = base_name + *suffix;
+
+        // Lookup the scalar name in the vector function info map.
+        const auto &vfi = lookup_vf_info(scal_name);
+
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
+        // Fetch the math function attributes.
+        // NOTE: these will be used in all math function invocations
+        // to ensure that scalar and vector versions are declared consistently
+        // with the same attributes.
+        const auto attrs = llvm_ext_math_func_attrs(s);
+
+        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+            // The inputs are vectors. Fetch their SIMD width.
+            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+
+            if (vector_width == 1u || vfi.empty()) {
+                // If the vector width is 1, or we do not have any vector implementation available,
+                // we scalarise the function call.
+                return llvm_scalarise_ext_math_vector_call(s, args, scal_name, vfi, attrs);
+            } else {
+                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                return llvm_invoke_vector_impl(s, vfi, attrs, args);
+            }
+        } else {
+            // The input is **not** a vector. Invoke the scalar function attaching vector
+            // variants if available.
+            auto *ret = llvm_invoke_external(s, scal_name, scal_t, args, attrs);
+            return llvm_add_vfabi_attrs(s, ret, vfi);
+        }
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: this handles only the scalar case.
+    if (llvm_is_real(x_t) != 0) {
+        auto *f = real_nary_op(s, x_t, "mpfr_" + base_name, boost::numeric_cast<unsigned>(nargs));
+        return builder.CreateCall(f, args);
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Invalid type '{}' encountered in the LLVM implementation of the C math function '{}'",
+                    llvm_type_name(x_t), base_name));
+    // LCOV_EXCL_STOP
 }
 
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
