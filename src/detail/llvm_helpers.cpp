@@ -387,11 +387,10 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     return call;
 }
 
-// Helper to invoke a scalar function with arguments which may or may not
-// be vectors.
+// Helper to invoke a scalar function with arguments which may or may not be vectors.
 //
-// In the former case, the call will be decomposed into a sequence of calls with scalar arguments,
-// and the return values will be re-assembled as a vector. Vector arguments must all have the same size.
+// In the former case, the call will be decomposed into a sequence of calls with scalar arguments, and the return values
+// will be re-assembled as a vector. Vector arguments must all have the same size.
 //
 // In the latter case, this function will be equivalent to invoking the scalar function on the scalar arguments.
 //
@@ -399,8 +398,8 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
 //
 // make_s_call will be used to generate the scalar call on the scalar arguments.
 //
-// vfi contains the information about the vector variants of the scalar function. The information in vfi
-// will be attached to the scalar call(s).
+// vfi contains the information about the vector variants of the scalar function. The information in vfi will be
+// attached to the scalar call(s).
 llvm::Value *
 llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
                            const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
@@ -413,6 +412,9 @@ llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args
     // Make sure all arguments are either vectors or scalars.
     assert(std::ranges::all_of(args, [](const auto &arg) { return arg->getType()->isVectorTy(); })
            || std::ranges::all_of(args, [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
+    // Make sure all vector arguments have a size > 1.
+    assert(std::ranges::all_of(
+        args, [](const auto &arg) { return !arg->getType()->isVectorTy() || get_vector_size(arg) > 1u; }));
 
     auto &builder = s.builder();
 
@@ -741,14 +743,13 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
 
         if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
-            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            assert(vec_t->getNumElements() > 1u);
 
-            if (vector_width == 1u || vfi.empty()) {
-                // If the vector width is 1, or we do not have any vector implementation available,
-                // we scalarise the function call.
+            if (vfi.empty()) {
+                // If we do not have any vector implementation available, we scalarise the function call.
                 return llvm_scalarise_ext_math_vector_call(s, args, scal_name, vfi, attrs);
             } else {
-                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                // We have one or more vector implementations available. Use them.
                 return llvm_invoke_vector_impl(s, vfi, attrs, args);
             }
         } else {
@@ -831,14 +832,13 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
         if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
-            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            assert(vec_t->getNumElements() > 1u);
 
-            if (vector_width == 1u || vfi.empty()) {
-                // If the vector width is 1, or we do not have any vector implementation available,
-                // we let LLVM handle it.
+            if (vfi.empty()) {
+                // If we do not have any vector implementation available, we let LLVM handle it.
                 return llvm_invoke_intrinsic(builder, intr_name, {x_t}, args);
             } else {
-                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                // We have one or more vector implementations available. Use them.
                 return llvm_invoke_vector_impl(s, vfi, s_intr->getAttributes(), args);
             }
         } else {
