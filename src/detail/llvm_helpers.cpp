@@ -918,6 +918,65 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     // LCOV_EXCL_STOP
 }
 
+llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, const std::vector<llvm::Value *> &args)
+{
+    assert(!args.empty());
+    assert(!base_name.empty());
+
+    // Check that all arguments are non-null.
+    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
+
+    // Check that all arguments are of the same type.
+    assert(std::ranges::all_of(args.begin() + 1, args.end(),
+                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+
+    auto &bld = s.builder();
+    auto &md = s.module();
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = args[0]->getType();
+    auto *scal_t = x_t->getScalarType();
+
+    // Create the name of the scalar function.
+    const auto scal_name = fmt::format("{}.{}", base_name, llvm_type_name(scal_t));
+
+    // Look it up in the module.
+    auto *scal_f = md.getFunction(scal_name);
+    if (scal_f == nullptr) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to lookup in 'llvm_math_ir_defined()' the scalar function '{}'", scal_name));
+    }
+
+    // Lookup the scalar function name in the vector function info map.
+    const auto &vfi = lookup_vf_info(scal_name);
+
+    // Execute the generators, if available.
+    for (const auto &vf : vfi) {
+        if (vf.gen) {
+            vf.gen(s);
+        }
+    }
+
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        // The inputs are vectors. Fetch their SIMD width.
+        assert(vec_t->getNumElements() > 1u);
+
+        if (vfi.empty()) {
+            // If we do not have any vector implementation available, we use llvm_scalarise_vector_call().
+            return llvm_scalarise_vector_call(
+                s, args, [&bld, scal_f](const std::vector<llvm::Value *> &v) { return bld.CreateCall(scal_f, v); },
+                vfi);
+        } else {
+            // We have one or more vector implementations available. Use them.
+            return llvm_invoke_vector_impl(s, vfi, {}, args);
+        }
+    } else {
+        // The input is **not** a vector. Invoke the scalar function attaching vector variants if available.
+        auto *ret = bld.CreateCall(scal_f, args);
+        return llvm_add_vfabi_attrs(s, ret, vfi);
+    }
+}
+
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)

@@ -96,8 +96,8 @@ llvm::Value *llvm_math_intr(llvm_state &, const std::string &,
 #endif
 
                             const std::vector<llvm::Value *> &);
-
 llvm::Value *llvm_math_cmath(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
+llvm::Value *llvm_math_ir_defined(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
 
