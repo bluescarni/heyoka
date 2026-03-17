@@ -144,6 +144,15 @@ constexpr bool sleef_avx512 = true;
 constexpr bool sleef_avx512 = false;
 #endif
 
+// Helper to add to retval a SLEEF-based vf_info instance for a combined function.
+//
+// A combined SLEEF function returns two results in one call, the prototypical example being sincos(). Our approach for
+// taking advantage of these combined functions is to introduce dedicated scalar wrappers in the IR (e.g.,
+// heyoka.combined_sin/cos) and associate to them vector variants which internally invoke the combined SLEEF functions.
+// We then rely on LLVM recognising that two combined calls on the same argument (e.g., heyoka.combined_sin(x) and
+// heyoka.combined_cos(x)) end up invoking the same combined SLEEF primitive twice with the same argument. Via CSE, the
+// second call should be elided.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_name, const char *const sleef_base_name,
                                const std::string_view sleef_tp, const std::uint32_t idx)
@@ -151,7 +160,8 @@ void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_n
     assert(sleef_tp == "d" || sleef_tp == "f");
     assert(idx == 0u || idx == 1u);
 
-    const auto scalar_name = fmt::format("heyoka.combined_{}.{}", scalar_base_name, sleef_tp == "f" ? "f32" : "f64");
+    const auto scalar_name
+        = fmt::format("heyoka.combined_{}.{}", scalar_base_name, sleef_tp == "f" ? "float" : "double");
 
     assert(!retval.contains(scalar_name));
 
