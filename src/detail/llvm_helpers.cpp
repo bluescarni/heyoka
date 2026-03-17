@@ -529,12 +529,13 @@ std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal
     return {};
 }
 
-// Helper to invoke an external vector function with arguments args, automatically handling mismatches between the width
-// of the vector function and the width of the arguments.
+// Helper to invoke a vector function with arguments args, automatically handling mismatches between the width of the
+// vector function and the width of the arguments. The function can be external (i.e., only declared but not defined),
+// or internal (i.e., both declared and defined).
 //
 // vfi is a vector of vf_info instances listing the available implementations of the vector function (each one
 // supporting a different vector width). attrs is the set of attributes to attach to the invocation(s) of the vector
-// function.
+// function, if it is an external function - otherwise it is ignored.
 //
 // This function has several preconditions:
 //
@@ -567,8 +568,9 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
     const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     assert(vector_width > 1u);
 
-    // Fetch the builder.
+    // Fetch the builder and the module.
     auto &bld = s.builder();
+    auto &md = s.module();
 
     // Can we use the faster but less precise vectorised implementations?
     const auto use_fast_math = bld.getFastMathFlags().approxFunc();
@@ -579,10 +581,17 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
     auto vfi_it = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
                                    [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
 
+    // Small helper to get a pointer to a function in the module md. If the function is declared but not defined,
+    // nullptr will be returned.
+    const auto get_defined_vf = [&md](const std::string &vf_name) {
+        auto *vf_ptr = md.getFunction(vf_name);
+        return (vf_ptr != nullptr && vf_ptr->isDeclaration()) ? nullptr : vf_ptr;
+    };
+
     if (vfi_it == vfi.end()) {
-        // All vector implementations have a SIMD width *less than* vector_width. We will need
-        // to decompose the vector arguments into smaller vectors, perform the calculations
-        // on the smaller vectors, and reassemble the results into a single large vector.
+        // All vector implementations have a SIMD width *less than* vector_width. We will need to decompose the vector
+        // arguments into smaller vectors, perform the calculations on the smaller vectors, and reassemble the results
+        // into a single large vector.
 
         // Step back to the widest available vector implementation and fetch its width.
         --vfi_it;
@@ -595,6 +604,9 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
 
         // Fetch the vector function name (either the low-precision or standard version).
         const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
 
         // Compute the number of chunks into which the original vector arguments will be split.
         const auto n_chunks = (vector_width / available_vector_width)
@@ -622,6 +634,7 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
                 mask.push_back(boost::numeric_cast<int>(idx));
             }
             // Pad the mask if needed (this will happen only at the last iteration).
+            //
             // NOTE: the pad value is the last value in the original (large) vector.
             mask.insert(mask.end(), available_vector_width - mask.size(), boost::numeric_cast<int>(vector_width - 1u));
 
@@ -632,7 +645,11 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
             }
 
             // Invoke the vector implementation and add the result to vec_results.
-            vec_results.push_back(llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs));
+            if (vf_ptr == nullptr) {
+                vec_results.push_back(llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs));
+            } else {
+                vec_results.push_back(bld.CreateCall(vf_ptr, vec_args));
+            }
         }
 
         // Reassemble vec_results into a large vector.
@@ -648,15 +665,21 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
         // We have a vector implementation with exactly the correct width. Use it.
         assert(vfi_it->nargs == nargs);
 
-        // Fetch the vector function name (either the low-precision
-        // or standard version).
+        // Fetch the vector function name (either the low-precision or standard version).
         const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
 
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
+
         // Invoke it.
-        return llvm_invoke_external(s, vf_name, vec_t, args, attrs);
+        if (vf_ptr == nullptr) {
+            return llvm_invoke_external(s, vf_name, vec_t, args, attrs);
+        } else {
+            return bld.CreateCall(vf_ptr, args);
+        }
     } else {
-        // We have a vector implemention with SIMD width *greater than* vector_width. We need
-        // to pad the input arguments, invoke the SIMD implementation, trim the result and return.
+        // We have a vector implemention with SIMD width *greater than* vector_width. We need to pad the input
+        // arguments, invoke the SIMD implementation, trim the result and return.
 
         // Fetch the width of the vector implementation.
         const auto available_vector_width = vfi_it->width;
@@ -668,6 +691,9 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
 
         // Fetch the vector function name (either the low-precision or standard version).
         const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
 
         // Prepare the mask vector.
         std::vector<int> mask;
@@ -686,7 +712,12 @@ llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &
         }
 
         // Invoke the vector implementation.
-        auto *ret = llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs);
+        llvm::Value *ret = nullptr;
+        if (vf_ptr == nullptr) {
+            ret = llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs);
+        } else {
+            ret = bld.CreateCall(vf_ptr, vec_args);
+        }
 
         // We need one last shuffle to trim the padded values at the end of ret.
         mask.resize(vector_width);
