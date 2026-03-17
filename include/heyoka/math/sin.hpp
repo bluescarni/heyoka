@@ -26,16 +26,18 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC sin_impl : public func_base
 {
+    bool m_combined = false;
+
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     sin_impl();
-    explicit sin_impl(expression);
+    explicit sin_impl(expression, bool);
+
+    HEYOKA_DLL_LOCAL [[nodiscard]] bool is_combined() const noexcept;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
@@ -53,11 +55,18 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
+HEYOKA_DLL_PUBLIC expression combined_sin(expression);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression sin(expression);
 
 HEYOKA_END_NAMESPACE
+
+// Version changelog:
+//
+// - version 1: added the combined flag.
+BOOST_CLASS_VERSION(heyoka::detail::sin_impl, 1)
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sin_impl)
 
