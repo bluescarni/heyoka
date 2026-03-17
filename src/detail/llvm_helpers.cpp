@@ -211,9 +211,10 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 //
 // If the llvm.used variable does not exist yet, create it.
 //
-// NOTE: this has quadratic complexity when appending ptr to an existing
-// array. It should not be a problem for the type of use we do as we expect
-// just a few entries in this array, but something to keep in mind.
+// NOTE: this has quadratic complexity when appending ptr to an existing array. It should not be a problem for the type
+// of use we do as we expect just a few entries in this array, but something to keep in mind.
+//
+// NOTE: if ptr is already in the llvm.used array, then this will be a no-op.
 void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 {
     assert(ptr != nullptr);
@@ -232,8 +233,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
         assert(orig_used->hasInitializer());
         auto *orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
 
-        // Construct a new initializer with the original values
-        // plus the new pointer.
+        // Construct a new initializer with the original values plus the new pointer.
         std::vector<llvm::Constant *> arr_values;
         arr_values.reserve(
             boost::safe_numerics::safe<decltype(arr_values.size())>(orig_init->getType()->getNumElements()) + 1);
@@ -241,8 +241,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
             auto *orig_el = orig_init->getAggregateElement(boost::numeric_cast<unsigned>(i));
             assert(orig_el->getType()->isPointerTy());
 
-            // NOTE: if ptr was already in the llvm.used vector, just bail
-            // out early.
+            // NOTE: if ptr was already in the llvm.used vector, just bail out early.
             if (orig_el->isElementWiseEqual(ptr)) {
                 return;
             }
