@@ -185,6 +185,7 @@ ADD_HEYOKA_TESTCASE(var_ode_sys)
 ADD_HEYOKA_TESTCASE(llvm_multi_state)
 ADD_HEYOKA_TESTCASE(make_multi_cfunc)
 ADD_HEYOKA_TESTCASE(iau2006)
+ADD_HEYOKA_TESTCASE(combined_functions)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)

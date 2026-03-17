@@ -154,6 +154,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_sqrt(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_combined_sin(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_combined_cos(llvm_state &, llvm::Value *);
 
 // Primitives for double-length arithmetic.
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);

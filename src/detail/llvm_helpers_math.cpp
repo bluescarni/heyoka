@@ -9,11 +9,20 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include <fmt/core.h>
+
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
@@ -302,6 +311,73 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
                           "mpfr_pow",
 #endif
                           {x, y});
+}
+
+namespace
+{
+
+void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, llvm::Value *v)
+{
+    assert(v != nullptr);
+    assert(sin_or_cos == "sin" || sin_or_cos == "cos");
+    auto *scal_t = v->getType()->getScalarType();
+
+    // Crete the function name.
+    auto fname = fmt::format("heyoka.combined_{}.{}", sin_or_cos, llvm_type_name(scal_t));
+
+    // Look it up in the module.
+    auto &md = s.module();
+    if (md.getFunction(fname) != nullptr) {
+        // The function was created before, return.
+        return;
+    }
+
+    // The function was not created before, do it now.
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    if (scal_t->isFloatingPointTy()) {
+        // Fetch the current insertion block.
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function.
+        auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the function argument.
+        auto *x = f->args().begin();
+
+        // Create a new basic block to start insertion into.
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Compute and return.
+        bld.CreateRet(sin_or_cos == "sin" ? llvm_sin(s, x) : llvm_cos(s, x));
+
+        // Restore the original insertion block.
+        bld.SetInsertPoint(orig_bb);
+
+        return;
+    }
+
+    // TODO real128 and real.
+
+    throw std::invalid_argument(fmt::format(
+        "Unsupported type for the creation of a combined sincos scalar wrapper: '{}'", llvm_type_name(scal_t)));
+}
+
+} // namespace
+
+llvm::Value *llvm_combined_sin(llvm_state &s, llvm::Value *x)
+{
+    create_combined_sincos_scalar_wrapper(s, "sin", x);
+    return llvm_math_ir_defined(s, "heyoka.combined_sin", {x});
+}
+
+llvm::Value *llvm_combined_cos(llvm_state &s, llvm::Value *x)
+{
+    create_combined_sincos_scalar_wrapper(s, "cos", x);
+    return llvm_math_ir_defined(s, "heyoka.combined_cos", {x});
 }
 
 } // namespace detail
