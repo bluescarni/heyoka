@@ -18,6 +18,7 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -25,6 +26,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/ModRef.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -316,6 +318,81 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
 namespace
 {
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+// Helper to create a wrapper for sincosq() from libquadmath which returns the two values packed in an array.
+llvm::Function *create_sincosq_wrapper(llvm_state &s)
+{
+    constexpr auto fname = "heyoka.sincosq_wrapper";
+
+    // Look the wrapper up in the module.
+    auto &md = s.module();
+    auto *f = md.getFunction(fname);
+    if (f != nullptr) {
+        // The function was created before, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Fetch the mppp::real128 type.
+    auto *fp_t = to_external_llvm_type<mppp::real128>(ctx, false);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The function returns an array of 2 values.
+    auto *arr_t = llvm::ArrayType::get(fp_t, 2);
+
+    // Create the function.
+    auto *ft = llvm::FunctionType::get(arr_t, {fp_t}, false);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+    // NOTE: these are intended to inform the optimizer that this will be a pure function.
+    f->addFnAttr(llvm::Attribute::NoUnwind);
+    f->addFnAttr(llvm::Attribute::Speculatable);
+    f->addFnAttr(llvm::Attribute::WillReturn);
+    // NOTE: we are reading from memory in this function, but only from a local alloca and this is allowed by the
+    // semantics of memory(none).
+    f->setMemoryEffects(llvm::MemoryEffects::none());
+    // NOTE: it is important that we prevent inlining - if the function is inlined, the information about its pureness
+    // is lost and CSE won't work. This is a minor pessimisation but it should hopefully have a very small impact.
+    f->addFnAttr(llvm::Attribute::NoInline);
+
+    // Fetch the function argument.
+    auto *x = f->args().begin();
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Create storage for the return values.
+    auto *sin_ret = bld.CreateAlloca(fp_t);
+    auto *cos_ret = bld.CreateAlloca(fp_t);
+
+    // Invoke the quadmath function.
+    llvm_invoke_external(s, "sincosq", bld.getVoidTy(), {x, sin_ret, cos_ret},
+                         llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
+                                                  {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+
+    // Create the return value.
+    llvm::Value *ret = llvm::UndefValue::get(arr_t);
+    ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, sin_ret), {0});
+    ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, cos_ret), {1});
+
+    // Return it.
+    bld.CreateRet(ret);
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+#endif
+
+// Helper to create the combined sin/cos scalar wrappers.
 void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, llvm::Value *v)
 {
     assert(v != nullptr);
@@ -360,7 +437,70 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
         return;
     }
 
-    // TODO real128 and real.
+#if defined(HEYOKA_HAVE_REAL128)
+
+    if (scal_t == to_external_llvm_type<mppp::real128>(ctx, false)) {
+        // Ensure that the sincosq wrapper exists.
+        auto *wrapper = create_sincosq_wrapper(s);
+
+        // Fetch the current insertion block.
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function.
+        auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the function argument.
+        auto *x = f->args().begin();
+
+        // Create a new basic block to start insertion into.
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Execute the sincosq wrapper.
+        auto *arr_res = bld.CreateCall(wrapper, x);
+
+        // Extract the result from the array and return it.
+        bld.CreateRet(bld.CreateExtractValue(arr_res, {sin_or_cos == "sin" ? 0u : 1u}));
+
+        // Restore the original insertion block.
+        bld.SetInsertPoint(orig_bb);
+
+        return;
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if (llvm_is_real(scal_t) != 0) {
+        // Fetch the current insertion block.
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function.
+        auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the function argument.
+        auto *x = f->args().begin();
+
+        // Create a new basic block to start insertion into.
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Invoke the MPFR sincos primitive.
+        const auto sincos_res = llvm_real_sincos(s, x);
+
+        // Extract the result from sincos_res and return it.
+        bld.CreateRet(sin_or_cos == "sin" ? sincos_res.first : sincos_res.second);
+
+        // Restore the original insertion block.
+        bld.SetInsertPoint(orig_bb);
+
+        return;
+    }
+
+#endif
 
     throw std::invalid_argument(fmt::format(
         "Unsupported type for the creation of a combined sincos scalar wrapper: '{}'", llvm_type_name(scal_t)));
