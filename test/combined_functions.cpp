@@ -20,6 +20,20 @@
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
 
+#include <fmt/core.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -116,6 +130,81 @@ TEST_CASE("scalar sincos backend fusion")
         const auto &obj1 = std::get<0>(cf.get_llvm_states())[1].get_object_code();
         REQUIRE(obj1.find("sincos") != std::string::npos);
     });
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+// Test that combined_sin/combined_cos on the same argument are fused into a single sincosq wrapper call via CSE for
+// real128.
+TEST_CASE("sincos fusion real128")
+{
+    auto x = make_vars("x");
+
+    cfunc<mppp::real128> cf({combined_sin(x), combined_cos(x)}, {x});
+
+    // Check fusion in the IR.
+    const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
+    auto call_count = 0u;
+    for (auto it = boost::make_find_iterator(std::as_const(ir), boost::first_finder("@heyoka.sincosq_wrapper"));
+         it != string_find_iterator(); ++it) {
+        ++call_count;
+    }
+
+    // We expect 2 occurrences: 1 call + 1 definition.
+    REQUIRE(call_count == 2u);
+
+    // Check correctness of the produced values.
+    using namespace mppp::literals;
+
+    const std::vector<mppp::real128> ins = {1.23_rq};
+    std::vector<mppp::real128> outs(2u);
+
+    cf(outs, ins);
+
+    REQUIRE(outs[0] == approximately(sin(1.23_rq)));
+    REQUIRE(outs[1] == approximately(cos(1.23_rq)));
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Test that combined_sin/combined_cos on the same argument are fused into a single mpfr sincos wrapper call via CSE for
+// mppp::real.
+TEST_CASE("sincos fusion real")
+{
+    const auto prec = 237u;
+
+    auto x = make_vars("x");
+
+    cfunc<mppp::real> cf({combined_sin(x), combined_cos(x)}, {x}, kw::prec = prec, kw::compact_mode = false);
+
+    // Check fusion in the IR.
+    const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+    const auto search_str = fmt::format("@heyoka.real.{}.sincos", prec);
+
+    using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
+    auto call_count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder(search_str)); it != string_find_iterator(); ++it) {
+        ++call_count;
+    }
+
+    // We expect 2 occurrences: 1 call + 1 definition.
+    REQUIRE(call_count == 2u);
+
+    // Check correctness of the produced values.
+    const std::vector ins{mppp::real{"1.23", prec}};
+    std::vector<mppp::real> outs(2u, mppp::real{0, prec});
+
+    cf(outs, ins);
+
+    REQUIRE(outs[0] == approximately(sin(mppp::real{"1.23", prec})));
+    REQUIRE(outs[1] == approximately(cos(mppp::real{"1.23", prec})));
 }
 
 #endif
