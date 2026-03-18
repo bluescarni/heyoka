@@ -413,32 +413,10 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
     auto &bld = s.builder();
     auto &ctx = s.context();
 
-    if (scal_t->isFloatingPointTy()) {
-        // Fetch the current insertion block.
-        auto *orig_bb = bld.GetInsertBlock();
-
-        // Create the function.
-        auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
-        auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
-
-        // Fetch the function argument.
-        auto *x = f->args().begin();
-
-        // Create a new basic block to start insertion into.
-        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-
-        // Compute and return.
-        bld.CreateRet(sin_or_cos == "sin" ? llvm_sin(s, x) : llvm_cos(s, x));
-
-        // Restore the original insertion block.
-        bld.SetInsertPoint(orig_bb);
-
-        return;
-    }
-
 #if defined(HEYOKA_HAVE_REAL128)
 
+    // NOTE: we need to handle real128 first because it is classified as a floating-point type in LLVM, and thus the
+    // isFloatingPointTy() check below would evaluate to true.
     if (scal_t == to_external_llvm_type<mppp::real128>(ctx, false)) {
         // Ensure that the sincosq wrapper exists.
         auto *wrapper = create_sincosq_wrapper(s);
@@ -470,6 +448,30 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
     }
 
 #endif
+
+    if (scal_t->isFloatingPointTy()) {
+        // Fetch the current insertion block.
+        auto *orig_bb = bld.GetInsertBlock();
+
+        // Create the function.
+        auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the function argument.
+        auto *x = f->args().begin();
+
+        // Create a new basic block to start insertion into.
+        bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+        // Compute and return.
+        bld.CreateRet(sin_or_cos == "sin" ? llvm_sin(s, x) : llvm_cos(s, x));
+
+        // Restore the original insertion block.
+        bld.SetInsertPoint(orig_bb);
+
+        return;
+    }
 
 #if defined(HEYOKA_HAVE_REAL)
 
