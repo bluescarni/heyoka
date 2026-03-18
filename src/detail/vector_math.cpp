@@ -150,6 +150,12 @@ constexpr bool sleef_avx512 = true;
 constexpr bool sleef_avx512 = false;
 #endif
 
+#ifdef HEYOKA_SLEEF_ADVSIMD
+constexpr bool sleef_advsimd = true;
+#else
+constexpr bool sleef_advsimd = false;
+#endif
+
 // Helper to add to retval a SLEEF-based vf_info instance for a combined function.
 //
 // A combined SLEEF function returns two results in one call, the prototypical example being sincos(). Our approach for
@@ -202,6 +208,8 @@ void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_n
             = {make_sleef_vfinfo(base_simd_width, "sse4"), make_sleef_vfinfo(base_simd_width * 2u, "avx")};
     } else if (features.sse2 && sleef_sse2) {
         retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "sse2")};
+    } else if (features.aarch64 && sleef_advsimd) {
+        retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "advsimd")};
     }
 }
 

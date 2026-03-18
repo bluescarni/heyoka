@@ -58,6 +58,10 @@ function(heyoka_get_simd_configs OUT_SUFFIXES OUT_FLAGS)
         if(_HEYOKA_HAS_AVX512 AND NOT _HEYOKA_HAS_AVX2)
             message(FATAL_ERROR "AVX-512 detected but AVX2 is not available - this should not happen.")
         endif()
+    # AArch64: AdvSIMD is always available as baseline.
+    elseif(_proc MATCHES "aarch64|arm64")
+        list(APPEND _suffixes "advsimd")
+        list(APPEND _flags "")
     endif()
 
     set(${OUT_SUFFIXES} "${_suffixes}" PARENT_SCOPE)
