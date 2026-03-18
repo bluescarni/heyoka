@@ -38,6 +38,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/mdspan.hpp>
 
@@ -205,6 +206,115 @@ TEST_CASE("sincos fusion real")
 
     REQUIRE(outs[0] == approximately(sin(mppp::real{"1.23", prec})));
     REQUIRE(outs[1] == approximately(cos(mppp::real{"1.23", prec})));
+}
+
+#endif
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+// Test that kepE's internal sincos calls are fused via the combined primitives
+// in the explicitly vectorized codepath.
+TEST_CASE("kepE sincos fusion")
+{
+    const auto &tf = detail::get_target_features();
+
+    if (tf.sse2 || tf.aarch64) {
+        tuple_for_each(fp_types, [](auto fp_x) {
+            using fp_t = decltype(fp_x);
+
+            auto [ecc, M] = make_vars("ecc", "M");
+
+            cfunc<fp_t> cf({kepE(ecc, M)}, {ecc, M});
+
+            // Non-compact mode: check the SIMD llvm_state (third state).
+            const auto ir = std::get<0>(cf.get_llvm_states())[2].get_ir();
+
+            using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
+            auto call_count = 0u;
+            for (auto it = boost::make_find_iterator(std::as_const(ir), boost::first_finder("@heyoka.Sleef_sincos"));
+                 it != string_find_iterator(); ++it) {
+                ++call_count;
+            }
+
+            // 3 calls (initial guess + first Newton step + loop body) + 1 definition.
+            REQUIRE(call_count == 4u);
+        });
+    }
+}
+
+#endif
+
+#if defined(__linux__)
+
+// Test that kepE's scalar codegen fuses sin+cos into sincos via the backend.
+TEST_CASE("kepE scalar sincos backend fusion")
+{
+    auto [ecc, M] = make_vars("ecc", "M");
+
+    tuple_for_each(fp_types, [&](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        cfunc<fp_t> cf({kepE(ecc, M)}, {ecc, M});
+
+        const auto &obj0 = std::get<0>(cf.get_llvm_states())[0].get_object_code();
+        REQUIRE(obj0.find("sincos") != std::string::npos);
+        const auto &obj1 = std::get<0>(cf.get_llvm_states())[1].get_object_code();
+        REQUIRE(obj1.find("sincos") != std::string::npos);
+    });
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+// Test that kepE's sincos calls are fused via CSE for real128.
+TEST_CASE("kepE sincos fusion real128")
+{
+    auto [ecc, M] = make_vars("ecc", "M");
+
+    cfunc<mppp::real128> cf({kepE(ecc, M)}, {ecc, M});
+
+    const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
+    auto call_count = 0u;
+    for (auto it = boost::make_find_iterator(std::as_const(ir), boost::first_finder("@heyoka.sincosq_wrapper"));
+         it != string_find_iterator(); ++it) {
+        ++call_count;
+    }
+
+    // With CSE, each sincos on the same argument is fused: 3 calls (initial guess + first Newton step + loop body) + 1
+    // definition.
+    REQUIRE(call_count == 4u);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Test that kepE's sincos calls are fused via CSE for mppp::real.
+TEST_CASE("kepE sincos fusion real")
+{
+    const auto prec = 237u;
+
+    auto [ecc, M] = make_vars("ecc", "M");
+
+    cfunc<mppp::real> cf({kepE(ecc, M)}, {ecc, M}, kw::prec = prec, kw::compact_mode = false);
+
+    const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+    const auto search_str = fmt::format("@heyoka.real.{}.sincos", prec);
+
+    using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
+    auto call_count = 0u;
+    for (auto it = boost::make_find_iterator(std::as_const(ir), boost::first_finder(search_str));
+         it != string_find_iterator(); ++it) {
+        ++call_count;
+    }
+
+    // With CSE, each sincos on the same argument is fused: 3 calls (initial guess + first Newton step + loop body) + 1
+    // definition.
+    REQUIRE(call_count == 4u);
 }
 
 #endif
