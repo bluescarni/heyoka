@@ -37,7 +37,7 @@ public:
     cos_impl();
     explicit cos_impl(expression, bool);
 
-    HEYOKA_DLL_LOCAL [[nodiscard]] bool is_combined() const noexcept;
+    [[nodiscard]] HEYOKA_DLL_LOCAL bool is_combined() const noexcept;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
