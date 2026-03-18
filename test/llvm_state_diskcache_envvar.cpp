@@ -20,7 +20,7 @@ TEST_CASE("diskcache envvar")
     const auto *env_val = std::getenv("HEYOKA_CACHE_DIR");
 
     if (env_val == nullptr || *env_val == '\0') {
-        // Not set externally — skip.
+        // Not set externally - skip.
         WARN("HEYOKA_CACHE_DIR not set, skipping test");
         return;
     }
