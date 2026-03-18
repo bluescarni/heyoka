@@ -238,10 +238,12 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Reduce M to the [0, 2pi) range.
     auto *M = llvm_trig_arg_reduce(s, M_arg);
 
-    // Compute the initial guess from the usual elliptic expansion
-    // to the third order in eccentricities:
+    // Compute the initial guess from the usual elliptic expansion to the third order in eccentricities:
+    //
     // E = M + e*sin(M) + e**2*sin(M)*cos(M) + e**3*sin(M)*(3/2*cos(M)**2 - 1/2) + ...
-    auto [sin_M, cos_M] = llvm_sincos(s, M);
+    auto *sin_M = llvm_combined_sin(s, M);
+    auto *cos_M = llvm_combined_cos(s, M);
+
     // e*sin(M).
     auto *e_sin_M = llvm_fmul(s, ecc, sin_M);
     // e*cos(M).
@@ -300,9 +302,9 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *cos_E = builder.CreateAlloca(tp);
 
     // Write the initial values for sin_E and cos_E.
-    auto sin_cos_E = llvm_sincos(s, builder.CreateLoad(tp, retval));
-    builder.CreateStore(sin_cos_E.first, sin_E);
-    builder.CreateStore(sin_cos_E.second, cos_E);
+    auto *ret_load = builder.CreateLoad(tp, retval);
+    builder.CreateStore(llvm_combined_sin(s, ret_load), sin_E);
+    builder.CreateStore(llvm_combined_cos(s, ret_load), cos_E);
 
     // Helper to compute f(E).
     auto fE_compute = [&]() {
@@ -428,9 +430,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.CreateStore(new_val, retval);
 
         // Update sin_E/cos_E.
-        sin_cos_E = llvm_sincos(s, new_val);
-        builder.CreateStore(sin_cos_E.first, sin_E);
-        builder.CreateStore(sin_cos_E.second, cos_E);
+        builder.CreateStore(llvm_combined_sin(s, new_val), sin_E);
+        builder.CreateStore(llvm_combined_cos(s, new_val), cos_E);
 
         // Update f(E).
         builder.CreateStore(fE_compute(), fE);
@@ -605,7 +606,8 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // - L = lam,
     // - sL = sin(L)
     // - cL = cos(L).
-    auto [sL, cL] = llvm_sincos(s, lam);
+    auto *sL = llvm_combined_sin(s, lam);
+    auto *cL = llvm_combined_cos(s, lam);
     // k*sL.
     auto *k_sL = llvm_fmul(s, k, sL);
     // h*cL.
@@ -675,9 +677,9 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *cos_F = builder.CreateAlloca(tp);
 
     // Write the initial values for sin_F and cos_F.
-    auto sin_cos_F = llvm_sincos(s, builder.CreateLoad(tp, retval));
-    builder.CreateStore(sin_cos_F.first, sin_F);
-    builder.CreateStore(sin_cos_F.second, cos_F);
+    auto *ret_load_F = builder.CreateLoad(tp, retval);
+    builder.CreateStore(llvm_combined_sin(s, ret_load_F), sin_F);
+    builder.CreateStore(llvm_combined_cos(s, ret_load_F), cos_F);
 
     // Helper to compute f(F).
     auto fF_compute = [&]() {
@@ -799,9 +801,8 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.CreateStore(new_val, retval);
 
         // Update sin_F/cos_F.
-        sin_cos_F = llvm_sincos(s, new_val);
-        builder.CreateStore(sin_cos_F.first, sin_F);
-        builder.CreateStore(sin_cos_F.second, cos_F);
+        builder.CreateStore(llvm_combined_sin(s, new_val), sin_F);
+        builder.CreateStore(llvm_combined_cos(s, new_val), cos_F);
 
         // Update f(F).
         builder.CreateStore(fF_compute(), fF);
@@ -918,7 +919,8 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
 
     // Compute the initial guess following kep3:
     // https://github.com/esa/kep3/blob/e171a4a61431f3cd120898821c0d64c0e25a814e/src/core_astro/propagate_lagrangian.cpp#L60
-    auto [sDM, cDM] = llvm_sincos(s, DM);
+    auto *sDM = llvm_combined_sin(s, DM);
+    auto *cDM = llvm_combined_cos(s, DM);
     // c0*cos(DM).
     auto *c0_cDM = llvm_fmul(s, c0, cDM);
     // s0*cos(DM).
@@ -981,9 +983,9 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto *cos_DE = builder.CreateAlloca(tp);
 
     // Write the initial values for sin_DE and cos_DE.
-    auto sin_cos_DE = llvm_sincos(s, builder.CreateLoad(tp, retval));
-    builder.CreateStore(sin_cos_DE.first, sin_DE);
-    builder.CreateStore(sin_cos_DE.second, cos_DE);
+    auto *ret_load_DE = builder.CreateLoad(tp, retval);
+    builder.CreateStore(llvm_combined_sin(s, ret_load_DE), sin_DE);
+    builder.CreateStore(llvm_combined_cos(s, ret_load_DE), cos_DE);
 
     // Helper to compute f(DE).
     auto fDE_compute = [&]() {
@@ -1107,9 +1109,8 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
         builder.CreateStore(new_val, retval);
 
         // Update sin_DE/cos_DE.
-        sin_cos_DE = llvm_sincos(s, new_val);
-        builder.CreateStore(sin_cos_DE.first, sin_DE);
-        builder.CreateStore(sin_cos_DE.second, cos_DE);
+        builder.CreateStore(llvm_combined_sin(s, new_val), sin_DE);
+        builder.CreateStore(llvm_combined_cos(s, new_val), cos_DE);
 
         // Update f(DE).
         builder.CreateStore(fDE_compute(), fDE);
