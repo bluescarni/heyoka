@@ -62,6 +62,10 @@ function(heyoka_get_simd_configs OUT_SUFFIXES OUT_FLAGS)
     elseif(_proc MATCHES "aarch64|arm64")
         list(APPEND _suffixes "advsimd")
         list(APPEND _flags "")
+    # PPC64: VSX is baseline on POWER7+.
+    elseif(_proc MATCHES "ppc64")
+        list(APPEND _suffixes "vsx")
+        list(APPEND _flags "")
     endif()
 
     set(${OUT_SUFFIXES} "${_suffixes}" PARENT_SCOPE)
