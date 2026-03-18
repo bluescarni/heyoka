@@ -359,6 +359,70 @@ TEST_CASE("sincos combine pass")
         REQUIRE(n_uncombined_sin == 1);
     }
 
+    // Do also a test with par.
+    {
+        cfunc<double> cf({sin(par[0]), cos(par[0]), cos(par[0]), sin(par[1])}, {x, y});
+
+        const auto &dc = cf.get_dc();
+
+        auto n_combined_sin = 0, n_combined_cos = 0, n_uncombined_sin = 0;
+
+        for (const auto &ex : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    } else {
+                        ++n_uncombined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        REQUIRE(n_combined_sin == 1);
+        REQUIRE(n_combined_cos == 1);
+        REQUIRE(n_uncombined_sin == 1);
+    }
+
+    // And one with numbers.
+    {
+        const auto s3 = expression{func{detail::sin_impl{3_dbl, false}}};
+        const auto c3 = expression{func{detail::cos_impl{3_dbl, false}}};
+        const auto s2 = expression{func{detail::sin_impl{2_dbl, false}}};
+
+        cfunc<double> cf({s3, c3, c3, s2}, {x, y});
+
+        const auto &dc = cf.get_dc();
+
+        auto n_combined_sin = 0, n_combined_cos = 0, n_uncombined_sin = 0;
+
+        for (const auto &ex : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    } else {
+                        ++n_uncombined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        REQUIRE(n_combined_sin == 1);
+        REQUIRE(n_combined_cos == 1);
+        REQUIRE(n_uncombined_sin == 1);
+    }
+
     // Taylor decomposition: x' = sin(x).
     //
     // Taylor decomposition injects cos(x) as a hidden dependency, so the combine pass should find the pair and combine
@@ -388,7 +452,108 @@ TEST_CASE("sincos combine pass")
         REQUIRE(n_combined_sin == 1);
         REQUIRE(n_combined_cos == 1);
     }
+
+    // Do also a test with par.
+    {
+        auto ta = taylor_adaptive<double>{{prime(x) = sin(par[0])}, {0.1}, kw::tol = 1.};
+
+        const auto &dc = ta.get_decomposition();
+
+        auto n_combined_sin = 0, n_combined_cos = 0;
+
+        for (const auto &[ex, deps] : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        REQUIRE(n_combined_sin == 1);
+        REQUIRE(n_combined_cos == 1);
+    }
+
+    // And one with numbers.
+    {
+        const auto s3 = expression{func{detail::sin_impl{3_dbl, false}}};
+        auto ta = taylor_adaptive<double>{{prime(x) = s3}, {0.1}, kw::tol = 1.};
+
+        const auto &dc = ta.get_decomposition();
+
+        auto n_combined_sin = 0, n_combined_cos = 0;
+
+        for (const auto &[ex, deps] : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        // NOTE: here the checks are 0 because the creation of the Taylor decomposition triggers constant folding on the
+        // hidden dep, so the sin/cos pair is not recognised as acting on the same number.
+        REQUIRE(n_combined_sin == 0);
+        REQUIRE(n_combined_cos == 0);
+    }
 }
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+// Test that combined sin/cos are individually auto-vectorized via SLP. The combined scalar wrappers inline, exposing
+// llvm.sin/llvm.cos calls, which SLP vectorizes separately with regular SLEEF. The combined sincos fusion does NOT
+// happen in the SLP path, but individual vectorization should still work.
+TEST_CASE("sincos SLP vectorization")
+{
+    const auto &tf = detail::get_target_features();
+
+    if (tf.sse2 || tf.aarch64) {
+        auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+
+        // 4 combined sin + 4 combined cos on different arguments. SLP should bundle the sin calls together and the cos
+        // calls together, vectorizing each group with regular SLEEF.
+        cfunc<double> cf({combined_sin(a), combined_sin(b), combined_sin(c), combined_sin(d), combined_cos(a),
+                          combined_cos(b), combined_cos(c), combined_cos(d)},
+                         {a, b, c, d}, kw::slp_vectorize = true);
+
+        // Verify correctness.
+        const std::vector ins{1., 2., 3., 4.};
+        std::vector<double> outs(8u, 0.);
+
+        cf(outs, ins);
+
+        REQUIRE(outs[0] == approximately(std::sin(1.)));
+        REQUIRE(outs[1] == approximately(std::sin(2.)));
+        REQUIRE(outs[2] == approximately(std::sin(3.)));
+        REQUIRE(outs[3] == approximately(std::sin(4.)));
+        REQUIRE(outs[4] == approximately(std::cos(1.)));
+        REQUIRE(outs[5] == approximately(std::cos(2.)));
+        REQUIRE(outs[6] == approximately(std::cos(3.)));
+        REQUIRE(outs[7] == approximately(std::cos(4.)));
+
+        // Verify SLP vectorization happened: the scalar llvm.sin/llvm.cos intrinsics should be completely absent from
+        // the unstrided scalar module.
+        const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+        REQUIRE(ir.find("@llvm.sin.f64") == std::string::npos);
+        REQUIRE(ir.find("@llvm.cos.f64") == std::string::npos);
+    }
+}
+
+#endif
 
 TEST_CASE("sincos correctness")
 {
