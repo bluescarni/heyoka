@@ -67,12 +67,14 @@ void sincos_combine_impl(std::vector<V> &dc, const F &get_ex)
             if (f->template extract<sin_impl>() != nullptr) {
                 assert(sin_args.contains(args[0]));
                 if (cos_args.contains(args[0])) {
-                    ex = combined_sin(args[0]);
+                    // NOTE: it is important that we don't call combined_sin() directly here as that could lead to
+                    // constant folding, which would violate decomposition invariants.
+                    ex = expression{func{sin_impl(args[0], true)}};
                 }
             } else if (f->template extract<cos_impl>() != nullptr) {
                 assert(cos_args.contains(args[0]));
                 if (sin_args.contains(args[0])) {
-                    ex = combined_cos(args[0]);
+                    ex = expression{func{cos_impl(args[0], true)}};
                 }
             }
         }

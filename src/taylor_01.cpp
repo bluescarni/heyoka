@@ -986,11 +986,14 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
-    // Replace any number subexpression with an identity function.
-    detail::taylor_decompose_replace_numbers(u_vars_defs, n_eq);
-
     // Combine sin/cos calls.
     detail::sincos_combine_taylor(u_vars_defs);
+
+    // Replace any number subexpression with an identity function.
+    //
+    // NOTE: do this as the last step of the pipeline, so that it catches numbers which may have been generated in
+    // previous steps.
+    detail::taylor_decompose_replace_numbers(u_vars_defs, n_eq);
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
 }
