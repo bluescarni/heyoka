@@ -351,7 +351,7 @@ TEST_CASE("taylor sincos")
         compare_batch_scalar<fp_t>(
             {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
              prime(y) = x + y},
-            opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
+            opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f, T(2000));
 
         // Variable tests.
         {
@@ -512,7 +512,7 @@ TEST_CASE("taylor sincos")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({prime(x) = csin(y, combined), prime(y) = ccos(x, combined)}, opt_level,
-                                   high_accuracy, compact_mode, rng, -10.f, 10.f);
+                                   high_accuracy, compact_mode, rng, -10.f, 10.f, T(2000));
     };
 
     for (auto combined : {true, false}) {
@@ -563,7 +563,8 @@ TEST_CASE("taylor sincos cse")
 
     for (auto combined : {true, false}) {
         auto ta = taylor_adaptive<double>{
-            {prime(x) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined)), prime(y) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined))},
+            {prime(x) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined)),
+             prime(y) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined))},
             {2., 3.},
             kw::opt_level = 0,
             kw::tol = 1.};

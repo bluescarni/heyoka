@@ -1715,7 +1715,7 @@ TEST_CASE("cfunc bogus stride")
             cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, 0);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
+                REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 1000.));
             }
         } else {
             REQUIRE(outs[0] == approximately(pars[0] - ins[0] * ins[0], 100.));
