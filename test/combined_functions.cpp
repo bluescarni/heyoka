@@ -35,12 +35,14 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/mdspan.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -318,6 +320,75 @@ TEST_CASE("kepE sincos fusion real")
 }
 
 #endif
+
+// Test that the sincos combine pass correctly modifies cfunc and Taylor decompositions.
+TEST_CASE("sincos combine pass")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // cfunc decomposition: sin(x), cos(x), cos(x), sin(y).
+    //
+    // sin(x) and cos(x) share argument x -> both should be combined. The second cos(x) should be CSE'd away (same as
+    // first cos(x)). sin(y) has no matching cos(y) -> should remain non-combined.
+    {
+        cfunc<double> cf({sin(x), cos(x), cos(x), sin(y)}, {x, y});
+
+        const auto &dc = cf.get_dc();
+
+        auto n_combined_sin = 0, n_combined_cos = 0, n_uncombined_sin = 0;
+
+        for (const auto &ex : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    } else {
+                        ++n_uncombined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        REQUIRE(n_combined_sin == 1);
+        REQUIRE(n_combined_cos == 1);
+        REQUIRE(n_uncombined_sin == 1);
+    }
+
+    // Taylor decomposition: x' = sin(x).
+    //
+    // Taylor decomposition injects cos(x) as a hidden dependency, so the combine pass should find the pair and combine
+    // both.
+    {
+        auto ta = taylor_adaptive<double>{{prime(x) = sin(x)}, {0.1}, kw::tol = 1.};
+
+        const auto &dc = ta.get_decomposition();
+
+        auto n_combined_sin = 0, n_combined_cos = 0;
+
+        for (const auto &[ex, deps] : dc) {
+            if (const auto *f = std::get_if<func>(&ex.value())) {
+                if (const auto *si = f->extract<detail::sin_impl>()) {
+                    if (si->is_combined()) {
+                        ++n_combined_sin;
+                    }
+                }
+                if (const auto *ci = f->extract<detail::cos_impl>()) {
+                    if (ci->is_combined()) {
+                        ++n_combined_cos;
+                    }
+                }
+            }
+        }
+
+        REQUIRE(n_combined_sin == 1);
+        REQUIRE(n_combined_cos == 1);
+    }
+}
 
 TEST_CASE("sincos correctness")
 {

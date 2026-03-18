@@ -71,6 +71,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
+#include <heyoka/detail/sincos_combine.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -655,6 +656,9 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
+
+    // Combine sin/cos calls.
+    detail::sincos_combine_cfunc(ret);
 
     return ret;
 }
