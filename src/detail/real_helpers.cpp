@@ -48,9 +48,14 @@
 #include <heyoka/llvm_state.hpp>
 
 // NOTE: most of the functionality here is implemented as full-blown LLVM functions, despite the fact that generally all
-// we are doing is just invoking corresponding MPFR primitives after having converted LLVM reals into MPFR views. The
-// reason for going through this process is that the LLVM functions can be marked as speculatable, which should in
-// principle allow for better optimisation at the LLVM level.
+// we are doing is just invoking corresponding MPFR primitives after having converted LLVM reals into MPFR views. LLVM
+// will in general inline these functions anyway.
+//
+// If in the future we need CSE on duplicate calls (like we do for sincos), we can prevent inlining via NoInline and
+// assert pureness via memory(none) + Speculatable + NoUnwind + WillReturn. See llvm_real_sincos() and
+// create_sincosq_wrapper() for examples of this pattern. I think in general at this time we don't need to enforce CSE
+// at this level, as in Taylor integrators and cfunc we are doing CSE at the expression system level anyway - but
+// something to keep in mind for the future.
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -324,9 +329,6 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
         auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
@@ -462,9 +464,6 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
         auto *ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
@@ -702,9 +701,6 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
@@ -774,9 +770,6 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
         auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), fargs, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
@@ -832,9 +825,6 @@ llvm::Value *llvm_real_to_double(llvm_state &s, llvm::Value *x)
         auto *ft = llvm::FunctionType::get(dbl_t, {fp_t}, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 
@@ -883,9 +873,6 @@ llvm::Value *llvm_double_to_real(llvm_state &s, llvm::Value *x, llvm::Type *fp_t
         auto *ft = llvm::FunctionType::get(fp_t, {dbl_t}, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoUnwind);
-        f->addFnAttr(llvm::Attribute::Speculatable);
-        f->addFnAttr(llvm::Attribute::WillReturn);
 
         bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
 

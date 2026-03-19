@@ -22,7 +22,6 @@
 
 #include <fmt/core.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -127,10 +126,6 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
 
     // Create the function
     auto *f = hd::llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
-    f->addFnAttr(llvm::Attribute::NoRecurse);
-    f->addFnAttr(llvm::Attribute::NoUnwind);
-    f->addFnAttr(llvm::Attribute::Speculatable);
-    f->addFnAttr(llvm::Attribute::WillReturn);
 
     // Fetch the time argument.
     auto *tm_val = f->args().begin();
@@ -378,10 +373,6 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
 
     // Create the function
     auto *f = hd::llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
-    f->addFnAttr(llvm::Attribute::NoRecurse);
-    f->addFnAttr(llvm::Attribute::NoUnwind);
-    f->addFnAttr(llvm::Attribute::Speculatable);
-    f->addFnAttr(llvm::Attribute::WillReturn);
 
     // Fetch the time argument.
     auto *tm_val = f->args().begin();
