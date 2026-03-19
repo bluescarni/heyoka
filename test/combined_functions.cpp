@@ -605,3 +605,33 @@ TEST_CASE("sincos correctness")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+// Test combined sincos with real128 in a batch Taylor integrator,
+// exercising the real128 vector codepath.
+TEST_CASE("sincos real128 batch")
+{
+    using fp_t = mppp::real128;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = sin(y), prime(y) = cos(x)}, {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}}, 2, kw::tol = .5};
+
+    ta.step(true);
+
+    const auto jet = tc_to_jet(ta);
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == -1);
+    REQUIRE(jet[2] == 3);
+    REQUIRE(jet[3] == -4);
+
+    REQUIRE(jet[4] == approximately(sin(jet[2])));
+    REQUIRE(jet[5] == approximately(sin(jet[3])));
+    REQUIRE(jet[6] == approximately(cos(jet[0])));
+    REQUIRE(jet[7] == approximately(cos(jet[1])));
+}
+
+#endif
