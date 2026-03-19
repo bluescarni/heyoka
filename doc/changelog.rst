@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- heyoka can now take advantage of combined ``sincos()`` functions
+  for SIMD vectors and extended/multiple precision datatypes
+  (`#536 <https://github.com/bluescarni/heyoka/pull/536>`__).
 - Add an on-disk cache for JIT-compiled data
   (`#534 <https://github.com/bluescarni/heyoka/pull/534>`__).
 - Add support for LLVM 22
