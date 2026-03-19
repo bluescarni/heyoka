@@ -821,8 +821,7 @@ struct llvm_state::jit {
     }
 };
 
-// Small shared helper to setup the math flags in the builder at the
-// end of a constructor or a deserialization.
+// Small shared helper to setup the math flags in the builder at the end of a constructor or a deserialization.
 void llvm_state::ctor_setup_math_flags()
 {
     assert(m_builder);
@@ -830,9 +829,12 @@ void llvm_state::ctor_setup_math_flags()
     llvm::FastMathFlags fmf;
 
     if (m_fast_math) {
-        // Set flags for faster math at the
-        // price of potential change of semantics.
+        // Set flags for faster math at the price of potential change of semantics.
         fmf.setFast();
+        // NOTE: we intentionally do NOT set nnan/ninf. We are relying in several places (e.g., Kepler solvers) on being
+        // able to correctly detect non-finite values.
+        fmf.setNoNaNs(false);
+        fmf.setNoInfs(false);
     } else {
         // By default, allow only fp contraction.
         fmf.setAllowContract();
