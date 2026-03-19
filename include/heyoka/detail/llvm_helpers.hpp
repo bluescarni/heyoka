@@ -21,7 +21,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -77,10 +76,6 @@ HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(ir_builder &, llv
 
 HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(ir_builder &, const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &,
-                                                        const std::vector<llvm::Type *> &,
-                                                        const std::vector<llvm::Value *> &);
-
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
                                                        const std::vector<llvm::Value *> &);
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
@@ -101,11 +96,8 @@ llvm::Value *llvm_math_intr(llvm_state &, const std::string &,
 #endif
 
                             const std::vector<llvm::Value *> &);
-
-llvm::Value *llvm_invoke_vector_impl(llvm_state &, const std::vector<vf_info> &, const llvm::AttributeList &,
-                                     const std::vector<llvm::Value *> &);
-
 llvm::Value *llvm_math_cmath(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
+llvm::Value *llvm_math_ir_defined(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
 
@@ -142,7 +134,6 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_is_natural(llvm_state &, llvm::Value *);
 // Math functions.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_trunc(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_acos(llvm_state &, llvm::Value *);
@@ -162,6 +153,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_sqrt(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_combined_sin(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_combined_cos(llvm_state &, llvm::Value *);
 
 // Primitives for double-length arithmetic.
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);

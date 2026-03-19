@@ -56,27 +56,74 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-sin_impl::sin_impl(expression e) : func_base("sin", std::vector{std::move(e)}) {}
+namespace
+{
 
-sin_impl::sin_impl() : sin_impl(0_dbl) {}
+// Helpers to fetch the standard/combined variants of name and evaluation function for sin_impl.
+const char *sin_impl_fetch_name(const sin_impl &s)
+{
+    return s.is_combined() ? "combined_sin" : "sin";
+}
+
+using eval_func_t = llvm::Value *(*)(llvm_state &, llvm::Value *);
+
+eval_func_t sin_impl_sin_eval(const sin_impl &s)
+{
+    return s.is_combined() ? &llvm_combined_sin : &llvm_sin;
+}
+
+} // namespace
+
+void sin_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
+{
+    oa << boost::serialization::base_object<func_base>(*this);
+    oa << m_combined;
+}
+
+void sin_impl::load(boost::archive::binary_iarchive &ia, const unsigned version)
+{
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<sin_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a sin_impl: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
+    ia >> boost::serialization::base_object<func_base>(*this);
+    ia >> m_combined;
+}
+
+sin_impl::sin_impl(expression e, const bool combined)
+    : func_base(combined ? "combined_sin" : "sin", std::vector{std::move(e)}), m_combined(combined)
+{
+}
+
+sin_impl::sin_impl() : sin_impl(0_dbl, false) {}
+
+bool sin_impl::is_combined() const noexcept
+{
+    return m_combined;
+}
 
 llvm::Value *sin_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sin(s, args[0]); }, *this,
-                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) { return sin_impl_sin_eval(*this)(s, args[0]); },
+        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 namespace
 {
 
-[[nodiscard]] llvm::Function *sin_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+[[nodiscard]] llvm::Function *sin_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const sin_impl &fb,
                                               std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_c_eval_func_helper(
-        "sin", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sin(s, args[0]); }, fb, s, fp_t,
-        batch_size, high_accuracy);
+        sin_impl_fetch_name(fb),
+        [&s, &fb](const std::vector<llvm::Value *> &args, bool) { return sin_impl_sin_eval(fb)(s, args[0]); }, fb, s,
+        fp_t, batch_size, high_accuracy);
 }
 
 } // namespace
@@ -92,7 +139,7 @@ taylor_dc_t::size_type sin_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append the cosine decomposition.
-    u_vars_defs.emplace_back(cos(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(is_combined() ? combined_cos(args()[0]) : cos(args()[0]), std::vector<std::uint32_t>{});
 
     // Append the sine decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -111,19 +158,20 @@ namespace
 
 // Derivative of sin(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &, const std::vector<std::uint32_t> &,
-                                  const U &num, const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &fb,
+                                  const std::vector<std::uint32_t> &, const U &num, const std::vector<llvm::Value *> &,
+                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                  std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return llvm_sin(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        return sin_impl_sin_eval(fb)(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
 // Derivative of sin(variable).
-llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &,
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &fb,
                                   const std::vector<std::uint32_t> &deps, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
@@ -134,7 +182,7 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_imp
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return llvm_sin(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
+        return sin_impl_sin_eval(fb)(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
     }
 
     // NOTE: iteration in the [1, order] range
@@ -212,24 +260,24 @@ namespace
 
 // Derivative of sin(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &, const U &num,
+llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &fb, const U &num,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_numpar(
-        s, fp_t, n_uvars, batch_size, "sin", 1,
-        [&s](const auto &args) {
+        s, fp_t, n_uvars, batch_size, sin_impl_fetch_name(fb), 1,
+        [&s, &fb](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_sin(s, args[0]);
+            return sin_impl_sin_eval(fb)(s, args[0]);
         },
         num);
 }
 
 // Derivative of sin(variable).
-llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &, const variable &var,
+llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_impl &fb, const variable &var,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -240,7 +288,8 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "sin", n_uvars, batch_size, {var}, 1);
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, sin_impl_fetch_name(fb), n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -278,11 +327,12 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    llvm_sin(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
+                builder.CreateStore(sin_impl_sin_eval(fb)(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
+                                                                                builder.getInt32(0), var_idx)),
+                                    retval);
             },
             [&]() {
-                // Init the accumlator.
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -344,12 +394,13 @@ llvm::Function *sin_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 std::vector<expression> sin_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {cos(args()[0])};
+    return {is_combined() ? combined_cos(args()[0]) : cos(args()[0])};
 }
 
-} // namespace detail
+namespace
+{
 
-expression sin(expression e)
+expression sin_ex_impl(expression e, const bool combined)
 {
     // Simplify sin(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
@@ -361,8 +412,22 @@ expression sin(expression e)
             },
             num_ptr->value());
     } else {
-        return expression{func{detail::sin_impl(std::move(e))}};
+        return expression{func{detail::sin_impl(std::move(e), combined)}};
     }
+}
+
+} // namespace
+
+expression combined_sin(expression e)
+{
+    return detail::sin_ex_impl(std::move(e), true);
+}
+
+} // namespace detail
+
+expression sin(expression e)
+{
+    return detail::sin_ex_impl(std::move(e), false);
 }
 
 HEYOKA_END_NAMESPACE

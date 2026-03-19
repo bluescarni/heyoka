@@ -13,6 +13,9 @@
 #include <limits>
 #include <random>
 #include <tuple>
+#include <utility>
+
+#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -45,18 +48,41 @@ const auto fp_types = std::tuple<float, double
 #endif
                                  >{};
 
+// Wrappers to make the combined versions of sin/cos.
+expression csin(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_sin(std::move(x));
+    } else {
+        return sin(std::move(x));
+    }
+}
+
+expression ccos(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_cos(std::move(x));
+    } else {
+        return cos(std::move(x));
+    }
+}
+
 // Potential issue in the decomposition when x = 0 (not
 // currently the case).
 TEST_CASE("taylor sincos decompose bug 00")
 {
     auto x = "x"_var;
 
-    auto ta = taylor_adaptive<double>({prime(x) = sin(0_dbl) + cos(0_dbl) - x}, {0.}, kw::tol = 1.);
+    for (const auto combined : {true, false}) {
+        auto ta = taylor_adaptive<double>({prime(x) = csin(0_dbl, combined) + ccos(0_dbl, combined) - x}, {0.},
+                                          kw::tol = 1.);
+    }
 }
 
 TEST_CASE("taylor sincos")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode, bool fast_math) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode, bool fast_math,
+                     bool combined) {
         using std::sin;
         using std::cos;
 
@@ -67,7 +93,8 @@ TEST_CASE("taylor sincos")
         // Number-number tests.
         {
             auto ta = taylor_adaptive<fp_t>{
-                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+                 prime(y) = x + y},
                 {fp_t(2), fp_t(3)},
                 kw::tol = 1,
                 kw::high_accuracy = high_accuracy,
@@ -86,14 +113,15 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
-                                            {fp_t(2), fp_t(3)},
-                                            kw::tol = 1,
-                                            kw::high_accuracy = high_accuracy,
-                                            kw::compact_mode = compact_mode,
-                                            kw::opt_level = opt_level,
-                                            kw::fast_math = fast_math,
-                                            kw::pars = {fp_t{2}, fp_t{3}}};
+            auto ta
+                = taylor_adaptive<fp_t>{{prime(x) = csin(par[0], combined) + ccos(par[1], combined), prime(y) = x + y},
+                                        {fp_t(2), fp_t(3)},
+                                        kw::tol = 1,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode,
+                                        kw::opt_level = opt_level,
+                                        kw::fast_math = fast_math,
+                                        kw::pars = {fp_t{2}, fp_t{3}}};
 
             ta.step(true);
 
@@ -107,7 +135,8 @@ TEST_CASE("taylor sincos")
 
         {
             auto ta = taylor_adaptive_batch<fp_t>{
-                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+                 prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                 2,
                 kw::tol = 1,
@@ -134,15 +163,16 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
-                                                  {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
-                                                  2,
-                                                  kw::tol = 1,
-                                                  kw::high_accuracy = high_accuracy,
-                                                  kw::compact_mode = compact_mode,
-                                                  kw::opt_level = opt_level,
-                                                  kw::fast_math = fast_math,
-                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}}};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = csin(par[0], combined) + ccos(par[1], combined), prime(y) = x + y},
+                {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math,
+                kw::pars = {fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}}};
 
             ta.step(true);
 
@@ -163,7 +193,8 @@ TEST_CASE("taylor sincos")
 
         {
             auto ta = taylor_adaptive<fp_t>{
-                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+                 prime(y) = x + y},
                 {fp_t(2), fp_t(3)},
                 kw::tol = .5,
                 kw::high_accuracy = high_accuracy,
@@ -185,7 +216,8 @@ TEST_CASE("taylor sincos")
 
         {
             auto ta = taylor_adaptive_batch<fp_t>{
-                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+                 prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                 2,
                 kw::tol = .5,
@@ -219,7 +251,8 @@ TEST_CASE("taylor sincos")
 
         {
             auto ta = taylor_adaptive_batch<fp_t>{
-                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+                 prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
                 3,
                 kw::tol = .1,
@@ -266,15 +299,16 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
-                                                  {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
-                                                  3,
-                                                  kw::tol = .1,
-                                                  kw::high_accuracy = high_accuracy,
-                                                  kw::compact_mode = compact_mode,
-                                                  kw::opt_level = opt_level,
-                                                  kw::fast_math = fast_math,
-                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}}};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = csin(par[0], combined) + ccos(par[1], combined), prime(y) = x + y},
+                {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math,
+                kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}}};
 
             ta.step(true);
 
@@ -315,18 +349,20 @@ TEST_CASE("taylor sincos")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>(
-            {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
-            opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
+            {prime(x) = csin(expression{number{fp_t{2}}}, combined) + ccos(expression{number{fp_t{3}}}, combined),
+             prime(y) = x + y},
+            opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
 
         // Variable tests.
         {
-            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
-                                            {fp_t(2), fp_t(3)},
-                                            kw::tol = 1,
-                                            kw::high_accuracy = high_accuracy,
-                                            kw::compact_mode = compact_mode,
-                                            kw::opt_level = opt_level,
-                                            kw::fast_math = fast_math};
+            auto ta
+                = taylor_adaptive<fp_t>{{prime(x) = csin(y + 1_dbl, combined), prime(y) = ccos(x + 1_dbl, combined)},
+                                        {fp_t(2), fp_t(3)},
+                                        kw::tol = 1,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode,
+                                        kw::opt_level = opt_level,
+                                        kw::fast_math = fast_math};
 
             ta.step(true);
 
@@ -339,14 +375,15 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
-                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
-                                                  2,
-                                                  kw::tol = 1,
-                                                  kw::high_accuracy = high_accuracy,
-                                                  kw::compact_mode = compact_mode,
-                                                  kw::opt_level = opt_level,
-                                                  kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = csin(y + 1_dbl, combined), prime(y) = ccos(x + 1_dbl, combined)},
+                {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
             ta.step(true);
 
@@ -366,13 +403,14 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
-                                            {fp_t{2}, fp_t{3}},
-                                            kw::tol = 1,
-                                            kw::high_accuracy = high_accuracy,
-                                            kw::compact_mode = compact_mode,
-                                            kw::opt_level = opt_level,
-                                            kw::fast_math = fast_math};
+            auto ta
+                = taylor_adaptive<fp_t>{{prime(x) = csin(y + 1_dbl, combined), prime(y) = ccos(x + 1_dbl, combined)},
+                                        {fp_t{2}, fp_t{3}},
+                                        kw::tol = 1,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode,
+                                        kw::opt_level = opt_level,
+                                        kw::fast_math = fast_math};
 
             ta.step(true);
 
@@ -387,7 +425,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y), prime(y) = cos(x)},
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = csin(y, combined), prime(y) = ccos(x, combined)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
                                                   2,
                                                   kw::tol = .5,
@@ -420,7 +458,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y), prime(y) = cos(x)},
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = csin(y, combined), prime(y) = ccos(x, combined)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}},
                                                   3,
                                                   kw::tol = .1,
@@ -473,37 +511,43 @@ TEST_CASE("taylor sincos")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({prime(x) = sin(y), prime(y) = cos(x)}, opt_level, high_accuracy, compact_mode, rng,
-                                   -10.f, 10.f);
+        compare_batch_scalar<fp_t>({prime(x) = csin(y, combined), prime(y) = ccos(x, combined)}, opt_level,
+                                   high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
     };
 
-    for (auto cm : {false, true}) {
-        for (auto f : {false, true}) {
-            // NOTE: when enabling the fast math flag, we are observing buggy behaviour
-            // on x86 with 80-bit long double/real128. Specifically, it seems like C++ code
-            // such as sin(expression{number{fp_t{2}}}) (which ultimately just invokes
-            // std::sin() due to constant folding) returns sometimes a value of NaN.
-            // This happens when both 80-bit long double and real128 are available,
-            // and it is triggered when both the no-signed-zeros and no-nans fast math
-            // flags are activated. Disabling either the long double or real128 testing
-            // makes the problem go away.
-            //
-            // My impression is that there is some code generation bug in LLVM which leaks
-            // out into the surrounding C++ code - perhaps some register not being properly
-            // restored or something like that. For now, let us implement this workaround.
-            constexpr bool enable_fm_test =
-#if defined(HEYOKA_ARCH_PPC)
-                true
+    for (auto combined : {true, false}) {
+        for (auto cm : {false, true}) {
+            for (auto f : {false, true}) {
+                // NOTE: when enabling the fast math flag, we are observing buggy behaviour on x86 with 80-bit long
+                // double/real128. Specifically, it seems like C++ code such as sin(expression{number{fp_t{2}}}) (which
+                // ultimately just invokes std::sin() due to constant folding) returns sometimes a value of NaN. This
+                // happens when both 80-bit long double and real128 are available, and it is triggered when both the
+                // no-signed-zeros and no-nans fast math flags are activated. Disabling either the long double or
+                // real128 testing makes the problem go away.
+                //
+                // My impression is that there is some code generation bug in LLVM which leaks out into the surrounding
+                // C++ code - perhaps some register not being properly restored or something like that. For now, let us
+                // implement this workaround.
+                //
+                // UPDATE: this seems to be fixed as of LLVM 22.
+                constexpr bool enable_fm_test =
+#if defined(HEYOKA_ARCH_PPC) || LLVM_VERSION_MAJOR >= 22
+                    true
 #else
-                std::numeric_limits<long double>::digits != 64
+                    std::numeric_limits<long double>::digits != 64
 #endif
-                ;
+                    ;
 
-            for (auto fm : {false, enable_fm_test}) {
-                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 0, f, cm, fm); });
-                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 1, f, cm, fm); });
-                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 2, f, cm, fm); });
-                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 3, f, cm, fm); });
+                for (auto fm : {false, enable_fm_test}) {
+                    tuple_for_each(fp_types,
+                                   [&tester, f, cm, fm, combined](auto x) { tester(x, 0, f, cm, fm, combined); });
+                    tuple_for_each(fp_types,
+                                   [&tester, f, cm, fm, combined](auto x) { tester(x, 1, f, cm, fm, combined); });
+                    tuple_for_each(fp_types,
+                                   [&tester, f, cm, fm, combined](auto x) { tester(x, 2, f, cm, fm, combined); });
+                    tuple_for_each(fp_types,
+                                   [&tester, f, cm, fm, combined](auto x) { tester(x, 3, f, cm, fm, combined); });
+                }
             }
         }
     }
@@ -517,26 +561,29 @@ TEST_CASE("taylor sincos cse")
 
     auto x = "x"_var, y = "y"_var;
 
-    auto ta = taylor_adaptive<double>{
-        {prime(x) = (sin(x) + cos(y)) + (sin(y) + cos(x)), prime(y) = (sin(x) + cos(y)) + (sin(y) + cos(x))},
-        {2., 3.},
-        kw::opt_level = 0,
-        kw::tol = 1.};
+    for (auto combined : {true, false}) {
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined)),
+             prime(y) = (csin(x, combined) + ccos(y, combined)) + (csin(y, combined) + ccos(x, combined))},
+            {2., 3.},
+            kw::opt_level = 0,
+            kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 11u);
+        REQUIRE(ta.get_decomposition().size() == 11u);
 
-    ta.step(true);
+        ta.step(true);
 
-    const auto jet = tc_to_jet(ta);
+        const auto jet = tc_to_jet(ta);
 
-    REQUIRE(jet[0] == 2);
-    REQUIRE(jet[1] == 3);
-    REQUIRE(jet[2] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
-    REQUIRE(jet[3] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
-    REQUIRE(jet[4]
-            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
-                             / 2));
-    REQUIRE(jet[5]
-            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
-                             / 2));
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
+        REQUIRE(jet[3] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
+        REQUIRE(jet[4]
+                == approximately(
+                    (cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3]) / 2));
+        REQUIRE(jet[5]
+                == approximately(
+                    (cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3]) / 2));
+    }
 }

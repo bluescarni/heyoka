@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <utility>
 
 #include <mp++/real.hpp>
 
@@ -27,40 +28,61 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+// Wrappers to make the combined versions of sin/cos.
+expression csin(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_sin(std::move(x));
+    } else {
+        return sin(std::move(x));
+    }
+}
+
+expression ccos(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_cos(std::move(x));
+    } else {
+        return cos(std::move(x));
+    }
+}
+
 TEST_CASE("cos")
 {
     using fp_t = mppp::real;
 
     auto x = "x"_var, y = "y"_var;
 
-    for (auto opt_level : {0u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto ha : {false, true}) {
-                for (auto prec : {30, 123}) {
-                    // Test with param.
-                    {
-                        auto ta = taylor_adaptive<fp_t>{{prime(x) = cos(par[0]), prime(y) = x + y},
-                                                        {fp_t{2, prec}, fp_t{3, prec}},
-                                                        kw::tol = 1,
-                                                        kw::high_accuracy = ha,
-                                                        kw::compact_mode = cm,
-                                                        kw::opt_level = opt_level,
-                                                        kw::pars = {fp_t{3, prec}}};
+    for (auto combined : {true, false}) {
+        for (auto opt_level : {0u, 3u}) {
+            for (auto cm : {false, true}) {
+                for (auto ha : {false, true}) {
+                    for (auto prec : {30, 123}) {
+                        // Test with param.
+                        {
+                            auto ta = taylor_adaptive<fp_t>{{prime(x) = ccos(par[0], combined), prime(y) = x + y},
+                                                            {fp_t{2, prec}, fp_t{3, prec}},
+                                                            kw::tol = 1,
+                                                            kw::high_accuracy = ha,
+                                                            kw::compact_mode = cm,
+                                                            kw::opt_level = opt_level,
+                                                            kw::pars = {fp_t{3, prec}}};
 
-                        ta.step(true);
+                            ta.step(true);
 
-                        const auto jet = tc_to_jet(ta);
+                            const auto jet = tc_to_jet(ta);
 
-                        REQUIRE(jet[0] == 2);
-                        REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(cos(ta.get_pars()[0])));
-                        REQUIRE(jet[3] == approximately(fp_t{5, prec}));
-                        REQUIRE(jet[4] == 0);
-                        REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
-                    }
-                    // Test with variable.
-                    {
-                        auto ta = taylor_adaptive<fp_t>{{prime(x) = cos(y + 2_dbl), prime(y) = par[0] + x},
+                            REQUIRE(jet[0] == 2);
+                            REQUIRE(jet[1] == 3);
+                            REQUIRE(jet[2] == approximately(cos(ta.get_pars()[0])));
+                            REQUIRE(jet[3] == approximately(fp_t{5, prec}));
+                            REQUIRE(jet[4] == 0);
+                            REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
+                        }
+                        // Test with variable.
+                        {
+                            auto ta
+                                = taylor_adaptive<fp_t>{{prime(x) = ccos(y + 2_dbl, combined), prime(y) = par[0] + x},
                                                         {fp_t{2, prec}, fp_t{3, prec}},
                                                         kw::tol = 1,
                                                         kw::high_accuracy = ha,
@@ -68,16 +90,17 @@ TEST_CASE("cos")
                                                         kw::opt_level = opt_level,
                                                         kw::pars = {fp_t{-4, prec}}};
 
-                        ta.step(true);
+                            ta.step(true);
 
-                        const auto jet = tc_to_jet(ta);
+                            const auto jet = tc_to_jet(ta);
 
-                        REQUIRE(jet[0] == 2);
-                        REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(cos(jet[1] + fp_t(2, prec))));
-                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
-                        REQUIRE(jet[4] == approximately(fp_t(.5, prec) * -sin(jet[1] + fp_t(2, prec)) * jet[3]));
-                        REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
+                            REQUIRE(jet[0] == 2);
+                            REQUIRE(jet[1] == 3);
+                            REQUIRE(jet[2] == approximately(cos(jet[1] + fp_t(2, prec))));
+                            REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
+                            REQUIRE(jet[4] == approximately(fp_t(.5, prec) * -sin(jet[1] + fp_t(2, prec)) * jet[3]));
+                            REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
+                        }
                     }
                 }
             }
@@ -91,34 +114,36 @@ TEST_CASE("sin")
 
     auto x = "x"_var, y = "y"_var;
 
-    for (auto opt_level : {0u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto ha : {false, true}) {
-                for (auto prec : {30, 123}) {
-                    // Test with param.
-                    {
-                        auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(par[0]), prime(y) = x + y},
-                                                        {fp_t{2, prec}, fp_t{3, prec}},
-                                                        kw::tol = 1,
-                                                        kw::high_accuracy = ha,
-                                                        kw::compact_mode = cm,
-                                                        kw::opt_level = opt_level,
-                                                        kw::pars = {fp_t{3, prec}}};
+    for (auto combined : {true, false}) {
+        for (auto opt_level : {0u, 3u}) {
+            for (auto cm : {false, true}) {
+                for (auto ha : {false, true}) {
+                    for (auto prec : {30, 123}) {
+                        // Test with param.
+                        {
+                            auto ta = taylor_adaptive<fp_t>{{prime(x) = csin(par[0], combined), prime(y) = x + y},
+                                                            {fp_t{2, prec}, fp_t{3, prec}},
+                                                            kw::tol = 1,
+                                                            kw::high_accuracy = ha,
+                                                            kw::compact_mode = cm,
+                                                            kw::opt_level = opt_level,
+                                                            kw::pars = {fp_t{3, prec}}};
 
-                        ta.step(true);
+                            ta.step(true);
 
-                        const auto jet = tc_to_jet(ta);
+                            const auto jet = tc_to_jet(ta);
 
-                        REQUIRE(jet[0] == 2);
-                        REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(sin(ta.get_pars()[0])));
-                        REQUIRE(jet[3] == approximately(fp_t{5, prec}));
-                        REQUIRE(jet[4] == 0);
-                        REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
-                    }
-                    // Test with variable.
-                    {
-                        auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(y + 2_dbl), prime(y) = par[0] + x},
+                            REQUIRE(jet[0] == 2);
+                            REQUIRE(jet[1] == 3);
+                            REQUIRE(jet[2] == approximately(sin(ta.get_pars()[0])));
+                            REQUIRE(jet[3] == approximately(fp_t{5, prec}));
+                            REQUIRE(jet[4] == 0);
+                            REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
+                        }
+                        // Test with variable.
+                        {
+                            auto ta
+                                = taylor_adaptive<fp_t>{{prime(x) = csin(y + 2_dbl, combined), prime(y) = par[0] + x},
                                                         {fp_t{2, prec}, fp_t{3, prec}},
                                                         kw::tol = 1,
                                                         kw::high_accuracy = ha,
@@ -126,16 +151,17 @@ TEST_CASE("sin")
                                                         kw::opt_level = opt_level,
                                                         kw::pars = {fp_t{-4, prec}}};
 
-                        ta.step(true);
+                            ta.step(true);
 
-                        const auto jet = tc_to_jet(ta);
+                            const auto jet = tc_to_jet(ta);
 
-                        REQUIRE(jet[0] == 2);
-                        REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(sin(jet[1] + fp_t(2, prec))));
-                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
-                        REQUIRE(jet[4] == approximately(fp_t(.5, prec) * cos(jet[1] + fp_t(2, prec)) * jet[3]));
-                        REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
+                            REQUIRE(jet[0] == 2);
+                            REQUIRE(jet[1] == 3);
+                            REQUIRE(jet[2] == approximately(sin(jet[1] + fp_t(2, prec))));
+                            REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
+                            REQUIRE(jet[4] == approximately(fp_t(.5, prec) * cos(jet[1] + fp_t(2, prec)) * jet[3]));
+                            REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
+                        }
                     }
                 }
             }

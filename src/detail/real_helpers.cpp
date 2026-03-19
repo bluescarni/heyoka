@@ -37,6 +37,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/ModRef.h>
 
 #include <mp++/integer.hpp>
 #include <mp++/real.hpp>
@@ -357,8 +358,8 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
 }
 
 // Compute sin/cos at the same time.
-// NOTE: this needs a custom implementation due to the double
-// return value in the MPFR primitive.
+//
+// NOTE: this needs a custom implementation due to the double return value in the MPFR primitive.
 std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Value *x)
 {
     auto &md = s.module();
@@ -383,16 +384,23 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         auto *ft = llvm::FunctionType::get(ret_t, {fp_t}, false);
         f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
+        // NOTE: these are intended to inform the optimizer that this will be a pure function.
         f->addFnAttr(llvm::Attribute::NoUnwind);
         f->addFnAttr(llvm::Attribute::Speculatable);
         f->addFnAttr(llvm::Attribute::WillReturn);
+        // NOTE: we are reading from memory in this function, but only from a local alloca and this is allowed by the
+        // semantics of memory(none).
+        f->setMemoryEffects(llvm::MemoryEffects::none());
+        // NOTE: it is important that we prevent inlining - if the function is inlined, the information about its
+        // pureness is lost and CSE won't work. This is a minor pessimisation but it should hopefully have a very small
+        // impact.
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create undef values for the results and add them as initial function arguments.
         auto [real_res_sin, limb_arr_res_sin] = llvm_undef_mpfr_view(s, fp_t);
         auto [real_res_cos, limb_arr_res_cos] = llvm_undef_mpfr_view(s, fp_t);
-
         std::vector<llvm::Value *> mpfr_args{real_res_sin, real_res_cos};
 
         // Create the mpfr view for the input argument and add it to the function arguments.

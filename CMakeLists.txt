@@ -238,6 +238,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/sw_data_celestrak.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sincos_combine.cpp"
     # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
@@ -368,12 +369,29 @@ set(HEYOKA_SRC_FILES
 )
 
 if(HEYOKA_WITH_SLEEF)
-    # NOTE: the sleef dummy file needs to be compiled only
-    # if we are building with sleef support on.
     set(HEYOKA_SRC_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/make_combined_sleef_functions.cpp"
         "${HEYOKA_SRC_FILES}"
     )
+
+    # Detect available SIMD ISA levels and their compiler flags,
+    # then add the corresponding SLEEF wrapper files.
+    include(HeyokaSIMDConfigs)
+    heyoka_get_simd_configs(_HEYOKA_SLEEF_SUFFIXES _HEYOKA_SLEEF_FLAGS)
+
+    foreach(_HEYOKA_SLEEF_SUFFIX _HEYOKA_SLEEF_FLAG IN ZIP_LISTS _HEYOKA_SLEEF_SUFFIXES _HEYOKA_SLEEF_FLAGS)
+        set(_HEYOKA_SLEEF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_wrappers/${_HEYOKA_SLEEF_SUFFIX}.cpp")
+        list(APPEND HEYOKA_SRC_FILES "${_HEYOKA_SLEEF_SRC}")
+        # NOTE: some ISA levels (e.g., AArch64 AdvSIMD) are baseline and don't require a special compiler flag.
+        # In such cases, the flag will be empty.
+        if(NOT "${_HEYOKA_SLEEF_FLAG}" STREQUAL "")
+            set_source_files_properties("${_HEYOKA_SLEEF_SRC}" PROPERTIES COMPILE_OPTIONS "${_HEYOKA_SLEEF_FLAG}")
+        endif()
+        unset(_HEYOKA_SLEEF_SRC)
+    endforeach()
+    unset(_HEYOKA_SLEEF_SUFFIX)
+    unset(_HEYOKA_SLEEF_FLAG)
 endif()
 
 # Setup the heyoka ABI version number.
@@ -609,6 +627,14 @@ endif()
 if(HEYOKA_WITH_SLEEF)
     find_package(heyoka_SLEEF REQUIRED)
     target_link_libraries(heyoka PRIVATE heyoka::SLEEF)
+
+    # Add compile definitions for each SIMD ISA level that was detected.
+    foreach(_HEYOKA_SLEEF_SUFFIX IN LISTS _HEYOKA_SLEEF_SUFFIXES)
+        string(TOUPPER "${_HEYOKA_SLEEF_SUFFIX}" _HEYOKA_SLEEF_SUFFIX_UPPER)
+        target_compile_definitions(heyoka PRIVATE "HEYOKA_SLEEF_${_HEYOKA_SLEEF_SUFFIX_UPPER}")
+        unset(_HEYOKA_SLEEF_SUFFIX_UPPER)
+    endforeach()
+    unset(_HEYOKA_SLEEF_SUFFIX)
 endif()
 
 # Mandatory private dependency on openssl.
@@ -671,6 +697,10 @@ unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_HAVE_STRERROR_R)
 if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
+endif()
+if(HEYOKA_WITH_SLEEF)
+    unset(_HEYOKA_SLEEF_SUFFIXES)
+    unset(_HEYOKA_SLEEF_FLAGS)
 endif()
 
 if(HEYOKA_BUILD_TESTS)

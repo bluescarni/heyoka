@@ -65,65 +65,87 @@ const auto fp_types = std::tuple<float, double
 
 constexpr bool skip_batch_ld = false;
 
+// Wrappers to make the combined versions of sin/cos.
+expression sin(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_sin(std::move(x));
+    } else {
+        return sin(std::move(x));
+    }
+}
+
+expression cos(expression x, const bool combined)
+{
+    if (combined) {
+        return detail::combined_cos(std::move(x));
+    } else {
+        return cos(std::move(x));
+    }
+}
+
 TEST_CASE("sin diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(sin(x * x - y), x) == cos(x * x - y) * (x + x));
-    REQUIRE(diff(sin(x * x - y), y) == -cos(x * x - y));
+    for (const auto combined : {true, false}) {
+        REQUIRE(diff(sin(x * x - y, combined), x) == cos(x * x - y, combined) * (x + x));
+        REQUIRE(diff(sin(x * x - y, combined), y) == -cos(x * x - y, combined));
 
-    REQUIRE(diff(sin(par[0] * par[0] - y), par[0]) == cos(par[0] * par[0] - y) * (par[0] + par[0]));
-    REQUIRE(diff(sin(x * x - par[1]), par[1]) == -cos(x * x - par[1]));
+        REQUIRE(diff(sin(par[0] * par[0] - y, combined), par[0])
+                == cos(par[0] * par[0] - y, combined) * (par[0] + par[0]));
+        REQUIRE(diff(sin(x * x - par[1], combined), par[1]) == -cos(x * x - par[1], combined));
+    }
 }
 
 TEST_CASE("sin s11n")
 {
-    std::stringstream ss;
+    for (const auto combined : {true, false}) {
+        std::stringstream ss;
 
-    auto x = make_vars("x");
+        auto x = make_vars("x");
 
-    auto ex = sin(x);
+        auto ex = sin(x, combined);
 
-    {
-        boost::archive::binary_oarchive oa(ss);
+        {
+            boost::archive::binary_oarchive oa(ss);
 
-        oa << ex;
+            oa << ex;
+        }
+
+        ex = 0_dbl;
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> ex;
+        }
+
+        REQUIRE(ex == sin(x, combined));
     }
-
-    ex = 0_dbl;
-
-    {
-        boost::archive::binary_iarchive ia(ss);
-
-        ia >> ex;
-    }
-
-    REQUIRE(ex == sin(x));
 }
 
 TEST_CASE("sin number simpl")
 {
-    using std::sin;
-
     auto x = make_vars("x");
 
-    REQUIRE(sin(x * 0.) == 0_dbl);
-    REQUIRE(sin(0.123_flt) == expression{sin(0.123f)});
-    REQUIRE(sin(0.123_dbl) == expression{sin(0.123)});
-    REQUIRE(sin(-0.123_ldbl) == expression{sin(-0.123l)});
+    for (const auto combined : {true, false}) {
+        REQUIRE(sin(x * 0., combined) == 0_dbl);
+        REQUIRE(sin(0.123_flt, combined) == expression{std::sin(0.123f)});
+        REQUIRE(sin(0.123_dbl, combined) == expression{std::sin(0.123)});
+        REQUIRE(sin(-0.123_ldbl, combined) == expression{std::sin(-0.123l)});
 
 #if defined(HEYOKA_HAVE_REAL128)
-    using namespace mppp::literals;
+        using namespace mppp::literals;
 
-    REQUIRE(sin(-0.123_f128) == expression{sin(-0.123_rq)});
+        REQUIRE(sin(-0.123_f128, combined) == expression{sin(-0.123_rq)});
 #endif
+    }
 }
 
 TEST_CASE("cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
-        using std::sin;
-
         using fp_t = decltype(fp_x);
 
         auto x = make_vars("x");
@@ -134,37 +156,42 @@ TEST_CASE("cfunc")
 
         std::vector<fp_t> outs, ins, pars;
 
-        for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
+        for (const auto combined : {true, false}) {
+            for (auto batch_size : {1u, 2u, 4u, 5u}) {
+                if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
+                    continue;
+                }
 
-            outs.resize(batch_size * 3u);
-            ins.resize(batch_size);
-            pars.resize(batch_size);
+                outs.resize(batch_size * 3u);
+                ins.resize(batch_size);
+                pars.resize(batch_size);
 
-            std::generate(ins.begin(), ins.end(), gen);
-            std::generate(pars.begin(), pars.end(), gen);
+                std::generate(ins.begin(), ins.end(), gen);
+                std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf({sin(x), sin(expression{fp_t(.5)}), sin(par[0])}, {x},
-                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+                cfunc<fp_t> cf({sin(x, combined), sin(expression{fp_t(.5)}, combined), sin(par[0], combined)}, {x},
+                               kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                               kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
-            if (opt_level == 0u && compact_mode) {
-                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sin.");
-                }));
-            }
+                if (opt_level == 0u && compact_mode) {
+                    const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
 
-            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
-               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
-               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
+                    REQUIRE(std::ranges::any_of(irs, [combined](const auto &ir) {
+                        return boost::contains(ir, combined ? "heyoka.llvm_c_eval.combined_sin."
+                                                            : "heyoka.llvm_c_eval.sin.");
+                    }));
+                }
 
-            for (auto i = 0u; i < batch_size; ++i) {
-                REQUIRE(outs[i] == approximately(sin(ins[i]), fp_t(100)));
-                REQUIRE(outs[i + batch_size] == approximately(sin(static_cast<fp_t>(.5)), fp_t(100)));
-                REQUIRE(outs[i + 2u * batch_size] == approximately(sin(pars[i]), fp_t(100)));
+                cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+                   mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+                   kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
+
+                using std::sin;
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(outs[i] == approximately(sin(ins[i]), fp_t(100)));
+                    REQUIRE(outs[i + batch_size] == approximately(sin(static_cast<fp_t>(.5)), fp_t(100)));
+                    REQUIRE(outs[i + 2u * batch_size] == approximately(sin(pars[i]), fp_t(100)));
+                }
             }
         }
     };
@@ -187,22 +214,24 @@ TEST_CASE("cfunc_mp")
 
     const auto prec = 237u;
 
-    for (auto compact_mode : {false, true}) {
-        for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<mppp::real> cf({sin(x), sin(expression{mppp::real{-.5, prec}}), sin(par[0])}, {x},
-                                 kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+    for (const auto combined : {true, false}) {
+        for (auto compact_mode : {false, true}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                cfunc<mppp::real> cf(
+                    {sin(x, combined), sin(expression{mppp::real{-.5, prec}}, combined), sin(par[0], combined)}, {x},
+                    kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
-            const std::vector ins{mppp::real{".7", prec}};
-            const std::vector pars{mppp::real{"-.1", prec}};
-            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+                const std::vector ins{mppp::real{".7", prec}};
+                const std::vector pars{mppp::real{"-.1", prec}};
+                std::vector<mppp::real> outs(3u, mppp::real{0, prec});
 
-            cf(outs, ins, kw::pars = pars);
+                cf(outs, ins, kw::pars = pars);
 
-            auto i = 0u;
-            REQUIRE(outs[i] == sin(ins[i]));
-            REQUIRE(outs[i + 1u] == sin(mppp::real{-.5, prec}));
-            REQUIRE(outs[i + 2u * 1u] == sin(pars[i]));
+                auto i = 0u;
+                REQUIRE(outs[i] == sin(ins[i]));
+                REQUIRE(outs[i + 1u] == sin(mppp::real{-.5, prec}));
+                REQUIRE(outs[i + 2u * 1u] == sin(pars[i]));
+            }
         }
     }
 }
@@ -212,243 +241,265 @@ TEST_CASE("cfunc_mp")
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")
 {
-    for (auto fast_math : {false, true}) {
-        llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
+    for (const auto combined : {true, false}) {
+        for (auto fast_math : {false, true}) {
+            llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
 
-        auto [a, b] = make_vars("a", "b");
+            auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {sin(a), sin(b)}, {a, b});
-        add_cfunc<double>(s, "cfuncs", {sin(a), sin(b)}, {a, b}, kw::strided = true);
+            add_cfunc<double>(s, "cfunc", {sin(a, combined), sin(b, combined)}, {a, b});
+            add_cfunc<double>(s, "cfuncs", {sin(a, combined), sin(b, combined)}, {a, b}, kw::strided = true);
 
-        s.compile();
+            s.compile();
 
-        auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s.jit_lookup("cfunc"));
+            auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s.jit_lookup("cfunc"));
 
-        const std::vector ins{1., 2.};
-        std::vector<double> outs(2u, 0.);
+            const std::vector ins{1., 2.};
+            std::vector<double> outs(2u, 0.);
 
-        cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
 
-        REQUIRE(outs[0] == approximately(std::sin(1.)));
-        REQUIRE(outs[1] == approximately(std::sin(2.)));
+            REQUIRE(outs[0] == approximately(std::sin(1.)));
+            REQUIRE(outs[1] == approximately(std::sin(2.)));
 
 #if defined(HEYOKA_WITH_SLEEF)
 
-        const auto &tf = detail::get_target_features();
+            const auto &tf = detail::get_target_features();
 
-        auto ir = s.get_ir();
+            auto ir = s.get_ir();
 
-        using string_find_iterator = boost::find_iterator<std::string::iterator>;
+            using string_find_iterator = boost::find_iterator<std::string::iterator>;
 
-        auto count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
+            auto count = 0u;
+            for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+                 it != string_find_iterator(); ++it) {
+                ++count;
+            }
 
-        // NOTE: at the moment we have comprehensive coverage of LLVM versions
-        // in the CI only for x86_64.
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 2 calls in the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 3u);
-        }
+            // NOTE: at the moment we have comprehensive coverage of LLVM versions
+            // in the CI only for x86_64.
+            if (tf.sse2) {
+                // NOTE: occurrences of the scalar version:
+                // - 2 calls in the strided cfunc,
+                // - 1 declaration.
+                REQUIRE(count == 3u);
+            }
 
-        if (tf.aarch64) {
-            REQUIRE(count == 3u);
-        }
+            if (tf.aarch64) {
+                REQUIRE(count == 3u);
+            }
 
-        // NOTE: currently no auto-vectorization happens on ppc64 due apparently
-        // to the way the target machine is being set up by orc/lljit (it works
-        // fine with the opt tool). When this is resolved, we can test ppc64 too.
+            // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+            // to the way the target machine is being set up by orc/lljit (it works
+            // fine with the opt tool). When this is resolved, we can test ppc64 too.
 
-        // if (tf.vsx) {
-        //     REQUIRE(count == 3u);
-        // }
+            // if (tf.vsx) {
+            //     REQUIRE(count == 3u);
+            // }
 
-        // Some more extensive testing specific to x86, only for this function.
-        auto [c, d, e] = make_vars("c", "d", "e");
+            // Some more extensive testing specific to x86, only for this function.
+            auto [c, d, e] = make_vars("c", "d", "e");
 
-        llvm_state s2{kw::slp_vectorize = true};
+            llvm_state s2{kw::slp_vectorize = true};
 
-        add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d});
-        add_cfunc<double>(s2, "cfunc1s", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d}, kw::strided = true);
-        add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)}, {a, b, c, d, e});
-        add_cfunc<double>(s2, "cfunc2s", {sin(a), sin(b), sin(c), sin(d), sin(e)}, {a, b, c, d, e}, kw::strided = true);
+            add_cfunc<double>(s2, "cfunc1", {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined)},
+                              {a, b, c, d});
+            add_cfunc<double>(s2, "cfunc1s", {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined)},
+                              {a, b, c, d}, kw::strided = true);
+            add_cfunc<double>(
+                s2, "cfunc2",
+                {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined)},
+                {a, b, c, d, e});
+            add_cfunc<double>(
+                s2, "cfunc2s",
+                {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined)},
+                {a, b, c, d, e}, kw::strided = true);
 
-        s2.compile();
+            s2.compile();
 
-        auto *cf1_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s2.jit_lookup("cfunc1"));
-        auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s2.jit_lookup("cfunc2"));
+            auto *cf1_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s2.jit_lookup("cfunc1"));
+            auto *cf2_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s2.jit_lookup("cfunc2"));
 
-        const std::vector ins2{1., 2., 3., 4., 5.};
-        std::vector<double> outs2(5u, 0.);
+            const std::vector ins2{1., 2., 3., 4., 5.};
+            std::vector<double> outs2(5u, 0.);
 
-        cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+            cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
 
-        REQUIRE(outs2[0] == approximately(std::sin(1.)));
-        REQUIRE(outs2[1] == approximately(std::sin(2.)));
-        REQUIRE(outs2[2] == approximately(std::sin(3.)));
-        REQUIRE(outs2[3] == approximately(std::sin(4.)));
+            REQUIRE(outs2[0] == approximately(std::sin(1.)));
+            REQUIRE(outs2[1] == approximately(std::sin(2.)));
+            REQUIRE(outs2[2] == approximately(std::sin(3.)));
+            REQUIRE(outs2[3] == approximately(std::sin(4.)));
 
-        cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+            cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
 
-        REQUIRE(outs2[0] == approximately(std::sin(1.)));
-        REQUIRE(outs2[1] == approximately(std::sin(2.)));
-        REQUIRE(outs2[2] == approximately(std::sin(3.)));
-        REQUIRE(outs2[3] == approximately(std::sin(4.)));
-        REQUIRE(outs2[4] == approximately(std::sin(5.)));
+            REQUIRE(outs2[0] == approximately(std::sin(1.)));
+            REQUIRE(outs2[1] == approximately(std::sin(2.)));
+            REQUIRE(outs2[2] == approximately(std::sin(3.)));
+            REQUIRE(outs2[3] == approximately(std::sin(4.)));
+            REQUIRE(outs2[4] == approximately(std::sin(5.)));
 
-        ir = s2.get_ir();
+            ir = s2.get_ir();
 
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
+            count = 0u;
+            for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+                 it != string_find_iterator(); ++it) {
+                ++count;
+            }
 
-        if (tf.avx) {
-            // NOTE: occurrences of the scalar version:
-            // - 4 + 5 calls in the strided cfuncs,
-            // - 1 declaration,
-            // - 1 call to deal with the remainder in the
-            //   5-argument version.
-            REQUIRE(count == 11u);
-        }
+            if (tf.avx) {
+                // NOTE: occurrences of the scalar version:
+                // - 4 + 5 calls in the strided cfuncs,
+                // - 1 declaration,
+                // - 1 call to deal with the remainder in the
+                //   5-argument version.
+                REQUIRE(count == 11u);
+            }
 
 #endif
+        }
     }
 }
 
 TEST_CASE("vfabi float")
 {
-    for (auto fast_math : {false, true}) {
-        llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
+    for (const auto combined : {true, false}) {
+        for (auto fast_math : {false, true}) {
+            llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
 
-        auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+            auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d});
-        add_cfunc<float>(s, "cfuncs", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d}, kw::strided = true);
+            add_cfunc<float>(s, "cfunc", {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined)},
+                             {a, b, c, d});
+            add_cfunc<float>(s, "cfuncs", {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined)},
+                             {a, b, c, d}, kw::strided = true);
 
-        s.compile();
+            s.compile();
 
-        auto *cf_ptr
-            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(
+                s.jit_lookup("cfunc"));
 
-        const std::vector<float> ins{1., 2., 3., 4.};
-        std::vector<float> outs(4u, 0.);
+            const std::vector<float> ins{1., 2., 3., 4.};
+            std::vector<float> outs(4u, 0.);
 
-        cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
 
-        REQUIRE(outs[0] == approximately(std::sin(1.f)));
-        REQUIRE(outs[1] == approximately(std::sin(2.f)));
-        REQUIRE(outs[2] == approximately(std::sin(3.f)));
-        REQUIRE(outs[3] == approximately(std::sin(4.f)));
+            REQUIRE(outs[0] == approximately(std::sin(1.f)));
+            REQUIRE(outs[1] == approximately(std::sin(2.f)));
+            REQUIRE(outs[2] == approximately(std::sin(3.f)));
+            REQUIRE(outs[3] == approximately(std::sin(4.f)));
 
 #if defined(HEYOKA_WITH_SLEEF)
 
-        const auto &tf = detail::get_target_features();
+            const auto &tf = detail::get_target_features();
 
-        auto ir = s.get_ir();
+            auto ir = s.get_ir();
 
-        using string_find_iterator = boost::find_iterator<std::string::iterator>;
+            using string_find_iterator = boost::find_iterator<std::string::iterator>;
 
-        auto count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f32", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
+            auto count = 0u;
+            for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f32", boost::is_iequal()));
+                 it != string_find_iterator(); ++it) {
+                ++count;
+            }
 
-        // NOTE: at the moment we have comprehensive coverage of LLVM versions
-        // in the CI only for x86_64.
-        if (tf.sse2) {
-            // NOTE: occurrences of the scalar version:
-            // - 4 calls in the strided cfunc,
-            // - 1 declaration.
-            REQUIRE(count == 5u);
-        }
+            // NOTE: at the moment we have comprehensive coverage of LLVM versions
+            // in the CI only for x86_64.
+            if (tf.sse2) {
+                // NOTE: occurrences of the scalar version:
+                // - 4 calls in the strided cfunc,
+                // - 1 declaration.
+                REQUIRE(count == 5u);
+            }
 
-        if (tf.aarch64) {
-            REQUIRE(count == 5u);
-        }
+            if (tf.aarch64) {
+                REQUIRE(count == 5u);
+            }
 
-        // NOTE: currently no auto-vectorization happens on ppc64 due apparently
-        // to the way the target machine is being set up by orc/lljit (it works
-        // fine with the opt tool). When this is resolved, we can test ppc64 too.
+            // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+            // to the way the target machine is being set up by orc/lljit (it works
+            // fine with the opt tool). When this is resolved, we can test ppc64 too.
 
-        // if (tf.vsx) {
-        //     REQUIRE(count == 5u);
-        // }
+            // if (tf.vsx) {
+            //     REQUIRE(count == 5u);
+            // }
 
-        // Some more extensive testing specific to x86, only for this function.
-        auto [e, f, g, h, i] = make_vars("e", "f", "g", "h", "i");
+            // Some more extensive testing specific to x86, only for this function.
+            auto [e, f, g, h, i] = make_vars("e", "f", "g", "h", "i");
 
-        llvm_state s2{kw::slp_vectorize = true};
+            llvm_state s2{kw::slp_vectorize = true};
 
-        add_cfunc<float>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h)},
-                         {a, b, c, d, e, f, g, h});
-        add_cfunc<float>(s2, "cfunc1s", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h)},
-                         {a, b, c, d, e, f, g, h}, kw::strided = true);
-        add_cfunc<float>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h), sin(i)},
-                         {a, b, c, d, e, f, g, h, i});
-        add_cfunc<float>(s2, "cfunc2s", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h), sin(i)},
-                         {a, b, c, d, e, f, g, h, i}, kw::strided = true);
+            add_cfunc<float>(s2, "cfunc1",
+                             {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined),
+                              sin(f, combined), sin(g, combined), sin(h, combined)},
+                             {a, b, c, d, e, f, g, h});
+            add_cfunc<float>(s2, "cfunc1s",
+                             {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined),
+                              sin(f, combined), sin(g, combined), sin(h, combined)},
+                             {a, b, c, d, e, f, g, h}, kw::strided = true);
+            add_cfunc<float>(s2, "cfunc2",
+                             {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined),
+                              sin(f, combined), sin(g, combined), sin(h, combined), sin(i, combined)},
+                             {a, b, c, d, e, f, g, h, i});
+            add_cfunc<float>(s2, "cfunc2s",
+                             {sin(a, combined), sin(b, combined), sin(c, combined), sin(d, combined), sin(e, combined),
+                              sin(f, combined), sin(g, combined), sin(h, combined), sin(i, combined)},
+                             {a, b, c, d, e, f, g, h, i}, kw::strided = true);
 
-        s2.compile();
+            s2.compile();
 
-        auto *cf1_ptr
-            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s2.jit_lookup("cfunc1"));
-        auto *cf2_ptr
-            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s2.jit_lookup("cfunc2"));
+            auto *cf1_ptr = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(
+                s2.jit_lookup("cfunc1"));
+            auto *cf2_ptr = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(
+                s2.jit_lookup("cfunc2"));
 
-        const std::vector<float> ins2{1., 2., 3., 4., 5., 6., 7., 8., 9.};
-        std::vector<float> outs2(9u, 0.);
+            const std::vector<float> ins2{1., 2., 3., 4., 5., 6., 7., 8., 9.};
+            std::vector<float> outs2(9u, 0.);
 
-        cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+            cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
 
-        REQUIRE(outs2[0] == approximately(std::sin(1.f)));
-        REQUIRE(outs2[1] == approximately(std::sin(2.f)));
-        REQUIRE(outs2[2] == approximately(std::sin(3.f)));
-        REQUIRE(outs2[3] == approximately(std::sin(4.f)));
-        REQUIRE(outs2[4] == approximately(std::sin(5.f)));
-        REQUIRE(outs2[5] == approximately(std::sin(6.f)));
-        REQUIRE(outs2[6] == approximately(std::sin(7.f)));
-        REQUIRE(outs2[7] == approximately(std::sin(8.f)));
+            REQUIRE(outs2[0] == approximately(std::sin(1.f)));
+            REQUIRE(outs2[1] == approximately(std::sin(2.f)));
+            REQUIRE(outs2[2] == approximately(std::sin(3.f)));
+            REQUIRE(outs2[3] == approximately(std::sin(4.f)));
+            REQUIRE(outs2[4] == approximately(std::sin(5.f)));
+            REQUIRE(outs2[5] == approximately(std::sin(6.f)));
+            REQUIRE(outs2[6] == approximately(std::sin(7.f)));
+            REQUIRE(outs2[7] == approximately(std::sin(8.f)));
 
-        cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+            cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
 
-        REQUIRE(outs2[0] == approximately(std::sin(1.f)));
-        REQUIRE(outs2[1] == approximately(std::sin(2.f)));
-        REQUIRE(outs2[2] == approximately(std::sin(3.f)));
-        REQUIRE(outs2[3] == approximately(std::sin(4.f)));
-        REQUIRE(outs2[4] == approximately(std::sin(5.f)));
-        REQUIRE(outs2[5] == approximately(std::sin(6.f)));
-        REQUIRE(outs2[6] == approximately(std::sin(7.f)));
-        REQUIRE(outs2[7] == approximately(std::sin(8.f)));
-        REQUIRE(outs2[8] == approximately(std::sin(9.f)));
+            REQUIRE(outs2[0] == approximately(std::sin(1.f)));
+            REQUIRE(outs2[1] == approximately(std::sin(2.f)));
+            REQUIRE(outs2[2] == approximately(std::sin(3.f)));
+            REQUIRE(outs2[3] == approximately(std::sin(4.f)));
+            REQUIRE(outs2[4] == approximately(std::sin(5.f)));
+            REQUIRE(outs2[5] == approximately(std::sin(6.f)));
+            REQUIRE(outs2[6] == approximately(std::sin(7.f)));
+            REQUIRE(outs2[7] == approximately(std::sin(8.f)));
+            REQUIRE(outs2[8] == approximately(std::sin(9.f)));
 
-        ir = s2.get_ir();
+            ir = s2.get_ir();
 
-        count = 0u;
-        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f32", boost::is_iequal()));
-             it != string_find_iterator(); ++it) {
-            ++count;
-        }
+            count = 0u;
+            for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f32", boost::is_iequal()));
+                 it != string_find_iterator(); ++it) {
+                ++count;
+            }
 
-        if (tf.avx) {
-            // NOTE: occurrences of the scalar version:
-            // - 8 + 9 calls in the strided cfuncs,
-            // - 1 declaration,
-            // - 1 call to deal with the remainder in the
-            //   9-argument version.
-            REQUIRE(count == 19u);
-        }
+            if (tf.avx) {
+                // NOTE: occurrences of the scalar version:
+                // - 8 + 9 calls in the strided cfuncs,
+                // - 1 declaration,
+                // - 1 call to deal with the remainder in the
+                //   9-argument version.
+                REQUIRE(count == 19u);
+            }
 
 #endif
+        }
     }
 }
 
@@ -458,25 +509,27 @@ TEST_CASE("nonstandard batch sizes")
 {
     auto [x, y] = make_vars("x", "y");
 
-    auto ex = sin(x) + cos(x);
+    for (const auto combined : {true, false}) {
+        auto ex = sin(x, combined) + cos(x, combined);
 
-    std::vector<double> in, out;
+        std::vector<double> in, out;
 
-    for (auto batch_size : {3u, 17u, 20u, 23u}) {
-        for (auto cm : {false, true}) {
-            for (auto opt_level : {0u, 1u, 2u, 3u}) {
-                cfunc<double> cf({ex}, {x, y}, kw::batch_size = batch_size, kw::compact_mode = cm,
-                                 kw::opt_level = opt_level);
+        for (auto batch_size : {3u, 17u, 20u, 23u}) {
+            for (auto cm : {false, true}) {
+                for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                    cfunc<double> cf({ex}, {x, y}, kw::batch_size = batch_size, kw::compact_mode = cm,
+                                     kw::opt_level = opt_level);
 
-                in.resize(2u * batch_size, .3);
-                out.clear();
-                out.resize(batch_size);
+                    in.resize(2u * batch_size, .3);
+                    out.clear();
+                    out.resize(batch_size);
 
-                cf(mdspan<double, dextents<std::size_t, 2>>(out.data(), 1u, batch_size),
-                   mdspan<const double, dextents<std::size_t, 2>>(in.data(), 2u, batch_size));
+                    cf(mdspan<double, dextents<std::size_t, 2>>(out.data(), 1u, batch_size),
+                       mdspan<const double, dextents<std::size_t, 2>>(in.data(), 2u, batch_size));
 
-                std::ranges::for_each(out,
-                                      [](auto val) { REQUIRE(val == approximately(std::sin(.3) + std::cos(.3))); });
+                    std::ranges::for_each(out,
+                                          [](auto val) { REQUIRE(val == approximately(std::sin(.3) + std::cos(.3))); });
+                }
             }
         }
     }

@@ -57,27 +57,74 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-cos_impl::cos_impl(expression e) : func_base("cos", std::vector{std::move(e)}) {}
+namespace
+{
 
-cos_impl::cos_impl() : cos_impl(0_dbl) {}
+// Helpers to fetch the standard/combined variants of name and evaluation function for cos_impl.
+const char *cos_impl_fetch_name(const cos_impl &s)
+{
+    return s.is_combined() ? "combined_cos" : "cos";
+}
+
+using eval_func_t = llvm::Value *(*)(llvm_state &, llvm::Value *);
+
+eval_func_t cos_impl_cos_eval(const cos_impl &s)
+{
+    return s.is_combined() ? &llvm_combined_cos : &llvm_cos;
+}
+
+} // namespace
+
+void cos_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
+{
+    oa << boost::serialization::base_object<func_base>(*this);
+    oa << m_combined;
+}
+
+void cos_impl::load(boost::archive::binary_iarchive &ia, const unsigned version)
+{
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<cos_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load a cos_impl: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
+    ia >> boost::serialization::base_object<func_base>(*this);
+    ia >> m_combined;
+}
+
+cos_impl::cos_impl(expression e, const bool combined)
+    : func_base(combined ? "combined_cos" : "cos", std::vector{std::move(e)}), m_combined(combined)
+{
+}
+
+cos_impl::cos_impl() : cos_impl(0_dbl, false) {}
+
+bool cos_impl::is_combined() const noexcept
+{
+    return m_combined;
+}
 
 llvm::Value *cos_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_cos(s, args[0]); }, *this,
-                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) { return cos_impl_cos_eval(*this)(s, args[0]); },
+        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 namespace
 {
 
-[[nodiscard]] llvm::Function *cos_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+[[nodiscard]] llvm::Function *cos_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const cos_impl &fb,
                                               std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_c_eval_func_helper(
-        "cos", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_cos(s, args[0]); }, fb, s, fp_t,
-        batch_size, high_accuracy);
+        cos_impl_fetch_name(fb),
+        [&s, &fb](const std::vector<llvm::Value *> &args, bool) { return cos_impl_cos_eval(fb)(s, args[0]); }, fb, s,
+        fp_t, batch_size, high_accuracy);
 }
 
 } // namespace
@@ -93,7 +140,7 @@ taylor_dc_t::size_type cos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append the sine decomposition.
-    u_vars_defs.emplace_back(sin(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(is_combined() ? combined_sin(args()[0]) : sin(args()[0]), std::vector<std::uint32_t>{});
 
     // Append the cosine decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -112,18 +159,19 @@ namespace
 
 // Derivative of cos(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &, const std::vector<std::uint32_t> &,
-                                  const U &num, const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &fb,
+                                  const std::vector<std::uint32_t> &, const U &num, const std::vector<llvm::Value *> &,
+                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                  std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return llvm_cos(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        return cos_impl_cos_eval(fb)(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &,
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &fb,
                                   const std::vector<std::uint32_t> &deps, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
@@ -134,7 +182,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_imp
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return llvm_cos(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
+        return cos_impl_cos_eval(fb)(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
     }
 
     // NOTE: iteration in the [1, order] range
@@ -181,12 +229,14 @@ llvm::Value *taylor_diff_cos(llvm_state &s, llvm::Type *fp_t, const cos_impl &f,
 {
     assert(f.args().size() == 1u);
 
+    // LCOV_EXCL_START
     if (deps.size() != 1u) {
         throw std::invalid_argument(
             fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
                         "derivative of the cosine, but a vector of size {} was passed instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v) {
@@ -210,24 +260,24 @@ namespace
 
 // Derivative of cos(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &, const U &num,
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &fb, const U &num,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_numpar(
-        s, fp_t, n_uvars, batch_size, "cos", 1,
-        [&s](const auto &args) {
+        s, fp_t, n_uvars, batch_size, cos_impl_fetch_name(fb), 1,
+        [&s, &fb](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_cos(s, args[0]);
+            return cos_impl_cos_eval(fb)(s, args[0]);
         },
         num);
 }
 
 // Derivative of cos(variable).
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &, const variable &var,
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_impl &fb, const variable &var,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -238,7 +288,8 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "cos", n_uvars, batch_size, {var}, 1);
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, cos_impl_fetch_name(fb), n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -276,8 +327,9 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    llvm_cos(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
+                builder.CreateStore(cos_impl_cos_eval(fb)(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
+                                                                                builder.getInt32(0), var_idx)),
+                                    retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -342,12 +394,13 @@ llvm::Function *cos_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 std::vector<expression> cos_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {-sin(args()[0])};
+    return {-(is_combined() ? combined_sin(args()[0]) : sin(args()[0]))};
 }
 
-} // namespace detail
+namespace
+{
 
-expression cos(expression e)
+expression cos_ex_impl(expression e, const bool combined)
 {
     // Simplify cos(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
@@ -359,8 +412,22 @@ expression cos(expression e)
             },
             num_ptr->value());
     } else {
-        return expression{func{detail::cos_impl(std::move(e))}};
+        return expression{func{detail::cos_impl(std::move(e), combined)}};
     }
+}
+
+} // namespace
+
+expression combined_cos(expression e)
+{
+    return detail::cos_ex_impl(std::move(e), true);
+}
+
+} // namespace detail
+
+expression cos(expression e)
+{
+    return detail::cos_ex_impl(std::move(e), false);
 }
 
 HEYOKA_END_NAMESPACE

@@ -1145,7 +1145,7 @@ private:
 
             // We have read the value of cur_blob_len, update blob_char and blob_rem.
             blob_char += sizeof(std::uint64_t);
-            blob_rem -= sizeof(std::uint64_t);
+            blob_rem -= static_cast<unsigned>(sizeof(std::uint64_t));
 
             // The current blob chunk must fit in the remaining blob length.
             assert(cur_blob_len <= blob_rem);
@@ -1190,7 +1190,7 @@ private:
 
             // We have read the value of cur_blob_len, update blob_char and blob_rem.
             blob_char += sizeof(std::uint64_t);
-            blob_rem -= sizeof(std::uint64_t);
+            blob_rem -= static_cast<unsigned>(sizeof(std::uint64_t));
 
             // The current blob chunk must fit in the remaining blob length.
             assert(cur_blob_len <= blob_rem);

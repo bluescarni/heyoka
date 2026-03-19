@@ -53,6 +53,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_identity.hpp>
+#include <heyoka/detail/sincos_combine.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -833,8 +834,7 @@ std::vector<expression> pow_to_explog(const std::vector<expression> &v_ex)
 
 } // namespace detail
 
-// Taylor decomposition from lhs and rhs
-// of a system of equations.
+// Taylor decomposition from lhs and rhs of a system of equations.
 std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
                      const std::vector<expression> &sv_funcs_)
@@ -986,7 +986,13 @@ taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
     detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
+    // Combine sin/cos calls.
+    detail::sincos_combine_taylor(u_vars_defs);
+
     // Replace any number subexpression with an identity function.
+    //
+    // NOTE: do this as the last step of the pipeline, so that it catches numbers which may have been generated in
+    // previous steps.
     detail::taylor_decompose_replace_numbers(u_vars_defs, n_eq);
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));

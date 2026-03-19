@@ -169,6 +169,24 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     return f;
 }
 
+// Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for overloaded
+// intrinsics.
+//
+// NOTE: types and args are needed independently of each other. For instance, llvm.pow() is an intrinsic with 2
+// arguments but the types argument has only 1 element because both arguments always have the same type. I.e., the
+// intrinsic is type-dependent on a single type only (not 2).
+llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
+                                      const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
+{
+    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
+
+    // Create the function call.
+    auto *r = builder.CreateCall(callee_f, args);
+    assert(r != nullptr);
+
+    return r;
+}
+
 // Generate a set of function attributes to be used when invoking
 // external math functions.
 //
@@ -193,9 +211,10 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 //
 // If the llvm.used variable does not exist yet, create it.
 //
-// NOTE: this has quadratic complexity when appending ptr to an existing
-// array. It should not be a problem for the type of use we do as we expect
-// just a few entries in this array, but something to keep in mind.
+// NOTE: this has quadratic complexity when appending ptr to an existing array. It should not be a problem for the type
+// of use we do as we expect just a few entries in this array, but something to keep in mind.
+//
+// NOTE: if ptr is already in the llvm.used array, then this will be a no-op.
 void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 {
     assert(ptr != nullptr);
@@ -214,8 +233,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
         assert(orig_used->hasInitializer());
         auto *orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
 
-        // Construct a new initializer with the original values
-        // plus the new pointer.
+        // Construct a new initializer with the original values plus the new pointer.
         std::vector<llvm::Constant *> arr_values;
         arr_values.reserve(
             boost::safe_numerics::safe<decltype(arr_values.size())>(orig_init->getType()->getNumElements()) + 1);
@@ -223,8 +241,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
             auto *orig_el = orig_init->getAggregateElement(boost::numeric_cast<unsigned>(i));
             assert(orig_el->getType()->isPointerTy());
 
-            // NOTE: if ptr was already in the llvm.used vector, just bail
-            // out early.
+            // NOTE: if ptr was already in the llvm.used vector, just bail out early.
             if (orig_el->isElementWiseEqual(ptr)) {
                 return;
             }
@@ -256,10 +273,17 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 }
 
 // Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
-// The necessary vfabi information is stored in vfi. The function returns "call".
-// The attributes of the scalar function will be attached to the vector variants.
-// NOTE: this will insert the declarations of the vector variants into the module, if needed
-// (plus all the boilerplate necessary for preventing the declarations from being optimised out).
+//
+// The necessary vfabi information is stored in vfi.
+//
+// If the vector variants are external functions (this is signalled by the absence of the generator 'gen' in the vf_info
+// instances), then this function will also:
+//
+// - insert the declarations of the vector variants into the module, if needed, and
+// - attach to the vector variants the attributes of the scalar function.
+//
+// This function will also add boilerplate necessary to ensure that the vector variants are not optimised out *before*
+// the autovectorizer runs.
 llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const std::vector<vf_info> &vfi)
 {
     assert(call != nullptr);
@@ -275,9 +299,6 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     auto &context = s.context();
     auto &builder = s.builder();
 
-    // Can we use the faster but less precise vectorised implementations?
-    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
-
     if (!vfi.empty()) {
         // There exist vector variants of the scalar function.
         auto &md = s.module();
@@ -285,13 +306,15 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
         // Fetch the type of the scalar arguments.
         auto *scal_t = ft->getParamType(0);
 
+        // Can we use the faster but less precise vectorised implementations?
+        const auto use_fast_math = builder.getFastMathFlags().approxFunc();
+
         // Attach the "vector-function-abi-variant" attribute to the call so that LLVM's auto-vectorizer can take
         // advantage of these vector variants.
         std::vector<std::string> vf_abi_strs;
         vf_abi_strs.reserve(vfi.size());
         for (const auto &el : vfi) {
-            // Fetch the vf_abi attr string (either the low-precision
-            // or standard version).
+            // Fetch the vf_abi attr string (either the low-precision or standard version).
             const auto &vf_abi_attr
                 = (use_fast_math && !el.lp_vf_abi_attr.empty()) ? el.lp_vf_abi_attr : el.vf_abi_attr;
             vf_abi_strs.push_back(vf_abi_attr);
@@ -300,21 +323,19 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                                              fmt::format("{}", fmt::join(vf_abi_strs, ","))));
 
         // Now we need to:
-        // - add the declarations of the vector variants to the module,
-        // - ensure that these declarations are not removed by the optimiser,
-        //   otherwise the vector variants will not be picked up.
+        //
+        // - add the declarations of the vector variants to the module (if the variants are external functions),
+        // - ensure that the variants are not removed by the optimiser, otherwise the vector variants will not be picked
+        //   up.
 
         // Remember the original insertion block.
         auto *orig_bb = builder.GetInsertBlock();
 
-        // Add the vector variants and the boilerplate
-        // to prevent them from being removed.
         for (const auto &el : vfi) {
             assert(el.width > 0u);
             assert(el.nargs == num_args);
 
-            // Fetch the vector function name from el (either the low-precision
-            // or standard version).
+            // Fetch the vector function name from el (either the low-precision or standard version).
             const auto &el_name = (use_fast_math && !el.lp_name.empty()) ? el.lp_name : el.name;
 
             // The vector type for the current variant.
@@ -331,26 +352,35 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
             auto *vf_ptr = md.getFunction(el_name);
 
             if (vf_ptr == nullptr) {
+                // NOTE: if the variant is not in the module, it means it must be an external function.
+                assert(!el.gen);
+
                 // The declaration of the variant is not there yet, create it.
                 vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el_name, &md);
 
-                // NOTE: setting the attributes on the vector variant is not strictly required
-                // for the auto-vectorizer to work. However, in other parts of the code, the vector
-                // variants are invoked directly (via llvm_invoke_external()) and in those cases
-                // proper attributes do help the optimiser. Thus, we want to make sure
-                // that the attributes are set consistently regardless of where the declarations
-                // of the vector variants are created. The convention we follow is that the attributes
-                // of the vector variants must match the attributes of the scalar counterpart.
+                // NOTE: setting the attributes on the vector variant is not strictly required for the auto-vectorizer
+                // to work. However, in other parts of the code, the vector variants are invoked directly (via
+                // llvm_invoke_external()) and in those cases proper attributes do help the optimiser. Thus, we want to
+                // make sure that the attributes are set consistently regardless of where the declarations of the vector
+                // variants are created. The convention we follow is that the attributes of the vector variants must
+                // match the attributes of the scalar counterpart.
                 vf_ptr->setAttributes(f->getAttributes());
-            } else {
-                // The declaration of the variant is already there.
-                // Check that the signatures and attributes match.
+            } else if (vf_ptr->isDeclaration()) {
+                // NOTE: if the variant only has a declaration (and no definition), it means it must be an external
+                // function.
+                assert(!el.gen);
+
+                // The declaration of the variant is already there. Check that the signatures and attributes match.
                 assert(vf_ptr->getFunctionType() == vec_ft);
                 assert(vf_ptr->getAttributes() == f->getAttributes());
+            } else {
+                // NOTE: the variant has a definition, it must *not* be an external function.
+                assert(el.gen);
             }
 
-            // Ensure that the variant is not optimised out because it is not
-            // explicitly used in the code.
+            // Ensure that the variant is not optimised out because it is not explicitly used in the code.
+            //
+            // NOTE: llvm_append_used() will not insert vf_ptr if it is in the llvm.used array already.
             llvm_append_used(s, vf_ptr);
         }
 
@@ -361,11 +391,10 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     return call;
 }
 
-// Helper to invoke a scalar function with arguments which may or may not
-// be vectors.
+// Helper to invoke a scalar function with arguments which may or may not be vectors.
 //
-// In the former case, the call will be decomposed into a sequence of calls with scalar arguments,
-// and the return values will be re-assembled as a vector. Vector arguments must all have the same size.
+// In the former case, the call will be decomposed into a sequence of calls with scalar arguments, and the return values
+// will be re-assembled as a vector. Vector arguments must all have the same size.
 //
 // In the latter case, this function will be equivalent to invoking the scalar function on the scalar arguments.
 //
@@ -373,8 +402,8 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
 //
 // make_s_call will be used to generate the scalar call on the scalar arguments.
 //
-// vfi contains the information about the vector variants of the scalar function. The information in vfi
-// will be attached to the scalar call(s).
+// vfi contains the information about the vector variants of the scalar function. The information in vfi will be
+// attached to the scalar call(s).
 llvm::Value *
 llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
                            const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
@@ -387,6 +416,9 @@ llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args
     // Make sure all arguments are either vectors or scalars.
     assert(std::ranges::all_of(args, [](const auto &arg) { return arg->getType()->isVectorTy(); })
            || std::ranges::all_of(args, [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
+    // Make sure all vector arguments have a size > 1.
+    assert(std::ranges::all_of(
+        args, [](const auto &arg) { return !arg->getType()->isVectorTy() || get_vector_size(arg) > 1u; }));
 
     auto &builder = s.builder();
 
@@ -501,6 +533,202 @@ std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal
     return {};
 }
 
+// Helper to invoke a vector function with arguments args, automatically handling mismatches between the width of the
+// vector function and the width of the arguments. The function can be external (i.e., only declared but not defined),
+// or internal (i.e., both declared and defined).
+//
+// vfi is a vector of vf_info instances listing the available implementations of the vector function (each one
+// supporting a different vector width). attrs is the set of attributes to attach to the invocation(s) of the vector
+// function, if it is an external function - otherwise it is ignored.
+//
+// This function has several preconditions:
+//
+// - there must be at least 1 arg,
+// - vfi cannot be empty,
+// - all args must be vectors of the same type with a size greater than 1.
+llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &vfi, const llvm::AttributeList &attrs,
+                                     const std::vector<llvm::Value *> &args)
+{
+    assert(!args.empty());
+    assert(!vfi.empty());
+
+    // Check that all arguments are non-null.
+    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
+
+    // Check that all arguments are of the same type.
+    assert(std::ranges::all_of(args.begin() + 1, args.end(),
+                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+
+    const auto nargs = args.size();
+
+    // Fetch the argument type.
+    auto *x_t = args[0]->getType();
+
+    // Ensure that the arguments are vectors.
+    auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t);
+    assert(vec_t != nullptr);
+
+    // Fetch the vector width.
+    const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    assert(vector_width > 1u);
+
+    // Fetch the builder and the module.
+    auto &bld = s.builder();
+    auto &md = s.module();
+
+    // Can we use the faster but less precise vectorised implementations?
+    const auto use_fast_math = bld.getFastMathFlags().approxFunc();
+
+    // Lookup a vector implementation with width *greater than or equal to* vector_width.
+    //
+    // NOLINTNEXTLINE(modernize-use-ranges)
+    auto vfi_it = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
+                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
+
+    // Small helper to get a pointer to a function in the module md. If the function is declared but not defined,
+    // nullptr will be returned.
+    const auto get_defined_vf = [&md](const std::string &vf_name) {
+        auto *vf_ptr = md.getFunction(vf_name);
+        return (vf_ptr != nullptr && vf_ptr->isDeclaration()) ? nullptr : vf_ptr;
+    };
+
+    if (vfi_it == vfi.end()) {
+        // All vector implementations have a SIMD width *less than* vector_width. We will need to decompose the vector
+        // arguments into smaller vectors, perform the calculations on the smaller vectors, and reassemble the results
+        // into a single large vector.
+
+        // Step back to the widest available vector implementation and fetch its width.
+        --vfi_it;
+        const auto available_vector_width = vfi_it->width;
+        assert(available_vector_width > 0u);
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector type matching the chosen implementation.
+        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
+
+        // Fetch the vector function name (either the low-precision or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
+
+        // Compute the number of chunks into which the original vector arguments will be split.
+        const auto n_chunks = (vector_width / available_vector_width)
+                              + static_cast<std::uint32_t>(vector_width % available_vector_width != 0u);
+
+        // Prepare the vector of results of the invocations of the vector implementations.
+        std::vector<llvm::Value *> vec_results;
+        vec_results.reserve(n_chunks);
+
+        // Prepare the vector of arguments for the invocations of the vector implementations.
+        std::vector<llvm::Value *> vec_args;
+        vec_args.reserve(nargs);
+
+        // Prepare the mask vector.
+        std::vector<int> mask;
+        mask.reserve(vector_width);
+
+        for (std::uint32_t i = 0; i < n_chunks; ++i) {
+            // Construct the mask vector for the current iteration.
+            mask.clear();
+            const auto chunk_begin = i * available_vector_width;
+            // NOTE: special case for the last iteration.
+            const auto chunk_end = (i == n_chunks - 1u) ? vector_width : (chunk_begin + available_vector_width);
+            for (auto idx = chunk_begin; idx != chunk_end; ++idx) {
+                mask.push_back(boost::numeric_cast<int>(idx));
+            }
+            // Pad the mask if needed (this will happen only at the last iteration).
+            //
+            // NOTE: the pad value is the last value in the original (large) vector.
+            mask.insert(mask.end(), available_vector_width - mask.size(), boost::numeric_cast<int>(vector_width - 1u));
+
+            // Build the vector of arguments.
+            vec_args.clear();
+            for (const auto &arg : args) {
+                vec_args.push_back(bld.CreateShuffleVector(arg, mask));
+            }
+
+            // Invoke the vector implementation and add the result to vec_results.
+            if (vf_ptr == nullptr) {
+                vec_results.push_back(llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs));
+            } else {
+                vec_results.push_back(bld.CreateCall(vf_ptr, vec_args));
+            }
+        }
+
+        // Reassemble vec_results into a large vector.
+        auto *ret = llvm::concatenateVectors(bld, vec_results);
+
+        // We need one last shuffle to trim the padded values at the end of ret (if any).
+        mask.clear();
+        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
+            mask.push_back(boost::numeric_cast<int>(idx));
+        }
+        return bld.CreateShuffleVector(ret, mask);
+    } else if (vfi_it->width == vector_width) {
+        // We have a vector implementation with exactly the correct width. Use it.
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector function name (either the low-precision or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
+
+        // Invoke it.
+        if (vf_ptr == nullptr) {
+            return llvm_invoke_external(s, vf_name, vec_t, args, attrs);
+        } else {
+            return bld.CreateCall(vf_ptr, args);
+        }
+    } else {
+        // We have a vector implemention with SIMD width *greater than* vector_width. We need to pad the input
+        // arguments, invoke the SIMD implementation, trim the result and return.
+
+        // Fetch the width of the vector implementation.
+        const auto available_vector_width = vfi_it->width;
+        assert(available_vector_width > 0u);
+        assert(vfi_it->nargs == nargs);
+
+        // Fetch the vector type matching the chosen implementation.
+        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
+
+        // Fetch the vector function name (either the low-precision or standard version).
+        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+        // Lookup the vector function in the module.
+        auto *vf_ptr = get_defined_vf(vf_name);
+
+        // Prepare the mask vector.
+        std::vector<int> mask;
+        mask.reserve(available_vector_width);
+        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
+            mask.push_back(boost::numeric_cast<int>(idx));
+        }
+        // Pad the mask with the last value in the original vector.
+        mask.insert(mask.end(), available_vector_width - vector_width, boost::numeric_cast<int>(vector_width - 1u));
+
+        // Prepare the vector of arguments for the invocation of the vector implementation.
+        std::vector<llvm::Value *> vec_args;
+        vec_args.reserve(nargs);
+        for (const auto &arg : args) {
+            vec_args.push_back(bld.CreateShuffleVector(arg, mask));
+        }
+
+        // Invoke the vector implementation.
+        llvm::Value *ret = nullptr;
+        if (vf_ptr == nullptr) {
+            ret = llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs);
+        } else {
+            ret = bld.CreateCall(vf_ptr, vec_args);
+        }
+
+        // We need one last shuffle to trim the padded values at the end of ret.
+        mask.resize(vector_width);
+        return bld.CreateShuffleVector(ret, mask);
+    }
+}
+
 } // namespace
 
 // Implementation of an LLVM math function built on top of a function from the C math library, if possible.
@@ -535,6 +763,13 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         // Lookup the scalar name in the vector function info map.
         const auto &vfi = lookup_vf_info(scal_name);
 
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
         // Fetch the math function attributes.
         // NOTE: these will be used in all math function invocations
         // to ensure that scalar and vector versions are declared consistently
@@ -543,14 +778,13 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
 
         if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
-            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            assert(vec_t->getNumElements() > 1u);
 
-            if (vector_width == 1u || vfi.empty()) {
-                // If the vector width is 1, or we do not have any vector implementation available,
-                // we scalarise the function call.
+            if (vfi.empty()) {
+                // If we do not have any vector implementation available, we scalarise the function call.
                 return llvm_scalarise_ext_math_vector_call(s, args, scal_name, vfi, attrs);
             } else {
-                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                // We have one or more vector implementations available. Use them.
                 return llvm_invoke_vector_impl(s, vfi, attrs, args);
             }
         } else {
@@ -576,171 +810,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         fmt::format("Invalid type '{}' encountered in the LLVM implementation of the C math function '{}'",
                     llvm_type_name(x_t), base_name));
     // LCOV_EXCL_STOP
-}
-
-// Helper to invoke an external vector function with arguments args, automatically handling mismatches between the width
-// of the vector function and the width of the arguments.
-//
-// vfi is a vector of vf_info instances listing the available implementations of the vector function (each one
-// supporting a different vector width). attrs is the set of attributes to attach to the invocation(s) of the vector
-// function.
-//
-// This function has several preconditions:
-//
-// - there must be at least 1 arg,
-// - vfi cannot be empty,
-// - all args must be vectors of the same type with a size greater than 1.
-llvm::Value *llvm_invoke_vector_impl(llvm_state &s, const std::vector<vf_info> &vfi, const llvm::AttributeList &attrs,
-                                     const std::vector<llvm::Value *> &args)
-{
-    assert(!args.empty());
-    assert(!vfi.empty());
-
-    // Check that all arguments are non-null.
-    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
-
-    // Check that all arguments are of the same type.
-    assert(std::ranges::all_of(args.begin() + 1, args.end(),
-                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
-
-    const auto nargs = args.size();
-
-    // Fetch the argument type.
-    auto *x_t = args[0]->getType();
-
-    // Ensure that the arguments are vectors.
-    auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t);
-    assert(vec_t != nullptr);
-
-    // Fetch the vector width.
-    const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-    assert(vector_width > 1u);
-
-    // Fetch the builder.
-    auto &bld = s.builder();
-
-    // Can we use the faster but less precise vectorised implementations?
-    const auto use_fast_math = bld.getFastMathFlags().approxFunc();
-
-    // Lookup a vector implementation with width *greater than or equal to* vector_width.
-    //
-    // NOLINTNEXTLINE(modernize-use-ranges)
-    auto vfi_it = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
-                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
-
-    if (vfi_it == vfi.end()) {
-        // All vector implementations have a SIMD width *less than* vector_width. We will need
-        // to decompose the vector arguments into smaller vectors, perform the calculations
-        // on the smaller vectors, and reassemble the results into a single large vector.
-
-        // Step back to the widest available vector implementation and fetch its width.
-        --vfi_it;
-        const auto available_vector_width = vfi_it->width;
-        assert(available_vector_width > 0u);
-        assert(vfi_it->nargs == nargs);
-
-        // Fetch the vector type matching the chosen implementation.
-        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
-
-        // Fetch the vector function name (either the low-precision or standard version).
-        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
-
-        // Compute the number of chunks into which the original vector arguments will be split.
-        const auto n_chunks = (vector_width / available_vector_width)
-                              + static_cast<std::uint32_t>(vector_width % available_vector_width != 0u);
-
-        // Prepare the vector of results of the invocations of the vector implementations.
-        std::vector<llvm::Value *> vec_results;
-        vec_results.reserve(n_chunks);
-
-        // Prepare the vector of arguments for the invocations of the vector implementations.
-        std::vector<llvm::Value *> vec_args;
-        vec_args.reserve(nargs);
-
-        // Prepare the mask vector.
-        std::vector<int> mask;
-        mask.reserve(vector_width);
-
-        for (std::uint32_t i = 0; i < n_chunks; ++i) {
-            // Construct the mask vector for the current iteration.
-            mask.clear();
-            const auto chunk_begin = i * available_vector_width;
-            // NOTE: special case for the last iteration.
-            const auto chunk_end = (i == n_chunks - 1u) ? vector_width : (chunk_begin + available_vector_width);
-            for (auto idx = chunk_begin; idx != chunk_end; ++idx) {
-                mask.push_back(boost::numeric_cast<int>(idx));
-            }
-            // Pad the mask if needed (this will happen only at the last iteration).
-            // NOTE: the pad value is the last value in the original (large) vector.
-            mask.insert(mask.end(), available_vector_width - mask.size(), boost::numeric_cast<int>(vector_width - 1u));
-
-            // Build the vector of arguments.
-            vec_args.clear();
-            for (const auto &arg : args) {
-                vec_args.push_back(bld.CreateShuffleVector(arg, mask));
-            }
-
-            // Invoke the vector implementation and add the result to vec_results.
-            vec_results.push_back(llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs));
-        }
-
-        // Reassemble vec_results into a large vector.
-        auto *ret = llvm::concatenateVectors(bld, vec_results);
-
-        // We need one last shuffle to trim the padded values at the end of ret (if any).
-        mask.clear();
-        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
-            mask.push_back(boost::numeric_cast<int>(idx));
-        }
-        return bld.CreateShuffleVector(ret, mask);
-    } else if (vfi_it->width == vector_width) {
-        // We have a vector implementation with exactly the correct width. Use it.
-        assert(vfi_it->nargs == nargs);
-
-        // Fetch the vector function name (either the low-precision
-        // or standard version).
-        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
-
-        // Invoke it.
-        return llvm_invoke_external(s, vf_name, vec_t, args, attrs);
-    } else {
-        // We have a vector implemention with SIMD width *greater than* vector_width. We need
-        // to pad the input arguments, invoke the SIMD implementation, trim the result and return.
-
-        // Fetch the width of the vector implementation.
-        const auto available_vector_width = vfi_it->width;
-        assert(available_vector_width > 0u);
-        assert(vfi_it->nargs == nargs);
-
-        // Fetch the vector type matching the chosen implementation.
-        auto *available_vec_t = make_vector_type(vec_t->getScalarType(), available_vector_width);
-
-        // Fetch the vector function name (either the low-precision or standard version).
-        const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
-
-        // Prepare the mask vector.
-        std::vector<int> mask;
-        mask.reserve(available_vector_width);
-        for (std::uint32_t idx = 0; idx < vector_width; ++idx) {
-            mask.push_back(boost::numeric_cast<int>(idx));
-        }
-        // Pad the mask with the last value in the original vector.
-        mask.insert(mask.end(), available_vector_width - vector_width, boost::numeric_cast<int>(vector_width - 1u));
-
-        // Prepare the vector of arguments for the invocation of the vector implementation.
-        std::vector<llvm::Value *> vec_args;
-        vec_args.reserve(nargs);
-        for (const auto &arg : args) {
-            vec_args.push_back(bld.CreateShuffleVector(arg, mask));
-        }
-
-        // Invoke the vector implementation.
-        auto *ret = llvm_invoke_external(s, vf_name, available_vec_t, vec_args, attrs);
-
-        // We need one last shuffle to trim the padded values at the end of ret.
-        mask.resize(vector_width);
-        return bld.CreateShuffleVector(ret, mask);
-    }
 }
 
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
@@ -789,16 +858,22 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
 
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
         if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
-            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            assert(vec_t->getNumElements() > 1u);
 
-            if (vector_width == 1u || vfi.empty()) {
-                // If the vector width is 1, or we do not have any vector implementation available,
-                // we let LLVM handle it.
+            if (vfi.empty()) {
+                // If we do not have any vector implementation available, we let LLVM handle it.
                 return llvm_invoke_intrinsic(builder, intr_name, {x_t}, args);
             } else {
-                // The vector width is > 1 and we have one or more vector implementations available. Use them.
+                // We have one or more vector implementations available. Use them.
                 return llvm_invoke_vector_impl(s, vfi, s_intr->getAttributes(), args);
             }
         } else {
@@ -813,7 +888,17 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     // NOTE: this handles both the scalar and vector cases.
     if (scal_t == to_external_llvm_type<mppp::real128>(s.context(), false)) {
-        return llvm_scalarise_ext_math_vector_call(s, args, f128_name, lookup_vf_info(f128_name),
+        // Lookup the scalar function's name in the vector function info map.
+        const auto &vfi = lookup_vf_info(f128_name);
+
+        // Execute the generators, if available.
+        for (const auto &vf : vfi) {
+            if (vf.gen) {
+                vf.gen(s);
+            }
+        }
+
+        return llvm_scalarise_ext_math_vector_call(s, args, f128_name, vfi,
                                                    // NOTE: use the standard math function attributes.
                                                    llvm_ext_math_func_attrs(s));
     }
@@ -835,6 +920,81 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         fmt::format("Invalid type '{}' encountered in the implementation of the intrinsic-based math function '{}'",
                     llvm_type_name(x_t), intr_name));
     // LCOV_EXCL_STOP
+}
+
+// Implementation of an LLVM math function built on top of an IR-defined scalar function.
+//
+// 'base_name' is the base name of the function, that is, the name without the type mangling. It is assumed that the
+// scalar version of the function has already been generated in the module (if it is not, an error will be raised).
+//
+// This function will take care of:
+//
+// - handling input vector arguments (either via the vector variants if available, otherwise via
+//   llvm_scalarise_vector_call),
+// - attaching vfabi attributes to scalar calls.
+//
+// NOTE: in order for the vfabi machinery to work optimally, is would *probably* be advisable for the IR-defined scalar
+// function to be marked as noinline, because inlining destroys the information about the vfabi variants. We should
+// probably test this at one point by attaching vfabi info to, e.g., the Kepler solvers.
+llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, const std::vector<llvm::Value *> &args)
+{
+    assert(!args.empty());
+    assert(!base_name.empty());
+
+    // Check that all arguments are non-null.
+    assert(std::ranges::all_of(args, [](const auto &arg) { return arg != nullptr; }));
+
+    // Check that all arguments are of the same type.
+    assert(std::ranges::all_of(args.begin() + 1, args.end(),
+                               [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+
+    auto &bld = s.builder();
+    auto &md = s.module();
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = args[0]->getType();
+    auto *scal_t = x_t->getScalarType();
+
+    // Create the name of the scalar function.
+    const auto scal_name = fmt::format("{}.{}", base_name, llvm_type_name(scal_t));
+
+    // Look it up in the module.
+    auto *scal_f = md.getFunction(scal_name);
+    if (scal_f == nullptr) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Unable to lookup in 'llvm_math_ir_defined()' the scalar function '{}'", scal_name));
+        // LCOV_EXCL_STOP
+    }
+
+    // Lookup the scalar function name in the vector function info map.
+    const auto &vfi = lookup_vf_info(scal_name);
+
+    // Execute the generators, if available.
+    for (const auto &vf : vfi) {
+        if (vf.gen) {
+            vf.gen(s);
+        }
+    }
+
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        // The inputs are vectors.
+        assert(vec_t->getNumElements() > 1u);
+
+        if (vfi.empty()) {
+            // If we do not have any vector implementation available, we use llvm_scalarise_vector_call().
+            return llvm_scalarise_vector_call(
+                s, args, [&bld, scal_f](const std::vector<llvm::Value *> &v) { return bld.CreateCall(scal_f, v); },
+                vfi);
+        } else {
+            // We have one or more vector implementations available. Use them.
+            return llvm_invoke_vector_impl(s, vfi, scal_f->getAttributes(), args);
+        }
+    } else {
+        // The input is **not** a vector. Invoke the scalar function attaching vector variants if available.
+        auto *ret = bld.CreateCall(scal_f, args);
+        return llvm_add_vfabi_attrs(s, ret, vfi);
+    }
 }
 
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
@@ -1183,23 +1343,6 @@ llvm::Value *scalars_to_vector(ir_builder &builder, const std::vector<llvm::Valu
     }
 
     return vec;
-}
-
-// Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
-// overloaded intrinsics.
-// NOTE: types and args are needed independently of each other. For instance, llvm.pow() is an
-// intrinsic with 2 arguments but the types argument has only 1 element because both arguments
-// always have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
-llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
-                                      const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
-{
-    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
-
-    // Create the function call.
-    auto *r = builder.CreateCall(callee_f, args);
-    assert(r != nullptr);
-
-    return r;
 }
 
 // Helper to invoke an external function called 'name' with arguments args and return type ret_type.
