@@ -33,6 +33,20 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
+// NOTE: GCC warns about use of mismatched new/delete
+// when creating global variables. I am not sure this is
+// a real issue, as it looks like we are adopting the "canonical"
+// approach for the creation of global variables (at least
+// according to various sources online)
+// and clang is not complaining. But let us revisit
+// this issue in later LLVM versions.
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+
+#endif
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
@@ -446,3 +460,9 @@ llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic pop
+
+#endif
