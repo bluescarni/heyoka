@@ -18,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- The ``fast_math`` compilation flag does not set the LLVM ``nnan`` and ``ninf``
+  flags any more
+  (`#538 <https://github.com/bluescarni/heyoka/pull/538>`__).
 - Remove support for LLVM 17
   (`#535 <https://github.com/bluescarni/heyoka/pull/535>`__).
 - Copying Taylor integrators now results in shallow copies of the internal
