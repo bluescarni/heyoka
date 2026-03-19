@@ -127,6 +127,9 @@ void make_combined_sleef_function(llvm_state &s, const std::string &fname, llvm:
     // Create the function
     f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
     assert(f != nullptr);
+    // NOTE: force inlining, this is essential in order to make sure that the compiler is able to effectively CSE on the
+    // array wrapper calls.
+    f->addFnAttr(llvm::Attribute::AlwaysInline);
 
     // Fetch the function argument.
     auto *x = f->args().begin();
@@ -150,6 +153,22 @@ void make_combined_sleef_function(llvm_state &s, const std::string &fname, llvm:
 } // namespace
 
 // Helper to generate the IR code for the combined sleef vector functions.
+//
+// These are vectorized functions which are internally computing two values at once (e.g., sincos) and returning only
+// one of two results (e.g., sin or cos).
+//
+// There are several layers involved in the construction of these functions:
+//
+// - at the lowest level, we have C++ functions which accept in input a single SIMD vector and a pointer to write the
+//   result to (e.g, see sse2.cpp);
+// - at the middle level, we have IR functions which internally invoke the C++ functions and return the result as a
+//   2-elements array. These are marked as pure and noinline. The pureness "teaches" LLVM that multiple calls to these
+//   functions with the same argument can be compressed into a single call during CSE. The noinline is necessary because
+//   the pureness of the functions is lost if they are inlined - the compiler will see only the raw C++ calls with
+//   different alloca output pointers. This prevents CSE from happening;
+// - finally at the high level we have the combined sleef vector functions which invoke the middle level functions and
+//   extract one of the two elements from the returned array. We want these to be inlined - they will most likely be
+//   always inlined by the optimiser as they are so small, but we enforce it via AlwaysInline in order to make sure.
 void make_combined_sleef_functions(llvm_state &s, const std::string &scalar_base_name,
                                    const std::string &sleef_base_name, const std::string &sleef_tp,
                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)

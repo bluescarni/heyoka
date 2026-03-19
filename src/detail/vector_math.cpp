@@ -166,10 +166,12 @@ constexpr bool sleef_vsx = false;
 //
 // A combined SLEEF function returns two results in one call, the prototypical example being sincos(). Our approach for
 // taking advantage of these combined functions is to introduce dedicated scalar wrappers in the IR (e.g.,
-// heyoka.combined_sin/cos) and associate to them vector variants which internally invoke the combined SLEEF functions.
-// We then rely on LLVM recognising that two combined calls on the same argument (e.g., heyoka.combined_sin(x) and
-// heyoka.combined_cos(x)) end up invoking the same combined SLEEF primitive twice with the same argument. Via CSE, the
-// second call should be elided.
+// heyoka.combined_sin/cos) and associate to them vector variants which internally invoke the combined SLEEF functions,
+// extracting one of the two results. We then rely on LLVM recognising that two combined calls on the same argument
+// (e.g., heyoka.combined_sin(x) and heyoka.combined_cos(x)) end up invoking the same combined SLEEF primitive twice
+// with the same argument. Via CSE, the second call should then be elided.
+//
+// The combined vector variants are implemented in make_combined_sleef_functions(), see the comments there.
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_name, const char *const sleef_base_name,

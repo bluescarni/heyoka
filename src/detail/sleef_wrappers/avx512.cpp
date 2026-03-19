@@ -8,6 +8,8 @@
 
 #include "sleef_wrappers_helpers.hpp"
 
+// LCOV_EXCL_START
+
 // Double-precision.
 HEYOKA_SLEEF_PAIR_WRAPPER(Sleef_sincosd8_u10avx512f, __m512d)
 HEYOKA_SLEEF_PAIR_WRAPPER(Sleef_sincosd8_u35avx512f, __m512d)
@@ -15,3 +17,5 @@ HEYOKA_SLEEF_PAIR_WRAPPER(Sleef_sincosd8_u35avx512f, __m512d)
 // Single-precision.
 HEYOKA_SLEEF_PAIR_WRAPPER(Sleef_sincosf16_u10avx512f, __m512)
 HEYOKA_SLEEF_PAIR_WRAPPER(Sleef_sincosf16_u35avx512f, __m512)
+
+// LCOV_EXCL_STOP

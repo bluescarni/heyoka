@@ -276,7 +276,8 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 //
 // The necessary vfabi information is stored in vfi.
 //
-// If the vector variants are external functions, then this function will also:
+// If the vector variants are external functions (this is signalled by the absence of the generator 'gen' in the vf_info
+// instances), then this function will also:
 //
 // - insert the declarations of the vector variants into the module, if needed, and
 // - attach to the vector variants the attributes of the scalar function.
@@ -298,15 +299,15 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     auto &context = s.context();
     auto &builder = s.builder();
 
-    // Can we use the faster but less precise vectorised implementations?
-    const auto use_fast_math = builder.getFastMathFlags().approxFunc();
-
     if (!vfi.empty()) {
         // There exist vector variants of the scalar function.
         auto &md = s.module();
 
         // Fetch the type of the scalar arguments.
         auto *scal_t = ft->getParamType(0);
+
+        // Can we use the faster but less precise vectorised implementations?
+        const auto use_fast_math = builder.getFastMathFlags().approxFunc();
 
         // Attach the "vector-function-abi-variant" attribute to the call so that LLVM's auto-vectorizer can take
         // advantage of these vector variants.
@@ -365,12 +366,15 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 // match the attributes of the scalar counterpart.
                 vf_ptr->setAttributes(f->getAttributes());
             } else if (vf_ptr->isDeclaration()) {
+                // NOTE: if the variant only has a declaration (and no definition), it means it must be an external
+                // function.
                 assert(!el.gen);
 
                 // The declaration of the variant is already there. Check that the signatures and attributes match.
                 assert(vf_ptr->getFunctionType() == vec_ft);
                 assert(vf_ptr->getAttributes() == f->getAttributes());
             } else {
+                // NOTE: the variant has a definition, it must *not* be an external function.
                 assert(el.gen);
             }
 
@@ -918,6 +922,20 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     // LCOV_EXCL_STOP
 }
 
+// Implementation of an LLVM math function built on top of an IR-defined scalar function.
+//
+// 'base_name' is the base name of the function, that is, the name without the type mangling. It is assumed that the
+// scalar version of the function has already been generated in the module (if it is not, an error will be raised).
+//
+// This function will take care of:
+//
+// - handling input vector arguments (either via the vector variants if available, otherwise via
+//   llvm_scalarise_vector_call),
+// - attaching vfabi attributes to scalar calls.
+//
+// NOTE: in order for the vfabi machinery to work optimally, is would *probably* be advisable for the IR-defined scalar
+// function to be marked as noinline, because inlining destroys the information about the vfabi variants. We should
+// probably test this at one point by attaching vfabi info to, e.g., the Kepler solvers.
 llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, const std::vector<llvm::Value *> &args)
 {
     assert(!args.empty());
@@ -943,8 +961,10 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
     // Look it up in the module.
     auto *scal_f = md.getFunction(scal_name);
     if (scal_f == nullptr) [[unlikely]] {
+        // LCOV_EXCL_START
         throw std::invalid_argument(
             fmt::format("Unable to lookup in 'llvm_math_ir_defined()' the scalar function '{}'", scal_name));
+        // LCOV_EXCL_STOP
     }
 
     // Lookup the scalar function name in the vector function info map.
@@ -958,7 +978,7 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
     }
 
     if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
-        // The inputs are vectors. Fetch their SIMD width.
+        // The inputs are vectors.
         assert(vec_t->getNumElements() > 1u);
 
         if (vfi.empty()) {
@@ -968,7 +988,7 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
                 vfi);
         } else {
             // We have one or more vector implementations available. Use them.
-            return llvm_invoke_vector_impl(s, vfi, {}, args);
+            return llvm_invoke_vector_impl(s, vfi, scal_f->getAttributes(), args);
         }
     } else {
         // The input is **not** a vector. Invoke the scalar function attaching vector variants if available.

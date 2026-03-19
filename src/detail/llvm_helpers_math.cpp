@@ -357,6 +357,9 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
         auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
+        // NOTE: force inlining, this is essential in order to make sure that the compiler is able to effectively CSE on
+        // the array wrapper calls.
+        f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the function argument.
         auto *x = f->args().begin();
@@ -412,6 +415,9 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
         auto *ft = llvm::FunctionType::get(scal_t, {scal_t}, false);
         auto *f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
         assert(f != nullptr);
+        // NOTE: force inlining, this is essential in order to make sure that the compiler is able to effectively CSE on
+        // the wrapper calls.
+        f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the function argument.
         auto *x = f->args().begin();
@@ -433,12 +439,57 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
 
 #endif
 
+    // LCOV_EXCL_START
     throw std::invalid_argument(fmt::format(
         "Unsupported type for the creation of a combined sincos scalar wrapper: '{}'", llvm_type_name(scal_t)));
+    // LCOV_EXCL_STOP
 }
 
 } // namespace
 
+// Combined sin/cos variants.
+//
+// For scalar float/double/long double arguments, these should be equivalent to llvm_sin/cos. For real, real128 and
+// vector arguments, these will result in the invocation of combined sincos primitives from which sin and cos results
+// will be extracted. Thus, these should only be used in pairs - i.e., when one knows that both the sine and cosine of
+// the same argument is needed. Through LLVM's CSE optimisation pass, redundant double calls to the sincos primitives
+// will be reduced to a single sincos invocation, providing a performance benefit.
+//
+// All of this is achieved through an orchestration of wrappers at several levels:
+//
+// - first of all, we *always* need IR-defined combined sine and cosine scalar wrappers to be present, even if (like in
+//   the case of builtin floating-point types) they just reduce to direct intrinsic calls. This is needed because we can
+//   then associate vector variants information to the scalar wrappers through the machinery in vector_math.cpp. For
+//   real and real128, the scalar wrappers end up explicitly invoking the respective combined sincos primitives, while
+//   for the builtin floating-point types we just invoke the intrinsics and we let LLVM fuse them into combined sincos
+//   calls;
+// - for vector arguments, we register vector variants for the combined sine and cosine scalar wrappers in
+//   vector_math.cpp and then in llvm_math_ir_defined() we go through the usual process of either explicitly calling the
+//   vector variants or attaching vfabi attributes to the combined sine and cosine scalar wrappers in order to assist
+//   the SLP vectorizer.
+//
+// Note that at this time, SLP vectorization is not able to both vectorize and fuse the sin/cos calls into combined
+// sincos invocations. This would require us to:
+//
+// - explicitly mark as noinline the combined sine and cosine scalar wrappers (inlining defeats the vfabi attributes,
+//   which require a function call to be present), but this results in function call overhead and also prevents LLVM
+//   from automatically fuse sin/cos calls into sincos calls in the scalar case;
+// - append additional optimisation passes in llvm_state to perform further inlining and CSE *after* the SLP vectorizer
+//   has run. This is necessary because SLP vectorization exposes further inlining and CSE opportunities which must be
+//   exploited in order to achieve full vectorization and fusion, but no inlining or CSE happens in the standard
+//   pipeline after SLP vectorization.
+//
+// For reference, this is the code we used to enable the additional LLVM passes:
+//
+// PB.registerOptimizerLastEPCallback([](llvm::ModulePassManager &MPM,
+//     llvm::OptimizationLevel, llvm::ThinOrFullLTOPhase) {
+//     MPM.addPass(llvm::ModuleInlinerPass());
+//     llvm::FunctionPassManager FPM;
+//     FPM.addPass(llvm::GVNPass());
+//     MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
+// });
+//
+// In the future we may investigate this further if needed.
 llvm::Value *llvm_combined_sin(llvm_state &s, llvm::Value *x)
 {
     create_combined_sincos_scalar_wrapper(s, "sin", x);
