@@ -86,8 +86,13 @@ TEST_CASE("sincos fusion")
                     // Find the SIMD batch driver module.
                     const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
                     for (const auto &mod_ir : irs) {
-                        if (mod_ir.find("@heyoka.Sleef_sincos") != std::string::npos
-                            && mod_ir.find("batch_size_1(") == std::string::npos) {
+                        if (
+                            // Module contains the sleef primitive.
+                            mod_ir.find("@heyoka.Sleef_sincos") != std::string::npos &&
+                            // Module contains a driver function definition.
+                            mod_ir.find(".driver_") != std::string::npos &&
+                            // The driver function is not a scalar on.
+                            mod_ir.find("batch_size_1.driver_") == std::string::npos) {
                             ir = mod_ir;
                             break;
                         }
