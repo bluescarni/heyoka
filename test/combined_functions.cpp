@@ -19,6 +19,7 @@
 
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
+#include <boost/regex.hpp>
 
 #include <fmt/core.h>
 
@@ -102,11 +103,11 @@ TEST_CASE("sincos fusion")
                     ir = std::get<0>(cf.get_llvm_states())[2].get_ir();
                 }
 
-                // Sincos fusion is happening.
-                REQUIRE(ir.find("@heyoka.Sleef_sincos") != std::string::npos);
+                // Sincos fusion is happening: at least one call to the sincos array wrapper.
+                REQUIRE(boost::regex_search(ir, boost::regex(R"(call\s.*@heyoka\.Sleef_sincos)")));
                 // No separate sin/cos calls remain.
-                REQUIRE(ir.find("@llvm.sin.") == std::string::npos);
-                REQUIRE(ir.find("@llvm.cos.") == std::string::npos);
+                REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.sin\.)")));
+                REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.cos\.)")));
             });
         }
     }
@@ -230,11 +231,11 @@ TEST_CASE("kepE sincos fusion")
             // Non-compact mode: check the SIMD llvm_state (third state).
             const auto ir = std::get<0>(cf.get_llvm_states())[2].get_ir();
 
-            // Sincos fusion is happening.
-            REQUIRE(ir.find("@heyoka.Sleef_sincos") != std::string::npos);
+            // Sincos fusion is happening: at least one call to the sincos array wrapper.
+            REQUIRE(boost::regex_search(ir, boost::regex(R"(call\s.*@heyoka\.Sleef_sincos)")));
             // No separate sin/cos calls remain.
-            REQUIRE(ir.find("@llvm.sin.") == std::string::npos);
-            REQUIRE(ir.find("@llvm.cos.") == std::string::npos);
+            REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.sin\.)")));
+            REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.cos\.)")));
         });
     }
 }
@@ -547,8 +548,8 @@ TEST_CASE("sincos SLP vectorization")
         // the unstrided scalar module.
         const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
 
-        REQUIRE(ir.find("@llvm.sin.f64") == std::string::npos);
-        REQUIRE(ir.find("@llvm.cos.f64") == std::string::npos);
+        REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.sin\.f64)")));
+        REQUIRE(!boost::regex_search(ir, boost::regex(R"(call\s.*@llvm\.cos\.f64)")));
 #endif
     }
 }
