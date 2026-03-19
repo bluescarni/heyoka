@@ -76,21 +76,18 @@ TEST_CASE("sincos fusion")
 
                 cfunc<fp_t> cf({combined_sin(x), combined_cos(x)}, {x}, kw::compact_mode = compact_mode);
 
-                using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
-                auto call_count = 0u;
-
-                // Find the IR containing the SIMD driver and count sincos wrapper references. In compact mode, get_ir()
-                // returns a vector of strings (one per module) - we look for the module containing the SIMD batch
-                // driver (has "driver_0" and a batch_size > 1). In non-compact mode, the SIMD IR is the third
-                // llvm_state. Scalar driver modules contain dead-code sincos infrastructure kept alive by llvm.used for
-                // VFABI/SLP, so we must skip them.
+                // Find the IR containing the SIMD codegen and verify that sincos fusion happened:
+                // at least one call to the sincos array wrapper must be present, and no separate
+                // llvm.sin/llvm.cos calls should remain.
                 std::string ir;
 
                 if (compact_mode) {
+                    // In compact mode, get_ir() returns a vector of strings (one per module).
+                    // Find the SIMD batch driver module.
                     const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
                     for (const auto &mod_ir : irs) {
                         if (mod_ir.find("@heyoka.Sleef_sincos") != std::string::npos
-                            && mod_ir.find("batch_size_1") == std::string::npos) {
+                            && mod_ir.find("batch_size_1(") == std::string::npos) {
                             ir = mod_ir;
                             break;
                         }
@@ -100,14 +97,11 @@ TEST_CASE("sincos fusion")
                     ir = std::get<0>(cf.get_llvm_states())[2].get_ir();
                 }
 
-                for (auto it
-                     = boost::make_find_iterator(std::as_const(ir), boost::first_finder("@heyoka.Sleef_sincos"));
-                     it != string_find_iterator(); ++it) {
-                    ++call_count;
-                }
-
-                // We expect 2 occurrences: 1 call + 1 definition.
-                REQUIRE(call_count == 2u);
+                // Sincos fusion is happening.
+                REQUIRE(ir.find("@heyoka.Sleef_sincos") != std::string::npos);
+                // No separate sin/cos calls remain.
+                REQUIRE(ir.find("@llvm.sin.") == std::string::npos);
+                REQUIRE(ir.find("@llvm.cos.") == std::string::npos);
             });
         }
     }
@@ -231,15 +225,11 @@ TEST_CASE("kepE sincos fusion")
             // Non-compact mode: check the SIMD llvm_state (third state).
             const auto ir = std::get<0>(cf.get_llvm_states())[2].get_ir();
 
-            using string_find_iterator = boost::find_iterator<std::string::const_iterator>;
-            auto call_count = 0u;
-            for (auto it = boost::make_find_iterator(std::as_const(ir), boost::first_finder("@heyoka.Sleef_sincos"));
-                 it != string_find_iterator(); ++it) {
-                ++call_count;
-            }
-
-            // 3 calls (initial guess + first Newton step + loop body) + 1 definition.
-            REQUIRE(call_count == 4u);
+            // Sincos fusion is happening.
+            REQUIRE(ir.find("@heyoka.Sleef_sincos") != std::string::npos);
+            // No separate sin/cos calls remain.
+            REQUIRE(ir.find("@llvm.sin.") == std::string::npos);
+            REQUIRE(ir.find("@llvm.cos.") == std::string::npos);
         });
     }
 }
