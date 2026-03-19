@@ -273,10 +273,6 @@ llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm:
 
     // Create the function
     auto *f = llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
-    f->addFnAttr(llvm::Attribute::NoRecurse);
-    f->addFnAttr(llvm::Attribute::NoUnwind);
-    f->addFnAttr(llvm::Attribute::Speculatable);
-    f->addFnAttr(llvm::Attribute::WillReturn);
 
     // Fetch the arguments.
     auto *ptr_arg = f->getArg(0);

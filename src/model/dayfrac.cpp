@@ -254,6 +254,12 @@ llvm::Value *dbl_to_fp(llvm_state &s, llvm::Value *x, llvm::Type *fp_t)
 }
 
 // LLVM evaluation of dayfrac().
+//
+// NOTE: the evaluation is offloaded to the external function heyoka_tt_to_dayfrac(). If in the future we need CSE on
+// duplicate calls, we can wrap the invocation into an LLVM function, prevent inlining via NoInline and assert pureness
+// via memory(none) + Speculatable + NoUnwind + WillReturn. I think in general at this time we don't need to enforce CSE
+// at this level, as in Taylor integrators and cfunc we are doing CSE at the expression system level anyway - but
+// something to keep in mind for the future.
 llvm::Value *dayfrac_llvm_eval_impl(llvm_state &s, llvm::Value *x)
 {
     namespace hd = heyoka::detail;
