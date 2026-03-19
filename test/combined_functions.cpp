@@ -17,6 +17,8 @@
 #include <variant>
 #include <vector>
 
+#include <iostream>
+
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
 
@@ -547,6 +549,8 @@ TEST_CASE("sincos SLP vectorization")
         // Verify SLP vectorization happened: the scalar llvm.sin/llvm.cos intrinsics should be completely absent from
         // the unstrided scalar module.
         const auto ir = std::get<0>(cf.get_llvm_states())[0].get_ir();
+
+        std::cout << ir << "\n\n";
 
         REQUIRE(ir.find("@llvm.sin.f64") == std::string::npos);
         REQUIRE(ir.find("@llvm.cos.f64") == std::string::npos);
