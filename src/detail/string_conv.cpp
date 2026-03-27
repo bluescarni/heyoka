@@ -8,9 +8,9 @@
 
 #include <heyoka/config.hpp>
 
-#include <cassert>
 #include <charconv>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <type_traits>
@@ -40,11 +40,21 @@ namespace detail
 
 std::uint32_t uname_to_index(const std::string &s)
 {
-    assert(s.rfind("u_", 0) == 0);
+    if (!s.starts_with("u_")) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid string '{}' passed to uname_to_index(): the string does not begin with 'u_'", s));
+    }
 
     std::uint32_t value = 0;
-    [[maybe_unused]] auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
-    assert(ret.ec == std::errc{});
+    const auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
+
+    if (ret.ec != std::errc{}) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format(
+            "Invalid string '{}' passed to uname_to_index(): could not parse an integer after the initial 'u_' prefix",
+            s));
+        // LCOV_EXCL_STOP
+    }
 
     return value;
 }

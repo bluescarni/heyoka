@@ -228,8 +228,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
                           }) {
                 return getval(this).llvm_evaluate(s, args, val_t, time_ptr, high_accuracy);
             } else {
+                // LCOV_EXCL_START
                 throw not_implemented_error(
                     fmt::format("llvm_evaluate() is not implemented for the function '{}'", get_name()));
+                // LCOV_EXCL_STOP
             }
         }
 

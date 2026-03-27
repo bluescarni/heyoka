@@ -390,7 +390,9 @@ llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<
                              const std::uint32_t batch_size, const bool high_accuracy) const
 {
     if (batch_size == 0u) [[unlikely]] {
+        // LCOV_EXCL_START
         throw std::invalid_argument("The batch size must be nonzero in func::llvm_eval()");
+        // LCOV_EXCL_STOP
     }
 
     auto &bld = s.builder();
@@ -414,8 +416,10 @@ llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<
                     // Codegen the parameter argument.
                     llvm_args.push_back(detail::cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
                 } else {
+                    // LCOV_EXCL_START
                     throw std::invalid_argument(
                         "func::llvm_eval() can be invoked only with variable, number and parameter arguments");
+                    // LCOV_EXCL_STOP
                 }
             },
             arg.value());
@@ -486,8 +490,10 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
                     // For vars and params, the argument is an index in an array.
                     return llvm::Type::getInt32Ty(c);
                 } else {
+                    // LCOV_EXCL_START
                     throw std::invalid_argument("llvm_c_eval_func_name_args() can be invoked only with variable, "
                                                 "number and parameter arguments");
+                    // LCOV_EXCL_STOP
                 }
             },
             args[i].value()));
@@ -512,7 +518,9 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, const st
                                        const bool high_accuracy) const
 {
     if (batch_size == 0u) [[unlikely]] {
+        // LCOV_EXCL_START
         throw std::invalid_argument("The batch size must be nonzero in func::llvm_c_eval_func()");
+        // LCOV_EXCL_STOP
     }
 
     auto &md = s.module();
@@ -586,8 +594,10 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, const st
 
                     return detail::ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
                 } else {
+                    // LCOV_EXCL_START
                     throw std::invalid_argument(
                         "llvm_c_eval_func() can be invoked only with variable, number and parameter arguments");
+                    // LCOV_EXCL_STOP
                 }
             },
             args()[i].value());

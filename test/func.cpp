@@ -10,6 +10,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -55,6 +56,11 @@ struct func_00_s : func_base {
     explicit func_00_s(const std::string &name, func_args fargs) : func_base(name, std::move(fargs)) {}
 };
 
+struct func_00_llvm_name : func_base {
+    func_00_llvm_name() : func_base("f", "f2", std::make_shared<const std::vector<expression>>()) {}
+    explicit func_00_llvm_name(const std::string &name) : func_base(name, name + "2", func_args{}) {}
+};
+
 struct func_01 {
 };
 
@@ -86,6 +92,9 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(diff(expression{f}, std::get<param>(par[0].value())), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
+    REQUIRE_THROWS_MATCHES(
+        f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), std::invalid_argument,
+        Message("Invalid string 'x' passed to uname_to_index(): the string does not begin with 'u_'"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
@@ -168,6 +177,15 @@ TEST_CASE("func minimal")
         const auto fa = func_args({"x"_var, "y"_var}, false);
         func f_ns(func_00_s{"f", fa});
         REQUIRE(fa.get_args().data() != f_ns.get_func_args().get_args().data());
+    }
+
+    // Trigger constructors with custom llvm name.
+    {
+        func f_s(func_00_llvm_name{});
+    }
+
+    {
+        func f_s(func_00_llvm_name{"foo"});
     }
 }
 
