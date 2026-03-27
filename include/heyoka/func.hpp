@@ -216,6 +216,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
             // LCOV_EXCL_STOP
         }
 
+        // NOTE: val_t is the scalar/vector internal type used for evaluation.
         [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args,
                                                  llvm::Type *val_t, llvm::Value *time_ptr,
                                                  const bool high_accuracy) const final
@@ -398,20 +399,6 @@ namespace detail
 
 [[nodiscard]] llvm::Value *cfunc_nc_param_codegen(llvm_state &, const param &, std::uint32_t, llvm::Type *,
                                                   llvm::Value *, llvm::Value *);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &, const func_base &,
-                 llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                 std::uint32_t, bool);
-
-std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &, llvm::Type *,
-                                                                             const std::string &, std::uint32_t,
-                                                                             const std::vector<expression> &);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper(const std::string &,
-                        const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                        const func_base &, llvm_state &, llvm::Type *, std::uint32_t, bool);
 
 } // namespace detail
 
