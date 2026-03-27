@@ -279,6 +279,7 @@ llvm::Value *sw_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return llvm_sw_eval_helper(s, args[0], val_t->getScalarType(), batch_size, *m_sw_data, m_sw_name);
 }
 

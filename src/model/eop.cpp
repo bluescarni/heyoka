@@ -640,6 +640,7 @@ llvm::Value *eop_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Valu
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return llvm_eop_eval_helper(s, args[0], val_t->getScalarType(), batch_size, *m_eop_data, m_eop_name);
 }
 
@@ -970,6 +971,7 @@ llvm::Value *eopp_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Val
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return llvm_eopp_eval_helper(s, args[0], val_t->getScalarType(), batch_size, *m_eop_data, m_eop_name);
 }
 
