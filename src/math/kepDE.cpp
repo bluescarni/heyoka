@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <initializer_list>
 #include <utility>

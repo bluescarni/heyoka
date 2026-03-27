@@ -357,6 +357,8 @@ pow_eval_algo get_pow_eval_algo(const std::vector<expression> &args)
 llvm::Value *pow_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
                                      bool) const
 {
+    assert(args.size() == 2u);
+
     // Fetch the pow eval algo.
     const auto pea = get_pow_eval_algo(this->args());
     return pea.eval_f(s, args);

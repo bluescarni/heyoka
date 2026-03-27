@@ -63,9 +63,10 @@ std::vector<expression> time_impl::gradient() const
     return {};
 }
 
-llvm::Value *time_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Type *val_t,
-                                      llvm::Value *time_ptr, bool)
+llvm::Value *time_impl::llvm_evaluate(llvm_state &s, [[maybe_unused]] const std::vector<llvm::Value *> &args,
+                                      llvm::Type *val_t, llvm::Value *time_ptr, bool)
 {
+    assert(args.empty());
     // Determine the batch size.
     std::uint32_t batch_size = 1;
     if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {

@@ -81,6 +81,7 @@ llvm::Value *select_eval_impl(llvm_state &s, const std::vector<llvm::Value *> &a
 llvm::Value *select_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
                                         llvm::Value *, bool)
 {
+    assert(args.size() == 3u);
     return select_eval_impl(s, args);
 }
 

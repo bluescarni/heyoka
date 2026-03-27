@@ -190,6 +190,7 @@ llvm::Value *rel_eval_impl(llvm_state &s, rel_op op, const std::vector<llvm::Val
 llvm::Value *rel_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
                                      bool) const
 {
+    assert(args.size() == 2u);
     return rel_eval_impl(s, m_op, args);
 }
 

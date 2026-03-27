@@ -271,6 +271,7 @@ llvm::Value *llvm_sw_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *fp
 llvm::Value *sw_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
                                     llvm::Value *, bool) const
 {
+    assert(args.size() == 1u);
     sw_check_sw_data(m_sw_data);
 
     // Determine the batch size.

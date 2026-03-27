@@ -632,6 +632,7 @@ llvm::Value *llvm_eop_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *f
 llvm::Value *eop_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
                                      llvm::Value *, bool) const
 {
+    assert(args.size() == 1u);
     eop_check_eop_data(m_eop_data);
 
     // Determine the batch size.
@@ -963,6 +964,7 @@ llvm::Value *llvm_eopp_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *
 llvm::Value *eopp_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
                                       llvm::Value *, bool) const
 {
+    assert(args.size() == 1u);
     eop_check_eop_data(m_eop_data);
 
     // Determine the batch size.
