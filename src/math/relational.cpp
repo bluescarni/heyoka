@@ -187,22 +187,10 @@ llvm::Value *rel_eval_impl(llvm_state &s, rel_op op, const std::vector<llvm::Val
 
 } // namespace
 
-llvm::Value *rel_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+llvm::Value *rel_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool) const
 {
-    return llvm_eval_helper(
-        [&s, op = m_op](const std::vector<llvm::Value *> &args, bool) { return rel_eval_impl(s, op, args); }, *this, s,
-        fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *rel_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        name_from_op(m_op),
-        [&s, op = m_op](const std::vector<llvm::Value *> &args, bool) { return rel_eval_impl(s, op, args); }, *this, s,
-        fp_t, batch_size, high_accuracy);
+    return rel_eval_impl(s, m_op, args);
 }
 
 llvm::Value *rel_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,

@@ -65,31 +65,11 @@ std::vector<expression> atan_impl::gradient() const
     return {pow(1_dbl + pow(args()[0], 2_dbl), -1_dbl)};
 }
 
-llvm::Value *atan_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                  bool high_accuracy) const
+llvm::Value *atan_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                      llvm::Value *, bool)
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan(s, args[0]); }, *this,
-                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *atan_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                               std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "atan", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan(s, args[0]); }, fb, s, fp_t,
-        batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *atan_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                            bool high_accuracy) const
-{
-    return atan_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    assert(args.size() == 1u);
+    return llvm_atan(s, args[0]);
 }
 
 taylor_dc_t::size_type atan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&

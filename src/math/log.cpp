@@ -58,31 +58,11 @@ log_impl::log_impl(expression e) : func_base("log", std::vector{std::move(e)}) {
 
 log_impl::log_impl() : log_impl(1_dbl) {}
 
-llvm::Value *log_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+llvm::Value *log_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool)
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_log(s, args[0]); }, *this,
-                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *log_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                              std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "log", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_log(s, args[0]); }, fb, s, fp_t,
-        batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *log_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    return log_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    assert(args.size() == 1u);
+    return llvm_log(s, args[0]);
 }
 
 namespace

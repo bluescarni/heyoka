@@ -84,22 +84,10 @@ llvm::Value *logical_andor_eval_impl(llvm_state &s, const std::vector<llvm::Valu
 
 } // namespace
 
-llvm::Value *logical_and_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride,
-                                         std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *logical_and_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                             llvm::Value *, bool)
 {
-    return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, true); }, *this, s,
-        fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *logical_and_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                                   bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        "logical_and",
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, true); }, *this, s,
-        fp_t, batch_size, high_accuracy);
+    return logical_andor_eval_impl(s, args, true);
 }
 
 llvm::Value *logical_and_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
@@ -269,22 +257,10 @@ std::vector<expression> logical_or_impl::gradient() const
     return std::vector<expression>(this->args().size(), 0_dbl);
 }
 
-llvm::Value *logical_or_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                        llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride,
-                                        std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *logical_or_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                            llvm::Value *, bool)
 {
-    return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, false); }, *this,
-        s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *logical_or_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                                  bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        "logical_or",
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, false); }, *this,
-        s, fp_t, batch_size, high_accuracy);
+    return logical_andor_eval_impl(s, args, false);
 }
 
 llvm::Value *logical_or_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,

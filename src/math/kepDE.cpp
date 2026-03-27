@@ -26,6 +26,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -87,54 +88,20 @@ std::vector<expression> kepDE_impl::gradient() const
     return {(cos(DE) - 1_dbl) * den, sin(DE) * den, den};
 }
 
-namespace
+llvm::Value *kepDE_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
+                                       llvm::Value *, bool)
 {
+    assert(args.size() == 3u);
 
-llvm::Value *kepDE_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                  const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
-                                  std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_eval_helper(
-        [&s, fp_t, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepDE_func = llvm_add_inv_kep_DE(s, fp_t, batch_size);
+    // Determine the batch size.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    }
 
-            return s.builder().CreateCall(kepDE_func, {args[0], args[1], args[2]});
-        },
-        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
+    auto *kepDE_func = llvm_add_inv_kep_DE(s, val_t->getScalarType(), batch_size);
 
-} // namespace
-
-llvm::Value *kepDE_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                   bool high_accuracy) const
-{
-    return kepDE_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *kepDE_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                                std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "kepDE",
-        [&s, batch_size, fp_t](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepDE_func = llvm_add_inv_kep_DE(s, fp_t, batch_size);
-
-            return s.builder().CreateCall(kepDE_func, {args[0], args[1], args[2]});
-        },
-        fb, s, fp_t, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *kepDE_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                             bool high_accuracy) const
-{
-    return kepDE_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    return s.builder().CreateCall(kepDE_func, {args[0], args[1], args[2]});
 }
 
 } // namespace detail

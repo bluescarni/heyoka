@@ -31,6 +31,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
+#include <llvm/Support/Casting.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/eop_sw_helpers.hpp>
@@ -267,32 +268,18 @@ llvm::Value *llvm_sw_eval_helper(llvm_state &s, llvm::Value *arg, llvm::Type *fp
 
 } // namespace
 
-llvm::Value *sw_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                bool high_accuracy) const
+llvm::Value *sw_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
+                                    llvm::Value *, bool) const
 {
     sw_check_sw_data(m_sw_data);
 
-    return heyoka::detail::llvm_eval_helper(
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        [this, &s, fp_t, batch_size, &data = *m_sw_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_sw_eval_helper(s, args[0], fp_t, batch_size, data, m_sw_name);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
+    // Determine the batch size.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    }
 
-llvm::Function *sw_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                          bool high_accuracy) const
-{
-    sw_check_sw_data(m_sw_data);
-
-    return heyoka::detail::llvm_c_eval_func_helper(
-        get_name(),
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        [this, &s, fp_t, batch_size, &data = *m_sw_data](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_sw_eval_helper(s, args[0], fp_t, batch_size, data, m_sw_name);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    return llvm_sw_eval_helper(s, args[0], val_t->getScalarType(), batch_size, *m_sw_data, m_sw_name);
 }
 
 namespace

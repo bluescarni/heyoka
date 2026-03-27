@@ -49,32 +49,11 @@ sub_impl::sub_impl() : sub_impl(0_dbl, 0_dbl) {}
 
 sub_impl::sub_impl(expression a, expression b) : func_base("sub", {std::move(a), std::move(b)}) {}
 
-llvm::Value *sub_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+llvm::Value *sub_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool)
 {
-    assert(args().size() == 2u);
-
-    return llvm_eval_helper(
-        [&s](const auto &args, bool) {
-            assert(args.size() == 2u);
-            return llvm_fsub(s, args[0], args[1]);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *sub_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    assert(args().size() == 2u);
-
-    return llvm_c_eval_func_helper(
-        "sub",
-        [&s](const auto &args, bool) {
-            assert(args.size() == 2u);
-            return llvm_fsub(s, args[0], args[1]);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    assert(args.size() == 2u);
+    return llvm_fsub(s, args[0], args[1]);
 }
 
 namespace

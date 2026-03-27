@@ -78,20 +78,10 @@ llvm::Value *select_eval_impl(llvm_state &s, const std::vector<llvm::Value *> &a
 
 } // namespace
 
-llvm::Value *select_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                    llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                    bool high_accuracy) const
+llvm::Value *select_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                        llvm::Value *, bool)
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return select_eval_impl(s, args); },
-                            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *select_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                              bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        "select", [&s](const std::vector<llvm::Value *> &args, bool) { return select_eval_impl(s, args); }, *this, s,
-        fp_t, batch_size, high_accuracy);
+    return select_eval_impl(s, args);
 }
 
 llvm::Value *select_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,

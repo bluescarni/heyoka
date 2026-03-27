@@ -53,16 +53,14 @@ class HEYOKA_DLL_PUBLIC pow_impl : public func_base
 
 public:
     pow_impl();
-    explicit pow_impl(expression, expression);
+    explicit pow_impl(const expression &, const expression &);
 
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                             llvm::Value *, bool) const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
@@ -91,24 +89,24 @@ struct pow_eval_algo {
     std::string suffix;
 };
 
-pow_eval_algo get_pow_eval_algo(const pow_impl &);
+pow_eval_algo get_pow_eval_algo(const std::vector<expression> &args);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression pow(expression, expression);
-HEYOKA_DLL_PUBLIC expression pow(expression, float);
-HEYOKA_DLL_PUBLIC expression pow(expression, double);
-HEYOKA_DLL_PUBLIC expression pow(expression, long double);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, float);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, double);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, long double);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real);
+HEYOKA_DLL_PUBLIC expression pow(const expression &, mppp::real);
 
 #endif
 

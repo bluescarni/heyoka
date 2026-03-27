@@ -86,10 +86,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(diff(expression{f}, std::get<param>(par[0].value())), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
-                           Message("llvm_eval() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
-                           Message("llvm_c_eval_func() is not implemented for the function 'f'"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
