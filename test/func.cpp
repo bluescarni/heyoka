@@ -10,6 +10,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -55,6 +56,22 @@ struct func_00_s : func_base {
     explicit func_00_s(const std::string &name, func_args fargs) : func_base(name, std::move(fargs)) {}
 };
 
+struct func_00_llvm_name : func_base {
+    func_00_llvm_name() : func_base("f", "f2", std::make_shared<const std::vector<expression>>()) {}
+    explicit func_00_llvm_name(const std::string &name) : func_base(name, name + "2", func_args{}) {}
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+};
+
+struct func_00_llvm_wrong_name : func_base {
+    func_00_llvm_wrong_name() : func_base("f", "", std::make_shared<const std::vector<expression>>()) {}
+    explicit func_00_llvm_wrong_name(const std::string &name) : func_base(name, "", func_args{}) {}
+};
+
 struct func_01 {
 };
 
@@ -86,10 +103,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(diff(expression{f}, std::get<param>(par[0].value())), not_implemented_error,
                            Message("Cannot compute derivatives for the function 'f', because "
                                    "the function does not provide a gradient() member function"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
-                           Message("llvm_eval() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
-                           Message("llvm_c_eval_func() is not implemented for the function 'f'"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
@@ -141,6 +154,8 @@ TEST_CASE("func minimal")
         Message("Zero number of u variables detected in func::taylor_c_diff_func() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func(s, fp_t, 2, 1, false), not_implemented_error,
                            Message("Taylor diff in compact mode is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.llvm_evaluate(s, {}, fp_t, nullptr, false), not_implemented_error,
+                           Message("llvm_evaluate() is not implemented for the function 'f'"));
 
     // A few tests for shared arguments semantics.
     {
@@ -173,6 +188,15 @@ TEST_CASE("func minimal")
         func f_ns(func_00_s{"f", fa});
         REQUIRE(fa.get_args().data() != f_ns.get_func_args().get_args().data());
     }
+
+    // Trigger constructors with custom llvm name.
+    REQUIRE(func(func_00_llvm_name{}).get_llvm_name() == "f2");
+    REQUIRE(func(func_00_llvm_name{"bar"}).get_llvm_name() == "bar2");
+
+    REQUIRE_THROWS_MATCHES(func(func_00_llvm_wrong_name{}), std::invalid_argument,
+                           Message("Cannot create a function with no name"));
+    REQUIRE_THROWS_MATCHES(func(func_00_llvm_wrong_name{"adsadas"}), std::invalid_argument,
+                           Message("Cannot create a function with no name"));
 }
 
 TEST_CASE("shared func copy move")
@@ -617,6 +641,32 @@ TEST_CASE("func s11n")
     REQUIRE(f.get_name() == "pluto");
     REQUIRE(f.args().size() == 1u);
     REQUIRE(f.args()[0] == "x"_var);
+}
+
+HEYOKA_S11N_FUNC_EXPORT(func_00_llvm_name)
+
+TEST_CASE("func s11n custom llvm name")
+{
+    std::stringstream ss;
+
+    func f{func_00_llvm_name{"pluto"}};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "pluto");
+    REQUIRE(f.get_llvm_name() == "pluto2");
 }
 
 TEST_CASE("shared func s11n")

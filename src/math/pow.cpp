@@ -80,7 +80,10 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-pow_impl::pow_impl(expression b, expression e) : func_base("pow", std::vector{std::move(b), std::move(e)}) {}
+pow_impl::pow_impl(const expression &b, const expression &e)
+    : func_base("pow", "pow" + get_pow_eval_algo({b, e}).suffix, std::vector{b, e})
+{
+}
 
 pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
 
@@ -286,19 +289,19 @@ std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
 } // namespace
 
 // Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
-pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
+pow_eval_algo get_pow_eval_algo(const std::vector<expression> &args)
 {
     // Maximum integral exponent magnitude for which
     // pow() is transformed into multiplications and divisions.
     constexpr std::uint32_t pow_max_small_pow_n = 16;
 
-    assert(impl.args().size() == 2u);
+    assert(args.size() == 2u);
 
     // NOTE: check the special cases first, otherwise fall through
     // to the general case.
 
     // Small integral powers.
-    if (const auto exp = ex_is_integral(impl.args()[1])) {
+    if (const auto exp = ex_is_integral(args[1])) {
         if (*exp >= 0 && *exp <= pow_max_small_pow_n) {
             return {.algo = pow_eval_algo::type::pos_small_int,
                     .eval_f = [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); },
@@ -319,7 +322,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
     }
 
     // Small half-integral powers.
-    if (const auto exp2 = ex_is_odd_integral_half(impl.args()[1])) {
+    if (const auto exp2 = ex_is_odd_integral_half(args[1])) {
         if (*exp2 >= 0 && *exp2 <= pow_max_small_pow_n) {
             return {.algo = pow_eval_algo::type::pos_small_half,
                     .eval_f =
@@ -351,29 +354,14 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
             .suffix = {}};
 }
 
-llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+llvm::Value *pow_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool) const
 {
+    assert(args.size() == 2u);
+
     // Fetch the pow eval algo.
-    const auto pea = get_pow_eval_algo(*this);
-
-    return llvm_eval_helper([&](const std::vector<llvm::Value *> &args, bool) { return pea.eval_f(s, args); }, *this, s,
-                            fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    // Fetch the pow eval algo.
-    const auto pea = get_pow_eval_algo(*this);
-
-    // Build the function name.
-    const std::string func_name = "pow" + pea.suffix;
-
-    return llvm_c_eval_func_helper(
-        func_name, [&](const std::vector<llvm::Value *> &args, bool) { return pea.eval_f(s, args); }, *this, s, fp_t,
-        batch_size, high_accuracy);
+    const auto pea = get_pow_eval_algo(this->args());
+    return pea.eval_f(s, args);
 }
 
 namespace
@@ -389,7 +377,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
 
     if (order == 0u) {
         // Fetch the pow eval algo.
-        const auto pea = get_pow_eval_algo(f);
+        const auto pea = get_pow_eval_algo(f.args());
 
         return pea.eval_f(s, {taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
                               taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size)});
@@ -502,7 +490,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     const auto u_idx = uname_to_index(var.name());
 
     // Fetch the pow eval algo.
-    const auto pea = get_pow_eval_algo(f);
+    const auto pea = get_pow_eval_algo(f.args());
 
     // Codegen the exponent.
     auto *expo = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
@@ -617,7 +605,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                                             const V &n1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // Fetch the pow eval algo.
-    const auto pea = get_pow_eval_algo(fn);
+    const auto pea = get_pow_eval_algo(fn.args());
 
     // Create the function name.
     const std::string func_name = "pow" + pea.suffix;
@@ -862,7 +850,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                                             const U &n, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // Fetch the pow eval algo.
-    const auto pea = get_pow_eval_algo(fn);
+    const auto pea = get_pow_eval_algo(fn.args());
 
     // Special case for sqrt().
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
@@ -1033,7 +1021,7 @@ using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 
 // Wrapper for the implementation of the top-level pow() function.
 // NOLINTNEXTLINE(misc-no-recursion)
-expression pow_wrapper_impl(expression b, expression e)
+expression pow_wrapper_impl(const expression &b, const expression &e)
 {
     // Attempt constant folding first.
     const auto *b_num_ptr = std::get_if<number>(&b.value());
@@ -1071,7 +1059,7 @@ expression pow_wrapper_impl(expression b, expression e)
     }
 
     // The general case.
-    return expression{func{pow_impl{std::move(b), std::move(e)}}};
+    return expression{func{pow_impl{b, e}}};
 }
 
 } // namespace
@@ -1079,40 +1067,40 @@ expression pow_wrapper_impl(expression b, expression e)
 } // namespace detail
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression pow(expression b, expression e)
+expression pow(const expression &b, const expression &e)
 {
-    return detail::pow_wrapper_impl(std::move(b), std::move(e));
+    return detail::pow_wrapper_impl(b, e);
 }
 
-expression pow(expression b, float e)
+expression pow(const expression &b, float e)
 {
-    return pow(std::move(b), expression{e});
+    return pow(b, expression{e});
 }
 
-expression pow(expression b, double e)
+expression pow(const expression &b, double e)
 {
-    return pow(std::move(b), expression{e});
+    return pow(b, expression{e});
 }
 
-expression pow(expression b, long double e)
+expression pow(const expression &b, long double e)
 {
-    return pow(std::move(b), expression{e});
+    return pow(b, expression{e});
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression pow(expression b, mppp::real128 e)
+expression pow(const expression &b, mppp::real128 e)
 {
-    return pow(std::move(b), expression{e});
+    return pow(b, expression{e});
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression pow(expression b, mppp::real e)
+expression pow(const expression &b, mppp::real e)
 {
-    return pow(std::move(b), expression{std::move(e)});
+    return pow(b, expression{std::move(e)});
 }
 
 #endif

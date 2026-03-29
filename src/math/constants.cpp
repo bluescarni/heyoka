@@ -241,21 +241,18 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
     }
 }
 
-llvm::Value *constant::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
-                                 llvm::Value *, llvm::Value *, std::uint32_t batch_size, bool) const
+llvm::Value *constant::llvm_evaluate(llvm_state &s, [[maybe_unused]] const std::vector<llvm::Value *> &args,
+                                     llvm::Type *val_t, llvm::Value *, bool) const
 {
-    return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
-}
+    assert(args.empty());
 
-llvm::Function *constant::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    return detail::llvm_c_eval_func_helper(
-        get_name(),
-        [&s, batch_size, fp_t, this](const std::vector<llvm::Value *> &, bool) {
-            return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    // Determine the batch size.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    }
+
+    return detail::vector_splat(s.builder(), make_llvm_const(s, val_t->getScalarType()), batch_size);
 }
 
 llvm::Value *constant::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,

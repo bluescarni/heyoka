@@ -29,6 +29,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -90,54 +91,20 @@ std::vector<expression> kepF_impl::gradient() const
     return {-cos(F) * den, sin(F) * den, den};
 }
 
-namespace
+llvm::Value *kepF_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
+                                      llvm::Value *, bool)
 {
+    assert(args.size() == 3u);
 
-llvm::Value *kepF_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                 const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
-                                 std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_eval_helper(
-        [&s, fp_t, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepF_func = llvm_add_inv_kep_F(s, fp_t, batch_size);
+    // Determine the batch size.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+    }
 
-            return s.builder().CreateCall(kepF_func, {args[0], args[1], args[2]});
-        },
-        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
+    auto *kepF_func = llvm_add_inv_kep_F(s, val_t->getScalarType(), batch_size);
 
-} // namespace
-
-llvm::Value *kepF_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                  bool high_accuracy) const
-{
-    return kepF_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *kepF_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                               std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "kepF",
-        [&s, batch_size, fp_t](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepF_func = llvm_add_inv_kep_F(s, fp_t, batch_size);
-
-            return s.builder().CreateCall(kepF_func, {args[0], args[1], args[2]});
-        },
-        fb, s, fp_t, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *kepF_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                            bool high_accuracy) const
-{
-    return kepF_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    return s.builder().CreateCall(kepF_func, {args[0], args[1], args[2]});
 }
 
 taylor_dc_t::size_type kepF_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&

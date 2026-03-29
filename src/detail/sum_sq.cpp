@@ -8,7 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <sstream>
@@ -82,65 +81,17 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
-namespace
+llvm::Value *sum_sq_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                        llvm::Value *, bool)
 {
+    std::vector<llvm::Value *> sqs;
+    sqs.reserve(args.size());
 
-llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                   const std::vector<llvm::Value *> &eval_arr,
-                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                   bool high_accuracy)
-{
-    return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            std::vector<llvm::Value *> sqs;
-            sqs.reserve(args.size());
+    for (auto *val : args) {
+        sqs.push_back(llvm_square(s, val));
+    }
 
-            for (auto *val : args) {
-                sqs.push_back(llvm_square(s, val));
-            }
-
-            return pairwise_sum(s, sqs);
-        },
-        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Value *sum_sq_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                    llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                    bool high_accuracy) const
-{
-    return sum_sq_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *sum_sq_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                                 std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "sum_sq",
-        [&s](const std::vector<llvm::Value *> &args, bool) {
-            std::vector<llvm::Value *> sqs;
-            sqs.reserve(args.size());
-
-            for (auto *val : args) {
-                sqs.push_back(llvm_square(s, val));
-            }
-
-            return pairwise_sum(s, sqs);
-        },
-        fb, s, fp_t, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *sum_sq_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                              bool high_accuracy) const
-{
-    return sum_sq_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    return pairwise_sum(s, sqs);
 }
 
 namespace

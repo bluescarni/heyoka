@@ -15,7 +15,7 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-HEYOKA_DLL_PUBLIC expression sqrt(expression);
+HEYOKA_DLL_PUBLIC expression sqrt(const expression &);
 
 HEYOKA_END_NAMESPACE
 

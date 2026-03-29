@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -29,6 +30,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -669,6 +671,54 @@ namespace detail
 namespace
 {
 
+// Implementation of non-compact-mode evaluation for a func.
+llvm::Value *llvm_eval(const func &fn, llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                       llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride, const std::uint32_t batch_size,
+                       const bool high_accuracy)
+{
+    if (batch_size == 0u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument("The batch size must be nonzero in llvm_eval()");
+        // LCOV_EXCL_STOP
+    }
+
+    auto &bld = s.builder();
+
+    const auto &args = fn.args();
+
+    // Codegen the function arguments.
+    std::vector<llvm::Value *> llvm_args;
+    llvm_args.reserve(args.size());
+    for (const auto &arg : args) {
+        std::visit(
+            [&]<typename T>(const T &v) {
+                if constexpr (std::same_as<T, variable>) {
+                    // Fetch the index of the variable argument.
+                    const auto u_idx = uname_to_index(v.name());
+
+                    // Fetch the corresponding value from eval_arr.
+                    llvm_args.push_back(eval_arr.at(u_idx));
+                } else if constexpr (std::same_as<T, number>) {
+                    // Codegen the number argument.
+                    llvm_args.push_back(vector_splat(bld, llvm_codegen(s, fp_t, v), batch_size));
+                } else if constexpr (std::same_as<T, param>) {
+                    // Codegen the parameter argument.
+                    llvm_args.push_back(cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        "llvm_eval() can be invoked only with variable, number and parameter arguments");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            arg.value());
+    }
+
+    // Invoke llvm_evaluate() and return the result.
+    return fn.llvm_evaluate(s, llvm_args, make_vector_type(fp_t, batch_size), time_ptr, high_accuracy);
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
                        llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc,
@@ -694,8 +744,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
     for (std::uint32_t i = nvars; i < nuvars; ++i) {
         assert(std::holds_alternative<func>(dc[i].value()));
 
-        eval_arr.push_back(std::get<func>(dc[i].value())
-                               .llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy));
+        eval_arr.push_back(llvm_eval(std::get<func>(dc[i].value()), s, fp_t, eval_arr, par_ptr, time_ptr, stride,
+                                     batch_size, high_accuracy));
     }
 
     // Write the outputs.
@@ -1249,6 +1299,188 @@ HEYOKA_ADD_CFUNC_INST(mppp::real)
 namespace
 {
 
+// Helper to build the name and llvm arguments for the compact-mode evaluation of a func.
+std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &c, llvm::Type *fp_t,
+                                                                             const std::string &name,
+                                                                             const std::uint32_t batch_size,
+                                                                             const std::vector<expression> &args)
+{
+    // LCOV_EXCL_START
+
+    // Check that 'name' does not contain periods ".". Periods are used to separate fields in the mangled name.
+    if (boost::contains(name, ".")) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot generate a mangled name for the compact mode evaluation of the mathematical "
+                        "llvm function '{}': the function name cannot contain '.' symbols",
+                        name));
+    }
+
+    // LCOV_EXCL_STOP
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Init the name.
+    auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
+
+    // Init the vector of arguments:
+    //
+    // - idx of the u variable which is being evaluated,
+    // - eval array (pointer to val_t),
+    // - par ptr (pointer to scalar),
+    // - time ptr (pointer to scalar),
+    // - stride value.
+    auto *ptr_t = llvm::PointerType::getUnqual(c);
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), ptr_t, ptr_t, ptr_t,
+                                    to_external_llvm_type<std::size_t>(c)};
+
+    // Add the mangling and LLVM arg types for the argument types.
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        // Name mangling.
+        fname += std::visit([](const auto &v) { return cm_mangle(v); }, args[i].value());
+
+        // Add the arguments separator, if we are not at the
+        // last argument.
+        if (i != args.size() - 1u) {
+            fname += '_';
+        }
+
+        // Add the LLVM function argument type.
+        fargs.push_back(std::visit(
+            [&]<typename T>(const T &) -> llvm::Type * {
+                if constexpr (std::same_as<T, number>) {
+                    // For numbers, the argument is passed as a scalar floating-point value.
+                    return val_t->getScalarType();
+                } else if constexpr (std::same_as<T, variable> || std::same_as<T, param>) {
+                    // For vars and params, the argument is an index in an array.
+                    return llvm::Type::getInt32Ty(c);
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("llvm_c_eval_func_name_args() can be invoked only with variable, "
+                                                "number and parameter arguments");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            args[i].value()));
+    }
+
+    // Close the argument list with a ".".
+    //
+    // NOTE: this will result in a ".." in the name if the function has zero arguments.
+    fname += '.';
+
+    // Finally, add the mangling for the floating-point type.
+    fname += llvm_mangle_type(val_t);
+
+    return std::make_pair(std::move(fname), std::move(fargs));
+}
+
+// Implementation of compact-mode evaluation for a func.
+llvm::Function *llvm_c_eval_func(const func &fn, llvm_state &s, llvm::Type *fp_t, const std::uint32_t batch_size,
+                                 const bool high_accuracy)
+{
+    if (batch_size == 0u) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument("The batch size must be nonzero in llvm_c_eval_func()");
+        // LCOV_EXCL_STOP
+    }
+
+    auto &md = s.module();
+    auto &ctx = s.context();
+
+    // Fetch the type for external loading.
+    auto *ext_fp_t = make_external_llvm_type(fp_t);
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    const auto &args = fn.args();
+
+    // Build the function name and the function arguments.
+    const auto [fname, fargs] = llvm_c_eval_func_name_args(ctx, fp_t, fn.get_llvm_name(), batch_size, args);
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function has not been created before, do it now.
+    auto &bld = s.builder();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = bld.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+
+    // Create the function
+    f = llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Fetch the necessary arguments.
+    auto *eval_arr = f->args().begin() + 1;
+    auto *par_ptr = f->args().begin() + 2;
+    auto *time_ptr = f->args().begin() + 3;
+    auto *stride = f->args().begin() + 4;
+
+    // Create the llvm arguments.
+    std::vector<llvm::Value *> g_args;
+    g_args.reserve(args.size());
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        auto *arg = std::visit(
+            [&]<typename T>(const T &) -> llvm::Value * {
+                auto *const cur_f_arg = f->args().begin() + 5 + i;
+
+                if constexpr (std::same_as<T, number>) {
+                    // NOTE: number arguments are passed directly as FP constants when f is invoked. We just need to
+                    // splat them.
+                    return vector_splat(bld, cur_f_arg, batch_size);
+                } else if constexpr (std::same_as<T, variable>) {
+                    // NOTE: for variables, the u index is passed to f.
+                    return cfunc_c_load_eval(s, val_t, eval_arr, cur_f_arg);
+                } else if constexpr (std::same_as<T, param>) {
+                    // NOTE: for params, we have to load the value from par_ptr.
+                    //
+                    // NOTE: the overflow check is done in add_cfunc_impl().
+
+                    // LCOV_EXCL_START
+                    assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
+                    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
+                    // LCOV_EXCL_STOP
+
+                    auto *ptr
+                        = bld.CreateInBoundsGEP(ext_fp_t, par_ptr, bld.CreateMul(stride, to_size_t(s, cur_f_arg)));
+
+                    return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        "llvm_c_eval_func() can be invoked only with variable, number and parameter arguments");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            args[i].value());
+
+        g_args.push_back(arg);
+    }
+
+    // Compute the return value.
+    auto *ret = fn.llvm_evaluate(s, g_args, val_t, time_ptr, high_accuracy);
+
+    // Return it.
+    bld.CreateRet(ret);
+
+    // Restore the original insertion block.
+    bld.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
 // Implementation of the compact-mode evaluation of a compiled function split over several driver functions
 // implemented in distinct llvm_state objects.
 //
@@ -1446,7 +1678,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
         for (const auto &ex : seg) {
             // Get the evaluation function.
             auto *func
-                = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(*cur_state, fp_t, batch_size, high_accuracy);
+                = llvm_c_eval_func(std::get<heyoka::func>(ex.value()), *cur_state, fp_t, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);

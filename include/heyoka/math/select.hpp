@@ -52,10 +52,8 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+    [[nodiscard]] static llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                                    llvm::Value *, bool);
 
     [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                                            const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,

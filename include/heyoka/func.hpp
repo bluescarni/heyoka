@@ -35,20 +35,24 @@
 // Current archive version is 2.
 //
 // Changelog:
+//
 // - version 2: re-implemented with tanuki.
 BOOST_CLASS_VERSION(heyoka::func, 2)
 
 // Current archive version is 2.
 //
 // Changelog:
+//
 // - version 2: introduction of the func_args class.
-BOOST_CLASS_VERSION(heyoka::func_base, 2)
+// - version 3: introduction of the m_llvm_name member.
+BOOST_CLASS_VERSION(heyoka::func_base, 3)
 
 HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_name;
+    std::string m_llvm_name;
     func_args m_args;
 
     // Serialization.
@@ -61,6 +65,9 @@ public:
     explicit func_base(std::string, std::vector<expression>, bool = false);
     explicit func_base(std::string, func_args::shared_args_t);
     explicit func_base(std::string, func_args);
+    explicit func_base(std::string, std::string, std::vector<expression>, bool = false);
+    explicit func_base(std::string, std::string, func_args::shared_args_t);
+    explicit func_base(std::string, std::string, func_args);
 
     func_base(const func_base &);
     func_base(func_base &&) noexcept;
@@ -71,6 +78,7 @@ public:
     ~func_base();
 
     [[nodiscard]] const std::string &get_name() const noexcept;
+    [[nodiscard]] const std::string &get_llvm_name() const noexcept;
     [[nodiscard]] const func_args &get_func_args() const noexcept;
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
     [[nodiscard]] func_args::shared_args_t shared_args() const noexcept;
@@ -108,6 +116,7 @@ concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions,cppcoreguidelines-virtual-class-destructor)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::string &get_name() const noexcept = 0;
+    [[nodiscard]] virtual const std::string &get_llvm_name() const noexcept = 0;
     [[nodiscard]] virtual const func_args &get_func_args() const noexcept = 0;
 
     virtual void to_stream(std::ostringstream &) const = 0;
@@ -122,11 +131,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
-    [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
-                                                 llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
-        = 0;
-
-    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                                     llvm::Value *, bool) const = 0;
 
     // NOTE: this is the last remaining trace of mutability related to decomposition. Note, however, that this is never
     // exposed in the public API.
@@ -135,8 +141,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
 
     virtual llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                                      const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                                     std::uint32_t, std::uint32_t, std::uint32_t, bool) const
-        = 0;
+                                     std::uint32_t, std::uint32_t, std::uint32_t, bool) const = 0;
 
     virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
         = 0;
@@ -151,10 +156,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
             // get_name() function in the derived function class that hides it.
             return static_cast<const func_base &>(getval(this)).get_name();
         }
+        [[nodiscard]] const std::string &get_llvm_name() const noexcept final
+        {
+            return static_cast<const func_base &>(getval(this)).get_llvm_name();
+        }
         [[nodiscard]] const func_args &get_func_args() const noexcept final
         {
-            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be a
-            // get_func_args() function in the derived function class that hides it.
             return static_cast<const func_base &>(getval(this)).get_func_args();
         }
 
@@ -178,14 +185,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
 
         [[nodiscard]] const std::vector<expression> &args() const noexcept final
         {
-            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be an
-            // args() function in the derived function class that hides it.
             return static_cast<const func_base &>(getval(this)).args();
         }
         [[nodiscard]] func_args::shared_args_t shared_args() const noexcept final
         {
-            // NOTE: make sure we are invoking the member function from func_base, as in principle there could be a
-            // shared_args() function in the derived function class that hides it.
             return static_cast<const func_base &>(getval(this)).shared_args();
         }
         // NOTE: the implementation of the first overload must go in expression.hpp as the definition of the expression
@@ -213,35 +216,20 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
             // LCOV_EXCL_STOP
         }
 
-        [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t,
-                                             const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                             llvm::Value *time_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                             bool high_accuracy) const final
+        // NOTE: val_t is the scalar/vector internal type used for evaluation.
+        [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                                 llvm::Type *val_t, llvm::Value *time_ptr,
+                                                 const bool high_accuracy) const final
         {
             if constexpr (requires(const T &x) {
                               {
-                                  x.llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy)
+                                  x.llvm_evaluate(s, args, val_t, time_ptr, high_accuracy)
                               } -> std::same_as<llvm::Value *>;
                           }) {
-                return getval(this).llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
+                return getval(this).llvm_evaluate(s, args, val_t, time_ptr, high_accuracy);
             } else {
                 throw not_implemented_error(
-                    fmt::format("llvm_eval() is not implemented for the function '{}'", get_name()));
-            }
-        }
-
-        [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                                       bool high_accuracy) const final
-        {
-            if constexpr (requires(const T &x) {
-                              {
-                                  x.llvm_c_eval_func(s, fp_t, batch_size, high_accuracy)
-                              } -> std::same_as<llvm::Function *>;
-                          }) {
-                return getval(this).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
-            } else {
-                throw not_implemented_error(
-                    fmt::format("llvm_c_eval_func() is not implemented for the function '{}'", get_name()));
+                    fmt::format("llvm_evaluate() is not implemented for the function '{}'", get_name()));
             }
         }
 
@@ -386,6 +374,7 @@ public:
     [[nodiscard]] bool is_time_dependent() const;
 
     [[nodiscard]] const std::string &get_name() const noexcept;
+    [[nodiscard]] const std::string &get_llvm_name() const noexcept;
 
     [[nodiscard]] const func_args &get_func_args() const noexcept;
 
@@ -395,10 +384,8 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                             llvm::Value *, bool) const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
@@ -412,28 +399,15 @@ namespace detail
 [[nodiscard]] llvm::Value *cfunc_nc_param_codegen(llvm_state &, const param &, std::uint32_t, llvm::Type *,
                                                   llvm::Value *, llvm::Value *);
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &, const func_base &,
-                 llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                 std::uint32_t, bool);
-
-std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &, llvm::Type *,
-                                                                             const std::string &, std::uint32_t,
-                                                                             const std::vector<expression> &);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper(const std::string &,
-                        const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                        const func_base &, llvm_state &, llvm::Type *, std::uint32_t, bool);
-
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
 
 // Macros for the registration of s11n for concrete functions.
-// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2.
-// This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
-// would synthesise, and thus to ameliorate the "class name too long" issue.
+//
+// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2. This allows us to reduce the
+// size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY would synthesise, and thus to ameliorate the "class
+// name too long" issue.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) TANUKI_S11N_WRAP_EXPORT_KEY2(f, "heyoka::func@" #f, heyoka::detail::func_iface)
 
 #define HEYOKA_S11N_FUNC_EXPORT_KEY2(f, gid) TANUKI_S11N_WRAP_EXPORT_KEY2(f, gid, heyoka::detail::func_iface)

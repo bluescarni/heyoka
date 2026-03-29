@@ -10,13 +10,11 @@
 
 #include <cassert>
 #include <cstdint>
-#include <initializer_list>
 #include <sstream>
-#include <stdexcept>
 #include <string>
-#include <unordered_map>
-#include <variant>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
 
@@ -28,6 +26,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -64,64 +63,17 @@ std::vector<expression> time_impl::gradient() const
     return {};
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-llvm::Value *time_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
-                                  llvm::Value *time_ptr, llvm::Value *, std::uint32_t batch_size, bool) const
+llvm::Value *time_impl::llvm_evaluate(llvm_state &s, [[maybe_unused]] const std::vector<llvm::Value *> &args,
+                                      llvm::Type *val_t, llvm::Value *time_ptr, bool)
 {
-    return ext_load_vector_from_memory(s, fp_t, time_ptr, batch_size);
-}
-
-// NOTE: there's some repetition with llvm_c_eval_func_helper here.
-llvm::Function *time_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, bool) const
-{
-    // LCOV_EXCL_START
-    assert(batch_size > 0u);
-    assert(args().empty());
-    // LCOV_EXCL_STOP
-
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the vector floating-point type.
-    auto *val_t = make_vector_type(fp_t, batch_size);
-
-    const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, "time", batch_size, args());
-    const auto &fname = na_pair.first;
-    const auto &fargs = na_pair.second;
-
-    // Try to see if we already created the function.
-    auto *f = md.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto *orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Fetch the necessary arguments (only time needed).
-        auto *t_ptr = f->args().begin() + 3;
-
-        // Load the time value(s).
-        auto *ret = ext_load_vector_from_memory(s, fp_t, t_ptr, batch_size);
-
-        // Return it.
-        builder.CreateRet(ret);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
+    assert(args.empty());
+    // Determine the batch size.
+    std::uint32_t batch_size = 1;
+    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+        batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
-    return f;
+    return ext_load_vector_from_memory(s, val_t->getScalarType(), time_ptr, batch_size);
 }
 
 namespace

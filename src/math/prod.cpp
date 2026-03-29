@@ -18,6 +18,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
@@ -28,6 +30,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/div.hpp>
@@ -52,10 +55,6 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
-
-prod_impl::prod_impl() : prod_impl(std::vector<expression>{}) {}
-
-prod_impl::prod_impl(std::vector<expression> v) : func_base("prod", std::move(v)) {}
 
 namespace
 {
@@ -106,12 +105,10 @@ bool ex_is_negative_pow(const expression &ex)
     }
 }
 
-// Check if a product is a negation - that is, a product with at least
-// 2 terms and whose first term is a number with value -1.
-bool prod_is_negation_impl(const prod_impl &p)
+// Check if the arguments to a product result in a negation - that is, a product with at least 2 terms and whose first
+// term is a number with value -1.
+bool prod_is_negation_impl(const std::vector<expression> &args)
 {
-    const auto &args = p.args();
-
     if (args.size() < 2u) {
         return false;
     }
@@ -121,6 +118,16 @@ bool prod_is_negation_impl(const prod_impl &p)
 }
 
 } // namespace
+
+prod_impl::prod_impl() : prod_impl(std::vector<expression>{}) {}
+
+// NOTE: we are forced to pass by const reference here. If we passed by copy followed by a move we would have evaluation
+// order issues (i.e., v could moved into the argument to the func_base constructor before prod_is_negation_impl() is
+// evaluated).
+prod_impl::prod_impl(const std::vector<expression> &v)
+    : func_base("prod", prod_is_negation_impl(v) ? "prod_neg" : "prod", v)
+{
+}
 
 // Return true if ex is a negation product - that is, a product with at least
 // 2 terms and whose first term is a number with value -1.
@@ -135,7 +142,7 @@ bool is_negation_prod(const expression &ex)
 
     const auto *prod_ptr = fptr->extract<prod_impl>();
 
-    return prod_ptr != nullptr && prod_is_negation_impl(*prod_ptr);
+    return prod_ptr != nullptr && prod_is_negation_impl(prod_ptr->args());
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -152,7 +159,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     }
 
     // Special case for negation.
-    if (prod_is_negation_impl(*this)) {
+    if (prod_is_negation_impl(args())) {
         oss << '-';
         // NOTE: if this has 2 arguments, then the recursive call will
         // involve a product with a single argument, which will be caught
@@ -274,64 +281,30 @@ std::vector<expression> prod_impl::gradient() const
     return retval;
 }
 
-llvm::Value *prod_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                  bool high_accuracy) const
+llvm::Value *prod_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
+                                      llvm::Value *, bool) const
 {
-    if (prod_is_negation_impl(*this)) {
+    if (prod_is_negation_impl(this->args())) {
         // Special case for negation.
-        assert(args().size() >= 2u);
+        assert(args.size() >= 2u);
 
-        return llvm_eval_helper(
-            [&s](const auto &args, bool) {
-                auto args_copy = std::vector(args.begin() + 1, args.end());
-                auto *res = pairwise_prod(s, args_copy);
+        auto args_copy = std::vector(args.begin() + 1, args.end());
+        auto *res = pairwise_prod(s, args_copy);
 
-                return llvm_fneg(s, res);
-            },
-            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        return llvm_fneg(s, res);
     } else {
-        return llvm_eval_helper(
-            [&s, fp_t, batch_size](const auto &args, bool) {
-                if (args.empty()) {
-                    return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{1.}), batch_size);
-                } else {
-                    auto args_copy = args;
-                    return pairwise_prod(s, args_copy);
-                }
-            },
-            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-    }
-}
+        if (args.empty()) {
+            // Determine the batch size.
+            std::uint32_t batch_size = 1;
+            if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+                batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            }
 
-llvm::Function *prod_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                            bool high_accuracy) const
-{
-    if (prod_is_negation_impl(*this)) {
-        // Special case for negation.
-        assert(args().size() >= 2u);
-
-        return llvm_c_eval_func_helper(
-            "prod_neg",
-            [&s](const auto &args, bool) {
-                auto args_copy = std::vector(args.begin() + 1, args.end());
-                auto *res = pairwise_prod(s, args_copy);
-
-                return llvm_fneg(s, res);
-            },
-            *this, s, fp_t, batch_size, high_accuracy);
-    } else {
-        return llvm_c_eval_func_helper(
-            "prod",
-            [&s, fp_t, batch_size](const auto &args, bool) {
-                if (args.empty()) {
-                    return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{1.}), batch_size);
-                } else {
-                    auto args_copy = args;
-                    return pairwise_prod(s, args_copy);
-                }
-            },
-            *this, s, fp_t, batch_size, high_accuracy);
+            return vector_splat(s.builder(), llvm_codegen(s, val_t->getScalarType(), number{1.}), batch_size);
+        } else {
+            auto args_copy = args;
+            return pairwise_prod(s, args_copy);
+        }
     }
 }
 
@@ -864,7 +837,7 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
         // Use get_pow_eval_algo() to understand
         // if we are in a special case with small
         // negative exponent.
-        const auto pea = get_pow_eval_algo(*pptr);
+        const auto pea = get_pow_eval_algo(pptr->args());
         return pea.algo != pow_eval_algo::type::neg_small_int && pea.algo != pow_eval_algo::type::neg_small_half;
     };
 
@@ -996,7 +969,7 @@ expression prod(std::vector<expression> args)
     std::stable_partition(args.begin(), args.end(),
                           [](const expression &ex) { return std::holds_alternative<number>(ex.value()); });
 
-    return expression{func{detail::prod_impl{std::move(args)}}};
+    return expression{func{detail::prod_impl{args}}};
 }
 
 HEYOKA_END_NAMESPACE

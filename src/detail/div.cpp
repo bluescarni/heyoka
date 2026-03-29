@@ -49,32 +49,11 @@ div_impl::div_impl() : div_impl(0_dbl, 1_dbl) {}
 
 div_impl::div_impl(expression a, expression b) : func_base("div", {std::move(a), std::move(b)}) {}
 
-llvm::Value *div_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+llvm::Value *div_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool)
 {
-    assert(args().size() == 2u);
-
-    return llvm_eval_helper(
-        [&s](const auto &args, bool) {
-            assert(args.size() == 2u);
-            return llvm_fdiv(s, args[0], args[1]);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *div_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    assert(args().size() == 2u);
-
-    return llvm_c_eval_func_helper(
-        "div",
-        [&s](const auto &args, bool) {
-            assert(args.size() == 2u);
-            return llvm_fdiv(s, args[0], args[1]);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    assert(args.size() == 2u);
+    return llvm_fdiv(s, args[0], args[1]);
 }
 
 namespace
@@ -100,8 +79,7 @@ llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &num0
 // are quite similar, so we handle them together.
 template <typename U,
           std::enable_if_t<
-              std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>, std::is_same<U, param>>, int>
-          = 0>
+              std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>, std::is_same<U, param>>, int> = 0>
 llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &nv, const variable &var1,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)

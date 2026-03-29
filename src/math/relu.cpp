@@ -105,7 +105,7 @@ void relu_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
-[[nodiscard]] std::vector<expression> relu_impl::gradient() const
+std::vector<expression> relu_impl::gradient() const
 {
     assert(args().size() == 1u);
     return {relup(args()[0], m_slope)};
@@ -129,29 +129,11 @@ llvm::Value *llvm_relu(llvm_state &s, llvm::Value *x, double slope)
 
 } // namespace
 
-[[nodiscard]] llvm::Value *relu_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t,
-                                                const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                                llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                                bool high_accuracy) const
+llvm::Value *relu_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                      llvm::Value *, bool) const
 {
-    return llvm_eval_helper(
-        [&](const std::vector<llvm::Value *> &args, bool) {
-            assert(args.size() == 1u);
-            return llvm_relu(s, args[0], m_slope);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *relu_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                            bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        get_name(),
-        [&](const std::vector<llvm::Value *> &args, bool) {
-            assert(args.size() == 1u);
-            return llvm_relu(s, args[0], m_slope);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    assert(args.size() == 1u);
+    return llvm_relu(s, args[0], m_slope);
 }
 
 namespace
@@ -395,29 +377,11 @@ llvm::Value *llvm_relup(llvm_state &s, llvm::Value *x, double slope)
 
 } // namespace
 
-[[nodiscard]] llvm::Value *relup_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t,
-                                                 const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                                 llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                                 bool high_accuracy) const
+llvm::Value *relup_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                       llvm::Value *, bool) const
 {
-    return llvm_eval_helper(
-        [&](const std::vector<llvm::Value *> &args, bool) {
-            assert(args.size() == 1u);
-            return llvm_relup(s, args[0], m_slope);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *relup_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                             bool high_accuracy) const
-{
-    return llvm_c_eval_func_helper(
-        get_name(),
-        [&](const std::vector<llvm::Value *> &args, bool) {
-            assert(args.size() == 1u);
-            return llvm_relup(s, args[0], m_slope);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+    assert(args.size() == 1u);
+    return llvm_relup(s, args[0], m_slope);
 }
 
 namespace

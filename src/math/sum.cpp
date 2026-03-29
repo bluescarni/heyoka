@@ -172,45 +172,11 @@ std::vector<expression> sum_impl::gradient() const
     return {args().size(), 1_dbl};
 }
 
-namespace
+llvm::Value *sum_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
+                                     bool)
 {
-
-llvm::Value *sum_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
-                                std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_eval_helper(
-        [&s](std::vector<llvm::Value *> args, bool) -> llvm::Value * { return pairwise_sum(s, args); }, fb, s, fp_t,
-        eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Value *sum_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
-{
-    return sum_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-namespace
-{
-
-[[nodiscard]] llvm::Function *sum_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                              std::uint32_t batch_size, bool high_accuracy)
-{
-    return llvm_c_eval_func_helper(
-        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s, args); }, fb, s, fp_t, batch_size,
-        high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *sum_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    return sum_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+    auto args_copy = args;
+    return detail::pairwise_sum(s, args_copy);
 }
 
 namespace
