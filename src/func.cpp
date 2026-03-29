@@ -79,18 +79,21 @@ func_base::func_base(std::string name, std::string llvm_name, std::vector<expres
     : m_name(std::move(name)), m_llvm_name(std::move(llvm_name)), m_args(std::move(args), shared)
 {
     detail::func_base_check_name(m_name);
+    detail::func_base_check_name(m_llvm_name);
 }
 
 func_base::func_base(std::string name, std::string llvm_name, func_args::shared_args_t sargs)
     : m_name(std::move(name)), m_llvm_name(std::move(llvm_name)), m_args(std::move(sargs))
 {
     detail::func_base_check_name(m_name);
+    detail::func_base_check_name(m_llvm_name);
 }
 
 func_base::func_base(std::string name, std::string llvm_name, func_args fargs)
     : m_name(std::move(name)), m_llvm_name(std::move(llvm_name)), m_args(std::move(fargs))
 {
     detail::func_base_check_name(m_name);
+    detail::func_base_check_name(m_llvm_name);
 }
 
 func_base::func_base(const func_base &) = default;
@@ -110,7 +113,7 @@ void func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_args;
 }
 
-void func_base::load(boost::archive::binary_iarchive &ar, unsigned version)
+void func_base::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
     // LCOV_EXCL_START
     if (version < static_cast<unsigned>(boost::serialization::version<func_base>::type::value)) [[unlikely]] {

@@ -61,6 +61,11 @@ struct func_00_llvm_name : func_base {
     explicit func_00_llvm_name(const std::string &name) : func_base(name, name + "2", func_args{}) {}
 };
 
+struct func_00_llvm_wrong_name : func_base {
+    func_00_llvm_wrong_name() : func_base("f", "", std::make_shared<const std::vector<expression>>()) {}
+    explicit func_00_llvm_wrong_name(const std::string &name) : func_base(name, "", func_args{}) {}
+};
+
 struct func_01 {
 };
 
@@ -181,6 +186,11 @@ TEST_CASE("func minimal")
     // Trigger constructors with custom llvm name.
     REQUIRE(func(func_00_llvm_name{}).get_llvm_name() == "f2");
     REQUIRE(func(func_00_llvm_name{"bar"}).get_llvm_name() == "bar2");
+
+    REQUIRE_THROWS_MATCHES(func(func_00_llvm_wrong_name{}), std::invalid_argument,
+                           Message("Cannot create a function with no name"));
+    REQUIRE_THROWS_MATCHES(func(func_00_llvm_wrong_name{"adsadas"}), std::invalid_argument,
+                           Message("Cannot create a function with no name"));
 }
 
 TEST_CASE("shared func copy move")
