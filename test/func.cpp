@@ -59,6 +59,12 @@ struct func_00_s : func_base {
 struct func_00_llvm_name : func_base {
     func_00_llvm_name() : func_base("f", "f2", std::make_shared<const std::vector<expression>>()) {}
     explicit func_00_llvm_name(const std::string &name) : func_base(name, name + "2", func_args{}) {}
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
 };
 
 struct func_00_llvm_wrong_name : func_base {
@@ -635,6 +641,32 @@ TEST_CASE("func s11n")
     REQUIRE(f.get_name() == "pluto");
     REQUIRE(f.args().size() == 1u);
     REQUIRE(f.args()[0] == "x"_var);
+}
+
+HEYOKA_S11N_FUNC_EXPORT(func_00_llvm_name)
+
+TEST_CASE("func s11n custom llvm name")
+{
+    std::stringstream ss;
+
+    func f{func_00_llvm_name{"pluto"}};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "pluto");
+    REQUIRE(f.get_llvm_name() == "pluto2");
 }
 
 TEST_CASE("shared func s11n")
