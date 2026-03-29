@@ -374,6 +374,11 @@ const std::string &func::get_name() const noexcept
     return m_func->get_name();
 }
 
+const std::string &func::get_llvm_name() const noexcept
+{
+    return m_func->get_llvm_name();
+}
+
 const func_args &func::get_func_args() const noexcept
 {
     return m_func->get_func_args();
@@ -382,6 +387,12 @@ const func_args &func::get_func_args() const noexcept
 void func::to_stream(std::ostringstream &oss) const
 {
     m_func->to_stream(oss);
+}
+
+llvm::Value *func::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *val_t,
+                                 llvm::Value *time_ptr, const bool high_accuracy) const
+{
+    return m_func->llvm_evaluate(s, args, val_t, time_ptr, high_accuracy);
 }
 
 llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,

@@ -146,6 +146,8 @@ TEST_CASE("func minimal")
         Message("Zero number of u variables detected in func::taylor_c_diff_func() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func(s, fp_t, 2, 1, false), not_implemented_error,
                            Message("Taylor diff in compact mode is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.llvm_evaluate(s, {}, fp_t, nullptr, false), not_implemented_error,
+                           Message("llvm_evaluate() is not implemented for the function 'f'"));
 
     // A few tests for shared arguments semantics.
     {
@@ -180,13 +182,8 @@ TEST_CASE("func minimal")
     }
 
     // Trigger constructors with custom llvm name.
-    {
-        func f_s(func_00_llvm_name{});
-    }
-
-    {
-        func f_s(func_00_llvm_name{"foo"});
-    }
+    REQUIRE(func(func_00_llvm_name{}).get_llvm_name() == "f2");
+    REQUIRE(func(func_00_llvm_name{"bar"}).get_llvm_name() == "bar2");
 }
 
 TEST_CASE("shared func copy move")

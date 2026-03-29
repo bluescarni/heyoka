@@ -228,10 +228,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
                           }) {
                 return getval(this).llvm_evaluate(s, args, val_t, time_ptr, high_accuracy);
             } else {
-                // LCOV_EXCL_START
                 throw not_implemented_error(
                     fmt::format("llvm_evaluate() is not implemented for the function '{}'", get_name()));
-                // LCOV_EXCL_STOP
             }
         }
 
@@ -376,6 +374,7 @@ public:
     [[nodiscard]] bool is_time_dependent() const;
 
     [[nodiscard]] const std::string &get_name() const noexcept;
+    [[nodiscard]] const std::string &get_llvm_name() const noexcept;
 
     [[nodiscard]] const func_args &get_func_args() const noexcept;
 
@@ -384,6 +383,9 @@ public:
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                             llvm::Value *, bool) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
