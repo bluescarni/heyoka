@@ -41,8 +41,10 @@ namespace detail
 std::uint32_t uname_to_index(const std::string &s)
 {
     if (!s.starts_with("u_")) [[unlikely]] {
+        // LCOV_EXCL_START
         throw std::invalid_argument(
             fmt::format("Invalid string '{}' passed to uname_to_index(): the string does not begin with 'u_'", s));
+        // LCOV_EXCL_STOP
     }
 
     std::uint32_t value = 0;
