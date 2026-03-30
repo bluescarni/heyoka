@@ -62,6 +62,7 @@ void construct_composite_function_impl(std::string &name, std::string &llvm_name
                                        boost::safe_numerics::safe<S> &arg_idx, const expression &ex)
 {
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&name, &llvm_name, &fargs, &arg_idx]<typename T>(const T &v) {
             if constexpr (std::same_as<T, func>) {
                 // function node.
@@ -167,6 +168,7 @@ llvm::Value *composite_function_llvm_evaluate_impl(llvm_state &s, const expressi
                                                    llvm::Value *time_ptr, const bool high_accuracy)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&]<typename T>(const T &v) {
             if constexpr (std::same_as<T, func>) {
                 // Function node.
