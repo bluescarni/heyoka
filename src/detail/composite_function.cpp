@@ -53,10 +53,10 @@ namespace
 // to appear in the original function names.
 constexpr auto forbidden_composite_function_chars = R"(()#)";
 
-// NOLINTNEXTLINE(cert-err58-cpp)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex forbidden_composite_function_regex(fmt::format(R"([{}])", forbidden_composite_function_chars));
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters,misc-no-recursion)
 template <typename S>
 void construct_composite_function_impl(std::string &name, std::string &llvm_name, std::vector<expression> &fargs,
                                        boost::safe_numerics::safe<S> &arg_idx, const expression &ex)
@@ -161,6 +161,7 @@ composite_function_impl::composite_function_impl(const expression &ex)
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 llvm::Value *composite_function_llvm_evaluate_impl(llvm_state &s, const expression &ex, auto &arg_idx,
                                                    const std::vector<llvm::Value *> &args, llvm::Type *val_t,
                                                    llvm::Value *time_ptr, const bool high_accuracy)
