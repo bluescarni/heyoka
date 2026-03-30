@@ -56,8 +56,8 @@ constexpr auto forbidden_composite_function_chars = R"(()#)";
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const boost::regex forbidden_composite_function_regex(fmt::format(R"([{}])", forbidden_composite_function_chars));
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters,misc-no-recursion)
 template <typename S>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters,misc-no-recursion)
 void construct_composite_function_impl(std::string &name, std::string &llvm_name, std::vector<expression> &fargs,
                                        boost::safe_numerics::safe<S> &arg_idx, const expression &ex)
 {
