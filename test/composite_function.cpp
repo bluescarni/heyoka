@@ -151,3 +151,19 @@ TEST_CASE("cfunc")
         REQUIRE(out[0] == approximately(std::sin(std::cos(1. * 3.) - (2. + 3.))));
     }
 }
+
+TEST_CASE("cfunc inline")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        cfunc<double> cf{{sin(cos(x * y) - (x + z))}, {x, y, z}, kw::compact_mode = true};
+        double out[] = {0};
+        std::vector<double> in{1, 2, 3};
+
+        cf(out, in);
+
+        REQUIRE(cf.get_dc().size() == 5u);
+        REQUIRE(out[0] == approximately(std::sin(std::cos(in[0] * in[1]) - (in[0] + in[2]))));
+    }
+}
