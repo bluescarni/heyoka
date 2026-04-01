@@ -120,11 +120,11 @@ void construct_composite_function_impl(std::string &name, std::string &llvm_name
         ex.value());
 }
 
-// Construct the names and arguments of a composite function from the original function expression.
+// Construct a func_base instance for the composite function of the input expression ex.
 //
-// The original function expression is traversed in a depth-first fashion. Each time a function node is encountered, its
-// name is appended to the composite function name. Each time a non-function node is encountered, it becomes an argument
-// to the composite function.
+// The original function expression ex is traversed in a depth-first fashion. Each time a function node is encountered,
+// its name is appended to the composite function name. Each time a non-function node is encountered, it becomes an
+// argument to the composite function.
 //
 // For instance, given the original expression sin(x + y) + z, the composite function name becomes something like
 // "composite|sum(sin(sum(#0,#1)),#2)" and the arguments become [x, y, z].
@@ -182,7 +182,7 @@ llvm::Value *composite_function_llvm_evaluate_impl(llvm_state &s, const expressi
                         composite_function_llvm_evaluate_impl(s, arg, arg_idx, args, val_t, time_ptr, high_accuracy));
                 }
 
-                // Run llvm evaluation for the current function node.
+                // Run the llvm evaluation for the current function node.
                 return v.llvm_evaluate(s, local_args, val_t, time_ptr, high_accuracy);
             } else {
                 // Non-function node. Its evaluation is taken directly from the list of arguments of the composite
