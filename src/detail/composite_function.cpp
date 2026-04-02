@@ -130,7 +130,7 @@ void construct_composite_function_impl(std::string &name, std::string &llvm_name
 // "composite|sum(sin(sum(#0,#1)),#2)" and the arguments become [x, y, z].
 //
 // NOTE: here we are using a simple recursive traversal of the expression for simplicity. Composite functions are
-// supposed to be created from short expressions in any case, thuse the recursive approach should be adequate.
+// supposed to be created from short expressions in any case, thus the recursive approach should be adequate.
 func_base construct_composite_function(const expression &ex)
 {
     if (!std::holds_alternative<func>(ex.value())) [[unlikely]] {
@@ -201,7 +201,7 @@ llvm::Value *composite_function_llvm_evaluate_impl(llvm_state &s, const expressi
 // is constructed and then passed to the llvm_evaluate() function of the function node.
 //
 // NOTE: here we are using a simple recursive traversal of the expression for simplicity. Composite functions are
-// supposed to be created from short expressions in any case, thuse the recursive approach should be adequate.
+// supposed to be created from short expressions in any case, thus the recursive approach should be adequate.
 llvm::Value *composite_function_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args,
                                                     llvm::Type *val_t, llvm::Value *time_ptr,
                                                     const bool high_accuracy) const
