@@ -604,8 +604,8 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
                 // always represent the size of inlined_idxs via the iterator difference type.
                 using range_diff_t = std::ranges::range_difference_t<decltype(inlined_idxs)>;
                 if (inlined_idxs.size() > static_cast<std::make_unsigned_t<range_diff_t>>(
+                        // LCOV_EXCL_START
                         std::numeric_limits<range_diff_t>::max())) [[unlikely]] {
-                    // LCOV_EXCL_START
                     throw std::overflow_error("Overflow detected in function_dc_inline()");
                     // LCOV_EXCL_STOP
                 }
