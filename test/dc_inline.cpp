@@ -7,14 +7,12 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cmath>
-#include <fmt/base.h>
 #include <vector>
-
-#include <fmt/ranges.h>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/atan2.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 
 #include "catch.hpp"
@@ -181,4 +179,30 @@ TEST_CASE("func paronly")
 
     REQUIRE(outputs[0] == approximately(2 + std::atan2(3., 2.)));
     REQUIRE(outputs[1] == outputs[0] + 1.);
+}
+
+TEST_CASE("inline limit")
+{
+    const auto x = make_vars("x");
+
+    auto ex = sin(x);
+    for (auto i = 0; i < 500; ++i) {
+        ex = sin(ex);
+    }
+
+    const auto cf = cfunc<double>({ex}, {x}, kw::compact_mode = true);
+
+    // NOTE: here the inlining limit must result in more than 3 expressions in the decomposition.
+    REQUIRE(cf.get_dc().size() > 3u);
+
+    const std::vector inputs = {1.};
+    std::vector<double> outputs(1);
+    cf(outputs, inputs);
+
+    auto cmp = std::sin(inputs[0]);
+    for (auto i = 0; i < 500; ++i) {
+        cmp = std::sin(cmp);
+    }
+
+    REQUIRE(outputs[0] == approximately(cmp));
 }

@@ -588,9 +588,15 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
             const auto dep_idx = dependees[i][0];
             assert(dep_idx > i);
 
-            // NOTE: don't inline if the expression is already large enough, or if the dependee is one of the outputs.
+            // Estimate the size of the expression *after* inlining.
+            const auto dep_n_nodes = get_n_nodes(dc[dep_idx]);
+            const auto cur_n_nodes = get_n_nodes(dc[i]);
+            const auto tot_n_nodes = boost::safe_numerics::safe<std::size_t>(dep_n_nodes) + cur_n_nodes;
+
+            // NOTE: don't inline if the resulting expression becomes too large, or if the dependee is one of the
+            // outputs.
             constexpr auto inline_thresh = 100u;
-            if ((dep_idx < dc_size - nouts) && get_n_nodes(dc[dep_idx]) < inline_thresh) {
+            if ((dep_idx < dc_size - nouts) && tot_n_nodes < inline_thresh) {
                 // Do the inlining.
                 dc[dep_idx]
                     = subs(dc[dep_idx], std::unordered_map<std::string, expression>{{fmt::format("u_{}", i), dc[i]}});
@@ -616,8 +622,6 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
                 // of another non-ouptput expression.
                 assert(i + 1u != dc_size - nouts);
                 continue;
-            } else {
-                ;
             }
         }
 
