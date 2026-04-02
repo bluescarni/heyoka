@@ -648,6 +648,56 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
     detail::get_logger()->trace("function_dc_inline() runtime: {}", sw);
     detail::get_logger()->trace("function_dc_inline() reduced decomposition size from {} to {}", dc.size(), out.size());
 
+#if !defined(NDEBUG)
+
+    // Sanity checking for the result of inlining.
+
+    // The first nvars expressions must be variables.
+    for (size_type i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(out[i].value()));
+    }
+
+    const auto out_size = out.size();
+
+    // From nvars to out_size - nouts, the expressions must be functions whose arguments are either variables in the u_n
+    // form, where n < i, or numbers/params.
+    for (auto i = nvars; i < out_size - nouts; ++i) {
+        std::visit(
+            [i]<typename T>(const T &v) {
+                if constexpr (std::same_as<T, func>) {
+                    for (const auto &arg : v.args()) {
+                        if (const auto *p_var = std::get_if<variable>(&arg.value())) {
+                            assert(p_var->name().starts_with("u_"));
+                            assert(uname_to_index(p_var->name()) < i);
+                        } else if (std::get_if<number>(&arg.value()) == nullptr
+                                   && std::get_if<param>(&arg.value()) == nullptr) {
+                            assert(false); // LCOV_EXCL_LINE
+                        }
+                    }
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            out[i].value());
+    }
+
+    // From out_size - nouts to out_size, the expressions must be either variables in the u_n form, where n < out_size -
+    // nouts, or numbers/params.
+    for (auto i = out_size - nouts; i < out_size; ++i) {
+        std::visit(
+            [out_size, nouts]<typename T>(const T &v) {
+                if constexpr (std::same_as<T, variable>) {
+                    assert(v.name().starts_with("u_"));
+                    assert(uname_to_index(v.name()) < out_size - nouts);
+                } else if constexpr (!std::same_as<T, number> && !std::same_as<T, param>) {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            out[i].value());
+    }
+
+#endif
+
     return out;
 }
 
