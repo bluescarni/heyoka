@@ -1825,18 +1825,11 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
 #else
 
-// NOTE: this results in occasional compilation failures due to multiply-defined symbols. We will have to either wait
-// for an LLVM fix (if this is truly an LLVM bug) or implement our own version of parallel compilation.
-//
-// NOLINTNEXTLINE
-#if 0
-
+    // Parallel compilation.
     if (m_parjit) {
         // Set the number of compilation threads.
         lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
     }
-
-#endif
 
 #endif
 
