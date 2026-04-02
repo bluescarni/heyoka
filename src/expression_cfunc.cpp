@@ -595,7 +595,10 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
 
             // NOTE: don't inline if the resulting expression becomes too large, or if the dependee is one of the
             // outputs.
-            constexpr auto inline_thresh = 100u;
+            //
+            // NOTE: we have done some minimal tuning for this value. Possibly subject to more tuning in the future.
+            // Note that as this value increases, compile times increase too.
+            constexpr auto inline_thresh = 200u;
             if ((dep_idx < dc_size - nouts) && tot_n_nodes < inline_thresh) {
                 // Do the inlining.
                 dc[dep_idx]
@@ -883,7 +886,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     // Combine sin/cos calls.
     detail::sincos_combine_cfunc(ret);
 
-    // Inline.
+    // Inline in compact mode.
     if (compact_mode) {
         ret = detail::function_dc_inline(ret, nvars, nouts);
     }
