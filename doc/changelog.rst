@@ -1,6 +1,18 @@
 Changelog
 =========
 
+7.11.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Introduce expression inlining for ``cfunc`` in compact mode.
+  This leads to a performance increase for the evaluation of large expressions
+  in the x2-x3 range
+  (`#541 <https://github.com/bluescarni/heyoka/pull/541>`__). Note that this
+  applies only to compiled functions, Taylor integrators are unaffected.
+
 7.10.0 (2026-03-20)
 -------------------
 
