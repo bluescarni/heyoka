@@ -313,11 +313,11 @@ struct llvm_mc_value {
     [[nodiscard]] std::size_t total_size() const;
 };
 
-// Cache lookup and insertion.
+// In-memory cache lookup and insertion.
 std::optional<llvm_mc_value> llvm_state_memcache_lookup(const std::vector<std::string> &, std::uint32_t);
 void llvm_state_memcache_try_insert(std::vector<std::string>, std::uint32_t, llvm_mc_value);
 
-// NOTE: although this is set to "true", the parjit functionality is currently disabled and this setting has no effect.
+// Default parallel compilation setting.
 inline constexpr bool default_parjit = true;
 
 } // namespace detail

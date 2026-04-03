@@ -36,12 +36,12 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/logical.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/select.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -167,17 +167,15 @@ TEST_CASE("cfunc")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(time.begin(), time.end(), gen);
 
-            cfunc<fp_t> cf(
-                {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
-                 select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
-                {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+            cfunc<fp_t> cf({select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
+                            select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
+                           {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.select.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.composite|select("); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
@@ -217,11 +215,9 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<mppp::real> cf(
-                {select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
-                 select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
-                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({select(logical_and({gt(x, par[0]), lt(x, 2. * y)}), x * x, y * y),
+                                  select(logical_or({lte(x, 0_dbl), lt(y, heyoka::time)}), x / y, y / x)},
+                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};

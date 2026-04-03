@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <list>
 #include <map>
@@ -66,6 +67,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/composite_function.hpp>
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
@@ -486,10 +488,231 @@ std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
     return retval;
 }
 
+namespace
+{
+
+// Detect if ex is a nested function - that is, a function expression in which at least one argument is a function
+// expression.
+bool is_nested_func(const expression &ex)
+{
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
+        return std::ranges::any_of(fptr->args(),
+                                   [](const expression &arg) { return std::holds_alternative<func>(arg.value()); });
+    } else {
+        return false;
+    }
+}
+
+// Decomposition inlining.
+//
+// This function will examine the central part of the input decomposition dc and it will inline elements of the
+// decomposition into others. In this context "inlining" means that an expression is substituted into another and then
+// removed, leading to the appearance of nested functions in the decomposition. These nested functions are then
+// flattened back into non-nested functions via composite_function().
+//
+// The goal of this operation is to reduce the number of loads/stores from/to the tape in compact mode: instead of
+// storing the result of each elementary expression evaluation into the tape, the result is immediately re-used in the
+// evaluation of another elementary expression.
+std::vector<expression> function_dc_inline(std::vector<expression> &dc,
+                                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                           const std::vector<expression>::size_type nvars,
+                                           const std::vector<expression>::size_type nouts)
+{
+    using size_type = std::vector<expression>::size_type;
+
+    spdlog::stopwatch sw;
+
+    const auto dc_size = dc.size();
+    assert(nvars + nouts <= dc_size);
+
+    // Establish the dependees for each element of the central part + outputs of the decomposition. We ignore the inputs
+    // because they cannot be subject to inlining.
+    std::vector<std::vector<size_type>> dependees;
+    dependees.resize(dc_size);
+    for (size_type i = nvars; i < dc_size; ++i) {
+        // NOTE: the central part of the decomposition is supposed to contain only function expressions.
+        assert(i >= dc_size - nouts || std::holds_alternative<func>(dc[i].value()));
+
+        // Establish the variables on which the current element depends.
+        const auto vars = get_variables(dc[i]);
+
+        // Add i to the dependees lists of each dependency.
+        for (const auto &var : vars) {
+            const auto idx = uname_to_index(var);
+            assert(idx < i);
+            dependees[idx].emplace_back(i);
+        }
+    }
+
+    // Prepare the output, initialising it with the inputs of the decomposition.
+    std::vector<expression> out(dc.data(), dc.data() + nvars);
+
+    // Keep track of the elements which were inlined.
+    //
+    // NOTE: these are indices in the original decomposition dc. The vector is kept automatically sorted in ascending
+    // order.
+    std::vector<size_type> inlined_idxs;
+
+    // NOTE: elements from the central part of the decomposition will be inlined into other (successive) elements, and
+    // removed from the output. Thus, each time we add an element to the output, we must make sure that the variables
+    // within it are appropriately remapped. This is accomplished by this function.
+    const auto u_remap = [&inlined_idxs](const expression &ex) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            // The expression is a variable, fetch its index.
+            const auto idx = uname_to_index(var_ptr->name());
+
+            // Compute the new index of the variable. This is calculated by subtracting from the original index the
+            // number of elements in inlined_idxs which are *less than* the original index.
+            const auto it = std::ranges::lower_bound(inlined_idxs, idx);
+            // NOTE: by definition, the current variable cannot show up among the inlined ones.
+            assert(it == inlined_idxs.end() || *it != idx);
+
+            // Compute the subtraction amount.
+            const auto diff = static_cast<size_type>(it - inlined_idxs.begin());
+            assert(idx >= diff);
+
+            // Rename if necessary and return.
+            if (diff != 0u) {
+                return expression{fmt::format("u_{}", idx - diff)};
+            }
+        }
+
+        // The expression is not a variable or it does not need renaming.
+        return ex;
+    };
+
+    // Within the central part of the decomposition, inline expressions which are the dependees of only one non-output
+    // expression.
+    for (size_type i = nvars; i < dc_size - nouts; ++i) {
+        if (dependees[i].size() == 1u) {
+            const auto dep_idx = dependees[i][0];
+            assert(dep_idx > i);
+
+            // Estimate the size of the expression *after* inlining.
+            const auto dep_n_nodes = get_n_nodes(dc[dep_idx]);
+            const auto cur_n_nodes = get_n_nodes(dc[i]);
+            const auto tot_n_nodes = boost::safe_numerics::safe<std::size_t>(dep_n_nodes) + cur_n_nodes;
+
+            // NOTE: don't inline if the resulting expression becomes too large, or if the dependee is one of the
+            // outputs.
+            //
+            // NOTE: we have done some minimal tuning for this value. Possibly subject to more tuning in the future.
+            // Note that as this value increases, compile times increase too.
+            constexpr auto inline_thresh = 200u;
+            if ((dep_idx < dc_size - nouts) && tot_n_nodes < inline_thresh) {
+                // Do the inlining.
+                dc[dep_idx]
+                    = subs(dc[dep_idx], std::unordered_map<std::string, expression>{{fmt::format("u_{}", i), dc[i]}});
+
+                // Update inlined_idxs.
+                inlined_idxs.push_back(i);
+
+                // Overflow check.
+                //
+                // NOTE: this is necessary due to the use of lower_bound() in u_remap - we must make sure that we can
+                // always represent the size of inlined_idxs via the iterator difference type.
+                using range_diff_t = std::ranges::range_difference_t<decltype(inlined_idxs)>;
+                if (inlined_idxs.size() > static_cast<std::make_unsigned_t<range_diff_t>>(
+                        // LCOV_EXCL_START
+                        std::numeric_limits<range_diff_t>::max())) [[unlikely]] {
+                    throw std::overflow_error("Overflow detected in function_dc_inline()");
+                    // LCOV_EXCL_STOP
+                }
+
+                // The current expression was inlined, we can directly move to the next one.
+                //
+                // NOTE: this cannot be the last iteration - if the expression was inlined, it means it is the dependee
+                // of another non-ouptput expression.
+                assert(i + 1u != dc_size - nouts);
+                continue;
+            }
+        }
+
+        // The current expression was *not* inlined. Before adding it to the output, we need to transform it into a
+        // composite function, if necessary, and remap its variables in order to account for the expressions inlined
+        // thus far.
+
+        // Turn the current expression into a composite function, if necessary.
+        if (is_nested_func(dc[i])) {
+            dc[i] = composite_function(dc[i]);
+        }
+
+        // Remap and add to the output.
+        void_ptr_map<const expression> func_map;
+        sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+        out.push_back(ex_traverse_transform_nodes(func_map, sargs_map, dc[i], u_remap, {}));
+    }
+
+    // Remap and insert the outputs.
+    std::ranges::copy(std::ranges::subrange(dc.data() + dc_size - nouts, dc.data() + dc_size)
+                          | std::views::transform(u_remap),
+                      std::back_inserter(out));
+
+    detail::get_logger()->trace("function_dc_inline() runtime: {}", sw);
+    detail::get_logger()->trace("function_dc_inline() reduced decomposition size from {} to {}", dc.size(), out.size());
+
+#if !defined(NDEBUG)
+
+    // Sanity checking for the result of inlining.
+
+    // The first nvars expressions must be variables.
+    for (size_type i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(out[i].value()));
+    }
+
+    const auto out_size = out.size();
+
+    // From nvars to out_size - nouts, the expressions must be functions whose arguments are either variables in the u_n
+    // form, where n < i, or numbers/params.
+    for (auto i = nvars; i < out_size - nouts; ++i) {
+        std::visit(
+            [i]<typename T>(const T &v) {
+                if constexpr (std::same_as<T, func>) {
+                    for (const auto &arg : v.args()) {
+                        if (const auto *p_var = std::get_if<variable>(&arg.value())) {
+                            assert(p_var->name().starts_with("u_"));
+                            assert(uname_to_index(p_var->name()) < i);
+                        } else if (std::get_if<number>(&arg.value()) == nullptr
+                                   && std::get_if<param>(&arg.value()) == nullptr) {
+                            assert(false); // LCOV_EXCL_LINE
+                        }
+                    }
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            out[i].value());
+    }
+
+    // From out_size - nouts to out_size, the expressions must be either variables in the u_n form, where n < out_size -
+    // nouts, or numbers/params.
+    for (auto i = out_size - nouts; i < out_size; ++i) {
+        std::visit(
+            [out_size, nouts]<typename T>(const T &v) {
+                if constexpr (std::same_as<T, variable>) {
+                    assert(v.name().starts_with("u_"));
+                    assert(uname_to_index(v.name()) < out_size - nouts);
+                } else if constexpr (!std::same_as<T, number> && !std::same_as<T, param>) {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            out[i].value());
+    }
+
+#endif
+
+    return out;
+}
+
+} // namespace
+
 } // namespace detail
 
-// Function decomposition from with explicit list of input variables.
-std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
+// Function decomposition.
+//
+// 'vars' is the list of input variables.
+std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars,
+                                           const bool compact_mode)
 {
     if (v_ex_.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
@@ -568,6 +791,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     v_ex = detail::prod_to_div_llvm_eval(v_ex);
 
     // Split prods.
+    //
     // NOTE: 8 is the same value as for split_sums_for_decompose().
     v_ex = detail::split_prods_for_decompose(v_ex, 8u);
 
@@ -661,6 +885,11 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     // Combine sin/cos calls.
     detail::sincos_combine_cfunc(ret);
+
+    // Inline in compact mode.
+    if (compact_mode) {
+        ret = detail::function_dc_inline(ret, nvars, nouts);
+    }
 
     return ret;
 }
@@ -1164,7 +1393,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #endif
 
     // Decompose the function and cache the number of vars and outputs.
-    auto dc = function_decompose(fn.first, fn.second);
+    auto dc = function_decompose(fn.first, fn.second, false);
     const auto nvars = boost::numeric_cast<std::uint32_t>(fn.second.size());
     const auto nouts = boost::numeric_cast<std::uint32_t>(fn.first.size());
 
@@ -1959,7 +2188,7 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
     }
 
     // Decompose the function and cache the number of vars and outputs.
-    auto dc = function_decompose(fn, vars);
+    auto dc = function_decompose(fn, vars, true);
     const auto nvars = boost::numeric_cast<std::uint32_t>(vars.size());
     const auto nouts = boost::numeric_cast<std::uint32_t>(fn.size());
 

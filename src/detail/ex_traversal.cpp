@@ -41,8 +41,8 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
     return_stack<expression> out_stack;
 
     // Check if we have the transformation functions.
-    const auto wih_leaf_tfunc = static_cast<bool>(leaf_tfunc);
-    const auto wih_branch_tfunc = static_cast<bool>(branch_tfunc);
+    const auto with_leaf_tfunc = static_cast<bool>(leaf_tfunc);
+    const auto with_branch_tfunc = static_cast<bool>(branch_tfunc);
 
     // Seed the stack.
     stack.emplace_back(&e, false);
@@ -110,7 +110,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
                 }();
 
                 // Transform the new copy, if necessary
-                if (wih_branch_tfunc) {
+                if (with_branch_tfunc) {
                     ex_copy = branch_tfunc(ex_copy);
                 }
 
@@ -134,7 +134,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
                         auto ex_copy = expression{f.make_copy_with_new_args(it->second)};
 
                         // Transform the new copy, if necessary
-                        if (wih_branch_tfunc) {
+                        if (with_branch_tfunc) {
                             ex_copy = branch_tfunc(ex_copy);
                         }
 
@@ -168,7 +168,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
 
             // Apply the transformation leaf_tfunc to the leaf node, if necessary, and add the
             // result to out_stack.
-            out_stack.emplace_back(wih_leaf_tfunc ? leaf_tfunc(*cur_ex) : *cur_ex);
+            out_stack.emplace_back(with_leaf_tfunc ? leaf_tfunc(*cur_ex) : *cur_ex);
         }
     }
 

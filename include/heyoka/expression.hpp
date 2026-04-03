@@ -605,7 +605,7 @@ llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
-                                                             const std::vector<expression> &);
+                                                             const std::vector<expression> &, bool);
 
 namespace detail
 {
