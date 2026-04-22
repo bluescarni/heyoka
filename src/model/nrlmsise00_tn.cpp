@@ -419,15 +419,18 @@ expression rho_approximation(const expression &h, const std::vector<expression> 
 
 } // namespace
 
-// This c++ function returns the symbolic expressions of the thermospheric density at a certain geodetic coordinate,
-// having the f107a, f107, ap indexes and from a time expression returning the days elapsed since the last 1st of
-// January 00:00:00.
+// This C++ function returns the symbolic expressions of the thermospheric density (in kg/m**3) as a function of:
 //
-// NOTE: geodetic coordinates in the order [h, lat, lon].
+// - the geodetic coordinates [h, lat, lon]  (with h in km and lat in [-pi/2, pi/2]),
+// - the number of fractional days 'doy_expr' passed since the 1st of January 00:00:00,
+// - the 81-day average 'f107a' of the F10.7 index centred on the day of doy_expr,
+// - the F10.7 index 'f107' for the day *before* doy_expr,
+// - the average of the Ap indices 'ap' on the day of doy_expr.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const expression &f107, const expression &f107a,
-                              const expression &ap,       // NOLINT
-                              const expression &doy_expr) // NOLINT
+                              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                              const expression &ap, const expression &doy_expr)
 
 {
     // Sanity checks.
@@ -435,19 +438,21 @@ expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const exp
         throw std::invalid_argument("The geodetic argument value must have exactly the size 3");
     }
 
-    // The expression for the number of (solar, not sidereal) rotations (rad.) made by the Earth since the last 1st of
-    // January 00:00:00 UTC. (seconds in day)
+    // The expression for the number of (solar, not sidereal) rotations (in rad) made by the Earth since the last 1st of
+    // January 00:00:00 UTC.
     const expression sid = doy_expr * boost::math::constants::two_pi<double>();
-    // The expression for the fraction of the orbit made by the Earth since the last 1st of January 00:00:00 UTC. (day
-    // of year)
+    // The expression for the fraction of the orbit made by the Earth since the last 1st of January 00:00:00 UTC.
     const expression doy = doy_expr * (boost::math::constants::two_pi<double>() / 365.25);
 
     // Preparing the input expressions to the ffnn
     std::vector<expression> in;
-    in.push_back(sin(geodetic[2])); // sin(lon)
-    in.push_back(cos(geodetic[2])); // cos(lon)
+    // sin(lon).
+    in.push_back(sin(geodetic[2]));
+    // cos(lon).
+    in.push_back(cos(geodetic[2]));
+    // Geodetic latitude.
     in.push_back(normalize_min_max(geodetic[1], -boost::math::constants::half_pi<double>(),
-                                   boost::math::constants::half_pi<double>())); // geodetic latitude
+                                   boost::math::constants::half_pi<double>()));
     in.push_back(sin(sid));
     in.push_back(cos(sid));
     in.push_back(sin(doy));
