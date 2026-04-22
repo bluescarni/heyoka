@@ -12,6 +12,8 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <fmt/core.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -434,8 +436,9 @@ expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const exp
 
 {
     // Sanity checks.
-    if (geodetic.size() != 3u) {
-        throw std::invalid_argument("The geodetic argument value must have exactly the size 3");
+    if (geodetic.size() != 3u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "The 'geodetic' argument must have a size of 3, but a size of {} was detected instead", geodetic.size()));
     }
 
     // The expression for the number of (solar, not sidereal) rotations (in rad) made by the Earth since the last 1st of
