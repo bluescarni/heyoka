@@ -48,6 +48,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/debug.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -652,6 +653,11 @@ auto taylor_sort_dc(const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_
 // Helper to verify a Taylor decomposition.
 void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &dc)
 {
+    // Skip the test if requested.
+    if (!edb_enabled()) {
+        return;
+    }
+
     using idx_t = taylor_dc_t::size_type;
 
     const auto n_eq = orig.size();
@@ -747,6 +753,11 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
 void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, const std::vector<expression> &sv_funcs,
                                 const taylor_dc_t &dc, std::vector<expression>::size_type n_eq)
 {
+    // Skip the test if requested.
+    if (!edb_enabled()) {
+        return;
+    }
+
     assert(sv_funcs.size() == sv_funcs_dc.size());
 
     std::unordered_map<std::string, expression> subs_map;

@@ -333,6 +333,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/iau2006.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/egm2008.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/dayfrac.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eo_dynamics.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.

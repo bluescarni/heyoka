@@ -115,6 +115,14 @@ IGOR_MAKE_NAMED_ARGUMENT(eop_data);
 IGOR_MAKE_NAMED_ARGUMENT(sw_data);
 IGOR_MAKE_NAMED_ARGUMENT(a);
 
+// EO dynamics.
+IGOR_MAKE_NAMED_ARGUMENT(max_geo_degree);
+IGOR_MAKE_NAMED_ARGUMENT(max_geo_order);
+IGOR_MAKE_NAMED_ARGUMENT(iau2006_thresh);
+IGOR_MAKE_NAMED_ARGUMENT(Cb);
+IGOR_MAKE_NAMED_ARGUMENT(elp2000_thresh);
+IGOR_MAKE_NAMED_ARGUMENT(vsop2013_thresh);
+
 // NOTE: this namespace contains several commonly-used kwargs descriptors.
 namespace descr
 {
