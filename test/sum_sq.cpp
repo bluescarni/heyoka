@@ -6,17 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include "heyoka/kw.hpp"
 #include <heyoka/config.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <initializer_list>
-#include <limits>
 #include <random>
 #include <sstream>
-#include <stdexcept>
 #include <tuple>
 #include <type_traits>
 #include <variant>
@@ -41,10 +38,10 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -213,15 +210,14 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf({sum_sq({x, y}), sum_sq({x, expression{fp_t(.5)}}), sum_sq({par[0], y})},
-                           {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+            cfunc<fp_t> cf({sum_sq({x, y}), sum_sq({x, expression{fp_t(.5)}}), sum_sq({par[0], y})}, {x, y},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sum_sq.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sum_sq."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -264,13 +260,10 @@ TEST_CASE("cfunc")
 
     // Check sum_to_sum_sq() failure due to non-numeric exponent.
     {
-        cfunc<double> cf({sum({pow(x, 2_dbl), pow(x, y)})}, {x, y},
-                         kw::compact_mode = true, kw::opt_level = 0u);
+        cfunc<double> cf({sum({pow(x, 2_dbl), pow(x, y)})}, {x, y}, kw::compact_mode = true, kw::opt_level = 0u);
 
         const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-        REQUIRE(std::ranges::none_of(irs, [](const auto &ir) {
-            return boost::contains(ir, "sum_sq");
-        }));
+        REQUIRE(std::ranges::none_of(irs, [](const auto &ir) { return boost::contains(ir, "sum_sq"); }));
     }
 }
 
@@ -284,9 +277,8 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<mppp::real> cf({sum_sq({x, y}), sum_sq({x, expression{.5}}), sum_sq({par[0], y})},
-                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({sum_sq({x, y}), sum_sq({x, expression{.5}}), sum_sq({par[0], y})}, {x, y},
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{".1", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};

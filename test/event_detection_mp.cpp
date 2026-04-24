@@ -33,7 +33,6 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
-#include "heyoka/kw.hpp"
 #include "test_utils.hpp"
 
 using namespace heyoka;

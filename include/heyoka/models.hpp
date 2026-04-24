@@ -14,6 +14,7 @@
 #include <heyoka/model/dayfrac.hpp>
 #include <heyoka/model/egm2008.hpp>
 #include <heyoka/model/elp2000.hpp>
+#include <heyoka/model/eo_dynamics.hpp>
 #include <heyoka/model/eop.hpp>
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>

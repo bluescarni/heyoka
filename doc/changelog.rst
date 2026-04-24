@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Introduce the ``eo_dynamics`` model, for the formulation of the dynamics of an
+  Earth-orbiting spacecraft
+  (`#542 <https://github.com/bluescarni/heyoka/pull/542>`__).
 - Introduce expression inlining for ``cfunc`` in compact mode.
   This leads to a performance increase for the evaluation of large expressions
   in the x2-x3 range

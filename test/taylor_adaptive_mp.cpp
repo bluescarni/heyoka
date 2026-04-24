@@ -34,7 +34,6 @@
 #include <xtensor/views/xview.hpp>
 
 #include "catch.hpp"
-#include "heyoka/kw.hpp"
 #include "test_utils.hpp"
 
 #include <fmt/ranges.h>
