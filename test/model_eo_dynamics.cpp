@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -394,4 +395,73 @@ TEST_CASE("error handling: elp2000/vsop2013 pairing")
 
     // Neither present: OK (third-body disabled - default).
     REQUIRE_NOTHROW(model::eo_dynamics());
+}
+
+// Verify the optional_from kwarg semantics: callers may pass a std::optional<> as kwarg, with an empty optional being
+// equivalent to not providing the kwarg at all.
+TEST_CASE("optional kwarg semantics")
+{
+    detail::edb_disabler ed;
+
+    const auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
+    const std::vector<expression> vars{x, y, z, vx, vy, vz};
+    const std::array<double, 6> state{6778.0, 100.0, -100.0, 1.0, 7.67, 0.5};
+
+    auto eval_rhs = [&](const std::vector<std::pair<expression, expression>> &dyn, const std::vector<double> &pars) {
+        std::vector<expression> rhs;
+        rhs.reserve(dyn.size());
+        for (const auto &p : dyn) {
+            rhs.push_back(p.second);
+        }
+        cfunc<double> cf{rhs, vars};
+        std::array<double, 6> out{};
+        cf(out, state, kw::time = 0.0, kw::pars = pars);
+        return out;
+    };
+
+    // Empty optional for Cb ≡ no kwarg (drag disabled).
+    {
+        const auto out_no_kwarg = eval_rhs(model::eo_dynamics(), {});
+        const auto out_empty = eval_rhs(model::eo_dynamics(kw::Cb = std::optional<expression>{}), {});
+        REQUIRE(out_no_kwarg == out_empty);
+    }
+
+    // Filled optional for Cb ≡ passing the expression directly.
+    {
+        const std::vector<double> pars{1e-2};
+        const auto out_direct = eval_rhs(model::eo_dynamics(kw::Cb = par[0]), pars);
+        const auto out_opt = eval_rhs(model::eo_dynamics(kw::Cb = std::optional<expression>(par[0])), pars);
+        REQUIRE(out_direct == out_opt);
+    }
+
+    // Cb as a double-precision value.
+    {
+        const auto out_direct = eval_rhs(model::eo_dynamics(kw::Cb = 1e-2), {});
+        const auto out_opt = eval_rhs(model::eo_dynamics(kw::Cb = std::optional<expression>(1e-2_dbl)), {});
+        REQUIRE(out_direct == out_opt);
+    }
+
+    // Both thresholds empty ≡ no kwargs (third-body disabled; pairing invariant not triggered).
+    {
+        const auto out_no_kwargs = eval_rhs(model::eo_dynamics(), {});
+        const auto out_empty_pair = eval_rhs(model::eo_dynamics(kw::elp2000_thresh = std::optional<double>{},
+                                                                kw::vsop2013_thresh = std::optional<double>{}),
+                                             {});
+        REQUIRE(out_no_kwargs == out_empty_pair);
+    }
+
+    // Both thresholds filled ≡ passing scalars directly.
+    {
+        const auto out_direct = eval_rhs(model::eo_dynamics(kw::elp2000_thresh = 1e-5, kw::vsop2013_thresh = 1e-3), {});
+        const auto out_opt = eval_rhs(model::eo_dynamics(kw::elp2000_thresh = std::optional<double>(1e-5),
+                                                         kw::vsop2013_thresh = std::optional<double>(1e-3)),
+                                      {});
+        REQUIRE(out_direct == out_opt);
+    }
+
+    // Pairing invariant still fires when one is empty and the other is provided.
+    REQUIRE_THROWS_AS(model::eo_dynamics(kw::elp2000_thresh = std::optional<double>{}, kw::vsop2013_thresh = 1e-3),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(model::eo_dynamics(kw::elp2000_thresh = 1e-5, kw::vsop2013_thresh = std::optional<double>{}),
+                      std::invalid_argument);
 }
