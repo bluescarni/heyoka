@@ -115,8 +115,8 @@ inline constexpr auto eo_dynamics_kw_cfg
 // - iau2006 precession-nutation truncation threshold: defaults to eo_dynamics_default_iau2006_thresh;
 // - expression for the ballistic coefficient Cb: defaults to not-provided, which disables atmospheric drag altogether.
 //   Cb is expected in m**2/kg;
-// - elp2000/vsop2013 truncation thresholds: must be either both provided or not-provide, default to not-provided (which
-//   disables third-body perturbations).
+// - elp2000/vsop2013 truncation thresholds: must be either both provided or not-provided, default to not-provided
+//   (which disables third-body perturbations altogether).
 inline constexpr auto eo_dynamics = []<typename... KwArgs>
     requires igor::validate<eo_dynamics_kw_cfg, KwArgs...>
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
