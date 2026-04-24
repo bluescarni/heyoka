@@ -156,8 +156,9 @@ eo_dynamics_make_3rd_body_acc(const std::array<expression, 3> &xyz, const double
 // Formulate the x/y/z components of the atmospheric drag acceleration.
 //
 // state is the state vector of the spacecraft in the GCRS (km, s). iau2006_thresh is the threshold to apply to the
-// IAU2006 PN theory. edata/sdata are the EOP/SW datasets to be used in the formulation. Cb is the ballistic coefficient
-// of the spacecraft, measured in m**2/kg.
+// IAU2006 PN theory (this is not necessarily used directly, as it may be floored internally - see below). edata/sdata
+// are the EOP/SW datasets to be used in the formulation. Cb is the ballistic coefficient of the spacecraft, measured in
+// m**2/kg.
 [[nodiscard]] std::array<expression, 3> eo_dynamics_make_drag_acc(const std::array<expression, 6> &state,
                                                                   const double iau2006_thresh, const eop_data &edata,
                                                                   const sw_data &sdata, const expression &Cb)
@@ -172,12 +173,25 @@ eo_dynamics_make_3rd_body_acc(const std::array<expression, 3> &xyz, const double
     // J2000. Since, as explained above, tm is measured in *seconds*, we need to rescale.
     const auto tm_jcy = tm / secs_in_cy;
 
+    // Apply a floor to the PN truncation threshold used for the drag rotations.
+    //
+    // With current thermospheric models, we don't need a highly-accurate modelling of the Earth's rotation in order to
+    // achieve good precision on the drag formulation. An empirical worst-case stress test (Bastille Day 2000
+    // geomagnetic-storm peak, retrograde-equatorial 250 km LEO, typical LEO ballistic coefficient) produces ~44 mm of
+    // position drift over a one-day propagation at the 1e-2 floor vs a 1e-3 reference. This is orders of magnitude
+    // below the cumulative uncertainty originating from the thermospheric models, the space weather indices and the
+    // spacecraft's ballistic coefficient.
+    constexpr auto min_iau2006_thresh = 1e-2;
+    // NOTE: use '<' for the flooring (rather than, e.g., std::max()) so that in case of NaN values we don't run into UB
+    // and we let the NaN value through - it will then be caught by the validation inside the frame rotation functions.
+    const auto floored_iau2006_thresh = iau2006_thresh < min_iau2006_thresh ? min_iau2006_thresh : iau2006_thresh;
+
     // Step 1: coordinate transformations.
     // -----------------------------------
 
     // Perform the GCSR->ITRS rotation for the position.
     const auto [x_itrs, y_itrs, z_itrs]
-        = rot_icrs_itrs({x, y, z}, kw::thresh = iau2006_thresh, kw::time_expr = tm_jcy, kw::eop_data = edata);
+        = rot_icrs_itrs({x, y, z}, kw::thresh = floored_iau2006_thresh, kw::time_expr = tm_jcy, kw::eop_data = edata);
 
     // Transform into geodetic coordinates.
     //
@@ -193,8 +207,8 @@ eo_dynamics_make_3rd_body_acc(const std::array<expression, 3> &xyz, const double
     const auto [x0, y0, z0] = make_vars("x0", "y0", "z0");
 
     // Compute the position of the fixed point in the GCRS.
-    const auto [x0_gcrs, y0_gcrs, z0_gcrs]
-        = rot_itrs_icrs({x0, y0, z0}, kw::thresh = iau2006_thresh, kw::time_expr = tm_jcy, kw::eop_data = edata);
+    const auto [x0_gcrs, y0_gcrs, z0_gcrs] = rot_itrs_icrs({x0, y0, z0}, kw::thresh = floored_iau2006_thresh,
+                                                           kw::time_expr = tm_jcy, kw::eop_data = edata);
 
     // Compute the velocity of the fixed point in the GCRS.
     //
