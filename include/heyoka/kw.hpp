@@ -157,7 +157,8 @@ inline constexpr auto constructible_input_range
     = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{.required
                                                                                                       = Mandatory};
 
-// NOTE: accepts either a T-constructible argument or a std::optional<T>.
+// NOTE: this descriptor will be satisfied either by types from which a std::optional<T> can be constructed via the
+// in-place constructor, or by std::optional<T> itself.
 template <typename T, auto NArg>
     requires igor::any_named_argument<NArg>
 inline constexpr auto optional_from = igor::descr<NArg, []<typename U>() { return can_make_optional<T, U>; }>{};
