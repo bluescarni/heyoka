@@ -15,6 +15,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/make_optional.hpp>
 
 // NOTE: all keyword arguments are gathered
 // in this file in order to make it easier to
@@ -155,6 +156,11 @@ template <auto NArg, typename T, bool Mandatory = false>
 inline constexpr auto constructible_input_range
     = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{.required
                                                                                                       = Mandatory};
+
+// NOTE: accepts either a T-constructible argument or a std::optional<T>.
+template <typename T, auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto optional_from = igor::descr<NArg, []<typename U>() { return can_make_optional<T, U>; }>{};
 
 } // namespace descr
 

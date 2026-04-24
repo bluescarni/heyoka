@@ -23,6 +23,7 @@
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/make_optional.hpp>
 #include <heyoka/sw_data.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -58,7 +59,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     // Parse the ballistic coefficient expression.
     auto Cb_opt = [&p]() -> std::optional<expression> {
         if constexpr (p.has(kw::Cb)) {
-            return expression(p(kw::Cb));
+            return make_optional<expression>(p(kw::Cb));
         } else {
             return {};
         }
@@ -67,7 +68,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     // Parse the ELP2000 and VSOP2013 thresholds.
     const auto elp2000_thresh_opt = [&p]() -> std::optional<double> {
         if constexpr (p.has(kw::elp2000_thresh)) {
-            return static_cast<double>(p(kw::elp2000_thresh));
+            return make_optional<double>(p(kw::elp2000_thresh));
         } else {
             return {};
         }
@@ -75,7 +76,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
 
     const auto vsop2013_thresh_opt = [&p]() -> std::optional<double> {
         if constexpr (p.has(kw::vsop2013_thresh)) {
-            return static_cast<double>(p(kw::vsop2013_thresh));
+            return make_optional<double>(p(kw::vsop2013_thresh));
         } else {
             return {};
         }
@@ -95,9 +96,9 @@ eo_dynamics_impl(std::uint32_t, std::uint32_t, double, const eop_data &, const s
 inline constexpr auto eo_dynamics_kw_cfg
     = igor::config<kw::descr::integral<kw::max_geo_degree>, kw::descr::integral<kw::max_geo_order>,
                    kw::descr::convertible_to<kw::iau2006_thresh, double>, kw::descr::same_as<kw::eop_data, eop_data>,
-                   kw::descr::same_as<kw::sw_data, sw_data>, kw::descr::constructible_from<expression, kw::Cb>,
-                   kw::descr::convertible_to<kw::elp2000_thresh, double>,
-                   kw::descr::convertible_to<kw::vsop2013_thresh, double>>{};
+                   kw::descr::same_as<kw::sw_data, sw_data>, kw::descr::optional_from<expression, kw::Cb>,
+                   kw::descr::optional_from<double, kw::elp2000_thresh>,
+                   kw::descr::optional_from<double, kw::vsop2013_thresh>>{};
 
 // Function to formulate the dynamics of an Earth-orbiting satellite.
 //
