@@ -35,7 +35,7 @@ concept can_make_optional = (!std::same_as<T, void>) && std::same_as<std::remove
                             && (detail::is_optional_passthrough<T, Args...> || std::constructible_from<T, Args...>);
 
 // NOTE: this is similar in spirit to std::make_optional, with the added ability to pass through an existing
-// std::optional<T> via copy/move rather than in-place construction
+// std::optional<T> via copy/move.
 template <typename T, typename... Args>
     requires can_make_optional<T, Args &&...>
 std::optional<T> make_optional(Args &&...args)
