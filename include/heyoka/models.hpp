@@ -21,6 +21,7 @@
 #include <heyoka/model/frame_transformations.hpp>
 #include <heyoka/model/iau2006.hpp>
 #include <heyoka/model/jb08_tn.hpp>
+#include <heyoka/model/lagrange_prop.hpp>
 #include <heyoka/model/mascon.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/nrlmsise00_tn.hpp>
