@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Introduce the ``lagrange_prop`` model, for the formulation of Lagrangian Keplerian
+  propagators
+  (`#544 <https://github.com/bluescarni/heyoka/pull/544>`__).
 - Introduce the ``eo_dynamics`` model, for the formulation of the dynamics of an
   Earth-orbiting spacecraft
   (`#542 <https://github.com/bluescarni/heyoka/pull/542>`__).
