@@ -22,8 +22,8 @@ namespace model
 {
 
 HEYOKA_DLL_PUBLIC std::pair<std::array<expression, 3>, std::array<expression, 3>>
-make_lagrange_prop(const std::array<expression, 3> &, const std::array<expression, 3> &, const expression &,
-                   const expression &);
+lagrange_prop(const std::array<expression, 3> &, const std::array<expression, 3> &, const expression &,
+              const expression &);
 
 } // namespace model
 

@@ -69,7 +69,7 @@ cfunc<double> make_lagrange_cfunc()
     const auto mu = expression{"mu"};
     const auto tm = expression{"tm"};
 
-    const auto [pos, vel] = model::make_lagrange_prop({pos0[0], pos0[1], pos0[2]}, {vel0[0], vel0[1], vel0[2]}, mu, tm);
+    const auto [pos, vel] = model::lagrange_prop({pos0[0], pos0[1], pos0[2]}, {vel0[0], vel0[1], vel0[2]}, mu, tm);
 
     std::vector vars{pos0[0], pos0[1], pos0[2], vel0[0], vel0[1], vel0[2], mu, tm};
     std::vector outputs{pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]};

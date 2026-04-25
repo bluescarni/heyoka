@@ -32,9 +32,9 @@ namespace model
 // division by zero; hyperbolic: negative a).
 std::pair<std::array<expression, 3>, std::array<expression, 3>>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-make_lagrange_prop(const std::array<expression, 3> &pos0, const std::array<expression, 3> &vel0,
-                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                   const expression &mu, const expression &tm)
+lagrange_prop(const std::array<expression, 3> &pos0, const std::array<expression, 3> &vel0,
+              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+              const expression &mu, const expression &tm)
 {
     const auto &[x0, y0, z0] = pos0;
     const auto &[vx0, vy0, vz0] = vel0;
