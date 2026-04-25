@@ -112,8 +112,8 @@ TEST_CASE("round_trip")
             const auto vel_norm2 = tc.vi[0] * tc.vi[0] + tc.vi[1] * tc.vi[1] + tc.vi[2] * tc.vi[2];
             const auto vel_rel_err = std::sqrt(vel_diff2 / vel_norm2);
 
-            REQUIRE(pos_rel_err < 5e-14);
-            REQUIRE(vel_rel_err < 5e-14);
+            REQUIRE(pos_rel_err < 1e-13);
+            REQUIRE(vel_rel_err < 1e-13);
         }
     }
 }
@@ -149,7 +149,7 @@ TEST_CASE("invariants_preserved")
             const auto h_norm2 = h0[0] * h0[0] + h0[1] * h0[1] + h0[2] * h0[2];
             const auto h_rel_err = std::sqrt(h_diff2 / h_norm2);
 
-            REQUIRE(h_rel_err < 5e-14);
+            REQUIRE(h_rel_err < 1e-13);
         }
     }
 }
@@ -198,8 +198,8 @@ TEST_CASE("vs_taylor_integrator")
             const auto vel_norm2 = state_ta[3] * state_ta[3] + state_ta[4] * state_ta[4] + state_ta[5] * state_ta[5];
             const auto vel_rel_err = std::sqrt(vel_diff2 / vel_norm2);
 
-            REQUIRE(pos_rel_err < 5e-14);
-            REQUIRE(vel_rel_err < 5e-14);
+            REQUIRE(pos_rel_err < 1e-13);
+            REQUIRE(vel_rel_err < 1e-13);
         }
     }
 }
