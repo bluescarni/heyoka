@@ -103,7 +103,7 @@ inline constexpr auto eo_dynamics_kw_cfg
 // Function to formulate the dynamics of an Earth-orbiting satellite.
 //
 // The dynamics is formulated in terms of the Cartesian state variables [x, y, z, vx, vy, vz] in the GCRS, with
-// distances measured in km and time in s.
+// distances measured in km and time in TT seconds elapsed since the epoch of J2000.
 //
 // The precise formulation of the dynamics is controlled by several optional keyword arguments. By default (i.e., if no
 // arguments are passed in input), purely Keplerian dynamics is returned, with the Earth's gravitational parameter taken
