@@ -530,8 +530,15 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
     std::vector<std::vector<size_type>> dependees;
     dependees.resize(dc_size);
     for (size_type i = nvars; i < dc_size; ++i) {
-        // NOTE: the central part of the decomposition is supposed to contain only function expressions.
-        assert(i >= dc_size - nouts || std::holds_alternative<func>(dc[i].value()));
+        // NOTE: the central part of the decomposition is supposed to contain only function expressions. The outputs
+        // cannot be function expressions.
+#if !defined(NDEBUG)
+        if (i < dc_size - nouts) {
+            assert(std::holds_alternative<func>(dc[i].value()));
+        } else {
+            assert(!std::holds_alternative<func>(dc[i].value()));
+        }
+#endif
 
         // Establish the variables on which the current element depends.
         const auto vars = get_variables(dc[i]);
@@ -545,12 +552,12 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
     }
 
     // Prepare the output, initialising it with the inputs of the decomposition.
-    std::vector<expression> out(dc.data(), dc.data() + nvars);
+    std::vector out(dc.data(), dc.data() + nvars);
 
     // Keep track of the elements which were inlined.
     //
     // NOTE: these are indices in the original decomposition dc. The vector is kept automatically sorted in ascending
-    // order.
+    // order during construction.
     std::vector<size_type> inlined_idxs;
 
     // NOTE: elements from the central part of the decomposition will be inlined into other (successive) elements, and
@@ -583,6 +590,8 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
 
     // Within the central part of the decomposition, inline expressions which are the dependees of only one non-output
     // expression.
+    void_ptr_map<const expression> func_map;
+    sargs_ptr_map<const func_args::shared_args_t> sargs_map;
     for (size_type i = nvars; i < dc_size - nouts; ++i) {
         if (dependees[i].size() == 1u) {
             const auto dep_idx = dependees[i][0];
@@ -638,8 +647,8 @@ std::vector<expression> function_dc_inline(std::vector<expression> &dc,
         }
 
         // Remap and add to the output.
-        void_ptr_map<const expression> func_map;
-        sargs_ptr_map<const func_args::shared_args_t> sargs_map;
+        func_map.clear();
+        sargs_map.clear();
         out.push_back(ex_traverse_transform_nodes(func_map, sargs_map, dc[i], u_remap, {}));
     }
 
