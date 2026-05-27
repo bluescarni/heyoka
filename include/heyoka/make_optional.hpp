@@ -21,8 +21,13 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Concept to detect if Args is a pack of exactly 1 parameter whose type, after the removal of cvref qualifiers, is
-// std::optional<T>.
+// Concept to detect if Args is a pack of exactly 1 type which:
+//
+// - after the removal of cvref qualifiers, is the same as std::optional<T>, and
+// - can be used to construct a std::optional<T>.
+//
+// NOTE: the latter condition is essentially equivalent to requiring that std::optional<T> is copy or move
+// constructible, depending on the exact type of Args.
 template <typename T, typename... Args>
 concept is_optional_passthrough
     = sizeof...(Args) == 1u && (... && std::same_as<std::optional<T>, std::remove_cvref_t<Args>>)
