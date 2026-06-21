@@ -26,9 +26,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu();
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu() noexcept;
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a();
+[[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a() noexcept;
 
 namespace detail
 {

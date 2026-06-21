@@ -38,8 +38,7 @@ namespace detail
 namespace
 {
 
-// Helper to fetch the EGM2008 S/C coefficients for a specific
-// degree and order.
+// Helper to fetch the EGM2008 S/C coefficients for a specific degree and order.
 std::array<double, 2> get_egm2008_sc(std::uint32_t n, std::uint32_t m)
 {
     assert(m <= n);
@@ -62,6 +61,7 @@ std::array<double, 2> get_egm2008_sc(std::uint32_t n, std::uint32_t m)
 }
 
 // Common checks for the egm2008_*() functions.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void egm2008_common_checks(std::uint32_t n, std::uint32_t m)
 {
@@ -80,24 +80,22 @@ void egm2008_common_checks(std::uint32_t n, std::uint32_t m)
 }
 
 // Kronecker delta.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto egm2008_kdelta(std::uint32_t n, std::uint32_t m)
 {
     return static_cast<double>(n == m);
 }
 
-// This helper will generate all the V/W terms necessary for the computation of the
-// geopotential up to V_nn and W_nn as a function of the geocentric Cartesian coordinates.
-// The terms are generated via the recursive algorithm
-// explained in Montenbruck, 3.2.4, with one important deviation: since the EGM2008 model
-// provides the *normalised* C/S coefficients, we have to adapt the recursive algorithm
-// to produce the normalised counterparts of the V/W terms. See the notebook in the tools/
-// directory for a derivation (but it is just a matter of adapting certain numerical factors
-// in the recursion).
+// This helper will generate all the V/W terms necessary for the computation of the geopotential up to V_nn and W_nn as
+// a function of the geocentric Cartesian coordinates. The terms are generated via the recursive algorithm explained in
+// Montenbruck, 3.2.4, with one important deviation: since the EGM2008 model provides the *normalised* C/S coefficients,
+// we have to adapt the recursive algorithm to produce the normalised counterparts of the V/W terms. See the notebook in
+// the tools/ directory for a derivation (but it is just a matter of adapting certain numerical factors in the
+// recursion).
 //
-// NOTE: apart from the renormalisation bits, there is nothing in this algorithm which
-// is specific to the EGM2008 model. That is, this should be usable with small modifications
-// in the implementation of other geopotential models.
+// NOTE: apart from the renormalisation bits, there is nothing in this algorithm which is specific to the EGM2008 model.
+// That is, this should be usable with small modifications in the implementation of other geopotential models.
 auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const expression &ya_r2,
                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                           const expression &za_r2, const expression &a2_r2, const expression &a_r)
@@ -107,6 +105,7 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
     rec_map.try_emplace({0, 0}, std::array{a_r, 0_dbl});
 
     // Run the recursion.
+    //
     // NOTE: we use '<' to stop the iteration because at the last iteration we only need the seeding to generate
     // V_nn/W_nn, which is performed as the last step of the second-to-last iteration.
     for (std::uint32_t m = 0; m < max_n; ++m) {
@@ -121,9 +120,8 @@ auto egm2008_make_rec_map(std::uint32_t max_n, const expression &xa_r2, const ex
             auto V_nm = F1 * za_r2 * V_nm1_m;
             auto W_nm = F1 * za_r2 * W_nm1_m;
 
-            // NOTE: we have to ignore the second part of the recursion formula
-            // if n == m + 1, otherwise we get a nonsensical term. See also eq. (17)
-            // in the Cunningham paper.
+            // NOTE: we have to ignore the second part of the recursion formula if n == m + 1, otherwise we get a
+            // nonsensical term. See also eq. (17) in the Cunningham paper.
             if (n != m + 1u) {
                 // Compute the quantities for the second part of the recursion formula.
                 assert(n >= 2u);
@@ -202,9 +200,8 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
     // Assemble the terms of the summation.
     std::vector<expression> terms;
     for (std::uint32_t i = 0; i <= n; ++i) {
-        // NOTE: in order to generate the full potential, we would iterate
-        // j in the [0, i] range here. However, we allow to stop the iteration
-        // at a order m < i, hence the iteration range here is [0, min(m, i)].
+        // NOTE: in order to generate the full potential, we would iterate j in the [0, i] range here. However, we allow
+        // to stop the iteration at a order m < i, hence the iteration range here is [0, min(m, i)].
         for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
             const auto [C, S] = get_egm2008_sc(i, j);
             const auto &[V, W] = rec_map.at({i, j});
@@ -216,8 +213,9 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, std::uint32_t 
     return mu_a * sum(std::move(terms));
 }
 
-// NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with
-// modifications due to the use of normalised coefficients in EGM2008.
+// NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with modifications due to the use of
+// normalised coefficients in EGM2008.
+//
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz, std::uint32_t n, std::uint32_t m,
                                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -226,8 +224,7 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     // Check degree/order.
     egm2008_common_checks(n, m);
 
-    // NOTE: in the Cunningham recursion formulae for the acceleration, we need V/W terms
-    // up to degree/order n+1.
+    // NOTE: in the Cunningham recursion formulae for the acceleration, we need V/W terms up to degree/order n+1.
     if (n == egm2008_max_degree) [[unlikely]] {
         throw std::invalid_argument(
             // LCOV_EXCL_START
@@ -256,13 +253,13 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
 
     // Assemble the terms of the summation.
     for (std::uint32_t i = 0; i <= n; ++i) {
-        // NOTE: in order to generate the full accelerations, we would iterate
-        // j in the [0, i] range here. However, we allow to stop the iteration
-        // at a order m < i, hence the iteration range here is [0, min(m, i)].
+        // NOTE: in order to generate the full accelerations, we would iterate j in the [0, i] range here. However, we
+        // allow to stop the iteration at a order m < i, hence the iteration range here is [0, min(m, i)].
         for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
             const auto [C, S] = get_egm2008_sc(i, j);
 
             // Compute the numerical coefficients.
+            //
             // NOTE: these differ from the original formulae due to the use of normalised geopotential coefficients.
             auto cxy_0 = std::sqrt((2. - egm2008_kdelta(0, j)) * ((2. * i) + 1) * (2. + i + j) * (1. + i + j)
                                    / ((2. - egm2008_kdelta(0, j + 1u)) * ((2. * i) + 3)));
@@ -301,12 +298,12 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
 // Default values of the gravitational parameter 'mu' and Earth radius 'a' for the egm2008_*() functions.
 //
 // NOTE: these are in SI units, taken from the official documentation of EGM2008.
-double get_egm2008_mu()
+double get_egm2008_mu() noexcept
 {
     return 3986004.415e8;
 }
 
-double get_egm2008_a()
+double get_egm2008_a() noexcept
 {
     return 6378136.3;
 }

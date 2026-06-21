@@ -124,6 +124,9 @@ IGOR_MAKE_NAMED_ARGUMENT(Cb);
 IGOR_MAKE_NAMED_ARGUMENT(elp2000_thresh);
 IGOR_MAKE_NAMED_ARGUMENT(vsop2013_thresh);
 
+// sh_gravity.
+IGOR_MAKE_NAMED_ARGUMENT(sh_coefficients);
+
 // NOTE: this namespace contains several commonly-used kwargs descriptors.
 namespace descr
 {
