@@ -1274,7 +1274,7 @@ TEST_CASE("acceleration")
         REQUIRE(out[1] == approximately(test_accelerations[i][1]));
         REQUIRE(out[2] == approximately(test_accelerations[i][2]));
 
-        cf(out_grad, in);
+        cf_grad(out_grad, in);
         REQUIRE(out[0] == approximately(out_grad[0]));
         REQUIRE(out[1] == approximately(out_grad[1]));
         REQUIRE(out[2] == approximately(out_grad[2]));
