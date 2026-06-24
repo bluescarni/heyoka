@@ -335,6 +335,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/dayfrac.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/eo_dynamics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/lagrange_prop.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/sh_gravity.cpp"
     # Callbacks.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.

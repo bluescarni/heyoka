@@ -12,7 +12,9 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <ranges>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -31,6 +33,37 @@ namespace model
 namespace detail
 {
 
+// Type trait to detect a 2-elements C array or std::array of any type.
+template <typename>
+struct is_array2_like : std::false_type {
+};
+
+template <typename T>
+struct is_array2_like<T[2]> : std::true_type {
+};
+
+template <typename T>
+struct is_array2_like<std::array<T, 2>> : std::true_type {
+};
+
+// Concept to detect if T is a possibly cvref-qualified array-like type whose perfectly-forwarded element type can be
+// used to construct an expression.
+template <typename T>
+concept expression_array_ctible = requires(T val) { expression{std::forward_like<T>(val[0])}; };
+
+// Concept to detect if R is an input range from which a list of S/C coefficients for a custom spherical harmonics
+// gravity model can be constructed.
+template <typename R>
+concept sh_gravity_sc_input_range
+    = std::ranges::input_range<R> && is_array2_like<std::remove_cvref_t<std::ranges::range_reference_t<R>>>::value
+      && expression_array_ctible<std::ranges::range_reference_t<R>>;
+
+// Kwarg descriptor for sh_gravity_sc_input_range.
+template <auto NArg>
+    requires igor::any_named_argument<NArg>
+inline constexpr auto sh_gravity_sc_input_range_descr
+    = igor::descr<NArg, []<typename U>() { return sh_gravity_sc_input_range<U>; }>{.required = true};
+
 // Common options for the sh_gravity_*() functions.
 template <typename... KwArgs>
 auto sh_gravity_common_opts(const KwArgs &...kw_args)
@@ -44,12 +77,17 @@ auto sh_gravity_common_opts(const KwArgs &...kw_args)
     auto a = expression(p(kw::a));
 
     // SH coefficients.
-    auto sh_coefficients = heyoka::detail::ranges_to<std::vector<expression>>(p(kw::sh_coefficients));
+    auto sc_rng
+        // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+        = p(kw::sh_coefficients) | std::views::transform([]<typename T>(T &&val) {
+              return std::array{expression{std::forward_like<T>(val[0])}, expression{std::forward_like<T>(val[1])}};
+          });
+    auto sh_coefficients = std::vector(std::ranges::begin(sc_rng), std::ranges::end(sc_rng));
 
     return std::tuple{std::move(mu), std::move(a), std::move(sh_coefficients)};
 }
 
-// Function used to get the S/C coefficients in the sh_gravity_*_impl() primitives.
+// Function type used to get the S/C coefficients in the sh_gravity_*_impl() primitives.
 using sh_gravity_sc_getter_t = std::function<std::array<expression, 2>(std::uint32_t, std::uint32_t)>;
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC expression sh_gravity_pot_impl(const std::array<expression, 3> &, std::uint32_t,
@@ -60,17 +98,15 @@ using sh_gravity_sc_getter_t = std::function<std::array<expression, 2>(std::uint
                                                                               const expression &, const expression &,
                                                                               const sh_gravity_sc_getter_t &);
 
-// Factory function for an implementation of sh_gravity_sc_getter_t which fetches the coefficients from a flattened list
-// of S/C coefficients beginning from n=2.
-[[nodiscard]] HEYOKA_DLL_PUBLIC sh_gravity_sc_getter_t sh_gravity_sc_getter_from_list(const std::vector<expression> &);
+[[nodiscard]] HEYOKA_DLL_PUBLIC sh_gravity_sc_getter_t
+sh_gravity_sc_getter_from_list(const std::vector<std::array<expression, 2>> &);
 
 } // namespace detail
 
 // kwargs configuration for the common options of the sh_gravity_*() functions.
-inline constexpr auto sh_gravity_kw_cfg
-    = igor::config<kw::descr::constructible_from<expression, kw::mu, true>,
-                   kw::descr::constructible_from<expression, kw::a, true>,
-                   kw::descr::constructible_input_range<kw::sh_coefficients, expression, true>>{};
+inline constexpr auto sh_gravity_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::mu, true>,
+                                                       kw::descr::constructible_from<expression, kw::a, true>,
+                                                       detail::sh_gravity_sc_input_range_descr<kw::sh_coefficients>>{};
 
 // NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
 // be reused in other invocations.
@@ -80,7 +116,7 @@ inline constexpr auto sh_gravity_pot = []<typename... KwArgs>
 (const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m, KwArgs &&...kw_args) {
     const auto [mu, a, sh_coefficients] = detail::sh_gravity_common_opts(kw_args...);
 
-    const auto sc_getter = sh_gravity_sc_getter_from_array(sh_coefficients);
+    const auto sc_getter = sh_gravity_sc_getter_from_list(sh_coefficients);
 
     return detail::sh_gravity_pot_impl(xyz, n, m, mu, a, sc_getter);
 };
@@ -91,7 +127,7 @@ inline constexpr auto sh_gravity_acct = []<typename... KwArgs>
 (const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m, KwArgs &&...kw_args) {
     const auto [mu, a, sh_coefficients] = detail::sh_gravity_common_opts(kw_args...);
 
-    const auto sc_getter = sh_gravity_sc_getter_from_array(sh_coefficients);
+    const auto sc_getter = sh_gravity_sc_getter_from_list(sh_coefficients);
 
     return detail::sh_gravity_acc_impl(xyz, n, m, mu, a, sc_getter);
 };
