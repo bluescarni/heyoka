@@ -48,11 +48,10 @@ TEST_CASE("error handling")
                                    "geopotential model: the order 1 is greater than the degree 0"));
 
     REQUIRE_THROWS_MATCHES(
-        model::egm2008_acc({x, y, z}, model::detail::egm2008_max_degree, 0), std::invalid_argument,
-        Message(
-            fmt::format("Invalid degree specified for the computation of the acceleration in "
-                        "the EGM2008 geopotential model: a degree of {} is too high, the maximum allowed value is {}",
-                        model::detail::egm2008_max_degree, model::detail::egm2008_max_degree - 1u)));
+        model::egm2008_acc({x, y, z}, model::detail::egm2008_max_degree + 1u, 0), std::invalid_argument,
+        Message(fmt::format("Invalid degree specified for the EGM2008 geopotential model: the maximum degree is "
+                            "{}, but a degree of {} was specified",
+                            model::detail::egm2008_max_degree, model::detail::egm2008_max_degree + 1u)));
 }
 
 // A test to check that custom mu/a are correctly forwarded.
@@ -1252,7 +1251,7 @@ TEST_CASE("acceleration")
 
     // Run a computation up to the max degree/order.
     REQUIRE_NOTHROW(
-        model::egm2008_pot({x, y, z}, model::detail::egm2008_max_degree - 1u, model::detail::egm2008_max_degree - 1u));
+        model::egm2008_acc({x, y, z}, model::detail::egm2008_max_degree, model::detail::egm2008_max_degree));
 
     // Prepare input/output for the compiled functions.
     std::vector<double> out(3), in(3);
