@@ -121,7 +121,7 @@ inline constexpr auto sh_gravity_pot = []<typename... KwArgs>
     return detail::sh_gravity_pot_impl(xyz, n, m, mu, a, sc_getter);
 };
 
-inline constexpr auto sh_gravity_acct = []<typename... KwArgs>
+inline constexpr auto sh_gravity_acc = []<typename... KwArgs>
     requires igor::validate<sh_gravity_kw_cfg, KwArgs...>
 // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m, KwArgs &&...kw_args) {
