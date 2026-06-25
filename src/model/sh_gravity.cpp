@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -61,16 +62,18 @@ std::uint32_t isqrt(const std::uint32_t y)
 
 } // namespace
 
-// Helper to construct an C/S coefficients getter for a custom spherical harmonics gravity model from a list of C/S
+// Helper to construct a C/S coefficients getter for a custom spherical harmonics gravity model from a list of C/S
 // coefficients.
 //
 // The coefficients are expected to be stored in C/S pairs as a flattened list up to degree n:
 //
 // [(C00, S00), (C10, S10), (C11, S11), (C20, S20), (C21, S21), (C22, S22), ..., (Cnn, Snn)]
 //
+// In addition to the getter, the maximum degree of the model (inferred from the size of cs_list) will be returned.
+//
 // NOTE: the returned std::function captures cs_list by reference, and thus cannot be used after the destruction of
 // cs_list.
-[[nodiscard]] sh_gravity_cs_getter_t
+[[nodiscard]] std::pair<sh_gravity_cs_getter_t, std::uint32_t>
 sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &cs_list)
 {
     const auto cs_list_size = cs_list.size();
@@ -107,7 +110,7 @@ sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &cs_
     // Now we can compute max_n - the maximum spherical harmonics degree of cs_list.
     const auto max_n = ((isqrt_discr - 1u) / 2u) - 1u;
 
-    return [&cs_list, max_n](const std::uint32_t n, const std::uint32_t m) {
+    auto ret = [&cs_list, max_n](const std::uint32_t n, const std::uint32_t m) {
         using safe_size_t = boost::safe_numerics::safe<decltype(cs_list.size())>;
 
         // NOTE: this check is already run in the implementation functions.
@@ -123,6 +126,51 @@ sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &cs_
         assert(idx < cs_list.size());
         return cs_list[idx];
     };
+
+    return {std::move(ret), max_n};
+}
+
+// Resolve the effective maximum degree (n) and order (m) for a custom spherical harmonics gravity model.
+//
+// 'max_degree' and 'max_order' are the optional values provided by the user, while 'max_cs_n' is the maximum degree
+// inferred from the list of C/S coefficients. The resolution rules are:
+//
+// - if neither 'max_degree' nor 'max_order' is provided, the full model is used: n = m = max_cs_n;
+// - if only 'max_degree' is provided, the order defaults to the degree: n = m = *max_degree;
+// - if both are provided, they are used as-is: n = *max_degree, m = *max_order;
+// - providing 'max_order' without 'max_degree' is an error;
+// - 'max_degree', if provided, cannot exceed max_cs_n.
+//
+// Returns the resolved {n, m} pair.
+//
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::pair<std::uint32_t, std::uint32_t> sh_gravity_resolve_n_m(const std::optional<std::uint32_t> &max_degree,
+                                                               const std::optional<std::uint32_t> &max_order,
+                                                               const std::uint32_t max_cs_n)
+{
+    // NOTE: a user-provided maximum order without a maximum degree is not meaningful.
+    if (max_order && !max_degree) [[unlikely]] {
+        throw std::invalid_argument("Cannot instantiate a custom spherical harmonics gravity model when only the "
+                                    "maximum order is specified - please provide a maximum degree as well");
+    }
+
+    if (max_degree) {
+        if (*max_degree > max_cs_n) [[unlikely]] {
+            throw std::invalid_argument(fmt::format(
+                "Invalid maximum degree {} specified for a custom spherical harmonics gravity model: it is larger "
+                "than the maximum degree {} supported by the provided C/S coefficients",
+                *max_degree, max_cs_n));
+        }
+
+        if (max_order) {
+            // NOTE: *max_order > *max_degree is invalid, it will be caught in the implementation functions.
+            return {*max_degree, *max_order};
+        }
+
+        return {*max_degree, *max_degree};
+    }
+
+    return {max_cs_n, max_cs_n};
 }
 
 namespace

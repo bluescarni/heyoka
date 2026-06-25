@@ -126,6 +126,8 @@ IGOR_MAKE_NAMED_ARGUMENT(vsop2013_thresh);
 
 // sh_gravity.
 IGOR_MAKE_NAMED_ARGUMENT(sh_coefficients);
+IGOR_MAKE_NAMED_ARGUMENT(max_order);
+IGOR_MAKE_NAMED_ARGUMENT(max_degree);
 
 // NOTE: this namespace contains several commonly-used kwargs descriptors.
 namespace descr

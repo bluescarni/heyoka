@@ -24,7 +24,7 @@ using namespace heyoka;
 
 template <typename T>
 concept can_sh_gravity_pot = requires(const std::array<expression, 3> &xyz, double a, double mu, T coeffs) {
-    model::sh_gravity_pot(xyz, 0, 0, kw::a = a, kw::mu = mu, kw::sh_coefficients = std::forward<T>(coeffs));
+    model::sh_gravity_pot(xyz, kw::a = a, kw::mu = mu, kw::sh_coefficients = std::forward<T>(coeffs));
 };
 
 TEST_CASE("basics")
@@ -33,30 +33,30 @@ TEST_CASE("basics")
 
     // Keplerian potential tests.
     {
-        auto pot = model::sh_gravity_pot(xyz, 0, 0, kw::a = 1., kw::mu = par[0],
+        auto pot = model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
                                          kw::sh_coefficients = std::vector{std::array{2., 1.}});
         REQUIRE(pot == par[0] * (2. / sqrt(sum({pow(xyz[0], 2.), pow(xyz[1], 2.), pow(xyz[2], 2.)}))));
     }
     {
-        auto pot = model::sh_gravity_pot(xyz, 0, 0, kw::a = 1., kw::mu = par[0],
+        auto pot = model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
                                          kw::sh_coefficients = std::vector{std::array{2_dbl, 1_dbl}});
         REQUIRE(pot == par[0] * (2. / sqrt(sum({pow(xyz[0], 2.), pow(xyz[1], 2.), pow(xyz[2], 2.)}))));
     }
     {
-        auto pot = model::sh_gravity_pot(xyz, 0, 0, kw::a = 1., kw::mu = par[0],
+        auto pot = model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
                                          kw::sh_coefficients = std::vector{std::array{"par0", "par1"}});
         REQUIRE(pot == par[0] * ("par0"_var / sqrt(sum({pow(xyz[0], 2.), pow(xyz[1], 2.), pow(xyz[2], 2.)}))));
     }
     {
         const std::array<double[2], 1> cfs = {{{2., 3.}}};
 
-        auto pot = model::sh_gravity_pot(xyz, 0, 0, kw::a = 1., kw::mu = par[0], kw::sh_coefficients = cfs);
+        auto pot = model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0], kw::sh_coefficients = cfs);
         REQUIRE(pot == par[0] * (2. / sqrt(sum({pow(xyz[0], 2.), pow(xyz[1], 2.), pow(xyz[2], 2.)}))));
     }
 
     // Keplerian acceleration tests.
     {
-        auto acc = model::sh_gravity_acc(xyz, 0, 0, kw::a = 1., kw::mu = 1_dbl,
+        auto acc = model::sh_gravity_acc(xyz, kw::a = 1., kw::mu = 1_dbl,
                                          kw::sh_coefficients = std::vector{std::array{1., 1.}});
         const auto spow = sum({pow(xyz[0], 2.), pow(xyz[1], 2.), pow(xyz[2], 2.)});
         REQUIRE(acc[0] == (-0.57735026918962573 * (1.7320508075688772 * ((xyz[0] / spow) / pow(spow, 0.5)))));
