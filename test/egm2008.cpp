@@ -29,6 +29,8 @@ using namespace heyoka_test;
 TEST_CASE("mu/a getters")
 {
     REQUIRE(model::get_egm2008_a() != model::get_egm2008_mu());
+    REQUIRE(model::get_egm2008_CS().extent(0) > 0u);
+    REQUIRE(model::get_egm2008_CS().extent(1) == 2u);
 }
 
 TEST_CASE("error handling")
