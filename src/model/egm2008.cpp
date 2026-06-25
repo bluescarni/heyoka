@@ -28,7 +28,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model
 {
 
-// Fetch the array of S/C coefficients for the EGM2008 model.
+// Fetch the array of C/S coefficients for the EGM2008 model.
 mdspan<const double, extents<std::size_t, std::dynamic_extent, 2>> get_egm2008_CS() noexcept
 {
     assert(std::ranges::size(detail::egm2008_CS) % 2u == 0u);
@@ -42,8 +42,8 @@ namespace detail
 namespace
 {
 
-// Helper to fetch the EGM2008 S/C coefficients for a specific degree and order.
-std::array<expression, 2> get_egm2008_sc(const std::uint32_t n, const std::uint32_t m)
+// Helper to fetch the EGM2008 C/S coefficients for a specific degree and order.
+std::array<expression, 2> get_egm2008_cs(const std::uint32_t n, const std::uint32_t m)
 {
     // NOTE: this check is performed in the pot/acc implementation functions.
     assert(m <= n);
@@ -102,7 +102,7 @@ expression egm2008_pot_impl(const std::array<expression, 3> &xyz, const std::uin
     // Check degree/order before delegating.
     egm2008_common_checks(n, m);
 
-    return sh_gravity_pot_impl(xyz, n, m, mu, a, &get_egm2008_sc);
+    return sh_gravity_pot_impl(xyz, n, m, mu, a, &get_egm2008_cs);
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -114,7 +114,7 @@ std::array<expression, 3> egm2008_acc_impl(const std::array<expression, 3> &xyz,
     // Check degree/order before delegating.
     egm2008_common_checks(n, m);
 
-    return sh_gravity_acc_impl(xyz, n, m, mu, a, &get_egm2008_sc);
+    return sh_gravity_acc_impl(xyz, n, m, mu, a, &get_egm2008_cs);
 }
 
 } // namespace detail

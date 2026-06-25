@@ -61,39 +61,39 @@ std::uint32_t isqrt(const std::uint32_t y)
 
 } // namespace
 
-// Helper to construct an S/C coefficients getter for a custom spherical harmonics gravity model from a list of S/C
+// Helper to construct an C/S coefficients getter for a custom spherical harmonics gravity model from a list of C/S
 // coefficients.
 //
-// The coefficients are expected to be stored in S/C pairs as a flattened list up to degree n:
+// The coefficients are expected to be stored in C/S pairs as a flattened list up to degree n:
 //
 // [(C00, S00), (C10, S10), (C11, S11), (C20, S20), (C21, S21), (C22, S22), ..., (Cnn, Snn)]
 //
-// NOTE: the returned std::function captures sc_list by reference, and thus cannot be used after the destruction of
-// sc_list.
-[[nodiscard]] sh_gravity_sc_getter_t
-sh_gravity_sc_getter_from_list(const std::vector<std::array<expression, 2>> &sc_list)
+// NOTE: the returned std::function captures cs_list by reference, and thus cannot be used after the destruction of
+// cs_list.
+[[nodiscard]] sh_gravity_cs_getter_t
+sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &cs_list)
 {
-    const auto sc_list_size = sc_list.size();
+    const auto cs_list_size = cs_list.size();
 
-    if (sc_list_size == 0u) [[unlikely]] {
+    if (cs_list_size == 0u) [[unlikely]] {
         throw std::invalid_argument(
-            "A custom spherical harmonics gravity model cannot be created from an empty list of S/C coefficients");
+            "A custom spherical harmonics gravity model cannot be created from an empty list of C/S coefficients");
     }
 
-    // NOTE: the size of sc_list is valid iff it is equal to n*(n+1)/2 for some integer n>0:
+    // NOTE: the size of cs_list is valid iff it is equal to n*(n+1)/2 for some integer n>0:
     //
-    // n*(n+1)/2 = sc_list_size
+    // n*(n+1)/2 = cs_list_size
     //
-    // By solving this quadratic equation for n, we obtain the discriminant 8*sc_list_size+1 which must be a perfect
+    // By solving this quadratic equation for n, we obtain the discriminant 8*cs_list_size+1 which must be a perfect
     // square in order for the solution of the quadratic equation to be an integer:
     //
-    // n = (sqrt(8*sc_list_size+1) - 1)/2.
+    // n = (sqrt(8*cs_list_size+1) - 1)/2.
     //
     // n is the maximum spherical harmonics degree plus one.
 
     // Compute the discriminant.
     using safe_uint32_t = boost::safe_numerics::safe<std::uint32_t>;
-    const auto discr = 8 * safe_uint32_t(sc_list_size) + 1;
+    const auto discr = 8 * safe_uint32_t(cs_list_size) + 1;
 
     // Check if it is a perfect square via isqrt().
     const auto isqrt_discr = isqrt(discr);
@@ -101,14 +101,14 @@ sh_gravity_sc_getter_from_list(const std::vector<std::array<expression, 2>> &sc_
         throw std::invalid_argument(
             fmt::format("Invalid custom spherical harmonics gravity model: the list of "
                         "coefficients has a size of {}, which is not equal to n*(n+1)/2 for any natural number n",
-                        sc_list_size));
+                        cs_list_size));
     }
 
-    // Now we can compute max_n - the maximum spherical harmonics degree of sc_list.
+    // Now we can compute max_n - the maximum spherical harmonics degree of cs_list.
     const auto max_n = ((isqrt_discr - 1u) / 2u) - 1u;
 
-    return [&sc_list, max_n](const std::uint32_t n, const std::uint32_t m) {
-        using safe_size_t = boost::safe_numerics::safe<decltype(sc_list.size())>;
+    return [&cs_list, max_n](const std::uint32_t n, const std::uint32_t m) {
+        using safe_size_t = boost::safe_numerics::safe<decltype(cs_list.size())>;
 
         // NOTE: this check is already run in the implementation functions.
         assert(m <= n);
@@ -120,8 +120,8 @@ sh_gravity_sc_getter_from_list(const std::vector<std::array<expression, 2>> &sc_
         }
 
         const auto idx = (n * (safe_size_t(n) + 1) / 2) + m;
-        assert(idx < sc_list.size());
-        return sc_list[idx];
+        assert(idx < cs_list.size());
+        return cs_list[idx];
     };
 }
 
@@ -253,9 +253,9 @@ auto sh_gravity_impl_make_rec_map(const std::uint32_t max_n, const expression &x
 } // namespace
 
 expression sh_gravity_pot_impl(const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m,
-                               const expression &mu, const expression &a, const sh_gravity_sc_getter_t &sc_get)
+                               const expression &mu, const expression &a, const sh_gravity_cs_getter_t &cs_get)
 {
-    assert(sc_get);
+    assert(cs_get);
 
     // Check n/m.
     sh_gravity_impl_common_checks(n, m);
@@ -280,7 +280,7 @@ expression sh_gravity_pot_impl(const std::array<expression, 3> &xyz, const std::
         // NOTE: in order to generate the full potential, we would iterate j in the [0, i] range here. However, we allow
         // to stop the iteration at a order m < i, hence the iteration range here is [0, min(m, i)].
         for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
-            const auto [C, S] = sc_get(i, j);
+            const auto [C, S] = cs_get(i, j);
             const auto &[V, W] = rec_map.at({i, j});
 
             terms.push_back((C * V) + (S * W));
@@ -291,7 +291,7 @@ expression sh_gravity_pot_impl(const std::array<expression, 3> &xyz, const std::
 }
 
 // NOTE: the computation of the acceleration is adapted from Montenbruck 3.2.5, with modifications due to the use of
-// normalised S/C coefficients.
+// normalised C/S coefficients.
 //
 // NOTE: the numerical factors in the recursion formulae are implemented in hard-coded double-precision arithmetic. As a
 // consequence, attempting to instantiate spherical harmonics gravity models with precision higher than double will
@@ -303,9 +303,9 @@ expression sh_gravity_pot_impl(const std::array<expression, 3> &xyz, const std::
 std::array<expression, 3> sh_gravity_acc_impl(const std::array<expression, 3> &xyz, const std::uint32_t n,
                                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                               const std::uint32_t m, const expression &mu, const expression &a,
-                                              const sh_gravity_sc_getter_t &sc_get)
+                                              const sh_gravity_cs_getter_t &cs_get)
 {
-    assert(sc_get);
+    assert(cs_get);
 
     // Check n/m.
     sh_gravity_impl_common_checks(n, m);
@@ -332,7 +332,7 @@ std::array<expression, 3> sh_gravity_acc_impl(const std::array<expression, 3> &x
         // NOTE: in order to generate the full accelerations, we would iterate j in the [0, i] range here. However, we
         // allow to stop the iteration at a order m < i, hence the iteration range here is [0, min(m, i)].
         for (std::uint32_t j = 0; j <= std::min(m, i); ++j) {
-            const auto [C, S] = sc_get(i, j);
+            const auto [C, S] = cs_get(i, j);
 
             // Compute the numerical coefficients.
             //
