@@ -20,7 +20,7 @@ namespace model::detail
 
 inline constexpr std::uint32_t egm2008_max_degree = 150;
 
-extern const double egm2008_CS[11473][2];
+extern const double egm2008_CS[11473 * 2];
 
 } // namespace model::detail
 

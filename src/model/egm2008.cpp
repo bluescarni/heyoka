@@ -8,8 +8,10 @@
 
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 
 #include <fmt/core.h>
@@ -17,6 +19,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/egm2008.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/egm2008.hpp>
 #include <heyoka/model/sh_gravity.hpp>
 
@@ -24,6 +27,14 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace model
 {
+
+// Fetch the array of S/C coefficients for the EGM2008 model.
+mdspan<const double, extents<std::size_t, std::dynamic_extent, 2>> get_egm2008_CS() noexcept
+{
+    assert(std::ranges::size(detail::egm2008_CS) % 2u == 0u);
+    return mdspan<const double, extents<std::size_t, std::dynamic_extent, 2>>{
+        detail::egm2008_CS, std::ranges::size(detail::egm2008_CS) / 2u};
+}
 
 namespace detail
 {
@@ -46,14 +57,17 @@ std::array<expression, 2> get_egm2008_sc(const std::uint32_t n, const std::uint3
         return {0_dbl, 0_dbl};
     }
 
+    // Fetch the span over the coefficients.
+    const auto cs_span = get_egm2008_CS();
+
     const auto start_n_idx = ((n * (n + 1u)) / 2u) - 3u;
     const auto idx = start_n_idx + m;
 
     // NOTE: the degree is validated in the pot/acc implementation functions, hence here 'idx' is guaranteed to be in
     // range (and, as a consequence, 'n' is small enough that the computation above cannot overflow).
-    assert(idx < std::ranges::size(egm2008_CS));
+    assert(idx < cs_span.extent(0));
 
-    return {expression{egm2008_CS[idx][0]}, expression{egm2008_CS[idx][1]}};
+    return {expression{cs_span[idx, 0]}, expression{cs_span[idx, 1]}};
 }
 
 // Common checks for the egm2008_*() functions.

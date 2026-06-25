@@ -10,8 +10,10 @@
 #define HEYOKA_MODEL_EGM2008_HPP
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -20,6 +22,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/mdspan.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -29,6 +32,9 @@ namespace model
 [[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_mu() noexcept;
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC double get_egm2008_a() noexcept;
+
+[[nodiscard]] HEYOKA_DLL_PUBLIC mdspan<const double, extents<std::size_t, std::dynamic_extent, 2>>
+get_egm2008_CS() noexcept;
 
 namespace detail
 {
