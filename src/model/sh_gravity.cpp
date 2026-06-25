@@ -21,6 +21,7 @@
 
 #include <fmt/core.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
@@ -28,7 +29,9 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/sh_gravity.hpp>
 
-namespace heyoka::model::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace model::detail
 {
 
 namespace
@@ -417,4 +420,6 @@ std::array<expression, 3> sh_gravity_acc_impl(const std::array<expression, 3> &x
     return {mu_a2 * sum(std::move(x_terms)), mu_a2 * sum(std::move(y_terms)), mu_a2 * sum(std::move(z_terms))};
 }
 
-} // namespace heyoka::model::detail
+} // namespace model::detail
+
+HEYOKA_END_NAMESPACE
