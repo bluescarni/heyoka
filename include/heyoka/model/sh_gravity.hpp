@@ -59,10 +59,8 @@ concept sh_gravity_cs_input_range
       && expression_array_ctible<std::ranges::range_reference_t<R>>;
 
 // Kwarg descriptor for sh_gravity_cs_input_range.
-template <auto NArg>
-    requires igor::any_named_argument<NArg>
 inline constexpr auto sh_gravity_cs_input_range_descr
-    = igor::descr<NArg, []<typename U>() { return sh_gravity_cs_input_range<U>; }>{.required = true};
+    = igor::descr<kw::sh_coefficients, []<typename U>() { return sh_gravity_cs_input_range<U>; }>{.required = true};
 
 // Common options for the sh_gravity_*() functions.
 template <typename... KwArgs>
@@ -104,9 +102,9 @@ sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &);
 } // namespace detail
 
 // kwargs configuration for the common options of the sh_gravity_*() functions.
-inline constexpr auto sh_gravity_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::mu, true>,
-                                                       kw::descr::constructible_from<expression, kw::a, true>,
-                                                       detail::sh_gravity_cs_input_range_descr<kw::sh_coefficients>>{};
+inline constexpr auto sh_gravity_kw_cfg
+    = igor::config<kw::descr::constructible_from<expression, kw::mu, true>,
+                   kw::descr::constructible_from<expression, kw::a, true>, detail::sh_gravity_cs_input_range_descr>{};
 
 // NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
 // be reused in other invocations.
@@ -116,7 +114,7 @@ inline constexpr auto sh_gravity_pot = []<typename... KwArgs>
 (const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m, KwArgs &&...kw_args) {
     const auto [mu, a, sh_coefficients] = detail::sh_gravity_common_opts(kw_args...);
 
-    const auto cs_getter = sh_gravity_cs_getter_from_list(sh_coefficients);
+    const auto cs_getter = detail::sh_gravity_cs_getter_from_list(sh_coefficients);
 
     return detail::sh_gravity_pot_impl(xyz, n, m, mu, a, cs_getter);
 };
@@ -127,7 +125,7 @@ inline constexpr auto sh_gravity_acc = []<typename... KwArgs>
 (const std::array<expression, 3> &xyz, const std::uint32_t n, const std::uint32_t m, KwArgs &&...kw_args) {
     const auto [mu, a, sh_coefficients] = detail::sh_gravity_common_opts(kw_args...);
 
-    const auto cs_getter = sh_gravity_cs_getter_from_list(sh_coefficients);
+    const auto cs_getter = detail::sh_gravity_cs_getter_from_list(sh_coefficients);
 
     return detail::sh_gravity_acc_impl(xyz, n, m, mu, a, cs_getter);
 };
