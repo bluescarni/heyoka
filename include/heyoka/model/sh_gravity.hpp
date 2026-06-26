@@ -130,13 +130,14 @@ sh_gravity_resolve_n_m(const std::optional<std::uint32_t> &, const std::optional
 } // namespace detail
 
 // kwargs configuration for the common options of the sh_gravity_*() functions.
-inline constexpr auto sh_gravity_kw_cfg
-    = igor::config<kw::descr::constructible_from<expression, kw::mu, true>,
-                   kw::descr::constructible_from<expression, kw::a, true>,
-                   igor::descr<kw::max_degree, []<typename U>() { return detail::is_optional_integral<U>::value; }>{},
-                   igor::descr<kw::max_order, []<typename U>() { return detail::is_optional_integral<U>::value; }>{},
-                   igor::descr<kw::sh_coefficients, []<typename U>() { return detail::sh_gravity_cs_input_range<U>; }>{
-                       .required = true}>{};
+inline constexpr auto sh_gravity_kw_cfg = igor::config<
+    kw::descr::constructible_from<expression, kw::mu, true>, kw::descr::constructible_from<expression, kw::a, true>,
+    igor::descr<kw::max_degree,
+                []<typename U>() { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
+    igor::descr<kw::max_order,
+                []<typename U>() { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
+    igor::descr<kw::sh_coefficients, []<typename U>() { return detail::sh_gravity_cs_input_range<U>; }>{.required
+                                                                                                        = true}>{};
 
 // NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
 // be reused in other invocations.

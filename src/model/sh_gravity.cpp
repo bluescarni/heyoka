@@ -118,12 +118,8 @@ sh_gravity_cs_getter_from_list(const std::vector<std::array<expression, 2>> &cs_
 
         // NOTE: this check is already run in the implementation functions.
         assert(m <= n);
-
-        if (n > max_n) [[unlikely]] {
-            throw std::invalid_argument(fmt::format("Invalid degree {} specified for a custom spherical harmonics "
-                                                    "gravity model: the maximum supported degree is {}",
-                                                    n, max_n));
-        }
+        // NOTE: this is checked in sh_gravity_resolve_n_m().
+        assert(n <= max_n);
 
         const auto idx = (n * (safe_size_t(n) + 1) / 2) + m;
         assert(idx < cs_list.size());

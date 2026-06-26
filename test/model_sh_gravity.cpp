@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <array>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -75,4 +76,47 @@ TEST_CASE("basics")
     REQUIRE(!can_sh_gravity_pot<std::vector<std::array<double, 1>>>);
     REQUIRE(!can_sh_gravity_pot<std::vector<std::array<double, 3>>>);
     REQUIRE(!can_sh_gravity_pot<std::vector<int>>);
+}
+
+TEST_CASE("failure modes")
+{
+    using Catch::Matchers::Message;
+
+    const auto xyz = make_vars("x", "y", "z");
+
+    REQUIRE_THROWS_MATCHES(
+        model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
+                              kw::sh_coefficients = std::vector<std::array<double, 2>>{}),
+        std::invalid_argument,
+        Message("A custom spherical harmonics gravity model cannot be created from an empty list of C/S coefficients"));
+    REQUIRE_THROWS_MATCHES(
+        model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
+                              kw::sh_coefficients = std::vector{std::array{1., 2.}, std::array{3., 4.}}),
+        std::invalid_argument,
+        Message("Invalid custom spherical harmonics gravity model: the list of coefficients has a size of 2, which is "
+                "not equal to n*(n+1)/2 for any natural number n"));
+    REQUIRE_THROWS_MATCHES(
+        model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
+                              kw::sh_coefficients
+                              = std::vector{std::array{1., 2.}, std::array{3., 4.}, std::array{3., 4.}},
+                              kw::max_degree = 4),
+        std::invalid_argument,
+        Message("Invalid maximum degree 4 specified for a custom spherical harmonics gravity model: it is larger "
+                "than the maximum degree 1 supported by the provided C/S coefficients"));
+    REQUIRE_THROWS_MATCHES(
+        model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
+                              kw::sh_coefficients
+                              = std::vector{std::array{1., 2.}, std::array{3., 4.}, std::array{3., 4.}},
+                              kw::max_order = 4),
+        std::invalid_argument,
+        Message("Cannot instantiate a custom spherical harmonics gravity model when only the maximum order is "
+                "specified - please provide a maximum degree as well"));
+    REQUIRE_THROWS_MATCHES(
+        model::sh_gravity_pot(xyz, kw::a = 1., kw::mu = par[0],
+                              kw::sh_coefficients
+                              = std::vector{std::array{1., 2.}, std::array{3., 4.}, std::array{3., 4.}},
+                              kw::max_degree = 1, kw::max_order = 4),
+        std::invalid_argument,
+        Message("Invalid combination of degree and order specified for a spherical harmonics gravity model: the order "
+                "4 is greater than the degree 1"));
 }
