@@ -21,7 +21,6 @@ function(ADD_HEYOKA_UTIL arg1)
   # Setup the C++ standard.
   target_compile_features(${arg1} PRIVATE cxx_std_23)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
-  add_test(${arg1} ${arg1})
 endfunction()
 
 ADD_HEYOKA_UTIL(eop_data_updater)
