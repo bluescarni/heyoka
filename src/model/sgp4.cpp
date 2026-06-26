@@ -462,7 +462,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 
         // Append the iqs and their derivatives.
         const auto tv = *diqs | std::views::transform([](const auto &p) { return p.second; });
-        func_init.insert(func_init.end(), tv.begin(), tv.end());
+        std::ranges::copy(tv, std::back_inserter(func_init));
     } else {
         // Append the iqs without derivatives.
         func_init.insert(func_init.end(), iqs_exprs.begin(), iqs_exprs.end());

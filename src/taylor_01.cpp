@@ -636,10 +636,8 @@ auto taylor_sort_dc(const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_
                                           assert(it_remap != remap.end());
                                           return uname_to_index(it_remap->second);
                                       });
-
-    auto retval = std::make_pair(
-        std::vector(std::ranges::begin(dc_transform_view), std::ranges::end(dc_transform_view)),
-        std::vector(std::ranges::begin(sv_funcs_dc_transform_view), std::ranges::end(sv_funcs_dc_transform_view)));
+    auto retval = std::make_pair(std::ranges::to<std::vector>(dc_transform_view),
+                                 std::ranges::to<std::vector>(sv_funcs_dc_transform_view));
 
     get_logger()->trace("Taylor topological sort runtime: {}", sw);
 

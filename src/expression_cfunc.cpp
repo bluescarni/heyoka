@@ -481,7 +481,7 @@ std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
                                 // arguments.
                                 return rename_variables_impl(func_map, sargs_map, ex, remap);
                             });
-    auto retval = std::vector(std::ranges::begin(transform_view), std::ranges::end(transform_view));
+    auto retval = std::ranges::to<std::vector>(transform_view);
 
     get_logger()->trace("function topological sort runtime: {}", sw);
 
