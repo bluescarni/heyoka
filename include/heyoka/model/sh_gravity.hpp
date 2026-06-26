@@ -87,7 +87,7 @@ auto sh_gravity_common_opts(const KwArgs &...kw_args)
         = p(kw::sh_coefficients) | std::views::transform([]<typename T>(T &&val) {
               return std::array{expression{std::forward_like<T>(val[0])}, expression{std::forward_like<T>(val[1])}};
           });
-    auto sh_coefficients = std::vector(std::ranges::begin(cs_rng), std::ranges::end(cs_rng));
+    auto sh_coefficients = std::ranges::to<std::vector>(cs_rng);
 
     // Maximum degree/order. These can optionally be provided - if they are, only a subset of the spherical harmonics
     // model is used, otherwise the full model is used.
