@@ -1,6 +1,17 @@
 Changelog
 =========
 
+7.12.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- In addition to the existing EGM2008 geopotential model, it is now possible to
+  define custom spherical harmonics gravity models. The models can be defined in
+  terms of numerical or symbolic coefficients
+  (`#546 <https://github.com/bluescarni/heyoka/pull/546>`__).
+
 7.11.0 (2026-04-27)
 -------------------
 

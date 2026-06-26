@@ -10,26 +10,26 @@ jobs:
   osx_x86:
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_osx_x86.sh
   osx_static_x86:
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_osx_x86_static.sh
   osx_static_arm64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_osx_arm64_static.sh
   windows_2022_llvm_latest:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/checkout@v6
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           # See: https://github.com/conda-incubator/setup-miniconda?tab=readme-ov-file#example-14-remove-defaults-channel
@@ -48,28 +48,28 @@ jobs:
   conda_release_static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_release_static.sh
   conda_clang_tidy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_clang_tidy.sh
   conda_release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_release.sh
   conda_coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_coverage.sh
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v7
         with:
           fail_ci_if_error: true
           files: ./build/coverage.info
@@ -77,17 +77,17 @@ jobs:
   conda_ubsan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_ubsan.sh
   conda_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_conda_asan.sh
       # Upload the docs.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: docs
           path: doc/_build/html
@@ -96,7 +96,7 @@ jobs:
     env:
       LLVM_VERSION: 21
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm20_asan:
@@ -104,7 +104,7 @@ jobs:
     env:
       LLVM_VERSION: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm19_asan:
@@ -112,7 +112,7 @@ jobs:
     env:
       LLVM_VERSION: 19
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_llvm_n_conda_asan.sh
   conda_llvm18_asan:
@@ -120,12 +120,12 @@ jobs:
     env:
       LLVM_VERSION: 18
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_llvm_n_conda_asan.sh
   conda_asan_arm64:
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build
         run: bash tools/gha_asan_arm64.sh

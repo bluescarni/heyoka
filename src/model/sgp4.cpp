@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
@@ -247,8 +248,7 @@ std::vector<expression> sgp4_time_prop(const std::vector<expression> &inputs, co
 
     // Fetch the expressions for the intermediate quantities.
     const auto &[MDOT, OMGDOT, N0DOT, NODCF, C4, C1, T2COF, MCOF, ETA, DELM0, OMGCOF, PERIGE, C5, SINM0, D2, D3, D4,
-                 T3COF, T4COF, T5COF, A0DP, AYCOF, LCOF, N0DP, X3THM1, X1MTH2, X7THM1, COSI0, SINI0]
-        = s;
+                 T3COF, T4COF, T5COF, A0DP, AYCOF, LCOF, N0DP, X3THM1, X1MTH2, X7THM1, COSI0, SINI0] = s;
 
     // First error code check: un-Kozaied mean motion is not positive.
     auto ERRORCODE = select(lte(N0DP, 0.), 2., 0.);
@@ -462,7 +462,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
 
         // Append the iqs and their derivatives.
         const auto tv = *diqs | std::views::transform([](const auto &p) { return p.second; });
-        func_init.insert(func_init.end(), tv.begin(), tv.end());
+        std::ranges::copy(tv, std::back_inserter(func_init));
     } else {
         // Append the iqs without derivatives.
         func_init.insert(func_init.end(), iqs_exprs.begin(), iqs_exprs.end());
