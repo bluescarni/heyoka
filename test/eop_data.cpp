@@ -334,7 +334,9 @@ TEST_CASE("parse_eop_data_iers_rapid test")
     {
         const std::string str
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
-              "-0.766    0.199    -0.720    0.300       inf   .137000   .8015000   -18.637    -3.667  \n";
+              "-0.766    0.199    -0.720    0.300       inf   .137000   .8015000   -18.637    -3.667  \n73 1 3 "
+              "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
+              "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the pm_x value inf on line 0 is not finite"));
@@ -342,7 +344,9 @@ TEST_CASE("parse_eop_data_iers_rapid test")
     {
         const std::string str
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
-              "-0.766    0.199    -0.720    0.300   .143000       nan   .8015000   -18.637    -3.667  \n";
+              "-0.766    0.199    -0.720    0.300   .143000       nan   .8015000   -18.637    -3.667  \n73 1 3 "
+              "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
+              "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the pm_y value nan on line 0 is not finite"));
@@ -352,7 +356,9 @@ TEST_CASE("parse_eop_data_iers_rapid test")
     {
         const std::string str
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
-              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000       inf    -3.667  \n";
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000       inf    -3.667  \n73 1 3 "
+              "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
+              "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dX value inf on line 0 is not finite"));
@@ -360,7 +366,9 @@ TEST_CASE("parse_eop_data_iers_rapid test")
     {
         const std::string str
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
-              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000   -18.637       nan  \n";
+              "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000   -18.637       nan  \n73 1 3 "
+              "41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
+              "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
