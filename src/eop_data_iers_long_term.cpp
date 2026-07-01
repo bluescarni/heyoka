@@ -142,7 +142,7 @@ eop_data eop_data::fetch_latest_iers_long_term()
     // Replace also '-' with '_'.
     std::ranges::replace(identifier, '-', '_');
 
-    // Parse, validate and return.
+    // Parse, construct and return.
     return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier), true);
 }
 

@@ -137,7 +137,7 @@ eop_data eop_data::fetch_latest_celestrak(bool long_term)
     // Build the identifier string.
     const auto *identifier = long_term ? "celestrak_long_term" : "celestrak_last_5_years";
 
-    // Parse, validate and return.
+    // Parse, construct and return.
     return eop_data(detail::parse_eop_data_celestrak(text), std::move(timestamp), identifier, true);
 }
 

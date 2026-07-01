@@ -77,7 +77,7 @@ void validate_eop_data_table(const eop_data_table &data)
 {
     const auto n_entries = data.size();
 
-    // NOTE: mathematically, we need at least 2 rows for linear interpolation.
+    // NOTE: the interpolation algorithm needs at least 2 data points.
     //
     // Furthermore, there is an LLVM (mis)behaviour for which this check is a workaround. If the data table has size 0
     // or 1, the optimizer is able to infer that the global arrays constructed from it are unused. LLVM then removes

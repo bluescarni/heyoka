@@ -7,7 +7,9 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <exception>
+#include <initializer_list>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -113,7 +115,7 @@ TEST_CASE("parse_sw_data_celestrak test")
               "68.1\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,68."
               "1";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_sw_data_celestrak(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid SW data table detected: the MJD value 58849 "
                                        "on line 0 is not less than the MJD value in the next line (58849)"));
     }
@@ -125,9 +127,10 @@ TEST_CASE("parse_sw_data_celestrak test")
               "F10.7_"
               "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
               "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,inf,69.4,OBS,71.4,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
               "68.1";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_sw_data_celestrak(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid SW data table detected: the f107 value inf on line 0 is invalid"));
     }
 
@@ -137,9 +140,10 @@ TEST_CASE("parse_sw_data_celestrak test")
               "F10.7_"
               "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
               "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,-1,69.4,OBS,71.4,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
               "68.1";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_sw_data_celestrak(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid SW data table detected: the f107 value -1 on line 0 is invalid"));
     }
 
@@ -149,10 +153,11 @@ TEST_CASE("parse_sw_data_celestrak test")
               "F10.7_"
               "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
               "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,3,69.4,OBS,inf,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
               "68.1";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_sw_data_celestrak(str), std::invalid_argument,
+            sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
             Message("Invalid SW data table detected: the f107a_center81 value inf on line 0 is invalid"));
     }
 
@@ -162,10 +167,11 @@ TEST_CASE("parse_sw_data_celestrak test")
               "F10.7_"
               "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
               "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,1,69.4,OBS,-2,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
               "68.1";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_sw_data_celestrak(str), std::invalid_argument,
+            sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
             Message("Invalid SW data table detected: the f107a_center81 value -2 on line 0 is invalid"));
     }
 
@@ -331,6 +337,51 @@ TEST_CASE("parse_sw_data_celestrak test")
                                Message("Error parsing a celestrak SW data file: at least 28 fields "
                                        "were expected in a data row, but 12 were found instead"));
     }
+}
+
+const std::initializer_list<sw_data_row> sample_custom_data
+    = {{.mjd = 123., .Ap_avg = 1, .f107 = 2., .f107a_center81 = 3.},
+       {.mjd = 124., .Ap_avg = 4, .f107 = 5., .f107a_center81 = 6.}};
+
+TEST_CASE("custom data error handling")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(sw_data({}, "", ""), std::invalid_argument,
+                           Message("Cannot initialise an SW data table from fewer than 2 rows (0 row(s) detected)"));
+    REQUIRE_THROWS_MATCHES(
+        sw_data(std::ranges::subrange(sample_custom_data.begin(), sample_custom_data.begin() + 1), "", ""),
+        std::invalid_argument,
+        Message("Cannot initialise an SW data table from fewer than 2 rows (1 row(s) detected)"));
+    REQUIRE_THROWS_MATCHES(sw_data(sample_custom_data, "", ""), std::invalid_argument,
+                           Message("Cannot construct an SW data instance with an empty timestamp"));
+    REQUIRE_THROWS_MATCHES(sw_data(sample_custom_data, "a", ""), std::invalid_argument,
+                           Message("Cannot construct an SW data instance with an empty identifier"));
+    REQUIRE_THROWS_MATCHES(
+        sw_data(sample_custom_data, "a.", "b"), std::invalid_argument,
+        Message("Invalid timestamp 'a.' specified for an SW data instance: the timestamp cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        sw_data(sample_custom_data, "a-", "b"), std::invalid_argument,
+        Message("Invalid timestamp 'a-' specified for an SW data instance: the timestamp cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        sw_data(sample_custom_data, "a", "b."), std::invalid_argument,
+        Message("Invalid identifier 'b.' specified for an SW data instance: the identifier cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        sw_data(sample_custom_data, "a", "b-"), std::invalid_argument,
+        Message("Invalid identifier 'b-' specified for an SW data instance: the identifier cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(sw_data(sample_custom_data, "a", "celestrak_a"), std::invalid_argument,
+                           Message("Invalid identifier 'celestrak_a' specified for an SW data instance: the identifier "
+                                   "cannot start with 'celestrak_', this prefix is reserved"));
+}
+
+TEST_CASE("custom data")
+{
+    const auto sdata = sw_data(sample_custom_data, "a", "b");
+    REQUIRE(sdata.get_table().size() == 2u);
+    REQUIRE(sdata.get_table()[0] == *sample_custom_data.begin());
+    REQUIRE(sdata.get_table()[1] == *(sample_custom_data.begin() + 1));
+    REQUIRE(sdata.get_timestamp() == "a");
+    REQUIRE(sdata.get_identifier() == "b");
 }
 
 TEST_CASE("s11n")
