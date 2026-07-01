@@ -6,13 +6,18 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <array>
 #include <cassert>
 #include <cmath>
+#include <initializer_list>
 #include <memory>
+#include <ranges>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
@@ -64,8 +69,10 @@ void eop_data_row::load(boost::archive::binary_iarchive &ia, unsigned)
 namespace detail
 {
 
+namespace
+{
+
 // Helper to validate a EOP data table.
-// NOTE: this must be called by every fetch_latest_*() function before passing the table to the eop_data constructor.
 void validate_eop_data_table(const eop_data_table &data)
 {
     const auto n_entries = data.size();
@@ -77,9 +84,8 @@ void validate_eop_data_table(const eop_data_table &data)
             throw std::invalid_argument(
                 fmt::format("Invalid EOP data table detected: the MJD value {} on line {} is not finite", cur_mjd, i));
         }
-        // NOTE: if data[i + 1u].mjd is NaN, then cur_mjd >= data[i + 1u].mjd evaluates
-        // to false and we will throw on the next iteration when we detect a non-finite
-        // value for the mjd.
+        // NOTE: if data[i + 1u].mjd is NaN, then cur_mjd >= data[i + 1u].mjd evaluates to false and we will throw on
+        // the next iteration when we detect a non-finite value for the mjd.
         if (i + 1u != n_entries && cur_mjd >= data[i + 1u].mjd) [[unlikely]] {
             // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format("Invalid EOP data table detected: the MJD value {} "
@@ -122,15 +128,15 @@ void validate_eop_data_table(const eop_data_table &data)
     }
 }
 
+} // namespace
+
 } // namespace detail
 
 struct eop_data::impl {
     eop_data_table m_data;
-    // NOTE: timestamp and identifier are meant to uniquely identify
-    // the data. The identifier indicates the data source, while the
-    // timestamp is used to identify the version of the data. The timestamp
-    // is always built from the "Last-Modified" property of the file on the
-    // remote server.
+    // NOTE: timestamp and identifier are meant to uniquely identify the data. The identifier indicates the data source,
+    // while the timestamp is used to identify the version of the data. For the downloadable datasets, the timestamp is
+    // always built from the "Last-Modified" property of the file on the remote server.
     std::string m_timestamp;
     std::string m_identifier;
 
@@ -154,13 +160,41 @@ void eop_data::load(boost::archive::binary_iarchive &ia, unsigned)
     ia >> m_impl;
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-eop_data::eop_data(eop_data_table data, std::string timestamp, std::string identifier)
-    : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp), std::move(identifier)))
+eop_data::eop_data(std::initializer_list<eop_data_row> ilist, std::string timestamp, std::string identifier)
+    : eop_data(std::vector(ilist), std::move(timestamp), std::move(identifier))
 {
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// List of reserved identifier prefixes.
+using namespace std::literals;
+constexpr std::array eop_data_reserved_prefixes = {"celestrak_"sv, "iers_rapid_"sv, "iers_long_term_"sv};
+
+} // namespace
+
+} // namespace detail
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+eop_data::eop_data(eop_data_table data, std::string timestamp, std::string identifier,
+                   const bool allow_reserved_prefixes)
+    : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp), std::move(identifier)))
+{
+    // Validate the table data.
+    detail::validate_eop_data_table(m_impl->m_data);
+
+    // Check timestamp and identifier.
+    detail::eop_sw_check_ts_id("EOP", m_impl->m_timestamp, m_impl->m_identifier, allow_reserved_prefixes,
+                               detail::eop_data_reserved_prefixes);
+}
+
 eop_data::eop_data()
+    // NOTE: we use a manual direct construction of the impl here (bypassing all sanity checks) because we assume that
+    // the builtin data is valid.
     : m_impl(std::make_shared<const impl>(
           eop_data_table(std::ranges::begin(detail::builtin_eop_data), std::ranges::end(detail::builtin_eop_data)),
           // NOTE: the builtin EOP data is from IERS' rapid finals2000A.all file downloaded from USNO.
@@ -188,8 +222,8 @@ namespace detail
 
 // eop data getter for the ERA.
 //
-// The ERA will be represented as a double-length floating-point, hence the value type of the
-// global array is itself a 2-elements array (of type scal_t).
+// The ERA will be represented as a double-length floating-point, hence the value type of the global array is itself a
+// 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
     // Determine the value type.
@@ -207,9 +241,9 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         const auto dut1 = r.delta_ut1_utc;
 
         // Convert the UTC jd into UT1.
-        // LCOV_EXCL_START
         double ut1_jd1{}, ut1_jd2{};
         const auto ret = ::eraUtcut1(utc_jd1, utc_jd2, dut1, &ut1_jd1, &ut1_jd2);
+        // LCOV_EXCL_START
         if (ret == -1) [[unlikely]] {
             throw std::invalid_argument(
                 fmt::format("Unable to convert the UTC Julian date ({}, {}) into a UT1 Julian date", utc_jd1, utc_jd2));
@@ -266,8 +300,8 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
 
 // eop data getter for the gmst82.
 //
-// The gmst82 will be represented as a double-length floating-point, hence the value type of the
-// global array is itself a 2-elements array (of type scal_t).
+// The gmst82 will be represented as a double-length floating-point, hence the value type of the global array is itself
+// a 2-elements array (of type scal_t).
 llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm::Type *scal_t)
 {
     // Determine the value type.
@@ -360,7 +394,9 @@ llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm:
 }
 
 // Getters for the polar motion and dX/dY data.
+//
 // NOTE: these are all similar, use a macro (yuck) to avoid repetition.
+//
 // NOTE: like with the ERA, perform the computations in double-precision.
 #define HEYOKA_LLVM_GET_EOP_DATA_IMPL(name, conv_factor)                                                               \
     llvm::Value *llvm_get_eop_data_##name(llvm_state &s, const eop_data &data, llvm::Type *scal_t)                     \

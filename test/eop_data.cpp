@@ -221,7 +221,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "41684.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the MJD value 41684 "
                                        "on line 0 is not less than the MJD value in the next line (41684)"));
     }
@@ -232,7 +232,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "41683.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the MJD value 41684 "
                                        "on line 0 is not less than the MJD value in the next line (41683)"));
     }
@@ -243,7 +243,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "41683.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the MJD value inf on line 0 is not finite"));
     }
     {
@@ -253,7 +253,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "     inf I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    "
               "0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  ";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the MJD value inf on line 1 is not finite"));
     }
 
@@ -314,7 +314,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "-0.022    0.109                                                     ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+            eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
             Message("Invalid EOP data table detected: the UT1-UTC value inf on line 0 is not finite"));
     }
     {
@@ -325,7 +325,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
               "0.199    -0.701    0.300   .141000   .134000        inf   -18.636    -3.571  ";
 
         REQUIRE_THROWS_MATCHES(
-            detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+            eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
             Message("Invalid EOP data table detected: the UT1-UTC value inf on line 1 is not finite"));
     }
 
@@ -335,7 +335,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
               "-0.766    0.199    -0.720    0.300       inf   .137000   .8015000   -18.637    -3.667  \n";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the pm_x value inf on line 0 is not finite"));
     }
     {
@@ -343,7 +343,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
               "-0.766    0.199    -0.720    0.300   .143000       nan   .8015000   -18.637    -3.667  \n";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the pm_y value nan on line 0 is not finite"));
     }
 
@@ -353,7 +353,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
               "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000       inf    -3.667  \n";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dX value inf on line 0 is not finite"));
     }
     {
@@ -361,7 +361,7 @@ TEST_CASE("parse_eop_data_iers_rapid test")
             = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    "
               "-0.766    0.199    -0.720    0.300   .143000   .137000   .8015000   -18.637       nan  \n";
 
-        REQUIRE_THROWS_MATCHES(detail::parse_eop_data_iers_rapid(str), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(eop_data(detail::parse_eop_data_iers_rapid(str), "ts", "id"), std::invalid_argument,
                                Message("Invalid EOP data table detected: the dY value nan on line 0 is not finite"));
     }
 }
@@ -1325,4 +1325,51 @@ TEST_CASE("eop_data_gmst82")
 
     // NOTE: test only double for the gmst82.
     tester.operator()<double>();
+}
+
+TEST_CASE("invalid ts/id")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(eop_data({}, "", ""), std::invalid_argument,
+                           Message("Cannot construct an EOP data instance with an empty timestamp"));
+    REQUIRE_THROWS_MATCHES(eop_data({}, "a", ""), std::invalid_argument,
+                           Message("Cannot construct an EOP data instance with an empty identifier"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a.", "b"), std::invalid_argument,
+        Message("Invalid timestamp 'a.' specified for an EOP data instance: the timestamp cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a-", "b"), std::invalid_argument,
+        Message("Invalid timestamp 'a-' specified for an EOP data instance: the timestamp cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a", "b."), std::invalid_argument,
+        Message(
+            "Invalid identifier 'b.' specified for an EOP data instance: the identifier cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a", "b-"), std::invalid_argument,
+        Message(
+            "Invalid identifier 'b-' specified for an EOP data instance: the identifier cannot contain '.' or '-'"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a", "celestrak_a"), std::invalid_argument,
+        Message("Invalid identifier 'celestrak_a' specified for an EOP data instance: the identifier cannot "
+                "start with 'celestrak_', this prefix is reserved"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a", "iers_rapid_a"), std::invalid_argument,
+        Message("Invalid identifier 'iers_rapid_a' specified for an EOP data instance: the identifier cannot "
+                "start with 'iers_rapid_', this prefix is reserved"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data({}, "a", "iers_long_term_a"), std::invalid_argument,
+        Message("Invalid identifier 'iers_long_term_a' specified for an EOP data instance: the identifier cannot "
+                "start with 'iers_long_term_', this prefix is reserved"));
+}
+
+TEST_CASE("custom data")
+{
+    const auto edata
+        = eop_data({{.mjd = 123., .delta_ut1_utc = 1., .pm_x = 2., .pm_y = 3., .dX = 4., .dY = 5.}}, "a", "b");
+    REQUIRE(edata.get_table().size() == 1u);
+    REQUIRE(edata.get_table()[0]
+            == eop_data_row{.mjd = 123., .delta_ut1_utc = 1., .pm_x = 2., .pm_y = 3., .dX = 4., .dY = 5.});
+    REQUIRE(edata.get_timestamp() == "a");
+    REQUIRE(edata.get_identifier() == "b");
 }

@@ -693,3 +693,32 @@ TEST_CASE("taylor scalar")
         tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
     }
 }
+
+// A EOP data table with fewer than 2 rows cannot define any interpolation interval, hence every evaluation must produce
+// a NaN. This exercises the empty/one-past-the-end handling in the bisection machinery (llvm_upper_bound +
+// llvm_eop_sw_data_locate_date) and the NaN branch of the interpolation function.
+TEST_CASE("degenerate data table interpolation")
+{
+    auto x = make_vars("x");
+
+    // A single valid row, for the size-1 case.
+    const eop_data_row row{.mjd = 60000., .delta_ut1_utc = 0., .pm_x = 0., .pm_y = 0., .dX = 0., .dY = 0.};
+
+    // Both an empty (size-0) and a single-row (size-1) table.
+    for (const auto &data : {eop_data({}, "ts", "id"), eop_data({row}, "ts", "id")}) {
+        // pm_x exercises the plain interpolation path, era the double-length one.
+        cfunc<double> cf_pm_x{{model::pm_x(kw::time_expr = x, kw::eop_data = data)}, {x}};
+        cfunc<double> cf_era{{model::era(kw::time_expr = x, kw::eop_data = data)}, {x}};
+
+        for (const double t : {-1000., 0., 60000., 1000.}) {
+            double out = 0.;
+
+            cf_pm_x(std::ranges::subrange(&out, &out + 1), std::ranges::subrange(&t, &t + 1));
+            REQUIRE(std::isnan(out));
+
+            out = 0.;
+            cf_era(std::ranges::subrange(&out, &out + 1), std::ranges::subrange(&t, &t + 1));
+            REQUIRE(std::isnan(out));
+        }
+    }
+}
