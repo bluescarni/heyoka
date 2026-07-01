@@ -77,6 +77,20 @@ void validate_eop_data_table(const eop_data_table &data)
 {
     const auto n_entries = data.size();
 
+    // NOTE: mathematically, we need at least 2 rows for linear interpolation.
+    //
+    // Furthermore, there is an LLVM (mis)behaviour for which this check is a workaround. If the data table has size 0
+    // or 1, the optimizer is able to infer that the global arrays constructed from it are unused. LLVM then removes
+    // these global arrays when optimising, which causes compilation failures in compact mode. This problem manifests
+    // itself only when multiple modules are being compiled in the same lljit instance - the linker keeps a single array
+    // definition in a module and replaces identical copies of the array in other modules with references to the single
+    // array definition. When the single array definition is optimised away, the references to it are not, leading to
+    // undefined symbols.
+    if (n_entries < 2u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot initialise an EOP data table from fewer than 2 rows ({} row(s) detected)", n_entries));
+    }
+
     for (decltype(data.size()) i = 0; i < n_entries; ++i) {
         // All mjd values must be finite and ordered in strictly ascending order.
         const auto cur_mjd = data[i].mjd;

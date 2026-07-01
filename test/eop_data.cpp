@@ -15,6 +15,7 @@
 #include <limits>
 #include <mutex>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -1327,49 +1328,58 @@ TEST_CASE("eop_data_gmst82")
     tester.operator()<double>();
 }
 
-TEST_CASE("invalid ts/id")
+const std::initializer_list<eop_data_row> sample_custom_data
+    = {{.mjd = 123., .delta_ut1_utc = 1., .pm_x = 2., .pm_y = 3., .dX = 4., .dY = 5.},
+       {.mjd = 124., .delta_ut1_utc = 2., .pm_x = -2., .pm_y = -3., .dX = 7., .dY = 6.}};
+
+TEST_CASE("custom data error handling")
 {
     using Catch::Matchers::Message;
 
     REQUIRE_THROWS_MATCHES(eop_data({}, "", ""), std::invalid_argument,
+                           Message("Cannot initialise an EOP data table from fewer than 2 rows (0 row(s) detected)"));
+    REQUIRE_THROWS_MATCHES(
+        eop_data(std::ranges::subrange(sample_custom_data.begin(), sample_custom_data.begin() + 1), "", ""),
+        std::invalid_argument,
+        Message("Cannot initialise an EOP data table from fewer than 2 rows (1 row(s) detected)"));
+    REQUIRE_THROWS_MATCHES(eop_data(sample_custom_data, "", ""), std::invalid_argument,
                            Message("Cannot construct an EOP data instance with an empty timestamp"));
-    REQUIRE_THROWS_MATCHES(eop_data({}, "a", ""), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(eop_data(sample_custom_data, "a", ""), std::invalid_argument,
                            Message("Cannot construct an EOP data instance with an empty identifier"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a.", "b"), std::invalid_argument,
+        eop_data(sample_custom_data, "a.", "b"), std::invalid_argument,
         Message("Invalid timestamp 'a.' specified for an EOP data instance: the timestamp cannot contain '.' or '-'"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a-", "b"), std::invalid_argument,
+        eop_data(sample_custom_data, "a-", "b"), std::invalid_argument,
         Message("Invalid timestamp 'a-' specified for an EOP data instance: the timestamp cannot contain '.' or '-'"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a", "b."), std::invalid_argument,
+        eop_data(sample_custom_data, "a", "b."), std::invalid_argument,
         Message(
             "Invalid identifier 'b.' specified for an EOP data instance: the identifier cannot contain '.' or '-'"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a", "b-"), std::invalid_argument,
+        eop_data(sample_custom_data, "a", "b-"), std::invalid_argument,
         Message(
             "Invalid identifier 'b-' specified for an EOP data instance: the identifier cannot contain '.' or '-'"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a", "celestrak_a"), std::invalid_argument,
+        eop_data(sample_custom_data, "a", "celestrak_a"), std::invalid_argument,
         Message("Invalid identifier 'celestrak_a' specified for an EOP data instance: the identifier cannot "
                 "start with 'celestrak_', this prefix is reserved"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a", "iers_rapid_a"), std::invalid_argument,
+        eop_data(sample_custom_data, "a", "iers_rapid_a"), std::invalid_argument,
         Message("Invalid identifier 'iers_rapid_a' specified for an EOP data instance: the identifier cannot "
                 "start with 'iers_rapid_', this prefix is reserved"));
     REQUIRE_THROWS_MATCHES(
-        eop_data({}, "a", "iers_long_term_a"), std::invalid_argument,
+        eop_data(sample_custom_data, "a", "iers_long_term_a"), std::invalid_argument,
         Message("Invalid identifier 'iers_long_term_a' specified for an EOP data instance: the identifier cannot "
                 "start with 'iers_long_term_', this prefix is reserved"));
 }
 
 TEST_CASE("custom data")
 {
-    const auto edata
-        = eop_data({{.mjd = 123., .delta_ut1_utc = 1., .pm_x = 2., .pm_y = 3., .dX = 4., .dY = 5.}}, "a", "b");
-    REQUIRE(edata.get_table().size() == 1u);
-    REQUIRE(edata.get_table()[0]
-            == eop_data_row{.mjd = 123., .delta_ut1_utc = 1., .pm_x = 2., .pm_y = 3., .dX = 4., .dY = 5.});
+    const auto edata = eop_data(sample_custom_data, "a", "b");
+    REQUIRE(edata.get_table().size() == 2u);
+    REQUIRE(edata.get_table()[0] == *sample_custom_data.begin());
+    REQUIRE(edata.get_table()[1] == *(sample_custom_data.begin() + 1));
     REQUIRE(edata.get_timestamp() == "a");
     REQUIRE(edata.get_identifier() == "b");
 }
