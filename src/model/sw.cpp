@@ -86,8 +86,8 @@ llvm::Function *llvm_get_sw_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
     // - the timestamp and identifier of the sw data,
     // - the floating-point type.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     const auto fname = fmt::format("heyoka.sw_get_{}.{}.{}-{}.{}", name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
@@ -248,8 +248,8 @@ sw_impl::sw_impl(std::string name, expression time_expr, sw_data data)
     // If we do not do that, we risk in principle having functions with the same
     // name using different sw data.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
           fmt::format("sw_{}_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),

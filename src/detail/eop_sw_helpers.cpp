@@ -101,8 +101,8 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     // - the timestamp and identifier of the eop/sw data,
     // - the value type of the array.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     const auto name = fmt::format("heyoka.{}_data_{}.{}.{}-{}.{}", data_id, arr_name, table.size(),
                                   data.get_timestamp(), data.get_identifier(), llvm_mangle_type(value_t));
 

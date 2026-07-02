@@ -106,8 +106,8 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}-{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
@@ -356,8 +356,8 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}-{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
@@ -608,8 +608,8 @@ eop_impl::eop_impl(std::string name, expression time_expr, eop_data data)
     // If we do not do that, we risk in principle having functions with the same
     // name using different eop data.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
           fmt::format("eop_{}_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),
@@ -951,8 +951,8 @@ eopp_impl::eopp_impl(std::string name, expression time_expr, eop_data data)
     // If we do not do that, we risk in principle having functions with the same
     // name using different eop data.
     //
-    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Because timestamp and
-    // identifier are both guaranteed not to contain '-', the boundary between the two is thus unambiguous.
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
           fmt::format("eop_{}p_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),
