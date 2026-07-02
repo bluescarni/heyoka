@@ -24,9 +24,11 @@ namespace
 
 auto make_logger()
 {
-    auto ret = spdlog::stdout_color_mt("heyoka");
+    // NOTE: mangle the version into the logger name. This avoids spdlog erroring out during logger creation when
+    // multiple versions of heyoka are linked into the same executable.
+    auto ret = spdlog::stdout_color_mt("heyoka-" HEYOKA_VERSION_STRING);
 #if !defined(NDEBUG)
-    ret->info("heyoka logger initialised");
+    ret->info("heyoka-" HEYOKA_VERSION_STRING " logger initialised");
 #endif
 
     return ret;

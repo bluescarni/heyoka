@@ -131,4 +131,9 @@ HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::sw_impl)
 
+// Serialisation changelog:
+//
+// - version 1: changed the name mangling scheme.
+BOOST_CLASS_VERSION(heyoka::model::detail::sw_impl, 1);
+
 #endif

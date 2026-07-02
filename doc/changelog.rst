@@ -7,6 +7,12 @@ Changelog
 New
 ~~~
 
+- In addition to the builtin datasets from IERS and CelesTrak,
+  it is now possible to construct and use custom EOP/SW datasets
+  (`#547 <https://github.com/bluescarni/heyoka/pull/547>`__).
+- Add the ``get_egm2008_CS()`` function, returning the harmonic coefficients of
+  the EGM2008 model
+  (`#546 <https://github.com/bluescarni/heyoka/pull/546>`__).
 - In addition to the existing EGM2008 geopotential model, it is now possible to
   define custom spherical harmonics gravity models. The models can be defined in
   terms of numerical or symbolic coefficients

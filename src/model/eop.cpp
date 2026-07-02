@@ -105,7 +105,10 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
+    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}-{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -352,7 +355,10 @@ llvm::Function *llvm_get_eop_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t
     // - the total number of rows in the eop data table,
     // - the timestamp and identifier of the eop data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}_{}.{}", name, name, table.size(), data.get_timestamp(),
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
+    const auto fname = fmt::format("heyoka.eop_get_{}_{}p.{}.{}-{}.{}", name, name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -575,8 +581,15 @@ void eop_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
     oa << m_eop_data;
 }
 
-void eop_impl::load(boost::archive::binary_iarchive &ia, unsigned)
+void eop_impl::load(boost::archive::binary_iarchive &ia, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<eop_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load an eop_impl instance: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ia >> boost::serialization::base_object<func_base>(*this);
     ia >> m_eop_name;
     ia >> m_eop_data;
@@ -594,8 +607,11 @@ eop_impl::eop_impl(std::string name, expression time_expr, eop_data data)
     //
     // If we do not do that, we risk in principle having functions with the same
     // name using different eop data.
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
-          fmt::format("eop_{}_{}_{}_{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
+          fmt::format("eop_{}_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),
       m_eop_name(std::move(name)), m_eop_data(std::move(data))
 {
@@ -908,8 +924,15 @@ void eopp_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
     oa << m_eop_data;
 }
 
-void eopp_impl::load(boost::archive::binary_iarchive &ia, unsigned)
+void eopp_impl::load(boost::archive::binary_iarchive &ia, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<eopp_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load an eopp_impl instance: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ia >> boost::serialization::base_object<func_base>(*this);
     ia >> m_eop_name;
     ia >> m_eop_data;
@@ -927,8 +950,11 @@ eopp_impl::eopp_impl(std::string name, expression time_expr, eop_data data)
     //
     // If we do not do that, we risk in principle having functions with the same
     // name using different eop data.
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
-          fmt::format("eop_{}p_{}_{}_{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
+          fmt::format("eop_{}p_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),
       m_eop_name(std::move(name)), m_eop_data(std::move(data))
 {

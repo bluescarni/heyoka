@@ -10,11 +10,17 @@
 #define HEYOKA_EOP_DATA_HPP
 
 #include <compare>
+#include <concepts>
+#include <initializer_list>
 #include <memory>
+#include <ranges>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -66,12 +72,21 @@ class HEYOKA_DLL_PUBLIC eop_data
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // NOTE: private implementation-detail constructor.
-    explicit eop_data(eop_data_table, std::string, std::string);
+    explicit eop_data(eop_data_table, std::string, std::string, bool);
 
 public:
     using row_type = eop_data_row;
 
     eop_data();
+    explicit eop_data(std::initializer_list<eop_data_row>, std::string, std::string);
+    template <typename R>
+        requires std::ranges::input_range<R>
+                 && std::same_as<eop_data_row, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+    explicit eop_data(R &&r, std::string timestamp, std::string identifier)
+        : eop_data(detail::eop_sw_table_from_range<eop_data_table>(std::forward<R>(r)), std::move(timestamp),
+                   std::move(identifier), false)
+    {
+    }
 
     [[nodiscard]] const eop_data_table &get_table() const noexcept;
     [[nodiscard]] const std::string &get_timestamp() const noexcept;
@@ -84,8 +99,6 @@ public:
 
 namespace detail
 {
-
-void validate_eop_data_table(const eop_data_table &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_rapid(const std::string &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC eop_data_table parse_eop_data_iers_long_term(const std::string &);

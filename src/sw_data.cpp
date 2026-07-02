@@ -11,12 +11,16 @@
 // https://github.com/fmtlib/fmt/pull/4477
 #include <cstdlib>
 
+#include <array>
 #include <cmath>
+#include <initializer_list>
 #include <memory>
 #include <ranges>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include <fmt/core.h>
 
@@ -55,11 +59,27 @@ void sw_data_row::load(boost::archive::binary_iarchive &ia, unsigned)
 namespace detail
 {
 
+namespace
+{
+
 // Helper to validate a SW data table.
-// NOTE: this must be called by every fetch_latest_*() function before passing the table to the sw_data constructor.
 void validate_sw_data_table(const sw_data_table &data)
 {
     const auto n_entries = data.size();
+
+    // NOTE: the interpolation algorithm needs at least 2 data points.
+    //
+    // Furthermore, there is an LLVM (mis)behaviour for which this check is a workaround. If the data table has size 0
+    // or 1, the optimizer is able to infer that the global arrays constructed from it are unused. LLVM then removes
+    // these global arrays when optimising, which causes compilation failures in compact mode. This problem manifests
+    // itself only when multiple modules are being compiled in the same lljit instance - the linker keeps a single array
+    // definition in a module and replaces identical copies of the array in other modules with references to the single
+    // array definition. When the single array definition is optimised away, the references to it are not, leading to
+    // undefined symbols.
+    if (n_entries < 2u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot initialise an SW data table from fewer than 2 rows ({} row(s) detected)", n_entries));
+    }
 
     for (decltype(data.size()) i = 0; i < n_entries; ++i) {
         // All mjd values must be finite and ordered in strictly ascending order.
@@ -70,9 +90,8 @@ void validate_sw_data_table(const sw_data_table &data)
                 fmt::format("Invalid SW data table detected: the MJD value {} on line {} is not finite", cur_mjd, i));
             // LCOV_EXCL_STOP
         }
-        // NOTE: if data[i + 1u].mjd is NaN, then cur_mjd >= data[i + 1u].mjd evaluates
-        // to false and we will throw on the next iteration when we detect a non-finite
-        // value for the mjd.
+        // NOTE: if data[i + 1u].mjd is NaN, then cur_mjd >= data[i + 1u].mjd evaluates to false and we will throw on
+        // the next iteration when we detect a non-finite value for the mjd.
         if (i + 1u != n_entries && cur_mjd >= data[i + 1u].mjd) [[unlikely]] {
             // LCOV_EXCL_START
             throw std::invalid_argument(fmt::format("Invalid SW data table detected: the MJD value {} "
@@ -98,15 +117,15 @@ void validate_sw_data_table(const sw_data_table &data)
     }
 }
 
+} // namespace
+
 } // namespace detail
 
 struct sw_data::impl {
     sw_data_table m_data;
-    // NOTE: timestamp and identifier are meant to uniquely identify
-    // the data. The identifier indicates the data source, while the
-    // timestamp is used to identify the version of the data. The timestamp
-    // is always built from the "Last-Modified" property of the file on the
-    // remote server.
+    // NOTE: timestamp and identifier are meant to uniquely identify the data. The identifier indicates the data source,
+    // while the timestamp is used to identify the version of the data. For the downloadable datasets, the timestamp is
+    // always built from the "Last-Modified" property of the file on the remote server.
     std::string m_timestamp;
     std::string m_identifier;
 
@@ -130,13 +149,40 @@ void sw_data::load(boost::archive::binary_iarchive &ia, unsigned)
     ia >> m_impl;
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-sw_data::sw_data(sw_data_table data, std::string timestamp, std::string identifier)
-    : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp), std::move(identifier)))
+sw_data::sw_data(std::initializer_list<sw_data_row> ilist, std::string timestamp, std::string identifier)
+    : sw_data(std::vector(ilist), std::move(timestamp), std::move(identifier))
 {
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// List of reserved identifier prefixes.
+using namespace std::literals;
+constexpr std::array sw_data_reserved_prefixes = {"celestrak_"sv};
+
+} // namespace
+
+} // namespace detail
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+sw_data::sw_data(sw_data_table data, std::string timestamp, std::string identifier, const bool allow_reserved_prefixes)
+    : m_impl(std::make_shared<const impl>(std::move(data), std::move(timestamp), std::move(identifier)))
+{
+    // Validate the table data.
+    detail::validate_sw_data_table(m_impl->m_data);
+
+    // Check timestamp and identifier.
+    detail::eop_sw_check_ts_id("SW", m_impl->m_timestamp, m_impl->m_identifier, allow_reserved_prefixes,
+                               detail::sw_data_reserved_prefixes);
+}
+
 sw_data::sw_data()
+    // NOTE: we use a manual direct construction of the impl here (bypassing all sanity checks) because we assume that
+    // the builtin data is valid.
     : m_impl(std::make_shared<const impl>(
           sw_data_table(std::ranges::begin(detail::builtin_sw_data), std::ranges::end(detail::builtin_sw_data)),
           // NOTE: the builtin SW data is from celestrak's SW-Last5Years.csv file.

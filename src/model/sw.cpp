@@ -85,7 +85,10 @@ llvm::Function *llvm_get_sw_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
     // - the total number of rows in the sw data table,
     // - the timestamp and identifier of the sw data,
     // - the floating-point type.
-    const auto fname = fmt::format("heyoka.sw_get_{}.{}.{}_{}.{}", name, table.size(), data.get_timestamp(),
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
+    const auto fname = fmt::format("heyoka.sw_get_{}.{}.{}-{}.{}", name, table.size(), data.get_timestamp(),
                                    data.get_identifier(), hd::llvm_mangle_type(val_t));
 
     // Check if we already created the function.
@@ -218,8 +221,15 @@ void sw_impl::save(boost::archive::binary_oarchive &oa, unsigned) const
     oa << m_sw_data;
 }
 
-void sw_impl::load(boost::archive::binary_iarchive &ia, unsigned)
+void sw_impl::load(boost::archive::binary_iarchive &ia, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<sw_impl>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load an sw_impl instance: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ia >> boost::serialization::base_object<func_base>(*this);
     ia >> m_sw_name;
     ia >> m_sw_data;
@@ -237,8 +247,11 @@ sw_impl::sw_impl(std::string name, expression time_expr, sw_data data)
     //
     // If we do not do that, we risk in principle having functions with the same
     // name using different sw data.
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
     : func_base(
-          fmt::format("sw_{}_{}_{}_{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
+          fmt::format("sw_{}_{}_{}-{}", name, data.get_table().size(), data.get_timestamp(), data.get_identifier()),
           {std::move(time_expr)}),
       m_sw_name(std::move(name)), m_sw_data(std::move(data))
 {

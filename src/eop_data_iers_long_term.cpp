@@ -122,9 +122,6 @@ eop_data_table parse_eop_data_iers_long_term(const std::string &str)
         retval.push_back({.mjd = mjd, .delta_ut1_utc = delta_ut1_utc, .pm_x = pm_x, .pm_y = pm_y, .dX = dX, .dY = dY});
     }
 
-    // Validate the output.
-    validate_eop_data_table(retval);
-
     return retval;
 }
 
@@ -145,8 +142,8 @@ eop_data eop_data::fetch_latest_iers_long_term()
     // Replace also '-' with '_'.
     std::ranges::replace(identifier, '-', '_');
 
-    // Parse, validate and return.
-    return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier));
+    // Parse, construct and return.
+    return eop_data(detail::parse_eop_data_iers_long_term(text), std::move(timestamp), std::move(identifier), true);
 }
 
 HEYOKA_END_NAMESPACE

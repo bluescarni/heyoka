@@ -9,8 +9,14 @@
 #ifndef HEYOKA_DETAIL_EOP_SW_HELPERS_HPP
 #define HEYOKA_DETAIL_EOP_SW_HELPERS_HPP
 
+#include <concepts>
 #include <functional>
+#include <ranges>
+#include <span>
+#include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -36,6 +42,24 @@ template <typename Data>
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &, llvm::Value *, llvm::Value *,
                                                                           llvm::Value *);
+
+// NOTE: small generic helper to turn a range of rows into an EOP/SW data table of type T. This assumes that R is an
+// input range whose reference type is the row type of T.
+template <typename T, typename R>
+T eop_sw_table_from_range(R &&r)
+{
+    static_assert(std::ranges::input_range<T>);
+    static_assert(std::same_as<std::remove_cvref_t<std::ranges::range_reference_t<R>>, typename T::value_type>);
+
+    if constexpr (std::same_as<T, std::remove_cvref_t<R>>) {
+        return std::forward<R>(r);
+    } else {
+        return std::ranges::to<T>(r);
+    }
+}
+
+void eop_sw_check_ts_id(std::string_view, const std::string &, const std::string &, bool,
+                        std::span<const std::string_view>);
 
 } // namespace detail
 

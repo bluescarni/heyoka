@@ -693,3 +693,75 @@ TEST_CASE("taylor scalar")
         tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
     }
 }
+
+// Check that a custom EOP dataset built from a contiguous slice of the builtin dataset produces, within the slice's
+// covered time range, exactly the same values as the builtin dataset. Outside that range the custom dataset must
+// produce NaNs: this proves that the restricted dataset is actually being used, rather than the codegen silently
+// falling back to the builtin one.
+TEST_CASE("custom dataset equivalence")
+{
+    const eop_data builtin;
+    const auto &full = builtin.get_table();
+    REQUIRE(full.size() > 100u);
+
+    // A small contiguous interior slice of the builtin table, reused as a custom dataset. Same rows but a different
+    // identifier, hence a distinct symbolic identity/name mangling and a separate set of global arrays in codegen.
+    const auto p = full.size() / 2u;
+    const std::vector<eop_data_row> slice(full.data() + p, full.data() + p + 8);
+    const eop_data custom(slice, "ts", "id");
+
+    auto x = make_vars("x");
+
+    // Approximate tt-cy-since-J2000 bounds of the slice.
+    const auto to_cy = [](double mjd) { return (mjd - 51544.5) / 36525.; };
+    const auto lo = to_cy(slice.front().mjd);
+    const auto hi = to_cy(slice.back().mjd);
+
+    for (const auto compact_mode : {false, true}) {
+        // Paired builtin/custom outputs. pm_x and dX exercise the plain interpolation path, era and gmst82 the
+        // double-length one.
+        cfunc<double> cf({model::pm_x(kw::time_expr = x, kw::eop_data = builtin),
+                          model::pm_x(kw::time_expr = x, kw::eop_data = custom),
+                          model::dX(kw::time_expr = x, kw::eop_data = builtin),
+                          model::dX(kw::time_expr = x, kw::eop_data = custom),
+                          model::era(kw::time_expr = x, kw::eop_data = builtin),
+                          model::era(kw::time_expr = x, kw::eop_data = custom),
+                          model::gmst82(kw::time_expr = x, kw::eop_data = builtin),
+                          model::gmst82(kw::time_expr = x, kw::eop_data = custom)},
+                         {x}, kw::compact_mode = compact_mode);
+
+        std::vector<double> outs(8), ins(1);
+
+        const auto eval = [&cf, &outs, &ins](double t) {
+            ins[0] = t;
+            cf(mdspan<double, dextents<std::size_t, 2>>(outs.data(), 8u, 1u),
+               mdspan<const double, dextents<std::size_t, 2>>(ins.data(), 1u, 1u));
+        };
+
+        // Inside the slice: builtin and custom outputs must be identical for every quantity.
+        for (auto i = 1; i < 10; ++i) {
+            eval(lo + (hi - lo) * (i / 10.));
+
+            REQUIRE(outs[0] == outs[1]);
+            REQUIRE(outs[2] == outs[3]);
+            REQUIRE(outs[4] == outs[5]);
+            REQUIRE(outs[6] == outs[7]);
+        }
+
+        // Outside the slice: the custom dataset is out of range (NaN) for every quantity, while the builtin dataset -
+        // which the slice was taken from the middle of - is still in range and finite.
+        for (const auto t : {lo - (hi - lo), hi + (hi - lo)}) {
+            eval(t);
+
+            REQUIRE(std::isnan(outs[1]));
+            REQUIRE(std::isnan(outs[3]));
+            REQUIRE(std::isnan(outs[5]));
+            REQUIRE(std::isnan(outs[7]));
+
+            REQUIRE(!std::isnan(outs[0]));
+            REQUIRE(!std::isnan(outs[2]));
+            REQUIRE(!std::isnan(outs[4]));
+            REQUIRE(!std::isnan(outs[6]));
+        }
+    }
+}

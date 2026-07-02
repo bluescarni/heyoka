@@ -11,7 +11,9 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -98,7 +100,10 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
     // - the total number of rows in the eop/sw data table,
     // - the timestamp and identifier of the eop/sw data,
     // - the value type of the array.
-    const auto name = fmt::format("heyoka.{}_data_{}.{}.{}_{}.{}", data_id, arr_name, table.size(),
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
+    const auto name = fmt::format("heyoka.{}_data_{}.{}.{}-{}.{}", data_id, arr_name, table.size(),
                                   data.get_timestamp(), data.get_identifier(), llvm_mangle_type(value_t));
 
     // Helper to return a pointer to the first element of the array.
@@ -328,6 +333,46 @@ llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm:
 
     // Invoke the function and return the result.
     return bld.CreateCall(f, {ptr, arr_size, date_value});
+}
+
+// Common helper to check the timestamp/identifier for an EOP/SW dataset.
+void eop_sw_check_ts_id(const std::string_view descr, const std::string &timestamp, const std::string &identifier,
+                        const bool allow_reserved_prefixes, const std::span<const std::string_view> rp_span)
+{
+    // Check that the timestamp and identifier are not empty strings.
+    if (timestamp.empty()) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Cannot construct an {} data instance with an empty timestamp", descr));
+    }
+    if (identifier.empty()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Cannot construct an {} data instance with an empty identifier", descr));
+    }
+
+    // Check that timestamp and identifier do not contain "." or "-". The former is the standard heyoka separator for
+    // name mangling, the latter is the separator used to assemble in a single string timestamp and identifier in the
+    // EOP-specific name mangling scheme.
+    if (timestamp.contains('.') || timestamp.contains('-')) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid timestamp '{}' specified for an {} data instance: the timestamp cannot contain '.' or '-'",
+            timestamp, descr));
+    }
+    if (identifier.contains('.') || identifier.contains('-')) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid identifier '{}' specified for an {} data instance: the identifier cannot contain '.' or '-'",
+            identifier, descr));
+    }
+
+    // If we are not allowing reserved prefixes, check the identifier against them.
+    if (!allow_reserved_prefixes) {
+        for (const auto &reserved_prefix : rp_span) {
+            if (identifier.starts_with(reserved_prefix)) [[unlikely]] {
+                throw std::invalid_argument(
+                    fmt::format("Invalid identifier '{}' specified for an {} data instance: "
+                                "the identifier cannot start with '{}', this prefix is reserved",
+                                identifier, descr, reserved_prefix));
+            }
+        }
+    }
 }
 
 } // namespace detail

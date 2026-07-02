@@ -248,4 +248,10 @@ HEYOKA_END_NAMESPACE
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eop_impl)
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eopp_impl)
 
+// Serialisation changelog:
+//
+// - version 1: changed the name mangling scheme.
+BOOST_CLASS_VERSION(heyoka::model::detail::eop_impl, 1);
+BOOST_CLASS_VERSION(heyoka::model::detail::eopp_impl, 1);
+
 #endif
