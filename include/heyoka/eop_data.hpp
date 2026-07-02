@@ -28,7 +28,9 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-// Single row in a EOP data table.
+// Single row in an EOP data table.
+//
+// Each row associates a UTC modified Julian date (mjd) to a set of EOP quantities referring to 0h UTC of that mjd.
 struct HEYOKA_DLL_PUBLIC eop_data_row {
     // UTC modified Julian date.
     double mjd = 0;
