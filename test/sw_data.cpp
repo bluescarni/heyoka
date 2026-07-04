@@ -6,9 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <exception>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -16,6 +18,8 @@
 #include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
+
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -181,7 +185,8 @@ TEST_CASE("parse_sw_data_celestrak test")
             = "DATE,BSRN,ND,KP1,KP2,KP3,KP4,KP5,KP6,KP7,KP8,KP_SUM,AP1,AP2,AP3,AP4,AP5,AP6,AP7,AP8,AP_AVG,CP,C9,ISN,"
               "F10.7_"
               "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
-              "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,inf,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
+              "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,inf,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69."
+              "2,"
               "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
               "68.1";
 
@@ -363,6 +368,124 @@ TEST_CASE("parse_sw_data_celestrak test")
         REQUIRE_THROWS_MATCHES(detail::parse_sw_data_celestrak(str), std::invalid_argument,
                                Message("Error parsing a celestrak SW data file: at least 28 fields "
                                        "were expected in a data row, but 12 were found instead"));
+    }
+}
+
+TEST_CASE("reanchor_sw_data_celestrak error handling")
+{
+    using Catch::Matchers::Message;
+
+    // Fewer than 3 rows.
+    {
+        sw_data_table tbl{{.mjd = 0.}, {.mjd = 1.}};
+        REQUIRE_THROWS_MATCHES(detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+                               Message("Invalid CelesTrak SW dataset detected: the minimum number of required "
+                                       "rows is 3, but the dataset contains only 2 row(s)"));
+    }
+
+    // Non-finite mjd.
+    {
+        sw_data_table tbl{{.mjd = std::numeric_limits<double>::infinity()}, {.mjd = 1.}, {.mjd = 2.}};
+        REQUIRE_THROWS_MATCHES(
+            detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+            Message("Invalid CelesTrak SW dataset detected: a non-finite mjd was found at row index 0"));
+    }
+
+    // Non-integral mjd.
+    {
+        sw_data_table tbl{{.mjd = 0.}, {.mjd = 1.5}, {.mjd = 2.}};
+        REQUIRE_THROWS_MATCHES(
+            detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+            Message("Invalid CelesTrak SW dataset detected: a non-integral mjd was found at row index 1"));
+    }
+
+    // mjd too large in magnitude.
+    {
+        sw_data_table tbl{{.mjd = 4300000000.}, {.mjd = 4300000001.}, {.mjd = 4300000002.}};
+        REQUIRE_THROWS_MATCHES(detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+                               Message(fmt::format("Invalid CelesTrak SW dataset detected: the mjd value {} at row "
+                                                   "index 0 is too large in magnitude",
+                                                   4300000000.)));
+    }
+
+    // Non-monotonic mjd.
+    {
+        sw_data_table tbl{{.mjd = 0.}, {.mjd = 1.}, {.mjd = 1.}};
+        REQUIRE_THROWS_MATCHES(detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+                               Message("Invalid CelesTrak SW dataset detected: the mjd value at row index 2 is not "
+                                       "greater than the mjd value at the previous row index"));
+    }
+
+    // Non-consecutive mjd.
+    {
+        sw_data_table tbl{{.mjd = 0.}, {.mjd = 1.}, {.mjd = 3.}};
+        REQUIRE_THROWS_MATCHES(detail::reanchor_sw_data_celestrak(tbl), std::invalid_argument,
+                               Message("Invalid CelesTrak SW dataset detected: the mjd value at row index 2 is not "
+                                       "1 day larger than the mjd value at the previous row index"));
+    }
+}
+
+TEST_CASE("reanchor_sw_data_celestrak")
+{
+    // NOTE: the interpolated f107 is not bit-exact (its 20/24 and 17/24 offsets are not dyadic), hence the numerical
+    // tolerance (which has to be relatively large due to the large magnitudes of the mjds). Ap_avg and f107a_center81
+    // use the exact 0.5 offset and stay bit-exact.
+    const auto f107_close = [](double a, double b) { return std::abs(a - b) <= 1e-9; };
+
+    // A table entirely after 1991-06-01 (f107 anchored at 20h UTC throughout). 4 rows -> 3 re-anchored rows.
+    {
+        sw_data_table tbl{{.mjd = 50000., .Ap_avg = 10., .f107 = 60., .f107a_center81 = 100.},
+                          {.mjd = 50001., .Ap_avg = 20., .f107 = 66., .f107a_center81 = 110.},
+                          {.mjd = 50002., .Ap_avg = 30., .f107 = 72., .f107a_center81 = 120.},
+                          {.mjd = 50003., .Ap_avg = 40., .f107 = 78., .f107a_center81 = 130.}};
+
+        detail::reanchor_sw_data_celestrak(tbl);
+
+        // 4 rows in -> 3 out, with the first date (50000) dropped.
+        REQUIRE(tbl.size() == 3u);
+        REQUIRE(tbl[0].mjd == 50001.);
+        REQUIRE(tbl[1].mjd == 50002.);
+        REQUIRE(tbl[2].mjd == 50003.);
+
+        // Ap_avg and f107a_center81 are anchored at 12h UTC, so the 0h value is exactly the average of the two
+        // bracketing days.
+        REQUIRE(tbl[0].Ap_avg == 15.);
+        REQUIRE(tbl[1].Ap_avg == 25.);
+        REQUIRE(tbl[2].Ap_avg == 35.);
+        REQUIRE(tbl[0].f107a_center81 == 105.);
+        REQUIRE(tbl[1].f107a_center81 == 115.);
+        REQUIRE(tbl[2].f107a_center81 == 125.);
+
+        // f107 is anchored at 20h UTC, so the 0h value is prev + (cur - prev) * (1 - 20/24) = prev + (cur - prev)/6.
+        REQUIRE(f107_close(tbl[0].f107, 61.));
+        REQUIRE(f107_close(tbl[1].f107, 67.));
+        REQUIRE(f107_close(tbl[2].f107, 73.));
+    }
+
+    // A table straddling the 1991-06-01 f107 measurement-time change (mjd 48408): 17h UT before, 20h UT from then on. 3
+    // rows -> 2 re-anchored rows, the first of which (target 48408) is the seam row.
+    {
+        sw_data_table tbl{{.mjd = 48407., .Ap_avg = 10., .f107 = 0., .f107a_center81 = 100.},
+                          {.mjd = 48408., .Ap_avg = 20., .f107 = 27., .f107a_center81 = 110.},
+                          {.mjd = 48409., .Ap_avg = 30., .f107 = 33., .f107a_center81 = 120.}};
+
+        detail::reanchor_sw_data_celestrak(tbl);
+
+        REQUIRE(tbl.size() == 2u);
+        REQUIRE(tbl[0].mjd == 48408.);
+        REQUIRE(tbl[1].mjd == 48409.);
+
+        // Seam row (target 48408): left sample at 48407 + 17/24, right at 48408 + 20/24. The 0h value is f107_prev +
+        // (f107_cur - f107_prev) * (1 - 17/24) / (1 + 20/24 - 17/24) = 0 + 27 * (7/24)/(27/24) = 7.
+        REQUIRE(f107_close(tbl[0].f107, 7.));
+        // Post-seam row (target 48409): both samples at 20h, so prev + (cur - prev)/6 = 27 + 6/6 = 28.
+        REQUIRE(f107_close(tbl[1].f107, 28.));
+
+        // Ap_avg / f107a_center81 use the 12h anchor on both sides, unaffected by the seam.
+        REQUIRE(tbl[0].Ap_avg == 15.);
+        REQUIRE(tbl[1].Ap_avg == 25.);
+        REQUIRE(tbl[0].f107a_center81 == 105.);
+        REQUIRE(tbl[1].f107a_center81 == 115.);
     }
 }
 
