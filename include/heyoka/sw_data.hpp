@@ -11,7 +11,6 @@
 
 #include <compare>
 #include <concepts>
-#include <cstdint>
 #include <initializer_list>
 #include <memory>
 #include <ranges>
@@ -37,7 +36,7 @@ struct HEYOKA_DLL_PUBLIC sw_data_row {
     // UTC modified Julian date.
     double mjd = 0;
     // Daily arithmetic average of the 8 Ap indices.
-    std::uint16_t Ap_avg = 0;
+    double Ap_avg = 0;
     // Observed 10.7-cm solar radio flux (F10.7).
     double f107 = 0;
     // 81-day arithmetic average of observed F10.7 centred on the date.
@@ -110,5 +109,10 @@ namespace detail
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+// Version changelog:
+//
+// - version 1: switched AP_avg from std::uint16_t to double.
+BOOST_CLASS_VERSION(heyoka::sw_data_row, 1)
 
 #endif

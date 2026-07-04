@@ -48,8 +48,15 @@ void sw_data_row::save(boost::archive::binary_oarchive &oa, unsigned) const
     oa << f107a_center81;
 }
 
-void sw_data_row::load(boost::archive::binary_iarchive &ia, unsigned)
+void sw_data_row::load(boost::archive::binary_iarchive &ia, const unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<sw_data_row>::type::value)) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to load an sw_data_row instance: the archive version ({}) is too old", version));
+    }
+    // LCOV_EXCL_STOP
+
     ia >> mjd;
     ia >> Ap_avg;
     ia >> f107;
@@ -98,6 +105,13 @@ void validate_sw_data_table(const sw_data_table &data)
                                                     "on line {} is not less than the MJD value in the next line ({})",
                                                     // LCOV_EXCL_STOP
                                                     cur_mjd, i, data[i + 1u].mjd));
+        }
+
+        // Ap_avg values must be finite and non-negative.
+        const auto cur_Ap_avg = data[i].Ap_avg;
+        if (!std::isfinite(cur_Ap_avg) || cur_Ap_avg < 0) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid SW data table detected: the Ap_avg value {} on line {} is invalid", cur_Ap_avg, i));
         }
 
         // f107 values must be finite and non-negative.
@@ -208,16 +222,6 @@ const std::string &sw_data::get_identifier() const noexcept
 namespace detail
 {
 
-llvm::Value *llvm_get_sw_data_Ap_avg(llvm_state &s, const sw_data &data, llvm::Type *scal_t)
-{
-    return llvm_get_eop_sw_data(
-        s, data, scal_t, "Ap_avg",
-        [&s, scal_t](const sw_data_row &r) {
-            return llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{static_cast<double>(r.Ap_avg)}));
-        },
-        "sw");
-}
-
 // NOTE: these are all similar, use a macro (yuck) to avoid repetition.
 #define HEYOKA_LLVM_GET_SW_DATA_IMPL(name)                                                                             \
     llvm::Value *llvm_get_sw_data_##name(llvm_state &s, const sw_data &data, llvm::Type *scal_t)                       \
@@ -230,6 +234,7 @@ llvm::Value *llvm_get_sw_data_Ap_avg(llvm_state &s, const sw_data &data, llvm::T
             "sw");                                                                                                     \
     }
 
+HEYOKA_LLVM_GET_SW_DATA_IMPL(Ap_avg)
 HEYOKA_LLVM_GET_SW_DATA_IMPL(f107)
 HEYOKA_LLVM_GET_SW_DATA_IMPL(f107a_center81)
 

@@ -175,6 +175,33 @@ TEST_CASE("parse_sw_data_celestrak test")
             Message("Invalid SW data table detected: the f107a_center81 value -2 on line 0 is invalid"));
     }
 
+    // Invalid Ap_avg values.
+    {
+        const std::string str
+            = "DATE,BSRN,ND,KP1,KP2,KP3,KP4,KP5,KP6,KP7,KP8,KP_SUM,AP1,AP2,AP3,AP4,AP5,AP6,AP7,AP8,AP_AVG,CP,C9,ISN,"
+              "F10.7_"
+              "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
+              "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,inf,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
+              "68.1";
+
+        REQUIRE_THROWS_MATCHES(sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
+                               Message("Invalid SW data table detected: the Ap_avg value inf on line 0 is invalid"));
+    }
+
+    {
+        const std::string str
+            = "DATE,BSRN,ND,KP1,KP2,KP3,KP4,KP5,KP6,KP7,KP8,KP_SUM,AP1,AP2,AP3,AP4,AP5,AP6,AP7,AP8,AP_AVG,CP,C9,ISN,"
+              "F10.7_"
+              "OBS,F10.7_ADJ,F10.7_DATA_TYPE,F10.7_OBS_CENTER81,F10.7_OBS_LAST81,F10.7_ADJ_CENTER81,F10.7_ADJ_"
+              "LAST81\n2020-01-01,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,-1,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
+              "68.1\n2020-01-02,2542,22,3,0,0,7,7,13,10,7,47,2,0,0,3,3,5,4,3,2,0.0,0,6,71.8,69.4,OBS,71.4,69.7,69.2,"
+              "68.1";
+
+        REQUIRE_THROWS_MATCHES(sw_data(detail::parse_sw_data_celestrak(str), "ts", "id"), std::invalid_argument,
+                               Message("Invalid SW data table detected: the Ap_avg value -1 on line 0 is invalid"));
+    }
+
     // Unparsable data.
     {
         const std::string str

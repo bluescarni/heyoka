@@ -136,8 +136,7 @@ sw_data_table parse_sw_data_celestrak(const std::string &str)
         }
 
         // Init the SW values.
-        double mjd{}, f107{}, f107a_center81{};
-        std::uint16_t Ap_avg{};
+        double mjd{}, f107{}, f107a_center81{}, Ap_avg{};
 
         // This is the index of the last field we will be reading from.
         constexpr auto last_field_idx = 27u;
@@ -160,7 +159,7 @@ sw_data_table parse_sw_data_celestrak(const std::string &str)
                     break;
                 case 20u:
                     // Parse Ap_avg.
-                    if (const auto val = parse_sw_data_celestrak_value<std::uint16_t>(*field_it)) {
+                    if (const auto val = parse_sw_data_celestrak_value<double>(*field_it)) {
                         Ap_avg = *val;
                     } else {
                         missing_data = true;
