@@ -110,8 +110,8 @@ void validate_sw_data_table(const sw_data_table &data)
         // Ap_avg values must be finite and non-negative.
         const auto cur_Ap_avg = data[i].Ap_avg;
         if (!std::isfinite(cur_Ap_avg) || cur_Ap_avg < 0) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("Invalid SW data table detected: the Ap_avg value {} on line {} is invalid", cur_Ap_avg, i));
+            throw std::invalid_argument(fmt::format(
+                "Invalid SW data table detected: the Ap_avg value {} on line {} is invalid", cur_Ap_avg, i));
         }
 
         // f107 values must be finite and non-negative.
@@ -199,7 +199,7 @@ sw_data::sw_data()
     // the builtin data is valid.
     : m_impl(std::make_shared<const impl>(
           sw_data_table(std::ranges::begin(detail::builtin_sw_data), std::ranges::end(detail::builtin_sw_data)),
-          // NOTE: the builtin SW data is from celestrak's SW-Last5Years.csv file.
+          // NOTE: the builtin SW data is from celestrak's SW-All.csv file.
           detail::builtin_sw_data_ts, "celestrak_long_term"))
 {
 }
