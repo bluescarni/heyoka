@@ -32,9 +32,7 @@ HEYOKA_BEGIN_NAMESPACE
 // Single row in an SW data table.
 //
 // Each row associates a UTC modified Julian date (mjd) to a set of space weather quantities referring to 0h UTC of that
-// mjd. This is a normalisation we adopt: it need not match the provider's native time convention (which may differ per
-// quantity), so the provider-specific code re-anchors the data to 0h UTC and the stored values may differ from the
-// provider's raw numbers.
+// mjd.
 struct HEYOKA_DLL_PUBLIC sw_data_row {
     // UTC modified Julian date.
     double mjd = 0;

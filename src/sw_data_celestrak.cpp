@@ -60,6 +60,7 @@ std::optional<T> parse_sw_data_celestrak_value(const std::ranges::contiguous_ran
 }
 
 // Helper to parse a UTC calendar date from a celestrak SW datafile as a UTC mjd.
+//
 // NOTE: we assume that the date is always present.
 double parse_sw_data_celestrak_mjd(const std::ranges::contiguous_range auto &cur_field)
 {
@@ -76,7 +77,7 @@ double parse_sw_data_celestrak_mjd(const std::ranges::contiguous_range auto &cur
     }
 
     // Helper to parse an int representing a year/month/day.
-    const auto parse_ymd = [](auto *begin, const auto *end) {
+    const auto parse_ymd = [](const auto *begin, const auto *end) {
         // Remove leading zeroes.
         if (end - begin > 1) {
             while (begin != end && *begin == '0') {
@@ -211,7 +212,7 @@ sw_data_table parse_sw_data_celestrak(const std::string &str)
 
 } // namespace detail
 
-sw_data sw_data::fetch_latest_celestrak(bool long_term)
+sw_data sw_data::fetch_latest_celestrak(const bool long_term)
 {
     // Download the file.
     const auto *filename = long_term ? "SW-All.csv" : "SW-Last5Years.csv";
