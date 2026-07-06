@@ -215,6 +215,13 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 // of use we do as we expect just a few entries in this array, but something to keep in mind.
 //
 // NOTE: if ptr is already in the llvm.used array, then this will be a no-op.
+//
+// NOTE: LLVM provides the llvm::appendToUsed() function for this purpose:
+//
+// https://llvm.org/doxygen/ModuleUtils_8h.html
+//
+// However, our version avoids adding ptr if it is in the llvm.used array already, which llvm::appendToUsed() does not,
+// so for now we keep on using our version.
 void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 {
     assert(ptr != nullptr);
