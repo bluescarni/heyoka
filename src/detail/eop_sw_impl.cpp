@@ -28,6 +28,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/eop_sw_impl.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -46,7 +47,9 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka::model::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace model::detail
 {
 
 template <typename Data>
@@ -612,4 +615,6 @@ llvm::Function *eop_sw_p_impl<Data>::taylor_c_diff_func(llvm_state &s, llvm::Typ
 template class HEYOKA_DLL_PUBLIC eop_sw_p_impl<eop_data>;
 template class HEYOKA_DLL_PUBLIC eop_sw_p_impl<sw_data>;
 
-} // namespace heyoka::model::detail
+} // namespace model::detail
+
+HEYOKA_END_NAMESPACE

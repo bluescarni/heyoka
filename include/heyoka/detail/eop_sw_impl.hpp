@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -23,7 +24,9 @@
 // This header declares common base classes for the implementation of EOP/SW quantities and their derivatives in the
 // expression system.
 
-namespace heyoka::model::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace model::detail
 {
 
 // Base class common to the implementation of EOP/SW quantities and their derivatives.
@@ -136,6 +139,8 @@ public:
                                                      bool) const;
 };
 
-} // namespace heyoka::model::detail
+} // namespace model::detail
+
+HEYOKA_END_NAMESPACE
 
 #endif
