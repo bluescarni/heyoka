@@ -21,8 +21,8 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-// This header declares common base classes for the implementation of EOP/SW quantities and their derivatives in the
-// expression system.
+// This header declares common base classes and macros for the implementation of EOP/SW quantities and their derivatives
+// in the expression system.
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -46,8 +46,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS eop_sw_impl_base : public func_base
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    [[nodiscard]] const Data &checked_get_data() const;
-
 protected:
     // NOTE: we never expect to use this class directly, thus we can mark special member functions as protected.
     eop_sw_impl_base();
@@ -58,6 +56,7 @@ protected:
     eop_sw_impl_base &operator=(eop_sw_impl_base &&) noexcept;
     ~eop_sw_impl_base();
 
+    [[nodiscard]] const Data &checked_get_data() const;
     [[nodiscard]] llvm::Value *llvm_eval_helper(llvm_state &, unsigned, llvm::Value *, llvm::Type *,
                                                 std::uint32_t) const;
     // NOTE: this is used to generate/fetch the LLVM function that evaluates at the same time the EOP/SW quantity and
@@ -142,5 +141,141 @@ public:
 } // namespace model::detail
 
 HEYOKA_END_NAMESPACE
+
+// NOTE: this is a macro to be used when declaring the actual EOP/SW quantities in the expression system.
+//
+// It takes care of:
+//
+// - declaring classes for the EOP/SW quantity and its derivative,
+// - declaring function wrappers for the construction of the EOP/SW quantity and its derivative,
+// - defining the inline function objects intended for public use,
+// - invoking the s11n key exporting machinery.
+#define HEYOKA_MODEL_DECLARE_EOP_SW(name, data, kw_cfg, common_opts)                                                   \
+    HEYOKA_BEGIN_NAMESPACE                                                                                             \
+    namespace model                                                                                                    \
+    {                                                                                                                  \
+    namespace detail                                                                                                   \
+    {                                                                                                                  \
+    /* EOP/SW quantity. */                                                                                             \
+    class HEYOKA_DLL_PUBLIC name##_impl final : public eop_sw_impl<data>                                               \
+    {                                                                                                                  \
+        friend class boost::serialization::access;                                                                     \
+        void save(boost::archive::binary_oarchive &, unsigned) const;                                                  \
+        void load(boost::archive::binary_iarchive &, unsigned);                                                        \
+        BOOST_SERIALIZATION_SPLIT_MEMBER()                                                                             \
+    private:                                                                                                           \
+        [[nodiscard]] llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t,                       \
+                                                      const data &) const final;                                       \
+        [[nodiscard]] expression ex_from_this() && final;                                                              \
+                                                                                                                       \
+    public:                                                                                                            \
+        name##_impl();                                                                                                 \
+        explicit name##_impl(expression, data);                                                                        \
+        [[nodiscard]] std::vector<expression> gradient() const final;                                                  \
+    };                                                                                                                 \
+    [[nodiscard]] HEYOKA_DLL_PUBLIC expression name##_func_impl(expression, data);                                     \
+    }                                                                                                                  \
+    inline constexpr auto name = []<typename... KwArgs>                                                                \
+        requires igor::validate<kw_cfg, KwArgs...>                                                                     \
+    (KwArgs &&...kw_args) -> expression {                                                                              \
+        return std::apply(detail::name##_func_impl, detail::common_opts(kw_args...));                                  \
+    };                                                                                                                 \
+    namespace detail                                                                                                   \
+    {                                                                                                                  \
+    /* Derivative of an EOP/SW quantity. */                                                                            \
+    class HEYOKA_DLL_PUBLIC name##p_impl final : public eop_sw_p_impl<data>                                            \
+    {                                                                                                                  \
+        friend class boost::serialization::access;                                                                     \
+        void save(boost::archive::binary_oarchive &, unsigned) const;                                                  \
+        void load(boost::archive::binary_iarchive &, unsigned);                                                        \
+        BOOST_SERIALIZATION_SPLIT_MEMBER()                                                                             \
+    private:                                                                                                           \
+        [[nodiscard]] llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t,                       \
+                                                      const data &) const final;                                       \
+                                                                                                                       \
+    public:                                                                                                            \
+        name##p_impl();                                                                                                \
+        explicit name##p_impl(expression, data);                                                                       \
+    };                                                                                                                 \
+    [[nodiscard]] HEYOKA_DLL_PUBLIC expression name##p_func_impl(expression, data);                                    \
+    }                                                                                                                  \
+    inline constexpr auto name##p = []<typename... KwArgs>                                                             \
+        requires igor::validate<kw_cfg, KwArgs...>                                                                     \
+    (KwArgs &&...kw_args) -> expression {                                                                              \
+        return std::apply(detail::name##p_func_impl, detail::common_opts(kw_args...));                                 \
+    };                                                                                                                 \
+    }                                                                                                                  \
+    HEYOKA_END_NAMESPACE                                                                                               \
+    /* s11n macros. */                                                                                                 \
+    HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::name##_impl)                                                    \
+    HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::name##p_impl)
+
+// NOTE: this is the definition counterpart of HEYOKA_MODEL_DECLARE_EOP_SW().
+#define HEYOKA_MODEL_DEFINE_EOP_SW(descr, name, data_tp)                                                               \
+    HEYOKA_BEGIN_NAMESPACE                                                                                             \
+    namespace model                                                                                                    \
+    {                                                                                                                  \
+    namespace detail                                                                                                   \
+    {                                                                                                                  \
+    /* EOP/SW quantity. */                                                                                             \
+    void name##_impl::save(boost::archive::binary_oarchive &oa, unsigned) const                                        \
+    {                                                                                                                  \
+        oa << boost::serialization::base_object<eop_sw_impl<data_tp>>(*this);                                          \
+    }                                                                                                                  \
+    void name##_impl::load(boost::archive::binary_iarchive &ia, unsigned)                                              \
+    {                                                                                                                  \
+        ia >> boost::serialization::base_object<eop_sw_impl<data_tp>>(*this);                                          \
+    }                                                                                                                  \
+    name##_impl::name##_impl() = default;                                                                              \
+    name##_impl::name##_impl(expression time_expr, data_tp data)                                                       \
+        : eop_sw_impl<data_tp>(#descr, #name, std::move(time_expr), std::move(data))                                   \
+    {                                                                                                                  \
+    }                                                                                                                  \
+    llvm::Function *name##_impl::get_llvm_eval_f(llvm_state &s, llvm::Type *const fp_t,                                \
+                                                 const std::uint32_t batch_size, const data_tp &data) const            \
+    {                                                                                                                  \
+        return llvm_get_##name##_##name##p_func(s, fp_t, batch_size, data);                                            \
+    }                                                                                                                  \
+    expression name##_impl::ex_from_this() &&                                                                          \
+    {                                                                                                                  \
+        return expression{func{std::move(*this)}};                                                                     \
+    }                                                                                                                  \
+    std::vector<expression> name##_impl::gradient() const                                                              \
+    {                                                                                                                  \
+        return {name##p(kw::time_expr = args()[0], kw::data_tp = checked_get_data())};                                 \
+    }                                                                                                                  \
+    expression name##_func_impl(expression time_expr, data_tp data)                                                    \
+    {                                                                                                                  \
+        return expression{func{name##_impl{std::move(time_expr), std::move(data)}}};                                   \
+    }                                                                                                                  \
+    /* Derivative of an EOP/SW quantity. */                                                                            \
+    void name##p_impl::save(boost::archive::binary_oarchive &oa, unsigned) const                                       \
+    {                                                                                                                  \
+        oa << boost::serialization::base_object<eop_sw_p_impl<data_tp>>(*this);                                        \
+    }                                                                                                                  \
+    void name##p_impl::load(boost::archive::binary_iarchive &ia, unsigned)                                             \
+    {                                                                                                                  \
+        ia >> boost::serialization::base_object<eop_sw_p_impl<data_tp>>(*this);                                        \
+    }                                                                                                                  \
+    name##p_impl::name##p_impl() = default;                                                                            \
+    name##p_impl::name##p_impl(expression time_expr, data_tp data)                                                     \
+        : eop_sw_p_impl<data_tp>(#descr, #name "p", std::move(time_expr), std::move(data))                             \
+    {                                                                                                                  \
+    }                                                                                                                  \
+    llvm::Function *name##p_impl::get_llvm_eval_f(llvm_state &s, llvm::Type *const fp_t,                               \
+                                                  const std::uint32_t batch_size, const data_tp &data) const           \
+    {                                                                                                                  \
+        return llvm_get_##name##_##name##p_func(s, fp_t, batch_size, data);                                            \
+    }                                                                                                                  \
+    expression name##p_func_impl(expression time_expr, data_tp data)                                                   \
+    {                                                                                                                  \
+        return expression{func{name##p_impl{std::move(time_expr), std::move(data)}}};                                  \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    HEYOKA_END_NAMESPACE                                                                                               \
+    /* s11n macros. */                                                                                                 \
+    HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::name##_impl)                                              \
+    HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::model::detail::name##p_impl)
 
 #endif
