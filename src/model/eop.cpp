@@ -10,8 +10,6 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
-#include <utility>
-#include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -27,7 +25,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
-#include <llvm/Support/Casting.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/eop_sw_helpers.hpp>
@@ -35,20 +32,11 @@
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/optional_s11n.hpp>
-#include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/eop_data.hpp>
-#include <heyoka/expression.hpp>
-#include <heyoka/func.hpp>
-#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/time.hpp>
 #include <heyoka/model/eop.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
-#include <heyoka/taylor.hpp>
-#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 

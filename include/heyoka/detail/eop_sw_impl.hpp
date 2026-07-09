@@ -12,13 +12,18 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>
 
 // This header declares common base classes and macros for the implementation of EOP/SW quantities and their derivatives
