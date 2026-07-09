@@ -1546,6 +1546,16 @@ void llvm_add_no_capture_argattr([[maybe_unused]] llvm_state &s, llvm::Argument 
 #endif
 }
 
+ip_restorer::ip_restorer(ir_builder &bld) : m_bld(bld), m_orig_bb(m_bld.GetInsertBlock())
+{
+    assert(m_orig_bb != nullptr);
+}
+
+ip_restorer::~ip_restorer()
+{
+    m_bld.SetInsertPoint(m_orig_bb);
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
