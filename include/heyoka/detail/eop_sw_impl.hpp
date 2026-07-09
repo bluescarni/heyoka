@@ -20,15 +20,24 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
+// This header declares common base classes for the implementation of EOP/SW quantities and their derivatives in the
+// expression system.
+
 namespace heyoka::model::detail
 {
 
 template <typename DataTable>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS eop_sw_impl : public func_base
 {
+    // The descriptor (used to distinguish between EOP and SW).
+    std::string m_descr;
+    // The name of the EOP/SW quantity.
     std::string m_name;
-    // NOTE: we wrap the data table into an optional because we do not want to pay the cost of storing the full data or
-    // a default-constructed object, which is anyway only used during serialisation.
+    // The data table.
+    //
+    // NOTE: this is wrapped into an optional so that default construction (which is necessary only for serialisation
+    // purposes) is cheap and does not require the actual storage of any EOP/SW data. In normal usage scenarios, we are
+    // always expecting the optional to be non-empty.
     std::optional<DataTable> m_data;
 
     // Serialization.
@@ -37,14 +46,30 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS eop_sw_impl : public func_base
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+    [[nodiscard]] const DataTable &checked_get_data() const;
+    [[nodiscard]] llvm::Value *llvm_eval_helper(llvm_state &, llvm::Value *, llvm::Type *, std::uint32_t) const;
+
 protected:
-    [[nodiscard]] virtual llvm::Function *get_llvm_eval(llvm_state &, llvm::Type *, std::uint32_t,
-                                                        const DataTable &) const = 0;
+    // NOTE: this is used to generate/fetch the LLVM function that evaluates at the same time the EOP/SW quantity and
+    // its derivative.
+    [[nodiscard]] virtual llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t,
+                                                          const DataTable &) const = 0;
+    // NOTE: this is used in taylor_decompose() to move-init an expression from this.
+    [[nodiscard]] virtual expression ex_from_this() && = 0;
+
+    // NOTE: we never expect to use this class directly, thus we can mark special member functions as protected.
+    eop_sw_impl();
+    explicit eop_sw_impl(std::string, std::string, expression, DataTable);
+    eop_sw_impl(const eop_sw_impl &);
+    eop_sw_impl(eop_sw_impl &&) noexcept;
+    eop_sw_impl &operator=(const eop_sw_impl &);
+    eop_sw_impl &operator=(eop_sw_impl &&) noexcept;
+    // NOTE: a protected destructor allows us to satisfy:
+    //
+    // https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual
+    ~eop_sw_impl();
 
 public:
-    eop_sw_impl();
-    explicit eop_sw_impl(std::string, expression, DataTable);
-
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
     [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,

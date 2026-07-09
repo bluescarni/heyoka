@@ -211,6 +211,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/composite_function.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_cache.cpp"
     # NOTE: this will be an empty file in case we are not
