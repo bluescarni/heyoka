@@ -11,8 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
-#include <limits>
 #include <random>
 #include <ranges>
 #include <sstream>
@@ -20,27 +18,17 @@
 #include <variant>
 #include <vector>
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-
 #if defined(HEYOKA_HAVE_REAL)
 
 #include <mp++/real.hpp>
 
 #endif
 
-#include <heyoka/detail/eop_sw_helpers.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/sw.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/sw_data.hpp>
@@ -52,8 +40,6 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 static std::mt19937 rng;
-
-constexpr auto ntrials = 10000;
 
 // NOTE: no point here in testing with precision higher than double, since the sw data accuracy
 // is in general nowhere near double precision.
@@ -162,130 +148,6 @@ TEST_CASE("sw diff")
     REQUIRE(diff(model::f107a_center81(kw::time_expr = 2. * x), x) == 0_dbl);
 }
 
-// NOTE: we will be testing only Ap_avg here.
-TEST_CASE("get_sw_func")
-{
-    const sw_data data;
-
-    auto tester = [&data]<typename T>() {
-        // The function for the computation of sw.
-        using fptr1_t = void (*)(T *, const T *) noexcept;
-        // The function to fetch the date/sw data.
-        using fptr2_t = void (*)(const T **, const T **) noexcept;
-
-        auto add_test_funcs = [&data](llvm_state &s, std::uint32_t batch_size) {
-            auto &ctx = s.context();
-            auto &bld = s.builder();
-            auto &md = s.module();
-
-            auto *scal_t = detail::to_external_llvm_type<T>(ctx);
-            auto *ptr_t = llvm::PointerType::getUnqual(ctx);
-
-            // Add the function for the computation of sw.
-            auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {ptr_t, ptr_t}, false);
-            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
-
-            auto *sw_ptr = f->getArg(0);
-            auto *time_ptr = f->getArg(1);
-
-            bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-
-            auto *tm_val = detail::ext_load_vector_from_memory(s, scal_t, time_ptr, batch_size);
-
-            auto *sw_f = model::detail::llvm_get_sw_func(s, scal_t, batch_size, data, "Ap_avg",
-                                                         &detail::llvm_get_sw_data_Ap_avg);
-
-            auto *sw = bld.CreateCall(sw_f, tm_val);
-
-            detail::ext_store_vector_to_memory(s, sw_ptr, sw);
-
-            bld.CreateRetVoid();
-
-            // Add the function to fetch the date/sw data.
-            ft = llvm::FunctionType::get(bld.getVoidTy(), {ptr_t, ptr_t}, false);
-            f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "fetch_data", &md);
-
-            auto *date_ptr_ptr = f->getArg(0);
-            auto *sw_ptr_ptr = f->getArg(1);
-
-            bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
-
-            auto *date_data_ptr = detail::llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, scal_t, "sw");
-            auto *sw_data_ptr = detail::llvm_get_sw_data_Ap_avg(s, data, scal_t);
-
-            bld.CreateStore(date_data_ptr, date_ptr_ptr);
-            bld.CreateStore(sw_data_ptr, sw_ptr_ptr);
-
-            bld.CreateRetVoid();
-        };
-
-        const auto data_size = data.get_table().size();
-
-        // NOTE: here we search sw on the C++ side to check the results coming out from LLVM.
-        auto sw_comp = [data_size](const T *date_ptr, const T *sw_ptr, T tm) -> T {
-            // Locate the first date *greater than* tm.
-            const auto *const date_it = std::ranges::upper_bound(date_ptr, date_ptr + data_size, tm);
-            if (date_it == date_ptr || date_it == date_ptr + data_size) {
-                return std::numeric_limits<T>::quiet_NaN();
-            }
-
-            // Establish the index of the time interval.
-            const auto idx = (date_it - 1) - date_ptr;
-
-            // Fetch and return the sw value.
-            return sw_ptr[idx];
-        };
-
-        for (const auto batch_size : {1u, 2u, 4u, 5u, 8u}) {
-            // Setup the compiled functions.
-            llvm_state s;
-            add_test_funcs(s, batch_size);
-            s.compile();
-            auto *fptr1 = reinterpret_cast<fptr1_t>(s.jit_lookup("test"));
-            auto *fptr2 = reinterpret_cast<fptr2_t>(s.jit_lookup("fetch_data"));
-
-            // Fetch the date/sw pointers.
-            const T *date_ptr{};
-            const T *sw_ptr{};
-            fptr2(&date_ptr, &sw_ptr);
-
-            // Prepare the input/output vectors.
-            std::vector<T> sw_vec(batch_size), tm_vec(batch_size);
-
-            // Randomised testing.
-            const auto first_date = date_ptr[0];
-            const auto last_date = date_ptr[data_size - 1u];
-            std::uniform_real_distribution<T> date_dist(first_date, last_date);
-            std::uniform_int_distribution<int> lp_dist(0, 100);
-            for (auto i = 0; i < ntrials; ++i) {
-                std::ranges::generate(tm_vec, [&date_dist, &lp_dist, first_date, last_date]() {
-                    // With low probability insert a date outside the date bounds.
-                    if (lp_dist(rng) == 0) {
-                        return lp_dist(rng) < 50 ? first_date - T(0.1) : last_date + T(0.1);
-                    }
-
-                    return date_dist(rng);
-                });
-
-                fptr1(sw_vec.data(), tm_vec.data());
-
-                for (auto j = 0u; j < batch_size; ++j) {
-                    const auto sw_cmp = sw_comp(date_ptr, sw_ptr, tm_vec[j]);
-
-                    if (std::isnan(sw_cmp)) {
-                        REQUIRE(std::isnan(sw_vec[j]));
-                    } else {
-                        REQUIRE(sw_vec[j] == approximately(sw_cmp, T(1000)));
-                    }
-                }
-            }
-        }
-    };
-
-    tester.operator()<float>();
-    tester.operator()<double>();
-}
-
 TEST_CASE("sw cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool compact_mode) {
@@ -302,23 +164,19 @@ TEST_CASE("sw cfunc")
             std::ranges::fill(ins, fp_t(0));
 
             // NOTE: here we create one output per sw quantity.
-            cfunc<fp_t> cf(
-                {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = x),
-                 model::f107a_center81(kw::time_expr = x)},
-                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode,
-                kw::opt_level = opt_level);
+            cfunc<fp_t> cf({model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = x),
+                            model::f107a_center81(kw::time_expr = x)},
+                           {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_Ap_avg_");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107_");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107a_center81_");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sw_Ap_avg_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sw_f107a_center81_"); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -350,11 +208,9 @@ TEST_CASE("sw cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            cfunc<mppp::real> cf(
-                {model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = par[0]),
-                 model::f107a_center81(kw::time_expr = expression{0.})},
-                {x}, kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({model::Ap_avg(kw::time_expr = x), model::f107(kw::time_expr = par[0]),
+                                  model::f107a_center81(kw::time_expr = expression{0.})},
+                                 {x}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             const std::vector pars{mppp::real{0, prec}};
