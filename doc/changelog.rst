@@ -21,9 +21,12 @@ New
 Changes
 ~~~~~~~
 
-- The space weather (SW) indices are now linearly interpolated between the dates
-  in the SW datasets. Previously, the space weather indices were implemented as
-  piecewise step functions
+- In the expression system, the values of the space weather (SW) indices are now linearly
+  interpolated between the dates in the SW datasets. Previously, the SW indices were
+  implemented as piecewise step functions
+  (`#548 <https://github.com/bluescarni/heyoka/pull/548>`__).
+- In the space weather (SW) datasets, the ``Ap_avg`` index is now stored as a
+  double-precision floating-point value, rather than as a 16-bit unsigned integer
   (`#548 <https://github.com/bluescarni/heyoka/pull/548>`__).
 
 Fix
