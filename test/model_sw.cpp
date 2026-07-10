@@ -24,6 +24,7 @@
 
 #endif
 
+#include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
@@ -302,6 +303,62 @@ TEST_CASE("sw cfunc")
         tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 0, cm); });
         tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
     }
+}
+
+// End-to-end check that the expression-system f107 function correctly linearly interpolates the underlying data table.
+// Unlike the low-level interpolation tests in the EOP suite (which invoke the codegen helper directly), this exercises
+// the full path model::f107() -> cfunc, and compares against a linear interpolation performed by hand in the test.
+TEST_CASE("f107 interpolation")
+{
+    const sw_data data;
+    const auto &tab = data.get_table();
+
+    // Convert a UTC mjd to TT centuries since J2000.
+    auto mjd_to_tt_cy = [](double mjd) {
+        double tai1{}, tai2{}, tt1{}, tt2{};
+        ::eraUtctai(2400000.5, mjd, &tai1, &tai2);
+        ::eraTaitt(tai1, tai2, &tt1, &tt2);
+        return ((tt1 - 2451545.) + tt2) / 36525.;
+    };
+
+    // Evaluate f107 as a function of time via a compiled function.
+    auto x = make_vars("x");
+    cfunc<double> cf{{model::f107(kw::time_expr = x)}, {x}};
+    auto eval = [&cf](double t) {
+        double out{};
+        cf(std::ranges::subrange(&out, &out + 1), std::ranges::subrange(&t, &t + 1));
+        return out;
+    };
+
+    // NOTE: the interpolation is performed in the TT-centuries coordinate, whose magnitude (~0.1-0.4) dwarfs the ~1-day
+    // interval width (~2.7e-5 centuries). The resulting subtractive cancellation caps the achievable accuracy at
+    // roughly 1e-9, hence the loose relative tolerance below (still far tighter than any interpolation bug would
+    // produce).
+    const auto close = [](double a, double b) { return std::abs(a - b) <= 1e-7 * std::max(1., std::abs(b)); };
+
+    // Pick an interval well inside the table, advancing to the first one with a non-constant f107 so the interpolation
+    // is non-degenerate.
+    auto idx = tab.size() / 2u;
+    while (idx + 1u < tab.size() && tab[idx].f107 == tab[idx + 1u].f107) {
+        ++idx;
+    }
+    REQUIRE(idx + 1u < tab.size());
+
+    const double t0 = mjd_to_tt_cy(tab[idx].mjd);
+    const double t1 = mjd_to_tt_cy(tab[idx + 1u].mjd);
+    const double f0 = tab[idx].f107;
+    const double f1 = tab[idx + 1u].f107;
+
+    // Interval endpoints.
+    REQUIRE(close(eval(t0), f0));
+    REQUIRE(close(eval(t1), f1));
+
+    // Interval midpoint.
+    REQUIRE(close(eval((t0 + t1) / 2.), (f0 + f1) / 2.));
+
+    // A generic interior point (30% into the interval) - catches weight/sign mistakes the symmetric midpoint would not.
+    const double frac = 0.3;
+    REQUIRE(close(eval(t0 + (frac * (t1 - t0))), f0 + (frac * (f1 - f0))));
 }
 
 #if defined(HEYOKA_HAVE_REAL)
