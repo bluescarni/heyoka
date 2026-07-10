@@ -10,6 +10,7 @@
 #define HEYOKA_DETAIL_EOP_SW_HELPERS_HPP
 
 #include <concepts>
+#include <cstdint>
 #include <functional>
 #include <ranges>
 #include <span>
