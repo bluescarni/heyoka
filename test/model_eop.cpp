@@ -330,8 +330,8 @@ TEST_CASE("get_eop_eop_func")
 
             auto *tm_val = detail::ext_load_vector_from_memory(s, scal_t, time_ptr, batch_size);
 
-            auto *pm_x_pm_xp_f = model::detail::llvm_get_eop_func(s, scal_t, batch_size, data, "pm_x",
-                                                                  &detail::llvm_get_eop_data_pm_x);
+            auto *pm_x_pm_xp_f = detail::llvm_get_eop_sw_func(s, "eop", scal_t, batch_size, data, "pm_x",
+                                                              &detail::llvm_get_eop_data_pm_x);
 
             auto *pm_x_pm_xp = bld.CreateCall(pm_x_pm_xp_f, tm_val);
             auto *pm_x = bld.CreateExtractValue(pm_x_pm_xp, 0);

@@ -62,10 +62,6 @@ namespace detail
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                              const eop_data &);
 
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, const char *,
-                  llvm::Value *(*)(llvm_state &, const eop_data &, llvm::Type *));
-
 template <typename... KwArgs>
 auto eop_common_opts(const KwArgs &...kw_args)
 {
