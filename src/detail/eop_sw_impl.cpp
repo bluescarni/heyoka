@@ -104,11 +104,15 @@ eop_sw_impl_base<Data>::eop_sw_impl_base(const eop_sw_impl_base &) = default;
 template <typename Data>
 eop_sw_impl_base<Data>::eop_sw_impl_base(eop_sw_impl_base &&) noexcept = default;
 
+// LCOV_EXCL_START
+
 template <typename Data>
 eop_sw_impl_base<Data> &eop_sw_impl_base<Data>::operator=(const eop_sw_impl_base &) = default;
 
 template <typename Data>
 eop_sw_impl_base<Data> &eop_sw_impl_base<Data>::operator=(eop_sw_impl_base &&) noexcept = default;
+
+// LCOV_EXCL_STOP
 
 // Small wrapper to check that we have eop/sw data to work with in eop_sw_impl_base. It should never happen that we end
 // up throwing here while using the public API, but better safe than sorry.
@@ -183,11 +187,15 @@ eop_sw_impl<Data>::eop_sw_impl(const eop_sw_impl &) = default;
 template <typename Data>
 eop_sw_impl<Data>::eop_sw_impl(eop_sw_impl &&) noexcept = default;
 
+// LCOV_EXCL_START
+
 template <typename Data>
 eop_sw_impl<Data> &eop_sw_impl<Data>::operator=(const eop_sw_impl &) = default;
 
 template <typename Data>
 eop_sw_impl<Data> &eop_sw_impl<Data>::operator=(eop_sw_impl &&) noexcept = default;
+
+// LCOV_EXCL_STOP
 
 template <typename Data>
 llvm::Value *eop_sw_impl<Data>::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &llvm_args,
@@ -432,11 +440,15 @@ eop_sw_p_impl<Data>::eop_sw_p_impl(const eop_sw_p_impl &) = default;
 template <typename Data>
 eop_sw_p_impl<Data>::eop_sw_p_impl(eop_sw_p_impl &&) noexcept = default;
 
+// LCOV_EXCL_START
+
 template <typename Data>
 eop_sw_p_impl<Data> &eop_sw_p_impl<Data>::operator=(const eop_sw_p_impl &) = default;
 
 template <typename Data>
 eop_sw_p_impl<Data> &eop_sw_p_impl<Data>::operator=(eop_sw_p_impl &&) noexcept = default;
+
+// LCOV_EXCL_STOP
 
 // NOTE: the gradient of the derivatives of EOP/SW quantities is always zero.
 template <typename Data>
