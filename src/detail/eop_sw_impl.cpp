@@ -99,9 +99,6 @@ eop_sw_impl_base<Data>::eop_sw_impl_base(const std::string &descr, const std::st
 }
 
 template <typename Data>
-eop_sw_impl_base<Data>::~eop_sw_impl_base() = default;
-
-template <typename Data>
 eop_sw_impl_base<Data>::eop_sw_impl_base(const eop_sw_impl_base &) = default;
 
 template <typename Data>

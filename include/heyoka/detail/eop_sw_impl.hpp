@@ -74,11 +74,16 @@ public:
     // actually executing at runtime (it seems like it does not), but let us be defensive about this potential issue.
     //
     // NOTE: this is also marked public in order to satisfy clang-tidy checks.
-    virtual ~eop_sw_impl_base();
+    //
+    // NOTE: this is defined inline to work around what looks like a clang-tidy bug.
+    virtual ~eop_sw_impl_base() = default;
 };
 
 // Base class for the implementation of an EOP/SW quantity.
 template <typename Data>
+// NOTE: apparently clang-tidy is unable to see that this class indeed has a public virtual dtor.
+//
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS eop_sw_impl : public eop_sw_impl_base<Data>
 {
     // Serialization.
@@ -179,7 +184,7 @@ HEYOKA_END_NAMESPACE
         void save(boost::archive::binary_oarchive &, unsigned) const;                                                  \
         void load(boost::archive::binary_iarchive &, unsigned);                                                        \
         BOOST_SERIALIZATION_SPLIT_MEMBER()                                                                             \
-    private:                                                                                                           \
+    protected:                                                                                                         \
         [[nodiscard]] llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t,                       \
                                                       const data &) const final;                                       \
         [[nodiscard]] expression ex_from_this() && final;                                                              \
@@ -205,7 +210,7 @@ HEYOKA_END_NAMESPACE
         void save(boost::archive::binary_oarchive &, unsigned) const;                                                  \
         void load(boost::archive::binary_iarchive &, unsigned);                                                        \
         BOOST_SERIALIZATION_SPLIT_MEMBER()                                                                             \
-    private:                                                                                                           \
+    protected:                                                                                                         \
         [[nodiscard]] llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t,                       \
                                                       const data &) const final;                                       \
                                                                                                                        \
