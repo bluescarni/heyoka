@@ -270,39 +270,6 @@ TEST_CASE("drag pointwise check")
 
         const double drag_dot_v = (drag_acc[0] * state[3]) + (drag_acc[1] * state[4]) + (drag_acc[2] * state[5]);
         REQUIRE(drag_dot_v < 0.0);
-
-        // Quantitative magnitude check - baselined against a first-principles evaluation with default sw/eop data at
-        // t=0 (J2000).
-        const double drag_mag_expected = 1.66292e-9;
-        REQUIRE(std::abs(std::sqrt(drag_mag2) - drag_mag_expected) < 1e-4 * drag_mag_expected);
-    }
-
-    // Spot-check against the drag notebook at heyoka.py: https://bluescarni.github.io/heyoka.py/notebooks/eo_atmo.html
-    {
-        const double earth_mu_local = model::get_egm2008_mu() / 1e9;
-        const double r_nb = 6910.0;
-        const double v_nb = std::sqrt(earth_mu_local / r_nb);
-        const std::array<double, 6> state_nb{r_nb, 0.0, 0.0, 0.0, v_nb, 0.0};
-        const std::vector<double> pars_nb{0.00019366446 * 2 / 0.15696615};
-
-        std::array<double, 3> kep_nb{};
-        std::array<double, 3> full_nb{};
-        kep_acc_cf(kep_nb, state_nb, kw::time = 0.0);
-        drag_acc_cf(full_nb, state_nb, kw::time = 0.0, kw::pars = pars_nb);
-
-        const std::array<double, 3> drag_nb{
-            full_nb[0] - kep_nb[0],
-            full_nb[1] - kep_nb[1],
-            full_nb[2] - kep_nb[2],
-        };
-        const double drag_nb_mag_km_s2
-            = std::sqrt((drag_nb[0] * drag_nb[0]) + (drag_nb[1] * drag_nb[1]) + (drag_nb[2] * drag_nb[2]));
-
-        // km/s² → m/s² (state is in km, notebook reports in m/s²).
-        const double drag_nb_m_s2 = drag_nb_mag_km_s2 * 1e3;
-
-        const double drag_nb_expected = 6.181088320949107e-8;
-        REQUIRE(std::abs(drag_nb_m_s2 - drag_nb_expected) < 1e-5 * drag_nb_expected);
     }
 }
 

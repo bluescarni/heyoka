@@ -593,8 +593,8 @@ TEST_CASE("sw_data_Ap_avg")
         // Fetch the array pointer.
         const auto *arr_ptr = fptr();
 
-        // Just check the first value.
-        REQUIRE(arr_ptr[0] == 21);
+        // Just check the first value against the source table.
+        REQUIRE(arr_ptr[0] == static_cast<T>(data.get_table()[0].Ap_avg));
     };
 
     tester.operator()<float>();
@@ -634,9 +634,9 @@ TEST_CASE("sw_data_f107")
         const auto *arr_ptr1 = fptr1();
         const auto *arr_ptr2 = fptr2();
 
-        // Just check the first values.
-        REQUIRE(arr_ptr1[0] == static_cast<T>(269.3));
-        REQUIRE(arr_ptr2[0] == static_cast<T>(266.6));
+        // Just check the first values against the source table.
+        REQUIRE(arr_ptr1[0] == static_cast<T>(data.get_table()[0].f107));
+        REQUIRE(arr_ptr2[0] == static_cast<T>(data.get_table()[0].f107a_center81));
     };
 
     tester.operator()<float>();
