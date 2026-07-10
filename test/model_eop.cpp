@@ -37,7 +37,6 @@
 
 #endif
 
-#include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
