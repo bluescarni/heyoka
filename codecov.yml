@@ -12,5 +12,6 @@ coverage:
   - "include/heyoka/detail/tanuki*"
   - "include/heyoka/detail/mdspan*"
   - "src/detail/erfa/.*"
+  - "utils/.*"
 
 comment: off
