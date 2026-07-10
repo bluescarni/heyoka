@@ -330,11 +330,7 @@ TEST_CASE("f107 interpolation")
         return out;
     };
 
-    // NOTE: the interpolation is performed in the TT-centuries coordinate, whose magnitude (~0.1-0.4) dwarfs the ~1-day
-    // interval width (~2.7e-5 centuries). The resulting subtractive cancellation caps the achievable accuracy at
-    // roughly 1e-9, hence the loose relative tolerance below (still far tighter than any interpolation bug would
-    // produce).
-    const auto close = [](double a, double b) { return std::abs(a - b) <= 1e-7 * std::max(1., std::abs(b)); };
+    const auto close = [](double a, double b) { return std::abs(a - b) <= 1e-12 * std::abs(b); };
 
     // Pick an interval well inside the table, advancing to the first one with a non-constant f107 so the interpolation
     // is non-degenerate.
