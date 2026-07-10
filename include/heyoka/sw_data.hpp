@@ -39,7 +39,7 @@ struct HEYOKA_DLL_PUBLIC sw_data_row {
     double Ap_avg = 0;
     // Observed 10.7-cm solar radio flux (F10.7).
     double f107 = 0;
-    // 81-day running average of observed F10.7 centred on the date.
+    // 81-day running average of the observed F10.7 centred on the date.
     double f107a_center81 = 0;
 
     // NOTE: used for testing.
