@@ -59,10 +59,6 @@ protected:
     eop_sw_impl_base(eop_sw_impl_base &&) noexcept;
     eop_sw_impl_base &operator=(const eop_sw_impl_base &);
     eop_sw_impl_base &operator=(eop_sw_impl_base &&) noexcept;
-    // NOTE: make this virtual. Even if we never explicitly destroy derived classes via base pointers, the Boost s11n
-    // machinery seemingly ends up compiling code that does. It is not clear 100% whether or not this code ends up
-    // actually executing at runtime, but let us be defensive about this potential issue.
-    virtual ~eop_sw_impl_base();
 
     [[nodiscard]] const Data &checked_get_data() const;
     [[nodiscard]] llvm::Value *llvm_eval_helper(llvm_state &, unsigned, llvm::Value *, llvm::Type *,
@@ -71,6 +67,14 @@ protected:
     // its derivative.
     [[nodiscard]] virtual llvm::Function *get_llvm_eval_f(llvm_state &, llvm::Type *, std::uint32_t, const Data &) const
         = 0;
+
+public:
+    // NOTE: make this virtual. Even if we never explicitly destroy derived classes via base pointers, the Boost s11n
+    // machinery seemingly ends up compiling code that does. It is not clear 100% whether or not this code ends up
+    // actually executing at runtime (it seems like it does not), but let us be defensive about this potential issue.
+    //
+    // NOTE: this is also marked public in order to satisfy clang-tidy checks.
+    virtual ~eop_sw_impl_base();
 };
 
 // Base class for the implementation of an EOP/SW quantity.
@@ -91,12 +95,14 @@ protected:
     eop_sw_impl(eop_sw_impl &&) noexcept;
     eop_sw_impl &operator=(const eop_sw_impl &);
     eop_sw_impl &operator=(eop_sw_impl &&) noexcept;
-    ~eop_sw_impl() override;
 
     // NOTE: this is used in taylor_decompose() to move-init an expression from this.
     [[nodiscard]] virtual expression ex_from_this() && = 0;
 
 public:
+    // NOTE: public for the same reason as the base class destructor.
+    ~eop_sw_impl() override;
+
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
     [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
@@ -130,9 +136,11 @@ protected:
     eop_sw_p_impl(eop_sw_p_impl &&) noexcept;
     eop_sw_p_impl &operator=(const eop_sw_p_impl &);
     eop_sw_p_impl &operator=(eop_sw_p_impl &&) noexcept;
-    ~eop_sw_p_impl() override;
 
 public:
+    // NOTE: public for the same reason as the base class destructor.
+    ~eop_sw_p_impl() override;
+
     [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
