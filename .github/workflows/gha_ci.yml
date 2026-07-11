@@ -20,7 +20,11 @@ jobs:
       - name: Build
         run: bash tools/gha_osx_x86_static.sh
   osx_static_arm64:
-    runs-on: macos-latest
+    # NOTE: here we would ideally like macos-latest, but currently we are experiencing
+    # immediate CI hang during test running with the recently-released OSX 26 Tahoe.
+    # I suspect the conda environment may not be compatible with OSX 26 yet. Let us revisit
+    # this at a later stage.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
       - name: Build
