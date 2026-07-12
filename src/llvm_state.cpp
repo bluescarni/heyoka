@@ -430,6 +430,8 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
     // AVX512 setup.
     const auto &tf = get_target_features();
     if (tf.avx512f) {
+        // LCOV_EXCL_START
+
         // NOTE: we enable 512-bit vectors if either forced by the
         // user or if simd_size_dbl is 8 (which means that 512-bit vectors
         // are a performance win).
@@ -446,6 +448,8 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
             f.addFnAttr("no-gather");
             f.addFnAttr("no-scatter");
         }
+
+        // LCOV_EXCL_STOP
     }
 
     // NOTE: adapted from here:

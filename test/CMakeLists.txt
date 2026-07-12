@@ -215,6 +215,7 @@ endif()
 # NOTE: additional custom setup for several tests.
 target_link_libraries(iau2006 PRIVATE heyoka_erfa)
 target_link_libraries(eop_data PRIVATE heyoka_erfa)
+target_link_libraries(model_sw PRIVATE heyoka_erfa)
 target_link_libraries(llvm_state_diskcache PRIVATE Boost::filesystem)
 set_tests_properties(llvm_state_diskcache_envvar PROPERTIES
     ENVIRONMENT "HEYOKA_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/heyoka_envvar_test_cache")

@@ -11,7 +11,6 @@
 
 #include <compare>
 #include <concepts>
-#include <cstdint>
 #include <initializer_list>
 #include <memory>
 #include <ranges>
@@ -29,15 +28,18 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-// Single row in a SW data table.
+// Single row in an SW data table.
+//
+// Each row gives the values assumed by a set of space weather quantities at the instant specified by the modified
+// Julian date mjd.
 struct HEYOKA_DLL_PUBLIC sw_data_row {
     // UTC modified Julian date.
     double mjd = 0;
-    // Arithmetic average of the 8 Ap indices for the day.
-    std::uint16_t Ap_avg = 0;
+    // 24-hour running average of the Ap index centred on the date.
+    double Ap_avg = 0;
     // Observed 10.7-cm solar radio flux (F10.7).
     double f107 = 0;
-    // 81-day arithmetic average of observed F10.7 centred on the date.
+    // 81-day running average of the observed F10.7 centred on the date.
     double f107a_center81 = 0;
 
     // NOTE: used for testing.
@@ -98,6 +100,7 @@ namespace detail
 {
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC sw_data_table parse_sw_data_celestrak(const std::string &);
+HEYOKA_DLL_PUBLIC void reanchor_sw_data_celestrak(sw_data_table &);
 
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_sw_data_Ap_avg(llvm_state &, const sw_data &, llvm::Type *);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_get_sw_data_f107(llvm_state &, const sw_data &, llvm::Type *);
@@ -107,5 +110,10 @@ namespace detail
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+// Version changelog:
+//
+// - version 1: switched AP_avg from std::uint16_t to double.
+BOOST_CLASS_VERSION(heyoka::sw_data_row, 1)
 
 #endif

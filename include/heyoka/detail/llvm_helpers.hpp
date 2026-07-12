@@ -39,6 +39,7 @@ HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
 std::uint32_t gl_arr_size(llvm::Value *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
@@ -204,6 +205,21 @@ HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
                                                const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &);
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm_state &, std::vector<llvm::Value *> &);
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_prod(llvm_state &, std::vector<llvm::Value *> &);
+
+// Small RAII helper to automatically restore an LLVM builder to the original insertion point.
+class ip_restorer
+{
+    ir_builder &m_bld;
+    llvm::BasicBlock *m_orig_bb = nullptr;
+
+public:
+    explicit ip_restorer(ir_builder &);
+    ip_restorer(const ip_restorer &) = delete;
+    ip_restorer(ip_restorer &&) noexcept = delete;
+    ip_restorer &operator=(const ip_restorer &) = delete;
+    ip_restorer &operator=(ip_restorer &&) noexcept = delete;
+    ~ip_restorer();
+};
 
 } // namespace detail
 

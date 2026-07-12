@@ -34,6 +34,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
 
 #include <heyoka/config.hpp>
@@ -374,6 +375,190 @@ void eop_sw_check_ts_id(const std::string_view descr, const std::string &timesta
         }
     }
 }
+
+// Helper to get/generate the function for the simultaneous computation of an EOP/SW quantity and its derivative via
+// first-order polynomial interpolation.
+//
+// 'descr' is the data descriptor, used to discriminate EOP and SW data. fp_t is the scalar floating-point value that
+// will be used in the computation. batch_size is the batch size. 'data' is the source of EOP/SW data. 'name' is the
+// name of the EOP/SW quantity. data_getter is the function to create/fetch the EOP/SW data.
+template <typename Data>
+llvm::Function *llvm_get_eop_sw_func(llvm_state &s, const char *descr, llvm::Type *fp_t, std::uint32_t batch_size,
+                                     const Data &data, const char *name,
+                                     llvm::Value *(*data_getter)(llvm_state &, const Data &, llvm::Type *))
+{
+    assert(data_getter != nullptr);
+
+    auto &md = s.module();
+
+    // Fetch the vector floating-point type.
+    auto *const val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the table of EOP/SW data.
+    const auto &table = data.get_table();
+
+    // Start by creating the mangled name of the function. The mangled name will be based on:
+    //
+    // - the descriptor,
+    // - the name of the EOP/SW quantity we are computing,
+    // - the total number of rows in the data table,
+    // - the timestamp and identifier of the data,
+    // - the floating-point type.
+    //
+    // NOTE: '-' is intentionally chosen as the separator between timestamp and identifier. Timestamp and identifier are
+    // both guaranteed not to contain '-', thus the boundary between the two is unambiguous.
+    const auto fname = fmt::format("heyoka.{}_get_{}_{}p.{}.{}-{}.{}", descr, name, name, table.size(),
+                                   data.get_timestamp(), data.get_identifier(), llvm_mangle_type(val_t));
+
+    // Check if we already created the function.
+    if (auto *const fptr = md.getFunction(fname)) {
+        return fptr;
+    }
+
+    // The function was not created before, do it now.
+    auto &bld = s.builder();
+    auto &ctx = s.context();
+
+    // Setup the insertion point restorer.
+    const ip_restorer ipr(bld);
+
+    // Construct the function prototype. The only input is the time value, the output is the array of two values for the
+    // EOP/SW quantity and its derivative.
+    auto *const ret_t = llvm::ArrayType::get(val_t, 2);
+    auto *const ft = llvm::FunctionType::get(ret_t, {val_t}, false);
+
+    // Create the function
+    auto *const f = llvm_func_create(ft, llvm::Function::PrivateLinkage, fname, &md);
+
+    // Fetch the time argument.
+    auto *const tm_val = f->args().begin();
+
+    // Create a new basic block to start insertion into.
+    bld.SetInsertPoint(llvm::BasicBlock::Create(ctx, "entry", f));
+
+    // Get/generate the date and the EOP/SW data.
+    auto *const date_ptr = llvm_get_eop_sw_data_date_tt_cy_j2000(s, data, fp_t, descr);
+    auto *const eop_sw_ptr = data_getter(s, data, fp_t);
+
+    // Codegen the array size (and its splatted counterpart).
+    auto *const arr_size = bld.getInt32(boost::numeric_cast<std::uint32_t>(table.size()));
+    auto *const arr_size_splat = vector_splat(bld, arr_size, batch_size);
+
+    // Locate the index in date_ptr of the time interval containing tm_val.
+    auto *const idx = llvm_eop_sw_data_locate_date(s, date_ptr, arr_size, tm_val);
+
+    // Codegen nan for use later.
+    auto *const nan_const = llvm_codegen(s, val_t, number{std::numeric_limits<double>::quiet_NaN()});
+
+    // We can now load the data from the date and EOP/SW arrays. The loaded data will be stored in the t0, t1, eop_sw0
+    // and eop_sw1 variables.
+    llvm::Value *t0{}, *t1{}, *eop_sw0{}, *eop_sw1{};
+
+    if (batch_size == 1u) {
+        // Scalar implementation.
+
+        // Storage for the values we will be loading from the date and EOP/SW arrays.
+        auto *const t0_alloc = bld.CreateAlloca(fp_t);
+        auto *const t1_alloc = bld.CreateAlloca(fp_t);
+        auto *const eop_sw0_alloc = bld.CreateAlloca(fp_t);
+        auto *const eop_sw1_alloc = bld.CreateAlloca(fp_t);
+
+        // NOTE: in the scalar implementation, we need to branch on the value of idx: if idx == arr_size, we will return
+        // NaNs, otherwise we will return the values in the arrays at indices idx and idx + 1.
+        llvm_if_then_else(
+            s, bld.CreateICmpEQ(idx, arr_size),
+            [&bld, nan_const, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc]() {
+                // Store the nans.
+                bld.CreateStore(nan_const, t0_alloc);
+                bld.CreateStore(nan_const, t1_alloc);
+                bld.CreateStore(nan_const, eop_sw0_alloc);
+                bld.CreateStore(nan_const, eop_sw1_alloc);
+            },
+            [&bld, idx, fp_t, date_ptr, eop_sw_ptr, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc]() {
+                // Compute idx + 1.
+                auto *const idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
+
+                // Load the date values.
+                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx})), t0_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1})), t1_alloc);
+
+                // Load the EOP/SW values.
+                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idx})), eop_sw0_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idxp1})), eop_sw1_alloc);
+            });
+
+        // Fetch the values that we have stored in the allocs.
+        t0 = bld.CreateLoad(fp_t, t0_alloc);
+        t1 = bld.CreateLoad(fp_t, t1_alloc);
+        eop_sw0 = bld.CreateLoad(fp_t, eop_sw0_alloc);
+        eop_sw1 = bld.CreateLoad(fp_t, eop_sw1_alloc);
+    } else {
+        // Vector implementation.
+
+        // Fetch the alignment of the scalar type.
+        const auto align = get_alignment(md, fp_t);
+
+        // Establish the SIMD lanes for which idx != arr_size. These are the lanes we will use for the gather operation.
+        auto *const mask = bld.CreateICmpNE(idx, arr_size_splat);
+
+        // Construct a 32-bit int version of the mask.
+        auto *const mask32 = bld.CreateZExt(mask, idx->getType());
+
+        // Compute idx + 1 as idx + mask. The idea of doing it like this is to avoid potential overflows if idx ==
+        // arr_size. The value of idxp1 will not matter anyway in the masked-out lanes.
+        auto *const idxp1 = bld.CreateAdd(idx, mask32);
+
+        // Load the date values, using nans as passhtru.
+        t0 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx}), llvm::Align(align), mask,
+                                    nan_const);
+        t1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1}), llvm::Align(align), mask,
+                                    nan_const);
+
+        // Load the EOP/SW values, using nans as passhtru.
+        eop_sw0 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idx}), llvm::Align(align),
+                                         mask, nan_const);
+        eop_sw1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idxp1}), llvm::Align(align),
+                                         mask, nan_const);
+    }
+
+    // We can now proceed to perform linear interpolation.
+
+    // t1 - t0.
+    auto *const t1_m_t0 = llvm_fsub(s, t1, t0);
+    // t1 - t.
+    auto *const t1_m_t = llvm_fsub(s, t1, tm_val);
+    // t - t0.
+    auto *const t_m_t0 = llvm_fsub(s, tm_val, t0);
+    // eop_sw0*(t1-t).
+    auto *const tmp1 = llvm_fmul(s, eop_sw0, t1_m_t);
+    // eop_sw1*(t-t0).
+    auto *const tmp2 = llvm_fmul(s, eop_sw1, t_m_t0);
+    // eop_sw0*(t1-t)+eop_sw1*(t-t0).
+    auto *const tmp3 = llvm_fadd(s, tmp1, tmp2);
+    // eop_sw = (eop_sw0*(t1-t)+eop_sw1*(t-t0))/(t1-t0).
+    auto *const eop_sw = llvm_fdiv(s, tmp3, t1_m_t0);
+    // eop_sw1-eop_sw0.
+    auto *const tmp4 = llvm_fsub(s, eop_sw1, eop_sw0);
+    // eop_swp = (eop_sw1-eop_sw0)/(t1-t0).
+    auto *const eop_swp = llvm_fdiv(s, tmp4, t1_m_t0);
+
+    // Create the return value.
+    llvm::Value *ret = llvm::UndefValue::get(ret_t);
+    ret = bld.CreateInsertValue(ret, eop_sw, 0);
+    ret = bld.CreateInsertValue(ret, eop_swp, 1);
+
+    bld.CreateRet(ret);
+
+    return f;
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_get_eop_sw_func(llvm_state &, const char *, llvm::Type *, std::uint32_t, const eop_data &, const char *,
+                     llvm::Value *(*)(llvm_state &, const eop_data &, llvm::Type *));
+template HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_get_eop_sw_func(llvm_state &, const char *, llvm::Type *, std::uint32_t, const sw_data &, const char *,
+                     llvm::Value *(*)(llvm_state &, const sw_data &, llvm::Type *));
 
 } // namespace detail
 

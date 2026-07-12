@@ -10,6 +10,7 @@
 #define HEYOKA_DETAIL_EOP_SW_HELPERS_HPP
 
 #include <concepts>
+#include <cstdint>
 #include <functional>
 #include <ranges>
 #include <span>
@@ -60,6 +61,11 @@ T eop_sw_table_from_range(R &&r)
 
 void eop_sw_check_ts_id(std::string_view, const std::string &, const std::string &, bool,
                         std::span<const std::string_view>);
+
+template <typename Data>
+[[nodiscard]] llvm::Function *llvm_get_eop_sw_func(llvm_state &, const char *, llvm::Type *, std::uint32_t,
+                                                   const Data &, const char *,
+                                                   llvm::Value *(*)(llvm_state &, const Data &, llvm::Type *));
 
 } // namespace detail
 

@@ -28,7 +28,10 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-// Single row in a EOP data table.
+// Single row in an EOP data table.
+//
+// Each row gives the values assumed by a set of Earth orientation parameters at the instant specified by the modified
+// Julian date mjd.
 struct HEYOKA_DLL_PUBLIC eop_data_row {
     // UTC modified Julian date.
     double mjd = 0;

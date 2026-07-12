@@ -18,6 +18,25 @@ New
   terms of numerical or symbolic coefficients
   (`#546 <https://github.com/bluescarni/heyoka/pull/546>`__).
 
+Changes
+~~~~~~~
+
+- In the expression system, the values of the space weather (SW) indices are now linearly
+  interpolated between the dates in the SW datasets. Previously, the SW indices were
+  implemented as piecewise step functions
+  (`#548 <https://github.com/bluescarni/heyoka/pull/548>`__).
+- In the space weather (SW) datasets, the ``Ap_avg`` index is now stored as a
+  double-precision floating-point value, rather than as a 16-bit unsigned integer
+  (`#548 <https://github.com/bluescarni/heyoka/pull/548>`__).
+
+Fix
+~~~
+
+- The library version is now mangled into the logger name. This prevents exceptions
+  on application startup if two different versions of heyoka are present in the runtime
+  environment at the same time
+  (`#547 <https://github.com/bluescarni/heyoka/pull/547>`__).
+
 7.11.0 (2026-04-27)
 -------------------
 

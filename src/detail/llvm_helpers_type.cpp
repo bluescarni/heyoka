@@ -195,15 +195,25 @@ std::string llvm_mangle_type(llvm::Type *t)
     }
 }
 
-// Helper to determine the vector size of x. If x is not
-// of type llvm::FixedVectorType, 1 will be returned.
-std::uint32_t get_vector_size(llvm::Value *x)
+// Helper to determine the vector size of a type. If the type is not llvm::FixedVectorType, 1 will be returned.
+std::uint32_t get_vector_size(llvm::Type *const tp)
 {
-    if (const auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(x->getType())) {
+    assert(tp != nullptr);
+
+    if (const auto *const vector_t = llvm::dyn_cast<llvm::FixedVectorType>(tp)) {
         return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
     } else {
         return 1;
     }
+}
+
+// Helper to determine the vector size of the type of a value. If the type is not llvm::FixedVectorType, 1 will be
+// returned.
+std::uint32_t get_vector_size(llvm::Value *const x)
+{
+    assert(x != nullptr);
+
+    return get_vector_size(x->getType());
 }
 
 // Small helper to compute the size of a global array.

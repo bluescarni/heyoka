@@ -10,20 +10,17 @@
 #define HEYOKA_MODEL_EOP_HPP
 
 #include <cstdint>
-#include <optional>
-#include <string>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/eop_sw_impl.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/eop_data.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
@@ -60,93 +57,10 @@ namespace model
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC eop_impl : public func_base
-{
-    std::string m_eop_name;
-    // NOTE: we wrap the eop data into an optional because
-    // we do not want to pay the cost of storing the full eop data
-    // for a default-constructed object, which is anyway only used
-    // during serialisation.
-    std::optional<eop_data> m_eop_data;
-
-    // Serialization.
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-public:
-    eop_impl();
-    explicit eop_impl(std::string, expression, eop_data);
-
-    [[nodiscard]] std::vector<expression> gradient() const;
-
-    [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
-                                             llvm::Value *, bool) const;
-
-    [[nodiscard]] taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
-
-    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
-                                                     bool) const;
-};
-
-class HEYOKA_DLL_PUBLIC eopp_impl : public func_base
-{
-    std::string m_eop_name;
-    std::optional<eop_data> m_eop_data;
-
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-public:
-    eopp_impl();
-    explicit eopp_impl(std::string, expression, eop_data);
-
-    [[nodiscard]] std::vector<expression> gradient() const;
-
-    [[nodiscard]] llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
-                                             llvm::Value *, bool) const;
-
-    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
-                                                     bool) const;
-};
-
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_era_erap_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                        const eop_data &);
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *llvm_get_gmst82_gmst82p_func(llvm_state &, llvm::Type *, std::uint32_t,
                                                                              const eop_data &);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_get_eop_func(llvm_state &, llvm::Type *, std::uint32_t, const eop_data &, const char *,
-                  llvm::Value *(*)(llvm_state &, const eop_data &, llvm::Type *));
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression era_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression erap_func_impl(expression, eop_data);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression gmst82p_func_impl(expression, eop_data);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_x_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_xp_func_impl(expression, eop_data);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_y_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression pm_yp_func_impl(expression, eop_data);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression dX_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression dXp_func_impl(expression, eop_data);
-
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression dY_func_impl(expression, eop_data);
-[[nodiscard]] HEYOKA_DLL_PUBLIC expression dYp_func_impl(expression, eop_data);
 
 template <typename... KwArgs>
 auto eop_common_opts(const KwArgs &...kw_args)
@@ -173,85 +87,17 @@ auto eop_common_opts(const KwArgs &...kw_args)
 inline constexpr auto eop_kw_cfg = igor::config<kw::descr::constructible_from<expression, kw::time_expr>,
                                                 kw::descr::same_as<kw::eop_data, eop_data>>{};
 
-inline constexpr auto era = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::era_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto erap = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::erap_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto gmst82 = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression {
-    return std::apply(detail::gmst82_func_impl, detail::eop_common_opts(kw_args...));
-};
-
-inline constexpr auto gmst82p = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression {
-    return std::apply(detail::gmst82p_func_impl, detail::eop_common_opts(kw_args...));
-};
-
-inline constexpr auto pm_x = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_x_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto pm_xp = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression {
-    return std::apply(detail::pm_xp_func_impl, detail::eop_common_opts(kw_args...));
-};
-
-inline constexpr auto pm_y = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::pm_y_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto pm_yp = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression {
-    return std::apply(detail::pm_yp_func_impl, detail::eop_common_opts(kw_args...));
-};
-
-inline constexpr auto dX = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::dX_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto dXp = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::dXp_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto dY = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::dY_func_impl, detail::eop_common_opts(kw_args...)); };
-
-inline constexpr auto dYp = []<typename... KwArgs>
-    requires igor::validate<eop_kw_cfg, KwArgs...>
-// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-(KwArgs &&...kw_args) -> expression { return std::apply(detail::dYp_func_impl, detail::eop_common_opts(kw_args...)); };
-
 } // namespace model
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eop_impl)
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::model::detail::eopp_impl)
-
-// Serialisation changelog:
-//
-// - version 1: changed the name mangling scheme.
-BOOST_CLASS_VERSION(heyoka::model::detail::eop_impl, 1);
-BOOST_CLASS_VERSION(heyoka::model::detail::eopp_impl, 1);
+// NOLINTBEGIN(cppcoreguidelines-missing-std-forward)
+HEYOKA_MODEL_DECLARE_EOP_SW(era, eop_data, eop_kw_cfg, eop_common_opts);
+HEYOKA_MODEL_DECLARE_EOP_SW(gmst82, eop_data, eop_kw_cfg, eop_common_opts);
+HEYOKA_MODEL_DECLARE_EOP_SW(pm_x, eop_data, eop_kw_cfg, eop_common_opts);
+HEYOKA_MODEL_DECLARE_EOP_SW(pm_y, eop_data, eop_kw_cfg, eop_common_opts);
+HEYOKA_MODEL_DECLARE_EOP_SW(dX, eop_data, eop_kw_cfg, eop_common_opts);
+HEYOKA_MODEL_DECLARE_EOP_SW(dY, eop_data, eop_kw_cfg, eop_common_opts);
+// NOLINTEND(cppcoreguidelines-missing-std-forward)
 
 #endif
