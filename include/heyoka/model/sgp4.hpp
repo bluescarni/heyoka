@@ -60,9 +60,8 @@ HEYOKA_DLL_PUBLIC void sgp4_compile_funcs(const std::function<void()> &, const s
 
 } // namespace detail
 
-// NOTE: a couple of ideas for performance improvements:
+// NOTE: ideas for performance improvements:
 //
-// - simultaneous computation of sin/cos for SLEEF,
 // - partitioning of the satellite list into simplified (perigee < 220km) and non-simplified dynamics. This would allow
 //   to get rid of the select() calls in the time propagation function, as we would then have 2 different functions for
 //   the simplified and non-simplified tprop. Getting rid of the select()s would allow to avoid unnecessary
