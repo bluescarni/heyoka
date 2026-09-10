@@ -306,7 +306,7 @@ llvm::Function *create_sincosq_wrapper(llvm_state &s)
                                                   {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
     // Create the return value.
-    llvm::Value *ret = llvm::UndefValue::get(arr_t);
+    llvm::Value *ret = llvm::PoisonValue::get(arr_t);
     ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, sin_ret), {0});
     ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, cos_ret), {1});
 

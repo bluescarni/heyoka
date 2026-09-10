@@ -271,7 +271,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Init the return value.
-    llvm::Value *res = llvm::UndefValue::get(fp_t);
+    llvm::Value *res = llvm::PoisonValue::get(fp_t);
 
 #if !defined(NDEBUG)
 
@@ -419,7 +419,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         auto *res_sin = llvm_mpfr_view_to_real(s, real_res_sin, limb_arr_res_sin, fp_t);
         auto *res_cos = llvm_mpfr_view_to_real(s, real_res_cos, limb_arr_res_cos, fp_t);
 
-        llvm::Value *res = llvm::UndefValue::get(ret_t);
+        llvm::Value *res = llvm::PoisonValue::get(ret_t);
         res = builder.CreateInsertValue(res, res_sin, {0});
         res = builder.CreateInsertValue(res, res_cos, {1});
 

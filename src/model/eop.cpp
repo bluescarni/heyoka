@@ -285,7 +285,7 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
                     .first;
 
     // Create the return value.
-    llvm::Value *ret = llvm::UndefValue::get(ret_t);
+    llvm::Value *ret = llvm::PoisonValue::get(ret_t);
     ret = bld.CreateInsertValue(ret, eop, 0);
     ret = bld.CreateInsertValue(ret, eopp, 1);
 

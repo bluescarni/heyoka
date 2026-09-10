@@ -683,7 +683,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
         dir_vec = builder.getInt1(dir);
     } else {
-        dir_vec = llvm::UndefValue::get(bool_vector_t);
+        dir_vec = llvm::PoisonValue::get(bool_vector_t);
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             const detail::dfloat<T> df_t_start(m_times_hi[i], m_times_lo[i]),
                 // NOTE: we load from the padding values here.
@@ -725,7 +725,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
         // In scalar mode, use a single value.
         batch_offset = builder.getInt32(0);
     } else {
-        batch_offset = llvm::UndefValue::get(int32_vec_t);
+        batch_offset = llvm::PoisonValue::get(int32_vec_t);
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             batch_offset = builder.CreateInsertElement(batch_offset, builder.getInt32(i), i);
         }

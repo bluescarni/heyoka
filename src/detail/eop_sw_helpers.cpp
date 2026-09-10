@@ -543,7 +543,7 @@ llvm::Function *llvm_get_eop_sw_func(llvm_state &s, const char *descr, llvm::Typ
     auto *const eop_swp = llvm_fdiv(s, tmp4, t1_m_t0);
 
     // Create the return value.
-    llvm::Value *ret = llvm::UndefValue::get(ret_t);
+    llvm::Value *ret = llvm::PoisonValue::get(ret_t);
     ret = bld.CreateInsertValue(ret, eop_sw, 0);
     ret = bld.CreateInsertValue(ret, eop_swp, 1);
 
