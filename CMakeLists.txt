@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 7.12.0 LANGUAGES CXX C)
+project(heyoka VERSION 7.13.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -155,8 +155,8 @@ check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 18 OR ${LLVM_VERSION_MAJOR} GREATER 22)
-  message(FATAL_ERROR "LLVM >= 18 and <= 22 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 18 OR ${LLVM_VERSION_MAJOR} GREATER 23)
+  message(FATAL_ERROR "LLVM >= 18 and <= 23 is required.")
 endif()
 
 message(STATUS "LLVM version: ${LLVM_VERSION}")
@@ -400,7 +400,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 44)
+set(HEYOKA_ABI_VERSION 45)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
