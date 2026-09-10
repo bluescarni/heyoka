@@ -50,7 +50,7 @@ ninja -v
 ctest -VV -j4
 
 # Create lcov report
-lcov --capture --directory . --output-file coverage.info
+lcov --capture --directory . --output-file coverage.info --ignore-errors inconsistent,inconsistent
 
 set +e
 set +x
