@@ -62,6 +62,7 @@
 
 #endif
 
+#include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -1004,15 +1005,51 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
     }
 }
 
-// Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
-// If vector_size is 1, a scalar is loaded instead.
-llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+namespace
+{
+
+// Helper to check the optional alignment argument in several load/store helpers below.
+//
+// tp is the scalar type whose alignment requirements will be checked against the "align" argument.
+void check_opt_alignment(ir_builder &builder, llvm::Type *const tp, const std::optional<std::size_t> align)
+{
+    assert(!tp->isVectorTy());
+
+    if (align) {
+        // First, check the numerical value of the alignment.
+        check_alignment(*align);
+
+        // Then, check that the alignment is not less than the one required by the scalar type.
+        if (const auto min_align = get_alignment(*builder.GetInsertBlock()->getModule(), tp); *align < min_align)
+            [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(
+                fmt::format("An invalid alignment of {} was specified for a pointer in a "
+                            "load/store operation, the minimum required alignment for a pointer of type {} is {}",
+                            *align, llvm_type_name(tp), min_align));
+            // LCOV_EXCL_STOP
+        }
+    }
+}
+
+} // namespace
+
+// Helper to load into a vector of size vector_size the sequential scalar data of type tp starting at ptr.
+//
+// If vector_size is 1, a scalar is loaded instead. The optional align argument can be used to specify the alignment of
+// the pointer. Note that, in any case, the pointer must be at the very least aligned for scalar loads.
+llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *const tp, llvm::Value *const ptr,
+                                     const std::uint32_t vector_size, const std::optional<std::size_t> align)
 {
     // LCOV_EXCL_START
     assert(vector_size > 0u);
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
+    assert(!tp->isVectorTy());
     // LCOV_EXCL_STOP
+
+    // Check the alignment argument.
+    check_opt_alignment(builder, tp, align);
 
     if (vector_size == 1u) {
         // Scalar case.
@@ -1036,28 +1073,32 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     return ret;
 }
 
-// This is like load_vector_from_memory(), except that the pointee of ptr might differ from the type of the loaded
-// value (e.g., in the case of real). This is supposed to be used when loading data created outside the LLVM
-// JIT world.
-llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+// This is like load_vector_from_memory(), except that the pointee of ptr might differ from the type of the loaded value
+// (e.g., in the case of real). This is supposed to be used when loading data created outside the LLVM JIT world.
+llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, llvm::Value *const ptr,
+                                         const std::uint32_t vector_size, const std::optional<std::size_t> align)
 {
+    // LCOV_EXCL_START
+    assert(vector_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
+    assert(!tp->isVectorTy());
+    // LCOV_EXCL_STOP
+
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
-        // LCOV_EXCL_START
-        if (tp->isVectorTy()) {
-            throw std::invalid_argument("Cannot load a vector of reals");
-        }
-        // LCOV_EXCL_STOP
-
+    if (const auto real_prec = llvm_is_real(tp)) {
         auto &context = s.context();
-
-        // Fetch the limb type.
-        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_external_llvm_type<mppp::real>(context);
+
+        // Check the alignment argument.
+        check_opt_alignment(builder, real_t, align);
+
+        // Fetch the limb type.
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -1104,20 +1145,27 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         return ret;
     } else {
 #endif
-        return load_vector_from_memory(builder, tp, ptr, vector_size);
+        return load_vector_from_memory(builder, tp, ptr, vector_size, align);
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
 }
 
-// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
-// a plain store will be performed.
-void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
+// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector, a plain store will be
+// performed.
+//
+// The optional align argument can be used to specify the alignment of the pointer. Note that, in any case, the pointer
+// must be at the very least aligned for scalar loads.
+void store_vector_to_memory(ir_builder &builder, llvm::Value *const ptr, llvm::Value *const vec,
+                            const std::optional<std::size_t> align)
 {
     // LCOV_EXCL_START
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
     // LCOV_EXCL_STOP
+
+    // Check the alignment argument.
+    check_opt_alignment(builder, vec->getType()->getScalarType(), align);
 
     if (auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Determine the vector size.
@@ -1134,10 +1182,11 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     }
 }
 
-// This is like store_vector_to_memory(), except that the pointee of ptr might differ from the type of the value to
-// be stored (e.g., in the case of real). This is supposed to be used when storing data created created inside LLVM into
-// a pointer that will then be used by code outside the LLVM realm.
-void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *vec)
+// This is like store_vector_to_memory(), except that the pointee of ptr might differ from the type of the value to be
+// stored (e.g., in the case of real). This is supposed to be used when storing data created created inside LLVM into a
+// pointer that will then be used by code outside the LLVM realm.
+void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Value *const vec,
+                                const std::optional<std::size_t> align)
 {
     auto &builder = s.builder();
 
@@ -1151,11 +1200,14 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         auto &context = s.context();
 
-        // Fetch the limb type.
-        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
-
         // Fetch the external real struct type.
         auto *real_t = to_external_llvm_type<mppp::real>(context);
+
+        // Check the alignment argument.
+        check_opt_alignment(builder, real_t, align);
+
+        // Fetch the limb type.
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -1196,7 +1248,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         }
     } else {
 #endif
-        store_vector_to_memory(builder, ptr, vec);
+        store_vector_to_memory(builder, ptr, vec, align);
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
@@ -1204,14 +1256,14 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
 // Gather a vector of type vec_tp from ptrs.
 //
-// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values
-// of type vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
+// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values of type
+// vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
 //
-// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value
-// will be a vector of values gathered from the addresses specified in ptrs.
+// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value will be a vector of
+// values gathered from the addresses specified in ptrs.
 //
-// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function
-// behaves like a scalar load from ptrs).
+// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function behaves like a
+// scalar load from ptrs).
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
     assert(ptrs->getType()->getScalarType()->isPointerTy());

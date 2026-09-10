@@ -9,9 +9,11 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <source_location>
 #include <string>
 #include <typeinfo>
@@ -62,14 +64,18 @@ llvm::Type *to_external_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
     return to_external_llvm_type_impl(c, typeid(T), err_throw);
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t,
+                                                       std::optional<std::size_t> = {});
+HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t,
+                                                           std::optional<std::size_t> = {});
 
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
 llvm::Value *ext_gather_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC void ext_store_vector_to_memory(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *,
+                                              std::optional<std::size_t> = {});
+HEYOKA_DLL_PUBLIC void ext_store_vector_to_memory(llvm_state &, llvm::Value *, llvm::Value *,
+                                                  std::optional<std::size_t> = {});
 
 HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 
