@@ -460,11 +460,14 @@ TEST_CASE("vfabi double")
             // NOTE: occurrences of the scalar version:
             // - 2 calls in the strided cfunc,
             // - 1 declaration.
-            REQUIRE(count == 3u);
+            //
+            // NOTE: we check with <= rather than == because newer LLVM versions may vectorise more
+            // aggressively (e.g., the calls in the strided cfunc), resulting in fewer scalar calls.
+            REQUIRE(count <= 3u);
         }
 
         if (tf.aarch64) {
-            REQUIRE(count == 3u);
+            REQUIRE(count <= 3u);
         }
 
         // NOTE: currently no auto-vectorization happens on ppc64 due apparently
@@ -472,7 +475,7 @@ TEST_CASE("vfabi double")
         // fine with the opt tool). When this is resolved, we can test ppc64 too.
 
         // if (tf.vsx) {
-        //     REQUIRE(count == 3u);
+        //     REQUIRE(count <= 3u);
         // }
 
 #endif
@@ -525,11 +528,14 @@ TEST_CASE("vfabi float")
             // NOTE: occurrences of the scalar version:
             // - 4 calls in the strided cfunc,
             // - 1 declaration.
-            REQUIRE(count == 5u);
+            //
+            // NOTE: we check with <= rather than == because newer LLVM versions may vectorise more
+            // aggressively (e.g., the calls in the strided cfunc), resulting in fewer scalar calls.
+            REQUIRE(count <= 5u);
         }
 
         if (tf.aarch64) {
-            REQUIRE(count == 5u);
+            REQUIRE(count <= 5u);
         }
 
         // NOTE: currently no auto-vectorization happens on ppc64 due apparently
@@ -537,7 +543,7 @@ TEST_CASE("vfabi float")
         // fine with the opt tool). When this is resolved, we can test ppc64 too.
 
         // if (tf.vsx) {
-        //     REQUIRE(count == 5u);
+        //     REQUIRE(count <= 5u);
         // }
 
 #endif
