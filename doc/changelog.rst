@@ -1,6 +1,28 @@
 Changelog
 =========
 
+7.13.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Add support for LLVM 23
+  (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).
+
+Changes
+~~~~~~~
+
+- Remove support for LLVM 18
+  (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).
+
+Fix
+~~~
+
+- An issue that could lead to suboptimal code generation on AVX-512
+  has been resolved
+  (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).
+
 7.12.0 (2026-07-16)
 -------------------
 

@@ -333,14 +333,9 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
 
     // LCOV_EXCL_START
 
-    // NOTE: the code model setup is working only on LLVM>=19 (or at least LLVM 18 + patches, as in the conda-forge LLVM
-    // package), due to this bug:
-    //
-    // https://github.com/llvm/llvm-project/issues/88115
-    //
-    // Additionally, there are indications from our CI that attempting to set the code model on Windows might just be
-    // buggy, as we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model
-    // setting on Windows altogether. We can revisit this at a later stage if needed.
+    // NOTE: there are indications from our CI that attempting to set the code model on Windows might just be buggy, as
+    // we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model setting
+    // on Windows altogether. We can revisit this at a later stage if needed.
 #if !defined(_WIN32)
 
     // Setup the code model.
