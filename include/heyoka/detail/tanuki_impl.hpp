@@ -1,4 +1,4 @@
-// Copyright 2023, 2024, 2025 Francesco Biscani (bluescarni@gmail.com)
+// Copyright 2023, 2024, 2025, 2026 Francesco Biscani (bluescarni@gmail.com)
 //
 // This file is part of the tanuki library.
 //
@@ -52,10 +52,10 @@
 #endif
 
 // Versioning.
-#define TANUKI_VERSION_MAJOR 2
+#define TANUKI_VERSION_MAJOR 3
 #define TANUKI_VERSION_MINOR 0
 #define TANUKI_VERSION_PATCH 0
-#define TANUKI_ABI_VERSION 2
+#define TANUKI_ABI_VERSION 3
 
 // NOTE: indirection to allow token pasting/stringification:
 //
@@ -150,20 +150,32 @@
 
 TANUKI_BEGIN_NAMESPACE
 
+#if defined(__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
+
+namespace detail
+{
+
+// NOTE: wrap std::free() in a helper function, so we avoid potential ambiguities when taking the address of
+// std::free(). See:
+//
+// https://stackoverflow.com/questions/27440953/stdunique-ptr-for-c-functions-that-need-free
+inline void free_deleter(void *const ptr) noexcept
+{
+    // NOLINTNEXTLINE(hicpp-no-malloc,cppcoreguidelines-owning-memory,cppcoreguidelines-no-malloc)
+    std::free(ptr);
+}
+
+} // namespace detail
+
+#endif
+
 // Helper to demangle a type name.
 inline std::string demangle(const char *s)
 {
 #if defined(__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
-    // NOTE: wrap std::free() in a local lambda, so we avoid potential ambiguities when taking the address of
-    // std::free(). See:
-    //
-    // https://stackoverflow.com/questions/27440953/stdunique-ptr-for-c-functions-that-need-free
-    //
-    // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory, hicpp-no-malloc)
-    auto deleter = [](void *ptr) { std::free(ptr); };
-
     // NOTE: abi::__cxa_demangle will return a pointer allocated by std::malloc, which we will delete via std::free().
-    const std::unique_ptr<char, decltype(deleter)> res{::abi::__cxa_demangle(s, nullptr, nullptr, nullptr), deleter};
+    const std::unique_ptr<char, void (*)(void *) noexcept> res{::abi::__cxa_demangle(s, nullptr, nullptr, nullptr),
+                                                               &detail::free_deleter};
 
     // NOTE: return the original string if demangling fails.
     return res ? std::string(res.get()) : std::string(s);
@@ -856,6 +868,10 @@ template <typename T, typename IFace, wrap_semantics Sem>
     assert(h != nullptr);
     assert((dynamic_cast<_tanuki_holder<T, IFace, Sem> *>(h) != nullptr));
 
+    // NOTE: clang-tidy suggests to make this const, but the point here is to provide deep constness semantics - we
+    // specifically want this to be non-const.
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
     auto &val = static_cast<_tanuki_holder<T, IFace, Sem> *>(h)->_tanuki_value;
 
     if constexpr (is_reference_wrapper_v<T>) {
@@ -1040,13 +1056,19 @@ namespace detail
 template <std::size_t N>
 concept power_of_two = (N > 0u) && ((N & (N - 1u)) == 0u);
 
+// NOTE: currently compilers are not agreeing on the type of constant template parameters (CTPs). In particular, some
+// compilers const-qualify them, and others even ref-qualify them. This little wrapper strips away any cvref
+// qualification in order to extract the underlying type.
+template <auto X>
+using ctp_t = std::remove_cvref_t<decltype(X)>;
+
 } // namespace detail
 
 // Concept for checking that Cfg is a valid config instance.
 template <auto Cfg>
 concept valid_config =
-    // This checks that decltype(Cfg) is a specialisation from the primary config template.
-    std::derived_from<std::remove_const_t<decltype(Cfg)>, detail::config_base> &&
+    // This checks that the type of Cfg is a specialisation from the primary config template.
+    std::derived_from<detail::ctp_t<Cfg>, detail::config_base> &&
     // The static alignment value must be a power of 2.
     detail::power_of_two<Cfg.static_align> &&
     // Cfg.explicit_ctor must be set to one of the valid enumerators.
@@ -1176,7 +1198,7 @@ struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
 };
 
 template <auto Cfg>
-using cfg_ref_t = cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::type;
+using cfg_ref_t = cfg_ref_type<ctp_t<Cfg>>::type;
 
 template <typename T, typename Wrap>
 struct get_ref_iface {
@@ -1228,7 +1250,7 @@ class TANUKI_VISIBLE wrap : private detail::wrap_storage<IFace, Cfg.static_size,
     using ref_iface_t = detail::get_ref_iface_t<Cfg, wrap<IFace, Cfg>>;
 
     // The default value type.
-    using default_value_t = decltype(Cfg)::default_value_type;
+    using default_value_t = detail::ctp_t<Cfg>::default_value_type;
 
     // Shortcut for the holder type corresponding to the value type T.
     template <typename T>
@@ -1684,6 +1706,8 @@ public:
             }
 
             // Helper to implement move-assignment via destruction + move-initialisation.
+            //
+            // NOLINTNEXTLINE(readability-redundant-lambda-parameter-list)
             const auto destroy_and_move_init = [this, &other]() noexcept {
                 destroy();
                 move_init_from(std::move(other));
@@ -1828,7 +1852,7 @@ public:
             }
 
             // Helper to perform assignment via destruction + initialisation.
-            const auto destroy_and_init = [this, &x]() {
+            const auto destroy_and_init = [this, &x] {
                 destroy();
 
                 try {
@@ -1968,6 +1992,11 @@ public:
             return w.m_pv_iface.get();
         }
     }
+    // NOTE: clang-tidy here complains that the wrap parameter could be marked as const and everything would still work.
+    // This is technically correct. However, the point of this overload is to provide deep constness (i.e., a mutable
+    // wrap gives a mutable IFace *, a const wrap gives a const IFace *).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
     [[nodiscard]] friend IFace *iface_ptr(wrap &w) noexcept
     {
         if constexpr (Cfg.semantics == wrap_semantics::value) {
@@ -2017,7 +2046,7 @@ public:
             }
 
             // Canonical swap implementation.
-            const auto canonical_swap = [&w1, &w2]() {
+            const auto canonical_swap = [&w1, &w2] {
                 auto temp(std::move(w1));
                 w1 = std::move(w2);
                 w2 = std::move(temp);
@@ -2077,6 +2106,11 @@ public:
     {
         return w.m_pv_iface->_tanuki_value_ptr();
     }
+    // NOTE: clang-tidy here complains that the wrap parameter could be marked as const and everything would still work.
+    // This is technically correct. However, the point of this overload is to provide deep constness (i.e., a mutable
+    // wrap gives a mutable void *, a const wrap gives a const void *).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
     [[nodiscard]] friend void *raw_value_ptr(wrap &w) noexcept
     {
         return w.m_pv_iface->_tanuki_value_ptr();
@@ -2165,14 +2199,18 @@ T *value_ptr(wrap<IFace, Cfg> &w) noexcept
 template <typename T, typename IFace, auto Cfg>
 const T &value_ref(const wrap<IFace, Cfg> &w)
 {
-    const auto *ptr = value_ptr<T>(w);
+    const auto *const ptr = value_ptr<T>(w);
     return ptr ? *ptr : throw std::bad_cast{};
 }
 
 template <typename T, typename IFace, auto Cfg>
 T &value_ref(wrap<IFace, Cfg> &w)
 {
-    auto *ptr = value_ptr<T>(w);
+    // NOTE: clang-tidy here complains that the pointee of ptr could be marked as const. This is a false positive: with
+    // a pointer to const, *ptr would be a const T, which cannot be returned as a T &.
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
+    auto *const ptr = value_ptr<T>(w);
     return ptr ? *ptr : throw std::bad_cast{};
 }
 
