@@ -232,12 +232,12 @@ llvm::Function *select_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t,
 
                     llvm_if_then_else(
                         s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-                        [&]() {
+                        [&] {
                             // If the order is zero, run the codegen.
                             builder.CreateStore(
                                 taylor_c_diff_numparam_codegen(s, fp_t, v, operands + i, par_ptr, batch_size), retval);
                         },
-                        [&]() {
+                        [&] {
                             // Otherwise, return zero.
                             builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size),
                                                 retval);

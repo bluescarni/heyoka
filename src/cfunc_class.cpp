@@ -280,7 +280,7 @@ struct cfunc<T>::impl {
 
             // Add the compiled functions.
             detail::tbb_isolated_parallel_invoke(
-                [&]() {
+                [&] {
                     // Scalar unstrided.
                     //
                     // NOTE: we fetch the decomposition from the scalar unstrided invocation of add_cfunc().
@@ -291,7 +291,7 @@ struct cfunc<T>::impl {
 
                     m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(s_arr[0].jit_lookup("cfunc"));
                 },
-                [&]() {
+                [&] {
                     // Scalar strided.
                     add_cfunc<T>(s_arr[1], "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy, kw::prec = prec,
                                  kw::strided = true);
@@ -300,7 +300,7 @@ struct cfunc<T>::impl {
 
                     m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(s_arr[1].jit_lookup("cfunc"));
                 },
-                [&]() {
+                [&] {
                     // Batch strided.
                     add_cfunc<T>(s_arr[2], "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
                                  kw::high_accuracy = high_accuracy, kw::prec = prec, kw::strided = true);
@@ -774,7 +774,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // The functor to evaluate the scalar remainder, if present. It will be run concurrently with the batch-parallel
     // iterations.
     const auto scalar_rem = [n_simd_blocks, batch_size, fptr_scal_s, nevals, out_data, read_inputs, in_data, read_pars,
-                             par_data, read_time, time_data, &tape_sa]<bool CM>() {
+                             par_data, read_time, time_data, &tape_sa]<bool CM> {
         auto *fptr = std::get<(CM ? 1 : 0)>(fptr_scal_s);
 
         // Tape setup.
@@ -827,7 +827,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     // NOTE: in compact mode each batch-parallel iteration needs its own tape.
     if (compact_mode) {
         // Construct the thread-specific storage for batch parallel operations.
-        typename impl::ets_t ets_batch([batch_size, &tape_sa]() {
+        typename impl::ets_t ets_batch([batch_size, &tape_sa] {
             // NOTE: the batch-mode tape is at index 1 only if the batch size is > 1, otherwise we are using the scalar
             // tape.
             const auto [sz, al] = tape_sa[batch_size > 1u];
@@ -837,7 +837,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         });
 
         detail::tbb_isolated_parallel_invoke(
-            [&ets_batch, &batch_iter, n_simd_blocks]() {
+            [&ets_batch, &batch_iter, n_simd_blocks] {
                 detail::tbb_isolated_parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                                                   [&ets_batch, &batch_iter](const auto &range) {
                                                       // Fetch the local tape.
@@ -854,20 +854,20 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
                                                       // from the parallel for loop we are currently in, and it would
                                                       // then start writing for a second time into the same tape it
                                                       // already begun writing into.
-                                                      oneapi::tbb::this_task_arena::isolate([&]() {
+                                                      oneapi::tbb::this_task_arena::isolate([&] {
                                                           batch_iter.template operator()<true>(range, tape_ptr);
                                                       });
                                                   });
             },
-            [&scalar_rem]() { scalar_rem.template operator()<true>(); });
+            [&scalar_rem] { scalar_rem.template operator()<true>(); });
     } else {
         detail::tbb_isolated_parallel_invoke(
-            [&batch_iter, n_simd_blocks]() {
+            [&batch_iter, n_simd_blocks] {
                 detail::tbb_isolated_parallel_for(
                     oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
                     [&batch_iter](const auto &range) { batch_iter.template operator()<false>(range, nullptr); });
             },
-            [&scalar_rem]() { scalar_rem.template operator()<false>(); });
+            [&scalar_rem] { scalar_rem.template operator()<false>(); });
     }
 }
 

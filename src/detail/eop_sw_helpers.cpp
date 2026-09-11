@@ -266,7 +266,7 @@ llvm::Value *llvm_eop_sw_data_locate_date(llvm_state &s, llvm::Value *ptr, llvm:
 
     // Determine the batch size from date_value.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
         assert(batch_size != 0u);
     }
@@ -467,14 +467,14 @@ llvm::Function *llvm_get_eop_sw_func(llvm_state &s, const char *descr, llvm::Typ
         // NaNs, otherwise we will return the values in the arrays at indices idx and idx + 1.
         llvm_if_then_else(
             s, bld.CreateICmpEQ(idx, arr_size),
-            [&bld, nan_const, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc]() {
+            [&bld, nan_const, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc] {
                 // Store the nans.
                 bld.CreateStore(nan_const, t0_alloc);
                 bld.CreateStore(nan_const, t1_alloc);
                 bld.CreateStore(nan_const, eop_sw0_alloc);
                 bld.CreateStore(nan_const, eop_sw1_alloc);
             },
-            [&bld, idx, fp_t, date_ptr, eop_sw_ptr, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc]() {
+            [&bld, idx, fp_t, date_ptr, eop_sw_ptr, t0_alloc, t1_alloc, eop_sw0_alloc, eop_sw1_alloc] {
                 // Compute idx + 1.
                 auto *const idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
 

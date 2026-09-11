@@ -361,7 +361,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
     auto &builder = s.builder();
 
-    auto *x_t = val->getType()->getScalarType();
+    const auto *const x_t = val->getType()->getScalarType();
 
     if (x_t->isFloatingPointTy()) {
         // Build the zero constant.

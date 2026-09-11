@@ -108,7 +108,7 @@ void pow_impl::to_stream(std::ostringstream &oss) const
     //   (x**y)**z instead.
 
     const auto base_is_negation = is_negation_prod(base);
-    const auto base_is_pow = [&]() {
+    const auto base_is_pow = [&] {
         const auto *fptr = std::get_if<func>(&base.value());
 
         return fptr != nullptr && fptr->extract<pow_impl>() != nullptr;
@@ -159,10 +159,10 @@ std::optional<safe_int64_t> ex_is_integral(const expression &ex)
 {
     return std::visit(
         [](const auto &v) -> std::optional<safe_int64_t> {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, number>) {
                 return std::visit(
                     [](const auto &x) -> std::optional<safe_int64_t> {
-                        using num_type = uncvref_t<decltype(x)>;
+                        using num_type = std::remove_cvref_t<decltype(x)>;
 
                         using std::trunc;
                         using std::isfinite;
@@ -215,10 +215,10 @@ std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
 {
     return std::visit(
         [](const auto &v) -> std::optional<safe_int64_t> {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, number>) {
                 return std::visit(
                     [](const auto &x) -> std::optional<safe_int64_t> {
-                        using num_type = uncvref_t<decltype(x)>;
+                        using num_type = std::remove_cvref_t<decltype(x)>;
 
                         using std::trunc;
                         using std::isfinite;
@@ -664,20 +664,20 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
                     llvm_square(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
                     retval);
             },
-            [&]() {
+            [&] {
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Distinguish the odd/even cases for the order.
                 llvm_if_then_else(
                     s, builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(1)),
-                    [&]() {
+                    [&] {
                         // Odd order.
                         auto *loop_end = builder.CreateAdd(
                             builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(1)), builder.getInt32(2)),
@@ -695,7 +695,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
                         auto *acc_load = builder.CreateLoad(val_t, acc);
                         builder.CreateStore(llvm_fadd(s, acc_load, acc_load), retval);
                     },
-                    [&]() {
+                    [&] {
                         // Even order.
 
                         // Pre-compute the final term.
@@ -782,13 +782,13 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
                     llvm_sqrt(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
                     retval);
             },
-            [&]() {
+            [&] {
                 // Compute the divisor: 2*a^[0].
                 auto *div = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
                 div = llvm_fadd(s, div, div);
@@ -816,7 +816,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 llvm_if_then_else(
                     s, ord_even,
-                    [&]() {
+                    [&] {
                         // retval -= (a^[n/2])**2.
                         auto *tmp = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                        builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
@@ -824,7 +824,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
                         builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), tmp), retval);
                     },
-                    []() {});
+                    [] {});
 
                 // retval -= acc.
                 builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), builder.CreateLoad(val_t, acc)),
@@ -912,14 +912,14 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 auto *pow_base = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
                 auto *pow_exp = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
 
                 builder.CreateStore(pea.eval_f(s, {pow_base, pow_exp}), retval);
             },
-            [&]() {
+            [&] {
                 // Create FP vector versions of exponent and order.
                 auto alpha_v = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);

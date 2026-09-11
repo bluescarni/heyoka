@@ -151,7 +151,7 @@ enum class taylor_outcome : std::int64_t {
     step_limit = -4294967296ll - 2,   // Maximum number of steps reached.
     time_limit = -4294967296ll - 3,   // Time limit reached.
     err_nf_state = -4294967296ll - 4, // Non-finite state detected at the end of the timestep.
-    cb_stop = -4294967296ll - 5       // Propagation stopped by callback.
+    cb_stop = -4294967296ll - 5,      // Propagation stopped by callback.
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
@@ -190,7 +190,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     const auto high_accuracy = p(kw::high_accuracy, false);
 
     // tol (defaults to undefined). Zero tolerance is considered the same as undefined.
-    auto tol = [&p]() -> std::optional<T> {
+    auto tol = [&p] -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
             auto retval = static_cast<T>(p(kw::tol));
             if (retval != 0) {
@@ -213,7 +213,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     );
 
     // Vector of parameters (defaults to empty vector).
-    auto pars = [&p]() -> std::vector<T> {
+    auto pars = [&p] -> std::vector<T> {
         if constexpr (p.has(kw::pars)) {
             return ranges_to<std::vector<T>>(p(kw::pars));
         } else {
@@ -262,7 +262,7 @@ Callback parse_propagate_cb(const Parser &p)
 template <typename T>
 inline constexpr auto ta_propagate_common_kw_cfg
     = igor::config<kw::descr::integral<kw::max_steps>, kw::descr::convertible_to<kw::max_delta_t, T>,
-                   igor::descr<kw::callback, []<typename U>() {
+                   igor::descr<kw::callback, []<typename U> {
                        return std::convertible_to<U, step_callback<T>>
                               || constructible_input_range<U, step_callback<T>>;
                    }>{}>{};
@@ -409,7 +409,7 @@ private:
             = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
         // Initial time (defaults to undefined).
-        auto tm = [&p]() -> std::optional<T> {
+        auto tm = [&p] -> std::optional<T> {
             if constexpr (p.has(kw::time)) {
                 return static_cast<T>(p(kw::time));
             } else {
@@ -418,7 +418,7 @@ private:
         }();
 
         // Extract the terminal events, if any.
-        auto tes = [&p]() -> std::vector<t_event_t> {
+        auto tes = [&p] -> std::vector<t_event_t> {
             if constexpr (p.has(kw::t_events)) {
                 return detail::ranges_to<std::vector<t_event_t>>(p(kw::t_events));
             } else {
@@ -427,7 +427,7 @@ private:
         }();
 
         // Extract the non-terminal events, if any.
-        auto ntes = [&p]() -> std::vector<nt_event_t> {
+        auto ntes = [&p] -> std::vector<nt_event_t> {
             if constexpr (p.has(kw::nt_events)) {
                 return detail::ranges_to<std::vector<nt_event_t>>(p(kw::nt_events));
             } else {
@@ -436,7 +436,7 @@ private:
         }();
 
         // Fetch the precision, if provided. Zero precision is considered the same as undefined.
-        auto prec = [&p]() -> std::optional<long long> {
+        auto prec = [&p] -> std::optional<long long> {
             if constexpr (p.has(kw::prec)) {
                 auto ret = boost::numeric_cast<long long>(p(kw::prec));
                 if (ret != 0) {
@@ -719,11 +719,12 @@ template <typename T, bool ForceScalarMaxDeltaT>
 inline constexpr auto tab_propagate_common_kw_cfg
     = igor::config<kw::descr::integral<kw::max_steps>,
                    igor::descr<kw::max_delta_t,
-                               []<typename U>() {
+                               []<typename U> {
                                    return std::convertible_to<U, T>
                                           || (!ForceScalarMaxDeltaT && constructible_input_range<U, T>);
+                                   // NOLINTNEXTLINE(readability-trailing-comma)
                                }>{},
-                   igor::descr<kw::callback, []<typename U>() {
+                   igor::descr<kw::callback, []<typename U> {
                        return std::convertible_to<U, step_callback_batch<T>>
                               || constructible_input_range<U, step_callback_batch<T>>;
                    }>{}>{};
@@ -744,7 +745,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
     //
     // NOTE: we want an explicit copy here because in the implementations of the propagate_*() functions we keep on
     // checking on max_delta_t before invoking the single step function. Hence, we want to avoid any risk of aliasing.
-    auto max_delta_t = [&]() -> std::vector<T> {
+    auto max_delta_t = [&] -> std::vector<T> {
         if constexpr (p.has(kw::max_delta_t)) {
             if constexpr (constructible_input_range<decltype(p(kw::max_delta_t)), T>) {
                 static_assert(!ForceScalarMaxDeltaT);
@@ -814,7 +815,7 @@ private:
     static constexpr auto finalise_ctor_kw_cfg
         = detail::ta_common_kw_cfg<T>
           | igor::config<igor::descr<kw::time,
-                                     []<typename U>() {
+                                     []<typename U> {
                                          return std::convertible_to<U, T> || detail::constructible_input_range<U, T>;
                                      }>{},
                          kw::descr::constructible_input_range<kw::t_events, t_event_t>,
@@ -833,7 +834,7 @@ private:
             = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
         // Initial times (defaults to a vector of zeroes).
-        auto tm = [&p, batch_size]() -> std::vector<T> {
+        auto tm = [&p, batch_size] -> std::vector<T> {
             if constexpr (p.has(kw::time)) {
                 // NOTE: silence clang warning.
                 (void)batch_size;
@@ -852,7 +853,7 @@ private:
         }();
 
         // Extract the terminal events, if any.
-        auto tes = [&p]() -> std::vector<t_event_t> {
+        auto tes = [&p] -> std::vector<t_event_t> {
             if constexpr (p.has(kw::t_events)) {
                 return detail::ranges_to<std::vector<t_event_t>>(p(kw::t_events));
             } else {
@@ -861,7 +862,7 @@ private:
         }();
 
         // Extract the non-terminal events, if any.
-        auto ntes = [&p]() -> std::vector<nt_event_t> {
+        auto ntes = [&p] -> std::vector<nt_event_t> {
             if constexpr (p.has(kw::nt_events)) {
                 return detail::ranges_to<std::vector<nt_event_t>>(p(kw::nt_events));
             } else {

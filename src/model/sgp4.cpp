@@ -123,7 +123,7 @@ auto sgp4_init(const std::vector<expression> &inputs)
 
     // Setup the inputs. If they are provided, use them, otherwise use variables with predefined names.
     // NOTE: in this function we do not use tsince, i.e., the last element of inputs.
-    const auto [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR] = [&inputs]() {
+    const auto [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR] = [&inputs] {
         if (inputs.empty()) {
             return make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
         } else {
@@ -238,7 +238,7 @@ std::vector<expression> sgp4_time_prop(const std::vector<expression> &inputs, co
 
     // Expressions representing the orbital elements, bstar and tsince.
     // NOTE: in this function we do not use n0, i.e., the first element of 'inputs'.
-    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE] = [&inputs]() {
+    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE] = [&inputs] {
         if (inputs.empty()) {
             return make_vars("e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
         } else {
@@ -429,7 +429,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
     // Initialise the input quantities for the sgp4 algorithm.
     // NOTE: these are all the default ones, apart from tsince for which we use heyoka::time
     // instead of a 'tsince' variable.
-    const auto sgp4_inputs = []() {
+    const auto sgp4_inputs = [] {
         const auto tmp = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
 
         // Add tsince as heyoka::time.

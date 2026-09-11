@@ -294,14 +294,22 @@ vsys_data<T>::vsys_data(const var_ode_sys &sys, const long long prec, const llvm
     //
     // NOTE: we set the cfunc kwarg check_prec to false because we are checking the precision of the input
     // multiprecision arguments in the Taylor integrators code.
-    m_tm_cfunc = cfunc<T>{std::move(tm_outs), std::move(tm_ins),
-                          // cfunc-specific kwargs.
-                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec,
-                          kw::check_prec = false, kw::parjit = parjit,
-                          // llvm_state-specific kwargs.
-                          kw::opt_level = tplt.get_opt_level(), kw::fast_math = tplt.fast_math(),
-                          kw::force_avx512 = tplt.force_avx512(), kw::slp_vectorize = tplt.get_slp_vectorize(),
-                          kw::code_model = tplt.get_code_model()};
+    m_tm_cfunc = cfunc<T>{
+        std::move(tm_outs),
+        std::move(tm_ins),
+        // cfunc-specific kwargs.
+        kw::high_accuracy = high_accuracy,
+        kw::compact_mode = compact_mode,
+        kw::prec = prec,
+        kw::check_prec = false,
+        kw::parjit = parjit,
+        // llvm_state-specific kwargs.
+        kw::opt_level = tplt.get_opt_level(),
+        kw::fast_math = tplt.fast_math(),
+        kw::force_avx512 = tplt.force_avx512(),
+        kw::slp_vectorize = tplt.get_slp_vectorize(),
+        kw::code_model = tplt.get_code_model(),
+    };
 }
 
 template <typename T>

@@ -289,12 +289,12 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, llvm::Type *fp_t, co
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of b_idx.
                 builder.CreateStore(
                     llvm_acos(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
-            [&]() {
+            [&] {
                 // Compute the fp version of the order.
                 auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 

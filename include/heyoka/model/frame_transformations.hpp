@@ -65,7 +65,7 @@ auto itrs_icrs_common_opts(const KwArgs &...kw_args)
     const auto thresh = static_cast<double>(p(kw::thresh, iau2006_default_thresh));
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() {
+    auto data = [&p] {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {
@@ -116,7 +116,7 @@ auto itrs_teme_common_opts(const KwArgs &...kw_args)
     auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // EOP data (defaults to def-cted).
-    auto data = [&p]() {
+    auto data = [&p] {
         if constexpr (p.has(kw::eop_data)) {
             return p(kw::eop_data);
         } else {

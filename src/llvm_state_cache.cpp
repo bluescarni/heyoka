@@ -319,31 +319,27 @@ std::filesystem::path get_default_diskcache_dir()
     // SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path_tmp)
     //
     // instead of getenv(). Keep in mind if this ever becomes an issue.
-    if (const auto *p = std::getenv("LOCALAPPDATA")) {
-        if (*p != '\0') {
-            return std::filesystem::path(p) / "heyoka" / "cache";
-        }
+    if (const auto *const p = std::getenv("LOCALAPPDATA"); p != nullptr && *p != '\0') {
+        return std::filesystem::path(p) / "heyoka" / "cache";
     }
 #elif defined(__APPLE__)
-    if (const auto *p = std::getenv("HOME")) {
-        if (*p != '\0') {
-            return std::filesystem::path(p) / "Library" / "Caches" / "heyoka";
-        }
+    if (const auto *const p = std::getenv("HOME"); p != nullptr && *p != '\0') {
+        return std::filesystem::path(p) / "Library" / "Caches" / "heyoka";
     }
 #else
-    if (const auto *p = std::getenv("XDG_CACHE_HOME")) {
+    // NOTE: XDG_CACHE_HOME, like all paths in the XDG Base directory specification, is required to be an absolute path:
+    //
+    // https://specifications.freedesktop.org/basedir/latest/
+    if (const auto *const p = std::getenv("XDG_CACHE_HOME");
+        p != nullptr && *p != '\0' && std::filesystem::path(p).is_absolute()) {
         // NOTE: XDG_CACHE_HOME does not seem to be very widespread, it is not present in our current CI setup.
         //
         // LCOV_EXCL_START
-        if (*p != '\0') {
-            return std::filesystem::path(p) / "heyoka";
-        }
+        return std::filesystem::path(p) / "heyoka";
         // LCOV_EXCL_STOP
     }
-    if (const auto *p = std::getenv("HOME")) {
-        if (*p != '\0') {
-            return std::filesystem::path(p) / ".cache" / "heyoka";
-        }
+    if (const auto *const p = std::getenv("HOME"); p != nullptr && *p != '\0') {
+        return std::filesystem::path(p) / ".cache" / "heyoka";
     }
 #endif
 
@@ -359,10 +355,8 @@ std::filesystem::path get_default_diskcache_dir()
 // otherwise it will fall back to get_default_diskcache_dir().
 std::filesystem::path get_initial_diskcache_dir()
 {
-    if (const auto *p = std::getenv("HEYOKA_CACHE_DIR")) {
-        if (*p != '\0') {
-            return {p};
-        }
+    if (const auto *const p = std::getenv("HEYOKA_CACHE_DIR"); p != nullptr && *p != '\0') {
+        return {p};
     }
 
     return get_default_diskcache_dir();
@@ -722,7 +716,7 @@ struct diskcache_state {
 
             // NOTE: the scope guard ensures sqlite3_reset() is called on all exit paths, releasing any write lock held
             // after SQLITE_ROW and resetting the statement for the next lookup invocation.
-            const boost::scope::scope_exit reset_guard([stmt]() noexcept { sqlite3_reset(stmt); });
+            const boost::scope::scope_exit reset_guard([stmt] noexcept { sqlite3_reset(stmt); });
 
             // Bind the statement.
             if (sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(hash)) != SQLITE_OK) [[unlikely]] {
@@ -750,7 +744,7 @@ struct diskcache_state {
             // Helper to complete the statement by stepping to SQLITE_DONE. This is necessary because the first step
             // returned SQLITE_ROW but the statement has not completed yet - the second step commits the UPDATE
             // (the last_access bump) and releases the write lock.
-            const auto finish = [stmt, this]() {
+            const auto finish = [stmt, this] {
                 if (sqlite3_step(stmt) != SQLITE_DONE) [[unlikely]] {
                     // LCOV_EXCL_START
                     throw std::runtime_error(
@@ -875,7 +869,7 @@ struct diskcache_state {
                 // Eviction loop: remove LRU entries until the new entry fits.
                 auto *const evict_stmt = conn->m_evict_stmt.get();
                 // NOTE: the scope guard ensures sqlite3_reset() on all exit paths, including exceptions.
-                const boost::scope::scope_exit evict_reset([evict_stmt]() noexcept { sqlite3_reset(evict_stmt); });
+                const boost::scope::scope_exit evict_reset([evict_stmt] noexcept { sqlite3_reset(evict_stmt); });
                 while (total_size + entry_size > total_limit) {
                     const auto erc = sqlite3_step(evict_stmt);
                     if (erc == SQLITE_DONE) {
@@ -911,8 +905,7 @@ struct diskcache_state {
                 if (total_size + entry_size <= total_limit) {
                     auto *const insert_stmt = conn->m_insert_stmt.get();
                     // NOTE: the scope guard ensures sqlite3_reset() on all exit paths, including exceptions.
-                    const boost::scope::scope_exit insert_reset(
-                        [insert_stmt]() noexcept { sqlite3_reset(insert_stmt); });
+                    const boost::scope::scope_exit insert_reset([insert_stmt] noexcept { sqlite3_reset(insert_stmt); });
 
                     // Bind the 8 parameters.
                     if (sqlite3_bind_int64(insert_stmt, 1, static_cast<sqlite3_int64>(hash)) != SQLITE_OK

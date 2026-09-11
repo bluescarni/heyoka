@@ -39,7 +39,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sum_sq.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -126,11 +125,11 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
     // This function calculates the j-th term in the summation in the formula for the
     // Taylor derivative of square() for each k-th argument in sf, and appends the result
     // to the k-th entry in v_sums.
-    auto looper = [&](std::uint32_t j) {
+    const auto looper = [&](std::uint32_t j) {
         for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
             std::visit(
                 [&](const auto &v) {
-                    using type = detail::uncvref_t<decltype(v)>;
+                    using type = std::remove_cvref_t<decltype(v)>;
 
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
@@ -193,7 +192,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
             // Compute the term outside the summation and store it in tmp.
             tmp.push_back(std::visit(
                 [&](const auto &v) -> llvm::Value * {
-                    using type = detail::uncvref_t<decltype(v)>;
+                    using type = std::remove_cvref_t<decltype(v)>;
 
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
@@ -267,7 +266,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
     for (const auto &arg : sf.args()) {
         nm_args.push_back(std::visit(
             [](const auto &v) -> std::variant<variable, number, param> {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     // LCOV_EXCL_START
@@ -330,7 +329,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
             for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
                 std::visit(
                     [&](const auto &v) {
-                        using type = detail::uncvref_t<decltype(v)>;
+                        using type = std::remove_cvref_t<decltype(v)>;
 
                         if constexpr (std::is_same_v<type, variable>) {
                             // Variable.
@@ -360,7 +359,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
         llvm_if_then_else(
             s, odd_or_even,
-            [&]() {
+            [&] {
                 // Odd order.
                 auto *loop_end = builder.CreateAdd(
                     builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(1)), builder.getInt32(2)),
@@ -379,15 +378,15 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 // Return 2 * ret.
                 builder.CreateStore(llvm_fadd(s, ret, ret), retval);
             },
-            [&]() {
+            [&] {
                 // Even order.
                 // NOTE: run the loop only if we are not at order 0.
                 llvm_if_then_else(
                     s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-                    []() {
+                    [] {
                         // Order 0, do nothing.
                     },
-                    [&]() {
+                    [&] {
                         // Order 2 or higher.
                         auto *loop_end = builder.CreateAdd(
                             builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(2)), builder.getInt32(2)),
@@ -407,7 +406,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                     // Load the external term.
                     auto *ex_term = std::visit( // LCOV_EXCL_LINE
                         [&](const auto &v) -> llvm::Value * {
-                            using type = detail::uncvref_t<decltype(v)>;
+                            using type = std::remove_cvref_t<decltype(v)>;
 
                             if constexpr (std::is_same_v<type, variable>) {
                                 // Variable.
@@ -421,13 +420,13 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
                                 llvm_if_then_else(
                                     s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-                                    [&]() {
+                                    [&] {
                                         // Order 0, store the num/param.
                                         builder.CreateStore(
                                             taylor_c_diff_numparam_codegen(s, fp_t, v, terms + k, par_ptr, batch_size),
                                             ret);
                                     },
-                                    [&]() {
+                                    [&] {
                                         // Order 2 or higher, store zero.
                                         builder.CreateStore(
                                             vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), ret);

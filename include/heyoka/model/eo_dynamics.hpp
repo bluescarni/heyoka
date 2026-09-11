@@ -57,7 +57,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     auto sw_data = p(kw::sw_data, heyoka::sw_data{});
 
     // Parse the ballistic coefficient expression.
-    auto Cb_opt = [&p]() -> std::optional<expression> {
+    auto Cb_opt = [&p] -> std::optional<expression> {
         if constexpr (p.has(kw::Cb)) {
             return make_optional<expression>(p(kw::Cb));
         } else {
@@ -66,7 +66,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     }();
 
     // Parse the ELP2000 and VSOP2013 thresholds.
-    const auto elp2000_thresh_opt = [&p]() -> std::optional<double> {
+    const auto elp2000_thresh_opt = [&p] -> std::optional<double> {
         if constexpr (p.has(kw::elp2000_thresh)) {
             return make_optional<double>(p(kw::elp2000_thresh));
         } else {
@@ -74,7 +74,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
         }
     }();
 
-    const auto vsop2013_thresh_opt = [&p]() -> std::optional<double> {
+    const auto vsop2013_thresh_opt = [&p] -> std::optional<double> {
         if constexpr (p.has(kw::vsop2013_thresh)) {
             return make_optional<double>(p(kw::vsop2013_thresh));
         } else {

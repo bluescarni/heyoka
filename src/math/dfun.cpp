@@ -85,7 +85,7 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     std::string full_name = "dfun_";
 
     // Fetch a reference to the arguments.
-    const auto &args = [&args_]() -> const std::vector<expression> & {
+    const auto &args = [&args_] -> const std::vector<expression> & {
         if constexpr (std::same_as<Args, std::vector<expression>>) {
             return args_;
         } else if constexpr (std::same_as<Args, func_args>) {
@@ -265,7 +265,7 @@ std::vector<expression> dfun_impl::gradient() const
         std::string new_name = "dfun_";
 
         // Helper to update new_name with last pair added to new_didx.
-        auto update_new_name = [&new_name, &new_didx]() {
+        auto update_new_name = [&new_name, &new_didx] {
             assert(!new_didx.empty());
             new_name += fmt::format("{},{} ", new_didx.back().first, new_didx.back().second);
         };

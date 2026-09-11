@@ -87,6 +87,7 @@ void sincos_combine_impl(std::vector<V> &dc, const F &get_ex)
 // (combined_sin()/combined_cos()).
 void sincos_combine_cfunc(std::vector<expression> &dc)
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     sincos_combine_impl(dc, []<typename T>(T &&ex) -> auto && { return std::forward<T>(ex); });
 }
 
@@ -94,6 +95,7 @@ void sincos_combine_cfunc(std::vector<expression> &dc)
 // (combined_sin()/combined_cos()).
 void sincos_combine_taylor(taylor_dc_t &dc)
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     sincos_combine_impl(dc, []<typename T>(T &&ex) -> auto && { return std::forward<T>(ex).first; });
 }
 

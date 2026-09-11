@@ -162,19 +162,19 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
         // the non-normalised derivatives.
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // If the order is zero, return the time itself.
                 builder.CreateStore(ext_load_vector_from_memory(s, fp_t, t_ptr, batch_size), retval);
             },
-            [&]() {
+            [&] {
                 llvm_if_then_else(
                     s, builder.CreateICmpEQ(ord, builder.getInt32(1)),
-                    [&]() {
+                    [&] {
                         // If the order is one, return 1.
                         builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size),
                                             retval);
                     },
-                    [&]() {
+                    [&] {
                         // If order > 1, return zero.
                         builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size),
                                             retval);

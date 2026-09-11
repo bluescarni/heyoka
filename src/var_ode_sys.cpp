@@ -323,7 +323,7 @@ var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &s
     assert(vargs.size() == vargs_hr.size());
 
     // Turn vargs into a shared_ptr for use in the dfun() API.
-    auto vargs_ptr = std::make_shared<const std::vector<expression>>(std::move(vargs));
+    const auto vargs_ptr = std::make_shared<const std::vector<expression>>(std::move(vargs));
 
     // Create the subs map to replace the state variables with implicit functions of vargs.
     std::unordered_map<std::string, expression> subs_map;

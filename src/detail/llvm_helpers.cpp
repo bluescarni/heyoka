@@ -98,7 +98,7 @@ namespace
 // math intrinsics.
 // NOTE: this is needed because for some types the use of LLVM intrinsics
 // might be buggy or not possible at all (e.g., for mppp::real).
-bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
+bool llvm_stype_can_use_math_intrinsics(llvm_state &s, const llvm::Type *const tp)
 {
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
@@ -120,7 +120,7 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 // intrinsic with 2 arguments but the types argument has only 1 element because both arguments
 // must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
 // NOTE: for intrinsics, it is not necessary to set up manually the function attributes, as LLVM takes care of it.
-llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
+llvm::Function *llvm_lookup_intrinsic(const ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, unsigned nargs)
 {
     // NOTE: we used to have an assert(types.size() <= nargs), but as it turns out there are sometimes overloaded
@@ -199,7 +199,8 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 {
     // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
     // which intrinsic we pick.
-    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_external_llvm_type<double>(s.context())}, 1);
+    const auto *const f
+        = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_external_llvm_type<double>(s.context())}, 1);
     assert(f != nullptr);
 
     return f->getAttributes();
@@ -238,7 +239,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 
         // Fetch the original initializer.
         assert(orig_used->hasInitializer());
-        auto *orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
+        const auto *const orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
 
         // Construct a new initializer with the original values plus the new pointer.
         std::vector<llvm::Constant *> arr_values;
@@ -510,7 +511,7 @@ llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vecto
 // - sinq(__float128) (suffix "q").
 //
 // If no C math function is available for the type scal_t, return an empty value.
-std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal_t)
+std::optional<std::string> get_cmath_func_suffix(llvm_state &s, const llvm::Type *const scal_t)
 {
     assert(scal_t != nullptr);
     assert(!scal_t->isVectorTy());
@@ -783,7 +784,7 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         // with the same attributes.
         const auto attrs = llvm_ext_math_func_attrs(s);
 
-        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             assert(vec_t->getNumElements() > 1u);
 
@@ -872,7 +873,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             }
         }
 
-        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             assert(vec_t->getNumElements() > 1u);
 
@@ -956,11 +957,11 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
                                [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
 
     auto &bld = s.builder();
-    auto &md = s.module();
+    const auto &md = s.module();
 
     // Determine the type and scalar type of the arguments.
     auto *x_t = args[0]->getType();
-    auto *scal_t = x_t->getScalarType();
+    const auto *const scal_t = x_t->getScalarType();
 
     // Create the name of the scalar function.
     const auto scal_name = fmt::format("{}.{}", base_name, llvm_type_name(scal_t));
@@ -984,7 +985,7 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
         }
     }
 
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
         // The inputs are vectors.
         assert(vec_t->getNumElements() > 1u);
 
@@ -1133,7 +1134,7 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *const ptr, llvm::V
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     // LCOV_EXCL_STOP
 
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Fetch the scalar type and the vector size.
         auto *scal_t = vec_t->getScalarType();
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
@@ -1309,7 +1310,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 // Convert the input LLVM vector to a std::vector of values. If vec is not a vector, return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Fetch the vector width.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
         assert(vector_size != 0u); // LCOV_EXCL_LINE
@@ -1374,7 +1375,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         // The function does not exist yet, make the prototype.
         std::vector<llvm::Type *> arg_types;
         arg_types.reserve(args.size());
-        for (auto *a : args) {
+        for (const auto *const a : args) {
             arg_types.push_back(a->getType());
         }
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
@@ -1535,12 +1536,15 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
 
     // Check it.
     llvm_if_then_else(
-        s, cond, []() {},
-        [&s, &bld, file_name, function_name, &loc]() {
+        s, cond, [] {},
+        [&s, &bld, file_name, function_name, &loc] {
             llvm_invoke_external(s, "heyoka_llvm_assertion_failure", bld.getVoidTy(),
-                                 {bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
-                                  bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
-                                  function_name});
+                                 {
+                                     bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
+                                     bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())),
+                                     file_name,
+                                     function_name,
+                                 });
         });
 
 #endif

@@ -44,13 +44,15 @@ using vf_map_t = std::unordered_map<std::string, std::vector<vf_info>>;
     assert(width > 0u);
 
     // Init the return value.
-    auto ret = vf_info{.name = std::move(v_name),
-                       .vf_abi_attr = {},
-                       .lp_name = std::move(lp_v_name),
-                       .lp_vf_abi_attr = {},
-                       .width = width,
-                       .nargs = nargs,
-                       .gen = std::move(gen)};
+    auto ret = vf_info{
+        .name = std::move(v_name),
+        .vf_abi_attr = {},
+        .lp_name = std::move(lp_v_name),
+        .lp_vf_abi_attr = {},
+        .width = width,
+        .nargs = nargs,
+        .gen = std::move(gen),
+    };
 
     // Setup the vfabi attributes.
     ret.vf_abi_attr = fmt::format("_ZGV_LLVM_N{}{}_{}({})", width, nargs == 1u ? "v" : "vv", s_name, ret.name);
@@ -70,7 +72,7 @@ std::string sleef_get_lp_suffix(const std::string &sleef_base_name)
     static const std::unordered_map<std::string, std::string> lp_suffix_map
         = {{"acosh", "u10"}, {"asinh", "u10"}, {"atanh", "u10"}, {"erf", "u10"}, {"exp", "u10"}, {"pow", "u10"}};
 
-    if (auto it = lp_suffix_map.find(sleef_base_name); it == lp_suffix_map.end()) {
+    if (const auto it = lp_suffix_map.find(sleef_base_name); it == lp_suffix_map.end()) {
         return "u35";
     } else {
         return it->second;
@@ -102,9 +104,11 @@ void add_vfinfo_sleef(vf_map_t &retval, const char *const scalar_name, const cha
     const std::uint32_t base_simd_width = (sleef_tp == "d") ? 2 : 4;
 
     if (features.avx512f) {
-        retval[scalar_name]
-            = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2"),
-               make_sleef_vfinfo(base_simd_width * 4u, "avx512f")};
+        retval[scalar_name] = {
+            make_sleef_vfinfo(base_simd_width, "avx2128"),
+            make_sleef_vfinfo(base_simd_width * 2u, "avx2"),
+            make_sleef_vfinfo(base_simd_width * 4u, "avx512f"),
+        };
     } else if (features.avx2) {
         retval[scalar_name]
             = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2")};
@@ -205,9 +209,11 @@ void add_vfinfo_sleef_combined(vf_map_t &retval, const char *const scalar_base_n
     const std::uint32_t base_simd_width = (sleef_tp == "d") ? 2 : 4;
 
     if (features.avx512f && sleef_avx512) {
-        retval[scalar_name]
-            = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2"),
-               make_sleef_vfinfo(base_simd_width * 4u, "avx512f")};
+        retval[scalar_name] = {
+            make_sleef_vfinfo(base_simd_width, "avx2128"),
+            make_sleef_vfinfo(base_simd_width * 2u, "avx2"),
+            make_sleef_vfinfo(base_simd_width * 4u, "avx512f"),
+        };
     } else if (features.avx2 && sleef_avx2) {
         retval[scalar_name]
             = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2")};

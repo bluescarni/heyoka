@@ -322,14 +322,14 @@ llvm::Function *create_sincosq_wrapper(llvm_state &s)
 #endif
 
 // Helper to create the combined sin/cos scalar wrappers.
-void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, llvm::Value *v)
+void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, const llvm::Value *const v)
 {
     assert(v != nullptr);
     assert(sin_or_cos == "sin" || sin_or_cos == "cos");
     auto *scal_t = v->getType()->getScalarType();
 
     // Crete the function name.
-    auto fname = fmt::format("heyoka.combined_{}.{}", sin_or_cos, llvm_type_name(scal_t));
+    const auto fname = fmt::format("heyoka.combined_{}.{}", sin_or_cos, llvm_type_name(scal_t));
 
     // Look it up in the module.
     auto &md = s.module();

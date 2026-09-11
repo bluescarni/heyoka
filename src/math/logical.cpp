@@ -199,7 +199,7 @@ llvm::Function *taylor_c_diff_func_logical_andor_impl(const func_base &fb, llvm_
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-        [&]() {
+        [&] {
             // For order zero, evaluate the logical operation.
             std::vector<llvm::Value *> vals;
             vals.reserve(2);
@@ -224,7 +224,7 @@ llvm::Function *taylor_c_diff_func_logical_andor_impl(const func_base &fb, llvm_
 
             builder.CreateStore(logical_andor_eval_impl(s, vals, is_and), retval);
         },
-        [&]() {
+        [&] {
             // Otherwise, return zero.
             builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
         });

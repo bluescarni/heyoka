@@ -50,7 +50,7 @@ constexpr std::array<std::string_view, 12> http_download_month_names
 
 // Map to associate abbreviated month names to [1, 12] indices.
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
-const auto http_download_month_names_map = []() {
+const auto http_download_month_names_map = [] {
     std::unordered_map<std::string_view, unsigned> retval;
 
     for (auto i = 0u; i < 12u; ++i) {
@@ -74,7 +74,7 @@ std::string http_download_parse_last_modified(std::string_view lm_field)
 {
     // Helper to parse an unsigned integral quantity from the range [begin, end). 'name'
     // is the name of the quantity, to be used only for error reporting.
-    auto uint_parse = [](const char *begin, const char *end, std::string_view name) {
+    const auto uint_parse = [](const char *begin, const char *end, std::string_view name) {
         unsigned out{};
         const auto res = std::from_chars(begin, end, out);
         if (res.ec != std::errc{} || res.ptr != end) [[unlikely]] {
@@ -131,7 +131,7 @@ std::string http_download_parse_last_modified(std::string_view lm_field)
 // https://github.com/boostorg/beast/blob/develop/example/http/client/async/http_client_async.cpp
 namespace net = boost::asio;
 namespace ssl = net::ssl;
-using tcp = net::ip::tcp;
+using net::ip::tcp;
 namespace beast = boost::beast;
 namespace http = beast::http;
 
@@ -447,7 +447,7 @@ std::pair<std::string, std::string> https_download(const std::string &host, unsi
         // Launch the asynchronous operation. The session is constructed with a strand to
         // ensure that handlers do not execute concurrently.
         const auto port_str = fmt::format("{}", port);
-        auto sesh = std::make_shared<detail::https_session>(net::make_strand(ioc), ctx);
+        const auto sesh = std::make_shared<detail::https_session>(net::make_strand(ioc), ctx);
         sesh->run(host.c_str(), port_str.c_str(), target.c_str());
 
         // Run the I/O service. The call will return when the get operation is complete.
@@ -477,7 +477,7 @@ std::pair<std::string, std::string> http_download(const std::string &host, unsig
 
         // Launch the asynchronous operation.
         const auto port_str = fmt::format("{}", port);
-        auto sesh = std::make_shared<detail::http_session>(ioc);
+        const auto sesh = std::make_shared<detail::http_session>(ioc);
         sesh->run(host.c_str(), port_str.c_str(), target.c_str());
 
         // Run the I/O service. The call will return when the get operation is complete.

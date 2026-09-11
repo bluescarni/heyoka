@@ -36,7 +36,6 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/udf_split.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -94,7 +93,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     const auto neg_it = std::stable_partition(terms.begin(), terms.end(), fpart);
 
     // Helper to stream the positive terms.
-    auto stream_pos_terms = [&]() {
+    auto stream_pos_terms = [&] {
         // Must have some positive terms.
         assert(neg_it != terms.begin());
 
@@ -108,7 +107,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     };
 
     // Helper to stream the negative terms.
-    auto stream_neg_terms = [&]() {
+    auto stream_neg_terms = [&] {
         // Must have some negative terms.
         assert(neg_it != terms.end());
 
@@ -209,7 +208,7 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_imp
     for (const auto &arg : sf.args()) {
         std::visit(
             [&](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     // Variable.
@@ -267,7 +266,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
     for (const auto &arg : sf.args()) {
         nm_args.push_back(std::visit(
             [](const auto &v) -> std::variant<variable, number, param> {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     // LCOV_EXCL_START
@@ -319,7 +318,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
         for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
             vals.push_back(std::visit(
                 [&](const auto &v) -> llvm::Value * {
-                    using type = detail::uncvref_t<decltype(v)>;
+                    using type = std::remove_cvref_t<decltype(v)>;
 
                     if constexpr (std::is_same_v<type, variable>) {
                         return taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, terms + i);
@@ -329,12 +328,12 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
 
                         llvm_if_then_else(
                             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-                            [&]() {
+                            [&] {
                                 // If the order is zero, run the codegen.
                                 builder.CreateStore(
                                     taylor_c_diff_numparam_codegen(s, fp_t, v, terms + i, par_ptr, batch_size), retval);
                             },
-                            [&]() {
+                            [&] {
                                 // Otherwise, return zero.
                                 builder.CreateStore(
                                     vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), retval);

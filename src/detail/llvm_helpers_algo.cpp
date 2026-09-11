@@ -111,8 +111,8 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
         // Check that it is less than or equal to the next value (if available).
         auto *next_idx = bld.CreateAdd(cur_idx, bld.getInt32(1));
         llvm_if_then_else(
-            s, bld.CreateICmpEQ(next_idx, arr_size), []() {},
-            [&bld, &s, cur_val, scal_t, ptr, next_idx]() {
+            s, bld.CreateICmpEQ(next_idx, arr_size), [] {},
+            [&bld, &s, cur_val, scal_t, ptr, next_idx] {
                 auto *next_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {next_idx}));
 
                 llvm_assert(s, llvm_fcmp_ole(s, cur_val, next_val));
@@ -123,7 +123,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(v->getType())) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(v->getType())) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
         assert(batch_size != 0u);
     }
@@ -157,14 +157,14 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     // Iterate as long as all elements of 'count' are > 0.
     llvm_while_loop(
         s,
-        [&bld, count, idx_vec_t, zero_vec_i32, batch_size]() -> llvm::Value * {
+        [&bld, count, idx_vec_t, zero_vec_i32, batch_size] -> llvm::Value * {
             auto *cmp = bld.CreateICmpUGT(bld.CreateLoad(idx_vec_t, count), zero_vec_i32);
 
             // NOTE: in scalar mode, no reduction is needed.
             return (batch_size == 1u) ? cmp : bld.CreateOrReduce(cmp);
         },
         [&bld, &s, first, count, idx_vec_t, batch_size, scal_t, fp_vec_t, v, one_vec_i32, arr_ptr, arr_size_splat,
-         two_vec_i32]() {
+         two_vec_i32] {
             // Load the value stored in 'first' - this will be the iterator we will
             // be using in the current iteration of the loop.
             llvm::Value *cur_first = bld.CreateLoad(idx_vec_t, first);
@@ -222,7 +222,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
                 // Scalar implementation.
                 llvm_if_then_else(
                     s, cmp,
-                    [&bld, one_vec_i32, it, first, count, step, cur_count]() {
+                    [&bld, one_vec_i32, it, first, count, step, cur_count] {
                         // Assign it + 1 to first.
                         auto *itp1 = bld.CreateAdd(it, one_vec_i32);
                         bld.CreateStore(itp1, first);
@@ -234,7 +234,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
                         // Assign new_count to count.
                         bld.CreateStore(new_count, count);
                     },
-                    [&bld, step, count]() {
+                    [&bld, step, count] {
                         // NOTE: no update of 'first' needed here.
                         // Assign step to count.
                         bld.CreateStore(step, count);

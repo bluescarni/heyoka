@@ -318,11 +318,11 @@ llvm::Function *constant::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
         // the non-normalised derivative.
         detail::llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // If the order is zero, return the constant itself.
                 builder.CreateStore(detail::vector_splat(builder, make_llvm_const(s, fp_t), batch_size), retval);
             },
-            [&]() {
+            [&] {
                 // Otherwise, return zero.
                 builder.CreateStore(detail::vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size),
                                     retval);

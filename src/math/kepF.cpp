@@ -844,7 +844,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
                                    {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
@@ -852,7 +852,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
                                     taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -960,14 +960,14 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -1081,14 +1081,14 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n0, num_k, par_ptr, batch_size),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -1203,7 +1203,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
                                    {taylor_c_diff_numparam_codegen(s, fp_t, n, num_h, par_ptr, batch_size),
@@ -1211,7 +1211,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
                                     taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -1326,7 +1326,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
                                    {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
@@ -1334,7 +1334,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
                                     taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -1451,14 +1451,14 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n, num_lam, par_ptr, batch_size)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -1580,7 +1580,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
                                    {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
@@ -1588,7 +1588,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
                                     taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
                 retval);
         },
-        [&]() {
+        [&] {
             // Create FP vector versions of the order.
             auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 

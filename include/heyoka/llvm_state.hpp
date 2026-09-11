@@ -190,7 +190,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
         const igor::parser p{kw_args...};
 
         // Module name (defaults to empty string).
-        auto mod_name = [&p]() -> std::string {
+        auto mod_name = [&p] -> std::string {
             if constexpr (p.has(kw::mname)) {
                 // NOTE: we explicitly turn the keyword argument here into a const reference in order to fortify the
                 // constructor against multiple usages of the same set of keyword arguments. If we do not do this and
@@ -240,10 +240,12 @@ public:
     //
     // NOTE: this configuration (paired with the internal use of std::as_const() for mname) ensures that we can re-use
     // the set of kw_args across multiple invocations.
-    static constexpr auto kw_cfg = igor::config<
-        igor::descr<kw::mname, []<typename U>() { return detail::string_like<std::remove_cvref_t<U>>; }>{},
-        kw::descr::integral<kw::opt_level>, kw::descr::boolean<kw::fast_math>, kw::descr::boolean<kw::force_avx512>,
-        kw::descr::boolean<kw::slp_vectorize>, kw::descr::same_as<kw::code_model, code_model>>{};
+    static constexpr auto kw_cfg
+        // NOLINTNEXTLINE(readability-trailing-comma)
+        = igor::config<igor::descr<kw::mname, []<typename U> { return detail::string_like<std::remove_cvref_t<U>>; }>{},
+                       kw::descr::integral<kw::opt_level>, kw::descr::boolean<kw::fast_math>,
+                       kw::descr::boolean<kw::force_avx512>, kw::descr::boolean<kw::slp_vectorize>,
+                       kw::descr::same_as<kw::code_model, code_model>>{};
 
     llvm_state();
     // NOTE: we require at least 1 kwarg in order to avoid competition with the default ctor.

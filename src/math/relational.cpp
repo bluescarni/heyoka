@@ -300,7 +300,7 @@ llvm::Function *rel_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-        [&]() {
+        [&] {
             // For order zero, evaluate the relational operation.
             std::vector<llvm::Value *> vals;
             vals.reserve(2);
@@ -325,7 +325,7 @@ llvm::Function *rel_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 
             builder.CreateStore(rel_eval_impl(s, m_op, vals), retval);
         },
-        [&]() {
+        [&] {
             // Otherwise, return zero.
             builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
         });

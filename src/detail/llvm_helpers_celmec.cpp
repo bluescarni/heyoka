@@ -307,7 +307,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.CreateStore(llvm_combined_cos(s, ret_load), cos_E);
 
     // Helper to compute f(E).
-    auto fE_compute = [&]() {
+    auto fE_compute = [&] {
         // e*sin(E).
         auto *e_sinE = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
         // E - M.
@@ -338,7 +338,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(20);
-    auto loop_cond = [&]() -> llvm::Value * {
+    const auto loop_cond = [&] -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(E) and on the magnitude of the bounding
         // range. This of course means that the final result is not guaranteed
@@ -407,7 +407,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     };
 
     // Run the loop.
-    llvm_while_loop(s, loop_cond, [&]() {
+    llvm_while_loop(s, loop_cond, [&] {
         // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
         auto *one_c = llvm_constantfp(s, tp, 1.);
@@ -444,7 +444,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // After exiting the NR loop, check the counter.
     llvm_if_then_else(
         s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
-        [&]() {
+        [&] {
             // Load the tol_check variable.
             auto *tol_check = builder.CreateLoad(vec_bool_t, tol_check_ptr);
 
@@ -454,7 +454,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
         },
-        []() {});
+        [] {});
 
     // Return the result.
     builder.CreateRet(builder.CreateLoad(tp, retval));
@@ -682,7 +682,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.CreateStore(llvm_combined_cos(s, ret_load_F), cos_F);
 
     // Helper to compute f(F).
-    auto fF_compute = [&]() {
+    auto fF_compute = [&] {
         // h*cos(F).
         auto *h_cosF = llvm_fmul(s, h, builder.CreateLoad(tp, cos_F));
         // k*sin(F).
@@ -715,7 +715,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(20);
-    auto loop_cond = [&]() -> llvm::Value * {
+    const auto loop_cond = [&] -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(F) and on the magnitude of the bounding
         // range. This of course means that the final result is not guaranteed
@@ -777,7 +777,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     };
 
     // Run the loop.
-    llvm_while_loop(s, loop_cond, [&]() {
+    llvm_while_loop(s, loop_cond, [&] {
         // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
         auto *one_c = llvm_constantfp(s, tp, 1.);
@@ -815,7 +815,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // After exiting the NR loop, check the counter.
     llvm_if_then_else(
         s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
-        [&]() {
+        [&] {
             // Load the tol_check variable.
             auto *tol_check = builder.CreateLoad(vec_bool_t, tol_check_ptr);
 
@@ -825,7 +825,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
         },
-        []() {});
+        [] {});
 
     // Load the result.
     llvm::Value *ret = builder.CreateLoad(tp, retval);
@@ -988,7 +988,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     builder.CreateStore(llvm_combined_cos(s, ret_load_DE), cos_DE);
 
     // Helper to compute f(DE).
-    auto fDE_compute = [&]() {
+    auto fDE_compute = [&] {
         // s0*(1 - cos(DE)).
         auto *one_c = llvm_constantfp(s, tp, 1.);
         auto *one_cDE = llvm_fsub(s, one_c, builder.CreateLoad(tp, cos_DE));
@@ -1023,7 +1023,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(20);
-    auto loop_cond = [&]() -> llvm::Value * {
+    const auto loop_cond = [&] -> llvm::Value * {
         // NOTE: we use an *absolute* tolerance of 4*eps for both the check
         // on the magnitude of f(DE) and on the magnitude of the bounding
         // range. This of course means that the final result is not guaranteed
@@ -1085,7 +1085,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     };
 
     // Run the loop.
-    llvm_while_loop(s, loop_cond, [&]() {
+    llvm_while_loop(s, loop_cond, [&] {
         // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
         auto *one_c = llvm_constantfp(s, tp, 1.);
@@ -1123,7 +1123,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
     // After exiting the NR loop, check the counter.
     llvm_if_then_else(
         s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
-        [&]() {
+        [&] {
             // Load the tol_check variable.
             auto *tol_check = builder.CreateLoad(vec_bool_t, tol_check_ptr);
 
@@ -1133,7 +1133,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
                 tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
             builder.CreateStore(new_val, retval);
         },
-        []() {});
+        [] {});
 
     // Load the result.
     llvm::Value *ret = builder.CreateLoad(tp, retval);

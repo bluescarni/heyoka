@@ -210,8 +210,13 @@ struct is_any_named_argument<named_argument<Tag, ExplicitType>> : std::true_type
 } // namespace detail
 
 // Concept to detect (const) named arguments.
+//
+// NOTE: we must use remove_cvref_t (rather than remove_const_t) on decltype() here and in all the other places where
+// the type of a non-type template parameter is inspected. The reason is that some compilers (e.g., clang 23) report
+// the type of a class-type non-type template parameter as a reference to const, rather than as a const object, and
+// remove_const_t is a no-op on a reference type.
 template <auto NA>
-concept any_named_argument = detail::is_any_named_argument<std::remove_const_t<decltype(NA)>>::value;
+concept any_named_argument = detail::is_any_named_argument<std::remove_cvref_t<decltype(NA)>>::value;
 
 namespace detail
 {
@@ -263,7 +268,7 @@ struct is_any_descr<descr<NA, Validator>> : std::true_type {
 
 // Concept to detect (const) descriptors.
 template <auto Descr>
-concept any_descr = detail::is_any_descr<std::remove_const_t<decltype(Descr)>>::value;
+concept any_descr = detail::is_any_descr<std::remove_cvref_t<decltype(Descr)>>::value;
 
 namespace detail
 {
@@ -310,7 +315,7 @@ struct is_any_config<config<Descrs...>> : std::true_type {
 
 // Concept to detect (const) instances of the config class.
 template <auto Cfg>
-concept any_config = is_any_config<std::remove_const_t<decltype(Cfg)>>::value;
+concept any_config = is_any_config<std::remove_cvref_t<decltype(Cfg)>>::value;
 
 template <auto Cfg, typename... Args>
 concept validate_unnamed_arguments = (Cfg.allow_unnamed) || (any_tagged_ref<std::remove_cvref_t<Args>> && ...);
@@ -458,13 +463,13 @@ concept validate = requires {
     requires detail::validate_no_repeated_named_arguments<Args...>;
     // Step 3: validate extra named arguments (i.e., those not present in Cfg).
     requires(Cfg.allow_extra)
-                || (detail::all_args_have_descriptors<std::remove_const_t<decltype(Cfg)>>::template value<Args...>);
+                || (detail::all_args_have_descriptors<std::remove_cvref_t<decltype(Cfg)>>::template value<Args...>);
     // Step 4: check the presence of the required named arguments.
-    requires(detail::all_required_arguments_are_present<std::remove_const_t<decltype(Cfg)>>::template value<Args...>);
+    requires(detail::all_required_arguments_are_present<std::remove_cvref_t<decltype(Cfg)>>::template value<Args...>);
     // Step 5: check the validators.
-    requires(detail::validate_validators<std::remove_const_t<decltype(Cfg)>>::template value<Args...>);
+    requires(detail::validate_validators<std::remove_cvref_t<decltype(Cfg)>>::template value<Args...>);
     // Step 6: run the validators.
-    requires(detail::validate_named_arguments<std::remove_const_t<decltype(Cfg)>>::template value<Args...>);
+    requires(detail::validate_named_arguments<std::remove_cvref_t<decltype(Cfg)>>::template value<Args...>);
 };
 
 namespace detail
@@ -608,7 +613,7 @@ template <auto Cfg, typename... Args>
 constexpr auto reject(Args &&...args)
 {
     // Need to go through an auxiliary struct in order to recover the pack of descriptors.
-    return detail::reject_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_reject(std::forward<Args>(args)...);
+    return detail::reject_na_from_cfg<std::remove_cvref_t<decltype(Cfg)>>::run_reject(std::forward<Args>(args)...);
 }
 
 // Remove from the set of variadic arguments args the named arguments *other than* NArgs.
@@ -658,7 +663,7 @@ template <auto Cfg, typename... Args>
 constexpr auto filter(Args &&...args)
 {
     // Need to go through an auxiliary struct in order to recover the pack of descriptors.
-    return detail::filter_na_from_cfg<std::remove_const_t<decltype(Cfg)>>::run_filter(std::forward<Args>(args)...);
+    return detail::filter_na_from_cfg<std::remove_cvref_t<decltype(Cfg)>>::run_filter(std::forward<Args>(args)...);
 }
 
 namespace detail

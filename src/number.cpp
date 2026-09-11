@@ -163,7 +163,7 @@ std::size_t hash(const number &n) noexcept
                 // by the comparison operator.
                 return std::hash<std::size_t>{}(n.value().index());
             } else {
-                return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+                return std::hash<std::remove_cvref_t<decltype(v)>>{}(v);
             }
         },
         n.value());
@@ -175,7 +175,7 @@ std::ostream &operator<<(std::ostream &os, const number &n)
 {
     std::visit(
         [&os](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = std::remove_cvref_t<decltype(arg)>;
 
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
@@ -209,7 +209,7 @@ bool is_zero(const number &n)
 {
     return std::visit(
         [](const auto &arg) {
-            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+            using type [[maybe_unused]] = std::remove_cvref_t<decltype(arg)>;
 
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
@@ -228,7 +228,7 @@ bool is_one(const number &n)
 {
     return std::visit(
         [](const auto &arg) {
-            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+            using type [[maybe_unused]] = std::remove_cvref_t<decltype(arg)>;
 
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
@@ -454,8 +454,8 @@ number binomial(const number &i, const number &j)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> number {
-            using type1 = detail::uncvref_t<decltype(v1)>;
-            using type2 = detail::uncvref_t<decltype(v2)>;
+            using type1 = std::remove_cvref_t<decltype(v1)>;
+            using type2 = std::remove_cvref_t<decltype(v2)>;
 
             if constexpr (!std::is_same_v<type1, type2>) {
                 throw std::invalid_argument("Cannot compute the binomial coefficient of two numbers of different type");
@@ -475,8 +475,10 @@ number binomial(const number &i, const number &j)
                     // For C++ FP types, we can use directly the binomial
                     // implementation in detail, after casting the
                     // arguments back to std::uint32_t.
-                    return number{detail::binomial<type1>(boost::numeric_cast<std::uint32_t>(v1),
-                                                          boost::numeric_cast<std::uint32_t>(v2))};
+                    return number{
+                        detail::binomial<type1>(boost::numeric_cast<std::uint32_t>(v1),
+                                                boost::numeric_cast<std::uint32_t>(v2)),
+                    };
 #if defined(HEYOKA_HAVE_REAL128)
                 } else if constexpr (std::is_same_v<type1, mppp::real128>) {
                     // For real128, we cannot use boost::numeric_cast, so we go through
@@ -485,7 +487,8 @@ number binomial(const number &i, const number &j)
                     const auto n2 = static_cast<mppp::integer<1>>(v2);
 
                     return number{
-                        detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2))};
+                        detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2)),
+                    };
 #endif
 #if defined(HEYOKA_HAVE_REAL)
                 } else if constexpr (std::is_same_v<type1, mppp::real>) {
@@ -512,8 +515,8 @@ number nextafter(const number &from, const number &to)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> number {
-            using type1 = detail::uncvref_t<decltype(v1)>;
-            using type2 = detail::uncvref_t<decltype(v2)>;
+            using type1 = std::remove_cvref_t<decltype(v1)>;
+            using type2 = std::remove_cvref_t<decltype(v2)>;
 
             if constexpr (!std::is_same_v<type1, type2>) {
                 throw std::invalid_argument("Cannot invoke nextafter() on two numbers of different type");
@@ -694,7 +697,7 @@ auto make_dl_twopi_dict()
 {
     std::unordered_map<std::type_index, std::pair<number, number>> retval;
 
-    auto impl = [&retval](auto twopi_hi, auto twopi_lo) {
+    const auto impl = [&retval](auto twopi_hi, auto twopi_lo) {
         using type = decltype(twopi_hi);
         static_assert(std::is_same_v<type, decltype(twopi_lo)>);
 
@@ -751,7 +754,7 @@ std::pair<number, number> dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
         assert(prec <= 113u);
 #endif
 
-        auto impl = [](auto val) {
+        const auto impl = [](auto val) {
             using type = decltype(val);
             const auto it = dl_twopi_dict.find(typeid(type));
 

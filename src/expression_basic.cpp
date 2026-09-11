@@ -257,7 +257,7 @@ detail::prime_wrapper prime(const expression &e)
 {
     return std::visit(
         [&e](const auto &v) -> detail::prime_wrapper {
-            if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
+            if constexpr (std::is_same_v<variable, std::remove_cvref_t<decltype(v)>>) {
                 return detail::prime_wrapper{v.name()};
             } else {
                 throw std::invalid_argument(
@@ -859,7 +859,7 @@ expression subs_impl(void_ptr_map<const expression> &func_map, sargs_ptr_map<con
                 }
 
                 // Create the new copy of the function.
-                auto ex_copy = [&]() {
+                auto ex_copy = [&] {
                     if (shared_args) {
                         // NOTE: if the function manages its arguments via a shared reference, we must make
                         // sure to record the new arguments in sargs_map, so that when we run again into the
@@ -1237,8 +1237,8 @@ bool ex_less_than(const expression &e1, const expression &e2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) {
-            using type1 = uncvref_t<decltype(v1)>;
-            using type2 = uncvref_t<decltype(v2)>;
+            using type1 = std::remove_cvref_t<decltype(v1)>;
+            using type2 = std::remove_cvref_t<decltype(v2)>;
 
             if constexpr (std::is_same_v<type1, type2>) {
                 // Handle the cases where v1 and v2

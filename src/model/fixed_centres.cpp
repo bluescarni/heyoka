@@ -115,7 +115,7 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
         const auto diff_y = positions[(3u * i) + 1u] - y;
         const auto diff_z = positions[(3u * i) + 2u] - z;
 
-        auto dist = sqrt(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)}));
+        const auto dist = sqrt(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)}));
 
         pot.push_back(masses[i] / dist);
     }
@@ -130,7 +130,7 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
     // Kinetic energy.
-    auto kin = 0.5_dbl * sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)});
+    const auto kin = 0.5_dbl * sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)});
 
     return kin + fixed_centres_potential_impl(G, masses, positions);
 }

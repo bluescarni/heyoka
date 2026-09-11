@@ -43,7 +43,7 @@ auto sw_common_opts(const KwArgs &...kw_args)
     auto time_expr = expression(p(kw::time_expr, heyoka::time));
 
     // SW data (defaults to def-cted).
-    auto data = [&p]() {
+    auto data = [&p] {
         if constexpr (p.has(kw::sw_data)) {
             return p(kw::sw_data);
         } else {

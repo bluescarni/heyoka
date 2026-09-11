@@ -196,23 +196,27 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     }
 
     // The lambda_l values (constant + linear term).
-    constexpr std::array<std::array<double, 2>, 17> lam_l_data = {{{4.402608631669, 26087.90314068555},
-                                                                   {3.176134461576, 10213.28554743445},
-                                                                   {1.753470369433, 6283.075850353215},
-                                                                   {6.203500014141, 3340.612434145457},
-                                                                   {4.091360003050, 1731.170452721855},
-                                                                   {1.713740719173, 1704.450855027201},
-                                                                   {5.598641292287, 1428.948917844273},
-                                                                   {2.805136360408, 1364.756513629990},
-                                                                   {2.326989734620, 1361.923207632842},
-                                                                   {0.599546107035, 529.6909615623250},
-                                                                   {0.874018510107, 213.2990861084880},
-                                                                   {5.481225395663, 74.78165903077800},
-                                                                   {5.311897933164, 38.13297222612500},
-                                                                   {0, 0.3595362285049309},
-                                                                   {5.198466400630, 77713.7714481804},
-                                                                   {1.627905136020, 84334.6615717837},
-                                                                   {2.355555638750, 83286.9142477147}}};
+    constexpr std::array<std::array<double, 2>, 17> lam_l_data = {
+        {
+            {4.402608631669, 26087.90314068555},
+            {3.176134461576, 10213.28554743445},
+            {1.753470369433, 6283.075850353215},
+            {6.203500014141, 3340.612434145457},
+            {4.091360003050, 1731.170452721855},
+            {1.713740719173, 1704.450855027201},
+            {5.598641292287, 1428.948917844273},
+            {2.805136360408, 1364.756513629990},
+            {2.326989734620, 1361.923207632842},
+            {0.599546107035, 529.6909615623250},
+            {0.874018510107, 213.2990861084880},
+            {5.481225395663, 74.78165903077800},
+            {5.311897933164, 38.13297222612500},
+            {0, 0.3595362285049309},
+            {5.198466400630, 77713.7714481804},
+            {1.627905136020, 84334.6615717837},
+            {2.355555638750, 83286.9142477147},
+        },
+    };
 
     // Fetch the data.
     static const auto data = build_vsop2103_data();
@@ -322,9 +326,11 @@ namespace
 {
 
 // G*M values for the planets.
-constexpr double vsop2013_gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
-                                     9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
-                                     1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
+constexpr double vsop2013_gm_pl[] = {
+    4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
+    9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
+    1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12,
+};
 
 // G*M value for the Sun.
 constexpr double vsop2013_gm_sun = 2.9591220836841438269e-04;
@@ -340,12 +346,12 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     // on the input arguments.
     expression a, lam, k, h, q_, p_;
 
-    heyoka::detail::tbb_isolated_parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
-                                                 [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
-                                                 [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
-                                                 [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
-                                                 [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
-                                                 [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
+    heyoka::detail::tbb_isolated_parallel_invoke([&] { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
+                                                 [&] { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
+                                                 [&] { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
+                                                 [&] { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
+                                                 [&] { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                                                 [&] { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
     // Compute the gravitational parameter for pl_idx.
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE

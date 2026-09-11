@@ -24,7 +24,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/type_traits.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -50,7 +49,7 @@ inline auto vv_transpose(const std::vector<std::variant<T...>> &v)
     // of the first element of v.
     auto retval = std::visit(
         [size = v.size()](const auto &x) {
-            using type = uncvref_t<decltype(x)>;
+            using type = std::remove_cvref_t<decltype(x)>;
 
             std::vector<type> tmp;
             tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(size));
@@ -67,10 +66,10 @@ inline auto vv_transpose(const std::vector<std::variant<T...>> &v)
                 std::visit(
                     [&x](auto &vv) {
                         // The value type of retval.
-                        using scal_t = uncvref_t<decltype(vv)>::value_type;
+                        using scal_t = std::remove_cvref_t<decltype(vv)>::value_type;
 
                         // The type of the current element of v.
-                        using x_t = uncvref_t<decltype(x)>;
+                        using x_t = std::remove_cvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<scal_t, x_t>) {
                             vv.push_back(x);

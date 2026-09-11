@@ -508,6 +508,7 @@ struct formatter<heyoka::dtens> : fmt::ostream_formatter {
 HEYOKA_BEGIN_NAMESPACE
 
 template <typename... KwArgs>
+// NOLINTNEXTLINE(readability-trailing-comma)
     requires igor::validate<igor::config<kw::descr::integral<kw::diff_order>>{}, KwArgs...>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)
@@ -521,6 +522,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
 }
 
 template <typename... KwArgs>
+// NOLINTNEXTLINE(readability-trailing-comma)
     requires igor::validate<igor::config<kw::descr::integral<kw::diff_order>>{}, KwArgs...>
 dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
                    const KwArgs &...kw_args)
@@ -756,7 +758,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
         // Batch size: defaults to undefined.
         //
         // NOTE: we want to handle this slightly different from add_cfunc(), thus it does not go in common options.
-        const auto batch_size = [&]() -> std::optional<std::uint32_t> {
+        const auto batch_size = [&] -> std::optional<std::uint32_t> {
             if constexpr (p.has(kw::batch_size)) {
                 return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
             } else {
@@ -844,7 +846,7 @@ private:
     // kwargs configuration for the call operator, single evaluation overload.
     static constexpr auto single_eval_kw_cfg
         = igor::config<igor::descr<kw::pars,
-                                   []<typename U>() {
+                                   []<typename U> {
                                        return std::same_as<in_1d, std::remove_cvref_t<U>>
                                               || detail::cfunc_in_range_1d<T, U>;
                                    }>{},
@@ -864,7 +866,7 @@ public:
     {
         const igor::parser p{kw_args...};
 
-        out_1d oput = [&]() {
+        out_1d oput = [&] {
             if constexpr (std::same_as<out_1d, std::remove_cvref_t<Out>>) {
                 return out;
             } else {
@@ -872,7 +874,7 @@ public:
             }
         }();
 
-        in_1d iput = [&]() {
+        in_1d iput = [&] {
             if constexpr (std::same_as<in_1d, std::remove_cvref_t<In>>) {
                 return in;
             } else {
@@ -880,7 +882,7 @@ public:
             }
         }();
 
-        auto pars = [&]() -> std::optional<in_1d> {
+        auto pars = [&] -> std::optional<in_1d> {
             if constexpr (p.has(kw::pars)) {
                 using pars_t = decltype(p(kw::pars));
 
@@ -897,7 +899,7 @@ public:
             }
         }();
 
-        auto tm = [&]() -> std::optional<T> {
+        auto tm = [&] -> std::optional<T> {
             if constexpr (p.has(kw::time)) {
                 return static_cast<T>(p(kw::time));
             } else {
@@ -919,7 +921,7 @@ private:
     // kwargs configuration for the call operator, multi evaluation overload.
     static constexpr auto multi_eval_kw_cfg
         = igor::config<kw::descr::same_as<kw::pars, in_2d>, kw::descr::same_as<kw::time, in_1d>,
-                       igor::descr<kw::batch_parallel, []<typename U>() {
+                       igor::descr<kw::batch_parallel, []<typename U> {
                            return std::same_as<std::remove_cvref_t<U>, bool>
                                   || std::same_as<std::remove_cvref_t<U>, std::optional<bool>>;
                        }>{}>{};
@@ -936,7 +938,7 @@ public:
     {
         const igor::parser p{kw_args...};
 
-        auto pars = [&]() -> std::optional<in_2d> {
+        auto pars = [&] -> std::optional<in_2d> {
             if constexpr (p.has(kw::pars)) {
                 return p(kw::pars);
             } else {
@@ -944,7 +946,7 @@ public:
             }
         }();
 
-        auto tm = [&]() -> std::optional<in_1d> {
+        auto tm = [&] -> std::optional<in_1d> {
             if constexpr (p.has(kw::time)) {
                 return p(kw::time);
             } else {
@@ -952,7 +954,7 @@ public:
             }
         }();
 
-        auto batch_parallel = [&]() -> std::optional<bool> {
+        auto batch_parallel = [&] -> std::optional<bool> {
             if constexpr (p.has(kw::batch_parallel)) {
                 return p(kw::batch_parallel);
             } else {

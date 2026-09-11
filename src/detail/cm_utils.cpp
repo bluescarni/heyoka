@@ -40,7 +40,6 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -81,7 +80,7 @@ std::vector<std::variant<std::uint32_t, number>> udef_to_variants(const expressi
 {
     return std::visit(
         [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
-            using type = uncvref_t<decltype(v)>;
+            using type = std::remove_cvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 std::vector<std::variant<std::uint32_t, number>> retval;
@@ -89,7 +88,7 @@ std::vector<std::variant<std::uint32_t, number>> udef_to_variants(const expressi
                 for (const auto &arg : v.args()) {
                     std::visit(
                         [&retval](const auto &x) {
-                            using tp = uncvref_t<decltype(x)>;
+                            using tp = std::remove_cvref_t<decltype(x)>;
 
                             if constexpr (std::is_same_v<tp, variable>) {
                                 retval.emplace_back(uname_to_index(x.name()));

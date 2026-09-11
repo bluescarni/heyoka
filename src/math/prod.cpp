@@ -178,7 +178,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
                                               [](const auto &ex) { return !ex_is_negative_pow(ex); });
 
     // Helper to stream the numerator of the product.
-    auto stream_num = [&]() {
+    auto stream_num = [&] {
         // We must have some terms in the numerator.
         assert(den_it != tmp_args.begin());
 
@@ -203,7 +203,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     };
 
     // Helper to stream the denominator of the product.
-    auto stream_den = [&]() {
+    auto stream_den = [&] {
         // We must have some terms in the denominator.
         assert(den_it != tmp_args.end());
 

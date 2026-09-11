@@ -157,7 +157,7 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
         // NaNs, otherwise we will return the values in the arrays at indices idx and idx + 1.
         hd::llvm_if_then_else(
             s, bld.CreateICmpEQ(idx, arr_size),
-            [&bld, nan_const, t0_alloc, t1_alloc, eop0_hi_alloc, eop0_lo_alloc, eop1_hi_alloc, eop1_lo_alloc]() {
+            [&bld, nan_const, t0_alloc, t1_alloc, eop0_hi_alloc, eop0_lo_alloc, eop1_hi_alloc, eop1_lo_alloc] {
                 // Store the nans.
                 bld.CreateStore(nan_const, t0_alloc);
                 bld.CreateStore(nan_const, t1_alloc);
@@ -167,7 +167,7 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
                 bld.CreateStore(nan_const, eop1_lo_alloc);
             },
             [&bld, idx, fp_t, eop_t, date_ptr, eop_ptr, t0_alloc, t1_alloc, eop0_hi_alloc, eop0_lo_alloc, eop1_hi_alloc,
-             eop1_lo_alloc]() {
+             eop1_lo_alloc] {
                 // Compute idx + 1.
                 auto *idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
 

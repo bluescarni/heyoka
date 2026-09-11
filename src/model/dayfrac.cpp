@@ -492,7 +492,7 @@ llvm::Function *taylor_c_diff_func_dayfrac_impl(llvm_state &s, llvm::Type *fp_t,
 
     hd::llvm_if_then_else(
         s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
-        [&]() {
+        [&] {
             // For order 0, compute dayfrac() for the order 0 of b_idx.
 
             // Evaluate.
@@ -501,7 +501,7 @@ llvm::Function *taylor_c_diff_func_dayfrac_impl(llvm_state &s, llvm::Type *fp_t,
             // Store the result.
             bld.CreateStore(dayfrac_val, retval);
         },
-        [&]() {
+        [&] {
             // For order > 0, we just return b^[n].
             bld.CreateStore(bn, retval);
         });

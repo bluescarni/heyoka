@@ -57,7 +57,6 @@
 #include <heyoka/detail/sincos_combine.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -126,8 +125,9 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // - par ptr (pointer to external scalar),
     // - time ptr (pointer to external scalar).
     auto *ptr_t = llvm::PointerType::getUnqual(context);
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), ptr_t, ptr_t,
-                                    ptr_t};
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), ptr_t, ptr_t, ptr_t,
+    };
 
     // Add the mangling and LLVM arg types for the argument types. Also, detect if
     // we have variables in the arguments.
@@ -150,7 +150,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
         // Add the LLVM function argument type.
         fargs.push_back(std::visit(
             [&](const auto &v) -> llvm::Type * {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::same_as<type, number>) {
                     // For numbers, the argument is passed as a scalar
@@ -224,6 +224,8 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const para
         throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
     }
     // LCOV_EXCL_STOP
+
+    // NOLINTNEXTLINE(readability-redundant-casting)
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
@@ -559,7 +561,7 @@ auto taylor_sort_dc(const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_
         // - check if the target vertex of the edge
         //   has other incoming edges;
         // - if it does not, insert it into tmp.
-        for (auto &e : tmp_edges) {
+        for (const auto &e : tmp_edges) {
             // Fetch the target of the edge.
             const auto t = boost::target(e, g);
 
@@ -683,7 +685,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
         std::visit(
             [i](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     for (const auto &arg : v.args()) {
@@ -701,7 +703,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
             },
             dc[i].first.value());
 
-        for (auto idx : dc[i].second) {
+        for (const auto idx : dc[i].second) {
             assert(idx >= n_eq);
             assert(idx < dc.size() - n_eq);
 
@@ -716,7 +718,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
         std::visit(
             [&dc, n_eq](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
@@ -772,7 +774,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
     for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
         assert(sv_funcs_dc[i] < dc.size());
 
-        auto sv_func = subs(dc[sv_funcs_dc[i]].first, subs_map);
+        const auto sv_func = subs(dc[sv_funcs_dc[i]].first, subs_map);
         assert(sv_func == sv_funcs[i]);
     }
 }

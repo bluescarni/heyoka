@@ -132,16 +132,16 @@ llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // Generate the vector of num/param arguments.
-                auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, fp_t, std::make_tuple(std::cref(np)...),
-                                                                      numpar_begin, par_ptr, batch_size,
-                                                                      std::make_index_sequence<sizeof...(np)>{});
+                const auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, fp_t, std::make_tuple(std::cref(np)...),
+                                                                            numpar_begin, par_ptr, batch_size,
+                                                                            std::make_index_sequence<sizeof...(np)>{});
 
                 // Run the codegen and store the result.
                 builder.CreateStore(cgen(np_args), retval);
             },
-            [&]() {
+            [&] {
                 // Otherwise, return zero.
                 builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
             });

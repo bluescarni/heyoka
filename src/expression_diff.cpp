@@ -799,7 +799,7 @@ void diff_tensors_forward_impl(
     // Create a dictionary mapping an input to its position
     // in the decomposition. This is used to locate diff arguments
     // in the decomposition.
-    const auto input_idx_map = [&]() {
+    const auto input_idx_map = [&] {
         boost::unordered_flat_map<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
 
         for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
@@ -826,8 +826,8 @@ void diff_tensors_forward_impl(
 
     // Helpers to ease the access to the active member of the local_diff variant.
     // NOTE: if used incorrectly, these will throw at runtime.
-    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
-    auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
+    const auto local_dmap = [&local_diff] -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
+    const auto local_dvec = [&local_diff] -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
     // This is used as a temporary variable in several places below.
     dtens_ss_idx_t tmp_v_idx;
@@ -976,6 +976,10 @@ void diff_tensors_forward_impl(
                 // Check if we already computed this derivative.
                 if (const auto it = local_dmap().find(tmp_v_idx); it == local_dmap().end()) {
                     // The derivative is new.
+                    //
+                    // NOTE: apparently clang-tidy cannot see cur_der is being moved below.
+                    //
+                    // NOLINTNEXTLINE(misc-const-correctness)
                     auto cur_der = diffs[diffs.size() - cur_nouts + out_idx];
 
                     [[maybe_unused]] const auto [_, flag] = local_dmap().try_emplace(tmp_v_idx, std::move(cur_der));
@@ -1048,8 +1052,9 @@ void diff_tensors_reverse_impl(
     // NOTE: currently local_dmap is never used because the heuristic
     // for deciding between forward and reverse mode prevents reverse mode
     // from being used for order > 1.
-    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); }; // LCOV_EXCL_LINE
-    auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
+    const auto local_dmap
+        = [&local_diff] -> diff_map_t & { return std::get<diff_map_t>(local_diff); }; // LCOV_EXCL_LINE
+    const auto local_dvec = [&local_diff] -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
     // Cache the number of diff arguments.
     const auto nargs = args.size();
@@ -1291,7 +1296,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
     // NOTE: check that nargs fits in a 32-bit int, so that
     // in the dtens API get_nargs() can safely return std::uint32_t.
-    (void)(boost::numeric_cast<std::uint32_t>(nargs));
+    static_cast<void>(boost::numeric_cast<std::uint32_t>(nargs));
 
     // Map to associate a dtens_sv_idx_t to a derivative.
     // This will be kept manually sorted according to dtens_v_idx_cmp
@@ -1300,9 +1305,9 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
     // Helper to locate a dtens_sv_idx_t in diff_map. If not present,
     // diff_map.end() will be returned.
-    auto search_diff_map = [&diff_map](const dtens_sv_idx_t &v) {
+    const auto search_diff_map = [&diff_map](const dtens_sv_idx_t &v) {
         // NOLINTNEXTLINE(modernize-use-ranges)
-        auto it = std::lower_bound(diff_map.begin(), diff_map.end(), v, [](const auto &item, const auto &vec) {
+        const auto it = std::lower_bound(diff_map.begin(), diff_map.end(), v, [](const auto &item, const auto &vec) {
             return dtens_sv_idx_cmp{}(item.first, vec);
         });
 
@@ -1392,7 +1397,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
         // Create the vector of expressions for the substitution.
         std::vector<expression> subs_ret;
-        for (auto *it = cur_begin; it != cur_end; ++it) {
+        for (const auto *it = cur_begin; it != cur_end; ++it) {
             subs_ret.push_back(it->second);
         }
 
@@ -1436,6 +1441,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
     // Assemble and return the result.
     dtens_map_t retval;
+    // NOLINTNEXTLINE(readability-trailing-comma)
     retval.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(diff_map));
 
     // Check sorting.
