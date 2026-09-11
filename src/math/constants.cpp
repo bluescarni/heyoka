@@ -69,6 +69,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// NOLINTNEXTLINE(modernize-use-string-view)
 std::string null_constant_func::operator()([[maybe_unused]] unsigned prec) const
 {
     assert(prec > 0u);
@@ -248,7 +249,7 @@ llvm::Value *constant::llvm_evaluate(llvm_state &s, [[maybe_unused]] const std::
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 

@@ -93,7 +93,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     const auto neg_it = std::stable_partition(terms.begin(), terms.end(), fpart);
 
     // Helper to stream the positive terms.
-    auto stream_pos_terms = [&] {
+    const auto stream_pos_terms = [&] {
         // Must have some positive terms.
         assert(neg_it != terms.begin());
 
@@ -107,7 +107,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     };
 
     // Helper to stream the negative terms.
-    auto stream_neg_terms = [&] {
+    const auto stream_neg_terms = [&] {
         // Must have some negative terms.
         assert(neg_it != terms.end());
 

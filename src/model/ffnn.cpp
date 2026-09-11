@@ -40,8 +40,8 @@ std::vector<expression> compute_layer(su32 layer_id, const std::vector<expressio
                                       su32 &bcounter)
 {
     assert(layer_id > 0u);
-    auto n_neurons_prev_layer = su32(inputs.size());
-    auto n_neurons_curr_layer = n_neurons[layer_id];
+    const auto n_neurons_prev_layer = su32(inputs.size());
+    const auto n_neurons_curr_layer = n_neurons[layer_id];
 
     std::vector<expression> retval, tmp_sum;
     retval.reserve(n_neurons_curr_layer);
@@ -111,7 +111,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons).
     auto n_hidden_layers = su32(nn_hidden.size());
     // Number of neuronal layers (counting input and output).
-    auto n_layers = n_hidden_layers + 2;
+    const auto n_layers = n_hidden_layers + 2;
     // Number of inputs.
     auto n_in = su32(in.size());
     // Number of neurons per neuronal layer.

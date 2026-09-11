@@ -88,7 +88,7 @@ llvm::Value *kepE_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Val
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
@@ -105,7 +105,7 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     // NOTE: the arguments here have already been decomposed, thus
     // args()[0] is a non-function value.
     assert(!std::holds_alternative<func>(args()[0].value()));
-    auto e_copy = args()[0];
+    const auto e_copy = args()[0];
 
     // Append the kepE decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -487,8 +487,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 // For order 0, invoke the function on the order 0 of e_idx.
                 builder.CreateStore(
                     builder.CreateCall(fkep,
-                                       {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
-                                        taylor_c_diff_numparam_codegen(s, fp_t, n, num_M, par_ptr, batch_size)}),
+                                       {
+                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
+                                           taylor_c_diff_numparam_codegen(s, fp_t, n, num_M, par_ptr, batch_size),
+                                       }),
                     retval);
             },
             [&] {
@@ -600,8 +602,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 // For order 0, invoke the function on the order 0 of M_idx.
                 builder.CreateStore(
                     builder.CreateCall(fkep,
-                                       {taylor_c_diff_numparam_codegen(s, fp_t, n, num_e, par_ptr, batch_size),
-                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
+                                       {
+                                           taylor_c_diff_numparam_codegen(s, fp_t, n, num_e, par_ptr, batch_size),
+                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx),
+                                       }),
                     retval);
             },
             [&] {
@@ -705,8 +709,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 // For order 0, invoke the function on the order 0 of M_idx/e_idx.
                 builder.CreateStore(
                     builder.CreateCall(fkep,
-                                       {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
-                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
+                                       {
+                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
+                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx),
+                                       }),
                     retval);
             },
             [&] {

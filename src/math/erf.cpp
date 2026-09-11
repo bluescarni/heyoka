@@ -188,7 +188,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_imp
     auto *ret = pairwise_sum(s, sum);
 
     // Generate the factor n * sqrt(pi) / 2.
-    auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);
+    const auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);
     auto *fac_s = vector_splat(builder, llvm_codegen(s, fp_t, fac), batch_size);
 
     // Multiply and return.

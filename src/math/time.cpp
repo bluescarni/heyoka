@@ -69,7 +69,7 @@ llvm::Value *time_impl::llvm_evaluate(llvm_state &s, [[maybe_unused]] const std:
     assert(args.empty());
     // Determine the batch size.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 

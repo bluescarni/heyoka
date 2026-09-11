@@ -120,6 +120,7 @@ inline constexpr auto eo_dynamics_kw_cfg
 //   (which disables third-body perturbations altogether).
 inline constexpr auto eo_dynamics = []<typename... KwArgs>
     requires igor::validate<eo_dynamics_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::eo_dynamics_impl, detail::eo_dynamics_opts(std::forward<KwArgs>(kw_args)...));
 };

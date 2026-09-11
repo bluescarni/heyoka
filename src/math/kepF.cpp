@@ -98,7 +98,7 @@ llvm::Value *kepF_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Val
 
     // Determine the batch size.
     std::uint32_t batch_size = 1;
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
         batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
     }
 
@@ -116,8 +116,8 @@ taylor_dc_t::size_type kepF_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     // args()[0-1] are non-function values.
     assert(!std::holds_alternative<func>(args()[0].value()));
     assert(!std::holds_alternative<func>(args()[1].value()));
-    auto h_copy = args()[0];
-    auto k_copy = args()[1];
+    const auto h_copy = args()[0];
+    const auto k_copy = args()[1];
 
     // Append the kepF decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -652,9 +652,11 @@ llvm::Value *taylor_diff_kepF_impl(llvm_state &s, llvm::Type *fp_t, const std::v
         auto *fkep = llvm_add_inv_kep_F(s, fp_t, batch_size);
 
         // Invoke and return.
-        return builder.CreateCall(fkep,
-                                  {taylor_fetch_diff(arr, h_idx, 0, n_uvars), taylor_fetch_diff(arr, k_idx, 0, n_uvars),
-                                   taylor_fetch_diff(arr, lam_idx, 0, n_uvars)});
+        return builder.CreateCall(fkep, {
+                                            taylor_fetch_diff(arr, h_idx, 0, n_uvars),
+                                            taylor_fetch_diff(arr, k_idx, 0, n_uvars),
+                                            taylor_fetch_diff(arr, lam_idx, 0, n_uvars),
+                                        });
     }
 
     // Splat the order.
@@ -847,9 +849,11 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
-                                   {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
-                                    taylor_c_diff_numparam_codegen(s, fp_t, n1, num_k, par_ptr, batch_size),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
+                                   {
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n1, num_k, par_ptr, batch_size),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx),
+                                   }),
                 retval);
         },
         [&] {
@@ -962,9 +966,12 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&] {
             builder.CreateStore(
-                builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
-                                          taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
-                                          taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size)}),
+                builder.CreateCall(fkep,
+                                   {
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size),
+                                   }),
                 retval);
         },
         [&] {
@@ -1083,9 +1090,12 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&] {
             builder.CreateStore(
-                builder.CreateCall(fkep, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
-                                          taylor_c_diff_numparam_codegen(s, fp_t, n0, num_k, par_ptr, batch_size),
-                                          taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size)}),
+                builder.CreateCall(fkep,
+                                   {
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n0, num_k, par_ptr, batch_size),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size),
+                                   }),
                 retval);
         },
         [&] {
@@ -1206,9 +1216,11 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
-                                   {taylor_c_diff_numparam_codegen(s, fp_t, n, num_h, par_ptr, batch_size),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
+                                   {
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n, num_h, par_ptr, batch_size),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx),
+                                   }),
                 retval);
         },
         [&] {
@@ -1329,9 +1341,11 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
-                                   {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
-                                    taylor_c_diff_numparam_codegen(s, fp_t, n, num_k, par_ptr, batch_size),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
+                                   {
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n, num_k, par_ptr, batch_size),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx),
+                                   }),
                 retval);
         },
         [&] {
@@ -1453,9 +1467,12 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&] {
             builder.CreateStore(
-                builder.CreateCall(fkep, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
-                                          taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
-                                          taylor_c_diff_numparam_codegen(s, fp_t, n, num_lam, par_ptr, batch_size)}),
+                builder.CreateCall(fkep,
+                                   {
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
+                                       taylor_c_diff_numparam_codegen(s, fp_t, n, num_lam, par_ptr, batch_size),
+                                   }),
                 retval);
         },
         [&] {
@@ -1583,9 +1600,11 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
         [&] {
             builder.CreateStore(
                 builder.CreateCall(fkep,
-                                   {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
-                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
+                                   {
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx),
+                                   }),
                 retval);
         },
         [&] {

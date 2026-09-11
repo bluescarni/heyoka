@@ -102,7 +102,7 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     // Validate didx and build up the full name.
     if (!didx.empty()) {
         // Helper to validate an element in didx and update full_name.
-        auto validate_p = [&args, &full_name](const auto &p) {
+        const auto validate_p = [&args, &full_name](const auto &p) {
             const auto [idx, order] = p;
 
             if (idx >= args.size()) [[unlikely]] {
@@ -137,7 +137,7 @@ auto make_dfun_name(const std::string &id_name, Args args_,
     }
 
     // Finalise full_name.
-    full_name += "_";
+    full_name += '_';
     full_name += id_name;
 
     if constexpr (std::same_as<Args, std::vector<expression>>) {
@@ -181,7 +181,7 @@ dfun_impl::dfun_impl(std::string full_name, std::string id_name, func_args::shar
     // Run some checks on m_didx in debug mode.
     if (!m_didx.empty()) {
         // Helper to validate an element in m_didx and update full_name.
-        auto validate_p = [this](const auto &p) {
+        const auto validate_p = [this](const auto &p) {
             const auto [idx, order] = p;
             assert(idx < this->args().size());
             assert(order != 0u);
@@ -265,7 +265,7 @@ std::vector<expression> dfun_impl::gradient() const
         std::string new_name = "dfun_";
 
         // Helper to update new_name with last pair added to new_didx.
-        auto update_new_name = [&new_name, &new_didx] {
+        const auto update_new_name = [&new_name, &new_didx] {
             assert(!new_didx.empty());
             new_name += fmt::format("{},{} ", new_didx.back().first, new_didx.back().second);
         };
@@ -319,7 +319,7 @@ std::vector<expression> dfun_impl::gradient() const
         }
 
         // Finish building the new name.
-        new_name += "_";
+        new_name += '_';
         new_name += m_id_name;
 
         // Build and add the gradient component.

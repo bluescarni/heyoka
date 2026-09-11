@@ -32,6 +32,8 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/elp2000.hpp>
 
+// NOLINTBEGIN(readability-trailing-comma)
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace model
@@ -129,7 +131,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // trigonometric argument.
     trig_eval_dict_t trig_eval;
 
-    auto seed_trig_eval = [&trig_eval](const expression &arg) {
+    const auto seed_trig_eval = [&trig_eval](const expression &arg) {
         const auto [it, flag] = trig_eval.insert({arg, {}});
         assert(flag);
         auto &pd = it->second;
@@ -1395,3 +1397,5 @@ std::array<double, 2> get_elp2000_mus()
 } // namespace model
 
 HEYOKA_END_NAMESPACE
+
+// NOLINTEND(readability-trailing-comma)

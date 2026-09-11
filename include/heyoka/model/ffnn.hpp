@@ -104,7 +104,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> ffnn_impl(const std::vector<expression
 inline constexpr auto ffnn_kw_cfg = igor::config<
     kw::descr::constructible_input_range<kw::inputs, expression, true>,
     igor::descr<kw::nn_hidden,
-                []<typename U>() {
+                []<typename U> {
                     return requires {
                         requires std::ranges::input_range<U>;
                         requires std::integral<std::remove_cvref_t<std::ranges::range_reference_t<U>>>;

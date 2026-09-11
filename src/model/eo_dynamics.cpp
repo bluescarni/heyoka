@@ -322,8 +322,10 @@ make_eo_dynamics(const std::uint32_t max_geo_degree, const std::uint32_t max_geo
                             kw::eop_data = eop_data);
 
         // Assign the dynamics.
-        dyn = std::vector{prime(x) = vx,          prime(y) = vy,          prime(z) = vz,
-                          prime(vx) = acc_x_gcrs, prime(vy) = acc_y_gcrs, prime(vz) = acc_z_gcrs};
+        dyn = std::vector{
+            prime(x) = vx,          prime(y) = vy,          prime(z) = vz,
+            prime(vx) = acc_x_gcrs, prime(vy) = acc_y_gcrs, prime(vz) = acc_z_gcrs,
+        };
     }
 
     // Add the atmospheric drag, if requested.

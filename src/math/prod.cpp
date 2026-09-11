@@ -178,7 +178,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
                                               [](const auto &ex) { return !ex_is_negative_pow(ex); });
 
     // Helper to stream the numerator of the product.
-    auto stream_num = [&] {
+    const auto stream_num = [&] {
         // We must have some terms in the numerator.
         assert(den_it != tmp_args.begin());
 
@@ -203,7 +203,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     };
 
     // Helper to stream the denominator of the product.
-    auto stream_den = [&] {
+    const auto stream_den = [&] {
         // We must have some terms in the denominator.
         assert(den_it != tmp_args.end());
 
@@ -296,7 +296,7 @@ llvm::Value *prod_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Val
         if (args.empty()) {
             // Determine the batch size.
             std::uint32_t batch_size = 1;
-            if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
+            if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(val_t)) {
                 batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
             }
 

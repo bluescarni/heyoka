@@ -91,7 +91,7 @@ auto sh_gravity_common_opts(const KwArgs &...kw_args)
 
     // Maximum degree/order. These can optionally be provided - if they are, only a subset of the spherical harmonics
     // model is used, otherwise the full model is used.
-    const auto max_degree_order_factory = [&p]<auto K>() -> std::optional<std::uint32_t> {
+    const auto max_degree_order_factory = [&p]<auto K> -> std::optional<std::uint32_t> {
         if constexpr (p.has(K)) {
             if constexpr (std::is_integral_v<std::remove_cvref_t<decltype(p(K))>>) {
                 return boost::numeric_cast<std::uint32_t>(p(K));
@@ -106,8 +106,9 @@ auto sh_gravity_common_opts(const KwArgs &...kw_args)
     auto max_degree = max_degree_order_factory.template operator()<kw::max_degree>();
     auto max_order = max_degree_order_factory.template operator()<kw::max_order>();
 
-    return std::tuple{std::move(mu), std::move(a), std::move(sh_coefficients), std::move(max_degree),
-                      std::move(max_order)};
+    return std::tuple{
+        std::move(mu), std::move(a), std::move(sh_coefficients), std::move(max_degree), std::move(max_order),
+    };
 }
 
 // Function type used to get the C/S coefficients in the sh_gravity_*_impl() primitives.
@@ -133,11 +134,14 @@ sh_gravity_resolve_n_m(const std::optional<std::uint32_t> &, const std::optional
 inline constexpr auto sh_gravity_kw_cfg = igor::config<
     kw::descr::constructible_from<expression, kw::mu, true>, kw::descr::constructible_from<expression, kw::a, true>,
     igor::descr<kw::max_degree,
-                []<typename U>() { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
+                // NOLINTNEXTLINE(readability-trailing-comma)
+                []<typename U> { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
     igor::descr<kw::max_order,
-                []<typename U>() { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
-    igor::descr<kw::sh_coefficients, []<typename U>() { return detail::sh_gravity_cs_input_range<U>; }>{.required
-                                                                                                        = true}>{};
+                // NOLINTNEXTLINE(readability-trailing-comma)
+                []<typename U> { return detail::is_optional_integral<std::remove_cvref_t<U>>::value; }>{},
+    igor::descr<kw::sh_coefficients, []<typename U> { return detail::sh_gravity_cs_input_range<U>; }>{
+        .required = true,
+    }>{};
 
 // NOTE: in these implementations we accept the kwargs as forwarding references in order to highlight that they cannot
 // be reused in other invocations.

@@ -293,8 +293,8 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                             auto trig_arg = sum(trig);
 
                             // Add the term to the chunk.
-                            auto tmp = Sval * sin(trig_arg);
-                            cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
+                            const auto tmp = Sval * sin(trig_arg);
+                            cur[i] = tmp + Cval * cos(std::move(trig_arg));
                         }
                     });
 
@@ -364,53 +364,53 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     // from the definitions in the VSOP2013 readme, and we thus need to convert.
 
     // sin(i/2)**2 = q_**2 + p_**2.
-    auto si22 = pow(q_, 2_dbl) + pow(p_, 2_dbl);
+    const auto si22 = pow(q_, 2_dbl) + pow(p_, 2_dbl);
 
     // cos(i/2).
-    auto ci2 = sqrt(1_dbl - si22);
+    const auto ci2 = sqrt(1_dbl - si22);
 
     // Compute q and p:
     // https://articles.adsabs.harvard.edu/full/gif/1972CeMec...5..303B/0000305.000.html
-    auto q = q_ / ci2;
-    auto p = p_ / ci2;
+    const auto q = q_ / ci2;
+    const auto p = p_ / ci2;
 
     // Now follow https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html.
-    auto e2 = pow(h, 2_dbl) + pow(k, 2_dbl);
-    auto e_quot = 1_dbl + sqrt(1_dbl - e2);
-    auto F = kepF(h, k, lam);
-    auto cF = cos(F), sF = sin(F);
-    auto lam_F = h * cF - k * sF;
-    auto lam_F_e_quot = lam_F / e_quot;
+    const auto e2 = pow(h, 2_dbl) + pow(k, 2_dbl);
+    const auto e_quot = 1_dbl + sqrt(1_dbl - e2);
+    const auto F = kepF(h, k, lam);
+    const auto cF = cos(F), sF = sin(F);
+    const auto lam_F = h * cF - k * sF;
+    const auto lam_F_e_quot = lam_F / e_quot;
 
-    auto X1 = a * (cF - k - h * lam_F_e_quot);
-    auto Y1 = a * (sF - h + k * lam_F_e_quot);
+    const auto X1 = a * (cF - k - h * lam_F_e_quot);
+    const auto Y1 = a * (sF - h + k * lam_F_e_quot);
 
-    auto p2 = pow(p, 2_dbl);
-    auto q2 = pow(q, 2_dbl);
-    auto p2_m_q2 = p2 - q2;
-    auto p2_p_q2 = p2 + q2;
-    auto two_p = p + p;
-    auto two_pq = two_p * q;
-    auto two_q = q + q;
+    const auto p2 = pow(p, 2_dbl);
+    const auto q2 = pow(q, 2_dbl);
+    const auto p2_m_q2 = p2 - q2;
+    const auto p2_p_q2 = p2 + q2;
+    const auto two_p = p + p;
+    const auto two_pq = two_p * q;
+    const auto two_q = q + q;
 
-    auto x = (1_dbl - p2_m_q2) * X1 + two_pq * Y1;
-    auto y = two_pq * X1 + (1_dbl + p2_m_q2) * Y1;
-    auto z = two_q * Y1 - two_p * X1;
+    const auto x = (1_dbl - p2_m_q2) * X1 + two_pq * Y1;
+    const auto y = two_pq * X1 + (1_dbl + p2_m_q2) * Y1;
+    const auto z = two_q * Y1 - two_p * X1;
 
     // Velocities.
-    auto n = sqrt(mu / pow(a, 3_dbl));
-    auto Fp = n / (1_dbl - h * sF - k * cF);
-    auto n_Fp = n - Fp;
-    auto n_Fp_equot = n_Fp / e_quot;
+    const auto n = sqrt(mu / pow(a, 3_dbl));
+    const auto Fp = n / (1_dbl - h * sF - k * cF);
+    const auto n_Fp = n - Fp;
+    const auto n_Fp_equot = n_Fp / e_quot;
 
-    auto VX1 = a * (-sF * Fp - h * n_Fp_equot);
-    auto VY1 = a * (cF * Fp + k * n_Fp_equot);
+    const auto VX1 = a * (-sF * Fp - h * n_Fp_equot);
+    const auto VY1 = a * (cF * Fp + k * n_Fp_equot);
 
-    auto vx = (1_dbl - p2_m_q2) * VX1 + two_pq * VY1;
-    auto vy = two_pq * VX1 + (1_dbl + p2_m_q2) * VY1;
-    auto vz = two_q * VY1 - two_p * VX1;
+    const auto vx = (1_dbl - p2_m_q2) * VX1 + two_pq * VY1;
+    const auto vy = two_pq * VX1 + (1_dbl + p2_m_q2) * VY1;
+    const auto vz = two_q * VY1 - two_p * VX1;
 
-    auto quot = (1_dbl + p2_p_q2);
+    const auto quot = (1_dbl + p2_p_q2);
 
     return {x / quot, y / quot, z / quot, vx / quot, vy / quot, vz / quot};
 }
@@ -436,12 +436,14 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
     const auto &vye = cart_dfj2000[4];
     const auto &vze = cart_dfj2000[5];
 
-    return {std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze,
-            std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze,
-            std::sin(eps) * ye + std::cos(eps) * ze,
-            std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze,
-            std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze,
-            std::sin(eps) * vye + std::cos(eps) * vze};
+    return {
+        std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze,
+        std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze,
+        std::sin(eps) * ye + std::cos(eps) * ze,
+        std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze,
+        std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze,
+        std::sin(eps) * vye + std::cos(eps) * vze,
+    };
 }
 
 } // namespace detail
