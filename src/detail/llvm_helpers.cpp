@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -22,6 +23,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/architecture.h>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -33,6 +35,7 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -47,6 +50,7 @@
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/ModRef.h>
+#include <llvm/Support/TypeSize.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1005,6 +1009,28 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
     }
 }
 
+namespace
+{
+
+// Constant signalling whether the in-memory layout of SIMD vectors matches the layout of arrays for the current
+// architecture.
+//
+// This is probably true for every architecture in existence right now. This variable is used to enable an optimised
+// path when loading/storing SIMD vectors from/to scalar buffers, which results in fewer IR operations than the portable
+// way of implementing such operations.
+//
+// NOTE: these are compile-time checks, which happen to work correctly because currently we are always jitting for the
+// host. If we ever enable jitting for non-host architectures, we should re-write these checks in terms of
+// runtime-derived properties (e.g., via the target triple).
+constexpr bool simd_layout_matches_array =
+#if BOOST_ARCH_ARM || BOOST_ARCH_X86 || BOOST_ARCH_PPC
+    true;
+#else
+    false;
+#endif
+
+} // namespace
+
 // Helper to load into a vector of size vector_size the sequential scalar data of type tp starting at ptr.
 //
 // If vector_size is 1, a scalar is loaded instead. It is assumed that the alignment of ptr is at least the alignment of
@@ -1026,18 +1052,34 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *const tp, 
         auto *vector_t = make_vector_type(tp, vector_size);
         assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
-        // NOTE: this is the only guaranteed portable version of loading a vector from an array of scalars, i.e., load
-        // the scalars one by one and then pack them in a vector. We are counting on the optimiser to be able to
-        // translate this process into a single vector load whenever possible.
+        // NOTE: the only guaranteed portable way of loading a vector from an array of scalars is to load the scalars
+        // one by one and then pack them in a vector. We are counting on the optimiser to be able to translate this
+        // process into a single vector load whenever possible.
         //
-        // In the past, we used expandload here which however resulted in less-than-optimal code (specifically, in some
-        // cases it would fail to optimise into a single vector load). Another possible approach is to use a straight
-        // load with vector type and scalar alignment, however this is incorrect when there exists padding between the
-        // scalar values (e.g., x86_fp80). This is a direct consequence of the fact that LLVM vectors do not allow for
-        // padding in their representation.
+        // In order to reduce the number of IR operations emitted, we implement an optimisation which is gated behind
+        // platform-specific and type-specific checks. Specifically, if we are on an architecture where SIMD vectors are
+        // guaranteed to match the layout of plain arrays and if the memory representation of the scalar type tp has no
+        // padding, then we emit a single vector load using the alignment of the scalar type.
         //
-        // Perhaps in the future, in order to reduce the number of instructions here produced, we could adopt the
-        // CreateAlignedLoad() approach on selected architectures and type combinations (e.g., float+double on x86).
+        // This gating ensures that the optimised codepath is (correctly) not taken for types such as x86_fp80.
+        //
+        // NOTE: this optimisation affects only the performance of code generation, the runtime performance of the code
+        // should be unaffected (again, assuming the optimiser does its job).
+        if constexpr (simd_layout_matches_array) {
+            using safe_size_t = boost::safe_numerics::safe<llvm::TypeSize::ScalarTy>;
+            assert(builder.GetInsertBlock() != nullptr);
+            const auto *const md = builder.GetInsertBlock()->getModule();
+            const auto &dl = md->getDataLayout();
+
+            // NOTE: this condition checks that the memory representation of tp has no padding.
+            if (dl.getTypeAllocSize(tp).getFixedValue() * safe_size_t(CHAR_BIT) == tp->getScalarSizeInBits()) {
+                const auto al = get_alignment(*md, tp);
+
+                return builder.CreateAlignedLoad(vector_t, ptr, llvm::Align(al));
+            }
+        }
+
+        // The portable approach.
         llvm::Value *ret = llvm::PoisonValue::get(vector_t);
         for (std::uint32_t i = 0; i < vector_size; ++i) {
             auto *p = builder.CreateInBoundsGEP(tp, ptr, builder.getInt32(i));
@@ -1139,9 +1181,25 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *const ptr, llvm::V
         auto *scal_t = vec_t->getScalarType();
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
 
-        // NOTE: this is the mirror image of the load performed in load_vector_from_memory(), i.e., we unpack the
-        // vector and store the scalars one by one. See the comment in load_vector_from_memory() for an explanation
-        // of why this is the only portable approach.
+        // NOTE: this is the mirror image of the loading code in load_vector_from_memory(). See there for explanations
+        // of this optimised codepath.
+        if constexpr (simd_layout_matches_array) {
+            using safe_size_t = boost::safe_numerics::safe<llvm::TypeSize::ScalarTy>;
+            assert(builder.GetInsertBlock() != nullptr);
+            const auto *const md = builder.GetInsertBlock()->getModule();
+            const auto &dl = md->getDataLayout();
+
+            if (dl.getTypeAllocSize(scal_t).getFixedValue() * safe_size_t(CHAR_BIT) == scal_t->getScalarSizeInBits()) {
+                const auto al = get_alignment(*md, scal_t);
+
+                builder.CreateAlignedStore(vec, ptr, llvm::Align(al));
+
+                return;
+            }
+        }
+
+        // NOTE: this is the mirror image of the portable load performed in load_vector_from_memory(), i.e., we unpack
+        // the vector and store the scalars one by one.
         for (std::uint32_t i = 0; i < vector_size; ++i) {
             auto *p = builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i));
             builder.CreateStore(builder.CreateExtractElement(vec, i), p);
