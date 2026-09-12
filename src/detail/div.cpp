@@ -90,7 +90,7 @@ llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &nv, 
 
     if (order == 0u) {
         // Special casing for zero order.
-        auto numerator = [&]() -> llvm::Value * {
+        auto numerator = [&] -> llvm::Value * {
             if constexpr (std::is_same_v<U, number> || std::is_same_v<U, param>) {
                 return taylor_codegen_numparam(s, fp_t, nv, par_ptr, batch_size);
             } else {
@@ -312,14 +312,14 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order zero, run the codegen.
                 auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
                 auto ret = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(llvm_fdiv(s, num_vec, ret), retval);
             },
-            [&]() {
+            [&] {
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 

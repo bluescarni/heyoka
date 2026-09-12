@@ -38,14 +38,14 @@ HEYOKA_DLL_PUBLIC llvm::Type *make_external_llvm_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
-HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(const llvm::Value *);
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Type *);
-HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
+HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(const llvm::Module &, llvm::Type *);
 std::uint32_t gl_arr_size(llvm::Value *);
-HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
+HEYOKA_DLL_PUBLIC std::uint64_t get_size(const llvm::Module &, llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
-bool llvm_is_ieee_like_fp(llvm::Type *);
+HEYOKA_DLL_PUBLIC std::string llvm_type_name(const llvm::Type *);
+bool llvm_is_ieee_like_fp(const llvm::Type *);
 
 // Helper to fetch the external llvm type corresponding to the C++ type T.
 //

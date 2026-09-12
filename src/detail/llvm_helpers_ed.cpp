@@ -142,7 +142,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
             // In scalar mode the offset is simply zero.
             offset = builder.getInt32(0);
         } else {
-            offset = llvm::UndefValue::get(make_vector_type(builder.getInt32Ty(), batch_size));
+            offset = llvm::PoisonValue::get(make_vector_type(builder.getInt32Ty(), batch_size));
             for (std::uint32_t i = 0; i < batch_size; ++i) {
                 offset = builder.CreateInsertElement(offset, builder.getInt32(i), i);
             }

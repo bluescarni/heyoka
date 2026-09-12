@@ -69,7 +69,6 @@
 #include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -319,7 +318,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
 
     // NOTE: iter limit will be derived from the number of binary digits
     // in the significand.
-    const boost::uintmax_t iter_limit = [&]() {
+    const boost::uintmax_t iter_limit = [&] {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             // NOTE: we use lb here, but any of lb, ub or the poly
@@ -355,7 +354,11 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
     errno = 0;
 
     // Run the root finder.
-    auto p = [&]() {
+    //
+    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
+    auto p = [&] {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             return boost::math::tools::bisect([poly, order](const auto &x) { return poly_eval(poly, x, order); }, lb,
@@ -369,6 +372,9 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
 #endif
     }();
 
+    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
     auto ret = std::move(p.first) / 2 + std::move(p.second) / 2;
 
     SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
@@ -534,6 +540,10 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     // - 2 factor to deal with the common case of event equation
     //   flipping around after the event (e.g., for collisions).
     // The rest is additional safety.
+    //
+    // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
     auto ret = std::move(g_eps) / std::move(abs_der) * 10;
 
     if (isfinite(ret)) {
@@ -1124,9 +1134,9 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
-    auto run_detection = [&](auto &out, const auto &ev_vec) {
+    const auto run_detection = [&](auto &out, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = std::remove_cvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
@@ -1156,7 +1166,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be already rescaled
             // to the [0, h) range.
-            auto add_d_event = [&](T root) {
+            const auto add_d_event = [&](T root) {
                 // NOTE: we do one last check on the root in order to
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
@@ -1193,6 +1203,9 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
 
                 // Evaluate the derivative and its absolute value.
                 const auto der = poly_eval_1(ptr, root, order);
+                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto abs_der = abs(der);
 
                 // Check it before proceeding.
@@ -1236,7 +1249,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
             // we will need to ignore roots within the cooldown period.
             // lb_offset is the value in the original [0, 1) range corresponding
             // to the end of the cooldown.
-            const auto lb_offset = [&]() {
+            const auto lb_offset = [&] {
                 if constexpr (is_terminal_event_v<ev_type>) {
                     if (m_te_cooldowns[i]) {
                         // NOTE: need to distinguish between forward
@@ -1304,7 +1317,12 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                 // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
                 // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
                 // [0, 1) range.
+                //
+                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto lb = std::move(std::get<0>(m_wlist.back()));
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto ub = std::move(std::get<1>(m_wlist.back()));
                 // NOTE: this will either revive an invalid tmp (first iteration),
                 // or it will replace it with one of the bisecting polynomials.
@@ -1364,6 +1382,10 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                     m_pt(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
+                    //
+                    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                    //
+                    // NOLINTNEXTLINE(misc-const-correctness)
                     auto mid = lb / 2 + ub / 2;
                     // NOTE: don't add the lower range if it falls
                     // entirely within the cooldown range.
@@ -1446,7 +1468,11 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                         assert(lb < ub); // LCOV_EXCL_LINE
 
                         // Check if the interval still contains a zero.
+                        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                        //
+                        // NOLINTNEXTLINE(misc-const-correctness)
                         auto f_lb = poly_eval(tmp1.v.data(), lb, order);
+                        // NOLINTNEXTLINE(misc-const-correctness)
                         auto f_ub = poly_eval(tmp1.v.data(), ub, order);
 
                         if (!(std::move(f_lb) * std::move(f_ub) < 0)) {
@@ -1474,7 +1500,7 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
                         // Helper to log with a default error message.
                         //
                         // NOLINTNEXTLINE(modernize-type-traits)
-                        const auto log_default = [cflag]() {
+                        const auto log_default = [cflag] {
                             get_logger()->warn("polynomial root finding during event detection returned a nonzero "
                                                "errno with error code {}",
                                                cflag);
@@ -1764,9 +1790,9 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out_vec' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
-    auto run_detection = [&](auto &out_vec, const auto &ev_vec) {
+    const auto run_detection = [&](auto &out_vec, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = std::remove_cvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
@@ -1843,7 +1869,7 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                 // Helper to add a detected event to out.
                 // NOTE: the root here is expected to be already rescaled
                 // to the [0, h) range.
-                auto add_d_event = [&](T root) {
+                const auto add_d_event = [&](T root) {
                     // NOTE: we do one last check on the root in order to
                     // avoid non-finite event times. This guarantees that
                     // sorting the events by time is safe.
@@ -1925,7 +1951,7 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                 // we will need to ignore roots within the cooldown period.
                 // lb_offset is the value in the original [0, 1) range corresponding
                 // to the end of the cooldown.
-                const auto lb_offset = [&]() {
+                const auto lb_offset = [&] {
                     if constexpr (is_terminal_event_v<ev_type>) {
                         if (m_te_cooldowns[j][i]) {
                             // NOTE: need to distinguish between forward
@@ -1986,8 +2012,8 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                     // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
                     // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
                     // [0, 1) range.
-                    auto lb = std::get<0>(m_wlist.back());
-                    auto ub = std::get<1>(m_wlist.back());
+                    const auto lb = std::get<0>(m_wlist.back());
+                    const auto ub = std::get<1>(m_wlist.back());
                     // NOTE: this will either revive an invalid tmp (first iteration),
                     // or it will replace it with one of the bisecting polynomials.
                     tmp = std::move(std::get<2>(m_wlist.back()));

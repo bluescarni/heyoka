@@ -40,6 +40,7 @@ constexpr decltype(auto) ranges_to(R &&r, Args &&...args)
         return std::ranges::to<C>(std::forward<R>(r), std::forward<Args>(args)...);
     } else if constexpr (std::constructible_from<C_value_t, R_ref_t> && std::movable<C_value_t>) {
         return std::ranges::to<C>(
+            // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
             std::forward<R>(r) | std::views::transform([]<typename T>(T &&x) { return C_value_t(std::forward<T>(x)); }),
             std::forward<Args>(args)...);
     } else {

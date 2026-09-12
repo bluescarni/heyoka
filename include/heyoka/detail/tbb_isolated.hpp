@@ -63,7 +63,7 @@ auto tbb_isolated_parallel_sort(Args &&...args) -> decltype(oneapi::tbb::paralle
 {
     oneapi::tbb::task_group_context isolated_ctx(oneapi::tbb::task_group_context::isolated);
     oneapi::tbb::task_group tg(isolated_ctx);
-    tg.run_and_wait([&args...]() { oneapi::tbb::parallel_sort(std::forward<Args>(args)...); });
+    tg.run_and_wait([&args...] { oneapi::tbb::parallel_sort(std::forward<Args>(args)...); });
 }
 
 } // namespace detail

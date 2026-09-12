@@ -56,7 +56,7 @@ namespace
 std::array<expression, 2> ccpow_impl(pow_dict_t &pd, const std::array<expression, 2> &pow1,
                                      const std::array<expression, 2> &powm1, std::int8_t n)
 {
-    auto it = pd.find(n);
+    const auto it = pd.find(n);
 
     if (it != pd.end()) {
         return it->second;
@@ -81,7 +81,7 @@ std::array<expression, 2> ccpow_impl(pow_dict_t &pd, const std::array<expression
 // supported by a cache.
 std::array<expression, 2> ccpow(const expression &ex, trig_eval_dict_t &td, std::int8_t n)
 {
-    auto it = td.find(ex);
+    const auto it = td.find(ex);
     assert(it != td.end());
 
     auto &pd = it->second;

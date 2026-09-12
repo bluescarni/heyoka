@@ -529,14 +529,14 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
 
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-        [&]() {
+        [&] {
             // For order 0, invoke the function on the order 0 of var_idx.
             auto *ret
                 = llvm_relup(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx), slope);
             // NOLINTNEXTLINE(readability-suspicious-call-argument)
             builder.CreateStore(ret, retval);
         },
-        [&]() {
+        [&] {
             // For all the other orders, the result is zero.
             builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
         });

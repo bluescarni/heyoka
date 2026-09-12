@@ -89,7 +89,7 @@ llvm::AttributeList get_mpfr_attr_list(llvm::LLVMContext &context)
 // and, in such case, return N. Otherwise, return 0.
 mpfr_prec_t llvm_is_real(llvm::Type *t)
 {
-    if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
+    if (const auto *const ptr = llvm::dyn_cast<llvm::StructType>(t)) {
         const auto sname = ptr->getStructName();
 
         if (sname.starts_with("heyoka.real.")) {
@@ -180,7 +180,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, ll
     auto *prec_const = llvm_mpfr_prec(s, real_prec);
 
     // Fetch the limb array type.
-    auto *struct_fp_t = llvm::cast<llvm::StructType>(r->getType());
+    const auto *const struct_fp_t = llvm::cast<llvm::StructType>(r->getType());
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Create the limb array and store into it the limbs from r.
@@ -227,7 +227,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     auto *prec_const = llvm_mpfr_prec(s, real_prec);
 
     // Fetch the limb array type.
-    auto *struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
+    const auto *const struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Create the limb array.
@@ -267,11 +267,11 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     auto &builder = s.builder();
 
     auto *real_t = to_external_llvm_type<mppp::real>(s.context());
-    auto *struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
+    const auto *const struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
     auto *limb_arr_t = struct_fp_t->getElementType(2u);
 
     // Init the return value.
-    llvm::Value *res = llvm::UndefValue::get(fp_t);
+    llvm::Value *res = llvm::PoisonValue::get(fp_t);
 
 #if !defined(NDEBUG)
 
@@ -419,7 +419,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         auto *res_sin = llvm_mpfr_view_to_real(s, real_res_sin, limb_arr_res_sin, fp_t);
         auto *res_cos = llvm_mpfr_view_to_real(s, real_res_cos, limb_arr_res_cos, fp_t);
 
-        llvm::Value *res = llvm::UndefValue::get(ret_t);
+        llvm::Value *res = llvm::PoisonValue::get(ret_t);
         res = builder.CreateInsertValue(res, res_sin, {0});
         res = builder.CreateInsertValue(res, res_cos, {1});
 

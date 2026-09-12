@@ -108,7 +108,7 @@ void pow_impl::to_stream(std::ostringstream &oss) const
     //   (x**y)**z instead.
 
     const auto base_is_negation = is_negation_prod(base);
-    const auto base_is_pow = [&]() {
+    const auto base_is_pow = [&] {
         const auto *fptr = std::get_if<func>(&base.value());
 
         return fptr != nullptr && fptr->extract<pow_impl>() != nullptr;
@@ -159,10 +159,10 @@ std::optional<safe_int64_t> ex_is_integral(const expression &ex)
 {
     return std::visit(
         [](const auto &v) -> std::optional<safe_int64_t> {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, number>) {
                 return std::visit(
                     [](const auto &x) -> std::optional<safe_int64_t> {
-                        using num_type = uncvref_t<decltype(x)>;
+                        using num_type = std::remove_cvref_t<decltype(x)>;
 
                         using std::trunc;
                         using std::isfinite;
@@ -215,10 +215,10 @@ std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
 {
     return std::visit(
         [](const auto &v) -> std::optional<safe_int64_t> {
-            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, number>) {
                 return std::visit(
                     [](const auto &x) -> std::optional<safe_int64_t> {
-                        using num_type = uncvref_t<decltype(x)>;
+                        using num_type = std::remove_cvref_t<decltype(x)>;
 
                         using std::trunc;
                         using std::isfinite;
@@ -303,55 +303,65 @@ pow_eval_algo get_pow_eval_algo(const std::vector<expression> &args)
     // Small integral powers.
     if (const auto exp = ex_is_integral(args[1])) {
         if (*exp >= 0 && *exp <= pow_max_small_pow_n) {
-            return {.algo = pow_eval_algo::type::pos_small_int,
-                    .eval_f = [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); },
-                    .exp = exp,
-                    .suffix = fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp))};
+            return {
+                .algo = pow_eval_algo::type::pos_small_int,
+                .eval_f = [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); },
+                .exp = exp,
+                .suffix = fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp)),
+            };
         }
 
         if (*exp < 0 && -*exp <= pow_max_small_pow_n) {
-            return {.algo = pow_eval_algo::type::neg_small_int,
-                    .eval_f =
-                        [e = *exp](auto &s, const auto &args) {
-                            auto *tmp = pow_ebs(s, args[0], -e);
-                            return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                        },
-                    .exp = exp,
-                    .suffix = fmt::format("_neg_small_int_{}", static_cast<std::int64_t>(-*exp))};
+            return {
+                .algo = pow_eval_algo::type::neg_small_int,
+                .eval_f =
+                    [e = *exp](auto &s, const auto &args) {
+                        auto *tmp = pow_ebs(s, args[0], -e);
+                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                    },
+                .exp = exp,
+                .suffix = fmt::format("_neg_small_int_{}", static_cast<std::int64_t>(-*exp)),
+            };
         }
     }
 
     // Small half-integral powers.
     if (const auto exp2 = ex_is_odd_integral_half(args[1])) {
         if (*exp2 >= 0 && *exp2 <= pow_max_small_pow_n) {
-            return {.algo = pow_eval_algo::type::pos_small_half,
-                    .eval_f =
-                        [e2 = *exp2](auto &s, const auto &args) {
-                            auto *tmp = llvm_sqrt(s, args[0]);
-                            return pow_ebs(s, tmp, e2);
-                        },
-                    .exp = exp2,
-                    .suffix = fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2))};
+            return {
+                .algo = pow_eval_algo::type::pos_small_half,
+                .eval_f =
+                    [e2 = *exp2](auto &s, const auto &args) {
+                        auto *tmp = llvm_sqrt(s, args[0]);
+                        return pow_ebs(s, tmp, e2);
+                    },
+                .exp = exp2,
+                .suffix = fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2)),
+            };
         }
 
         if (*exp2 < 0 && -*exp2 <= pow_max_small_pow_n) {
-            return {.algo = pow_eval_algo::type::neg_small_half,
-                    .eval_f =
-                        [e2 = *exp2](auto &s, const auto &args) {
-                            auto *tmp = llvm_sqrt(s, args[0]);
-                            tmp = pow_ebs(s, tmp, -e2);
-                            return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                        },
-                    .exp = exp2,
-                    .suffix = fmt::format("_neg_small_half_{}", static_cast<std::int64_t>(-*exp2))};
+            return {
+                .algo = pow_eval_algo::type::neg_small_half,
+                .eval_f =
+                    [e2 = *exp2](auto &s, const auto &args) {
+                        auto *tmp = llvm_sqrt(s, args[0]);
+                        tmp = pow_ebs(s, tmp, -e2);
+                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                    },
+                .exp = exp2,
+                .suffix = fmt::format("_neg_small_half_{}", static_cast<std::int64_t>(-*exp2)),
+            };
         }
     }
 
     // The general case.
-    return {.algo = pow_eval_algo::type::general,
-            .eval_f = [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); },
-            .exp = {},
-            .suffix = {}};
+    return {
+        .algo = pow_eval_algo::type::general,
+        .eval_f = [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); },
+        .exp = {},
+        .suffix = {},
+    };
 }
 
 llvm::Value *pow_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *, llvm::Value *,
@@ -379,8 +389,10 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
         // Fetch the pow eval algo.
         const auto pea = get_pow_eval_algo(f.args());
 
-        return pea.eval_f(s, {taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
-                              taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size)});
+        return pea.eval_f(s, {
+                                 taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
+                                 taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size),
+                             });
     } else {
         return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
@@ -627,9 +639,11 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
 
     const auto na_pair
         = taylor_c_diff_func_name_args(context, fp_t, "pow_square", n_uvars, batch_size,
-                                       {var,
-                                        // NOTE: as usual, here only the type is important, not the value.
-                                        number{0.}});
+                                       {
+                                           var,
+                                           // NOTE: as usual, here only the type is important, not the value.
+                                           number{0.},
+                                       });
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -664,20 +678,20 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
                     llvm_square(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
                     retval);
             },
-            [&]() {
+            [&] {
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Distinguish the odd/even cases for the order.
                 llvm_if_then_else(
                     s, builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(1)),
-                    [&]() {
+                    [&] {
                         // Odd order.
                         auto *loop_end = builder.CreateAdd(
                             builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(1)), builder.getInt32(2)),
@@ -695,7 +709,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
                         auto *acc_load = builder.CreateLoad(val_t, acc);
                         builder.CreateStore(llvm_fadd(s, acc_load, acc_load), retval);
                     },
-                    [&]() {
+                    [&] {
                         // Even order.
 
                         // Pre-compute the final term.
@@ -744,9 +758,11 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
     const auto na_pair
         = taylor_c_diff_func_name_args(context, fp_t, "pow_sqrt", n_uvars, batch_size,
-                                       {var,
-                                        // NOTE: as usual, here only the type is important, not the value.
-                                        number{.5}});
+                                       {
+                                           var,
+                                           // NOTE: as usual, here only the type is important, not the value.
+                                           number{.5},
+                                       });
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -782,13 +798,13 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
                     llvm_sqrt(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
                     retval);
             },
-            [&]() {
+            [&] {
                 // Compute the divisor: 2*a^[0].
                 auto *div = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
                 div = llvm_fadd(s, div, div);
@@ -816,7 +832,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 llvm_if_then_else(
                     s, ord_even,
-                    [&]() {
+                    [&] {
                         // retval -= (a^[n/2])**2.
                         auto *tmp = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                        builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
@@ -824,7 +840,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
                         builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), tmp), retval);
                     },
-                    []() {});
+                    [] {});
 
                 // retval -= acc.
                 builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), builder.CreateLoad(val_t, acc)),
@@ -912,14 +928,14 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 auto *pow_base = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
                 auto *pow_exp = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
 
                 builder.CreateStore(pea.eval_f(s, {pow_base, pow_exp}), retval);
             },
-            [&]() {
+            [&] {
                 // Create FP vector versions of exponent and order.
                 auto alpha_v = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);

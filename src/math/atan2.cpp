@@ -435,7 +435,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, run the codegen.
                 auto ret = llvm_atan2(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
                                       taylor_c_diff_numparam_codegen(s, fp_t, n, num_x, par_ptr, batch_size));
@@ -443,7 +443,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
-            [&]() {
+            [&] {
                 // Create FP vector version of the order.
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -539,7 +539,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, run the codegen.
                 auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size),
                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
@@ -547,7 +547,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
-            [&]() {
+            [&] {
                 // Create FP vector version of the order.
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
@@ -641,7 +641,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, run the codegen.
                 auto *ret = llvm_atan2(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
@@ -649,7 +649,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
-            [&]() {
+            [&] {
                 // Create FP vector version of the order.
                 auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 

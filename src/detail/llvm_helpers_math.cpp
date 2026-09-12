@@ -306,7 +306,7 @@ llvm::Function *create_sincosq_wrapper(llvm_state &s)
                                                   {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
     // Create the return value.
-    llvm::Value *ret = llvm::UndefValue::get(arr_t);
+    llvm::Value *ret = llvm::PoisonValue::get(arr_t);
     ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, sin_ret), {0});
     ret = bld.CreateInsertValue(ret, bld.CreateLoad(fp_t, cos_ret), {1});
 
@@ -322,14 +322,14 @@ llvm::Function *create_sincosq_wrapper(llvm_state &s)
 #endif
 
 // Helper to create the combined sin/cos scalar wrappers.
-void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, llvm::Value *v)
+void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view sin_or_cos, const llvm::Value *const v)
 {
     assert(v != nullptr);
     assert(sin_or_cos == "sin" || sin_or_cos == "cos");
     auto *scal_t = v->getType()->getScalarType();
 
     // Crete the function name.
-    auto fname = fmt::format("heyoka.combined_{}.{}", sin_or_cos, llvm_type_name(scal_t));
+    const auto fname = fmt::format("heyoka.combined_{}.{}", sin_or_cos, llvm_type_name(scal_t));
 
     // Look it up in the module.
     auto &md = s.module();

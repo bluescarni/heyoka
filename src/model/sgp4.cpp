@@ -123,7 +123,7 @@ auto sgp4_init(const std::vector<expression> &inputs)
 
     // Setup the inputs. If they are provided, use them, otherwise use variables with predefined names.
     // NOTE: in this function we do not use tsince, i.e., the last element of inputs.
-    const auto [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR] = [&inputs]() {
+    const auto [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR] = [&inputs] {
         if (inputs.empty()) {
             return make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
         } else {
@@ -215,9 +215,10 @@ auto sgp4_init(const std::vector<expression> &inputs)
     const auto T4COF = .25 * (3. * D3 + C1 * (12. * D2 + 10. * C1SQ));
     const auto T5COF = .2 * (3. * D4 + 12. * C1 * D3 + 6. * pow(D2, 2.) + 15. * C1SQ * (2. * D2 + C1SQ));
 
-    return std::array{MDOT,   OMGDOT, N0DOT, NODCF, C4,     C1,     T2COF,  MCOF,  ETA,   DELM0,
-                      OMGCOF, PERIGE, C5,    SINM0, D2,     D3,     D4,     T3COF, T4COF, T5COF,
-                      A0DP,   AYCOF,  LCOF,  N0DP,  X3THM1, X1MTH2, X7THM1, COSI0, SINI0};
+    return std::array{
+        MDOT, OMGDOT, N0DOT, NODCF, C4,    C1,   T2COF, MCOF, ETA,  DELM0,  OMGCOF, PERIGE, C5,    SINM0, D2,
+        D3,   D4,     T3COF, T4COF, T5COF, A0DP, AYCOF, LCOF, N0DP, X3THM1, X1MTH2, X7THM1, COSI0, SINI0,
+    };
 }
 
 // This is the second stage of the SGP4 algorithm, that performs the actual time
@@ -238,7 +239,7 @@ std::vector<expression> sgp4_time_prop(const std::vector<expression> &inputs, co
 
     // Expressions representing the orbital elements, bstar and tsince.
     // NOTE: in this function we do not use n0, i.e., the first element of 'inputs'.
-    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE] = [&inputs]() {
+    const auto [E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE] = [&inputs] {
         if (inputs.empty()) {
             return make_vars("e0", "i0", "node0", "omega0", "m0", "bstar", "tsince");
         } else {
@@ -429,7 +430,7 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
     // Initialise the input quantities for the sgp4 algorithm.
     // NOTE: these are all the default ones, apart from tsince for which we use heyoka::time
     // instead of a 'tsince' variable.
-    const auto sgp4_inputs = []() {
+    const auto sgp4_inputs = [] {
         const auto tmp = make_vars("n0", "e0", "i0", "node0", "omega0", "m0", "bstar");
 
         // Add tsince as heyoka::time.
@@ -546,9 +547,11 @@ sgp4_prop_funcs sgp4_build_funcs(std::uint32_t order)
         func_tprop_args.insert(func_tprop_args.end(), iqs_vars.begin(), iqs_vars.end());
     }
 
-    return {.init = {std::move(func_init), std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1)},
-            .tprop = {std::move(func_tprop), std::move(func_tprop_args)},
-            .dt = std::move(cart_dfun_dtens)};
+    return {
+        .init = {std::move(func_init), std::vector(sgp4_inputs.begin(), sgp4_inputs.end() - 1)},
+        .tprop = {std::move(func_tprop), std::move(func_tprop_args)},
+        .dt = std::move(cart_dfun_dtens),
+    };
 }
 
 // Compile in parallel the init (f1) and tprop (f2) functions.
@@ -775,7 +778,9 @@ template <typename T>
 mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> sgp4_propagator<T>::get_sat_data() const
 {
     return mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>{
-        m_impl->m_sat_buffer.data(), boost::numeric_cast<std::size_t>(m_impl->m_sat_buffer.size() / 9u)};
+        m_impl->m_sat_buffer.data(),
+        boost::numeric_cast<std::size_t>(m_impl->m_sat_buffer.size() / 9u),
+    };
 }
 
 template <typename T>
@@ -816,7 +821,7 @@ void sgp4_propagator<T>::replace_sat_data(mdspan<const T, extents<std::size_t, 9
     }
 
     // Fetch a reference to cf_init.
-    auto &cf_init = m_impl->m_cf_init;
+    const auto &cf_init = m_impl->m_cf_init;
 
     // Prepare the in/out spans for the invocation of cf_init.
     //
@@ -883,8 +888,10 @@ std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint
 
     const auto rng = dt.get_derivatives(order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>
@@ -899,8 +906,10 @@ std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint
 
     const auto rng = dt.get_derivatives(component, order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>

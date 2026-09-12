@@ -11,7 +11,6 @@
 #include <variant>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
@@ -245,9 +244,9 @@ HEYOKA_EX_COMPOUND_OP(/=, mppp::real)
 // NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator==(const expression &e1, const expression &e2) noexcept
 {
-    auto visitor = [](const auto &v1, const auto &v2) {
-        using type1 = detail::uncvref_t<decltype(v1)>;
-        using type2 = detail::uncvref_t<decltype(v2)>;
+    const auto visitor = [](const auto &v1, const auto &v2) {
+        using type1 = std::remove_cvref_t<decltype(v1)>;
+        using type2 = std::remove_cvref_t<decltype(v2)>;
 
         if constexpr (std::is_same_v<type1, type2>) {
             return v1 == v2;

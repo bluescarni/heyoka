@@ -24,6 +24,7 @@ namespace model
 namespace detail
 {
 
+// NOLINTNEXTLINE(modernize-use-string-view)
 std::string delta_tt_tai_func::operator()(unsigned) const
 {
     // NOTE: regardless of the required precision, we have an exact representation

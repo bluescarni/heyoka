@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -22,6 +23,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/architecture.h>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -33,6 +35,7 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -47,6 +50,7 @@
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/ModRef.h>
+#include <llvm/Support/TypeSize.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -98,7 +102,7 @@ namespace
 // math intrinsics.
 // NOTE: this is needed because for some types the use of LLVM intrinsics
 // might be buggy or not possible at all (e.g., for mppp::real).
-bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
+bool llvm_stype_can_use_math_intrinsics(llvm_state &s, const llvm::Type *const tp)
 {
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
@@ -120,7 +124,7 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 // intrinsic with 2 arguments but the types argument has only 1 element because both arguments
 // must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
 // NOTE: for intrinsics, it is not necessary to set up manually the function attributes, as LLVM takes care of it.
-llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
+llvm::Function *llvm_lookup_intrinsic(const ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, unsigned nargs)
 {
     // NOTE: we used to have an assert(types.size() <= nargs), but as it turns out there are sometimes overloaded
@@ -199,7 +203,8 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 {
     // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
     // which intrinsic we pick.
-    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_external_llvm_type<double>(s.context())}, 1);
+    const auto *const f
+        = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_external_llvm_type<double>(s.context())}, 1);
     assert(f != nullptr);
 
     return f->getAttributes();
@@ -238,7 +243,7 @@ void llvm_append_used(llvm_state &s, llvm::Constant *ptr)
 
         // Fetch the original initializer.
         assert(orig_used->hasInitializer());
-        auto *orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
+        const auto *const orig_init = llvm::cast<llvm::ConstantArray>(orig_used->getInitializer());
 
         // Construct a new initializer with the original values plus the new pointer.
         std::vector<llvm::Constant *> arr_values;
@@ -510,7 +515,7 @@ llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vecto
 // - sinq(__float128) (suffix "q").
 //
 // If no C math function is available for the type scal_t, return an empty value.
-std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal_t)
+std::optional<std::string> get_cmath_func_suffix(llvm_state &s, const llvm::Type *const scal_t)
 {
     assert(scal_t != nullptr);
     assert(!scal_t->isVectorTy());
@@ -783,7 +788,7 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         // with the same attributes.
         const auto attrs = llvm_ext_math_func_attrs(s);
 
-        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             assert(vec_t->getNumElements() > 1u);
 
@@ -872,7 +877,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             }
         }
 
-        if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+        if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
             // The inputs are vectors. Fetch their SIMD width.
             assert(vec_t->getNumElements() > 1u);
 
@@ -956,11 +961,11 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
                                [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
 
     auto &bld = s.builder();
-    auto &md = s.module();
+    const auto &md = s.module();
 
     // Determine the type and scalar type of the arguments.
     auto *x_t = args[0]->getType();
-    auto *scal_t = x_t->getScalarType();
+    const auto *const scal_t = x_t->getScalarType();
 
     // Create the name of the scalar function.
     const auto scal_name = fmt::format("{}.{}", base_name, llvm_type_name(scal_t));
@@ -984,7 +989,7 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
         }
     }
 
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(x_t)) {
         // The inputs are vectors.
         assert(vec_t->getNumElements() > 1u);
 
@@ -1004,60 +1009,111 @@ llvm::Value *llvm_math_ir_defined(llvm_state &s, const std::string &base_name, c
     }
 }
 
-// Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
-// If vector_size is 1, a scalar is loaded instead.
-llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+namespace
+{
+
+// Constant signalling whether the in-memory layout of SIMD vectors matches the layout of arrays for the current
+// architecture.
+//
+// This is probably true for every architecture in existence right now. This variable is used to enable an optimised
+// path when loading/storing SIMD vectors from/to scalar buffers, which results in fewer IR operations than the portable
+// way of implementing such operations.
+//
+// NOTE: these are compile-time checks, which happen to work correctly because currently we are always jitting for the
+// host. If we ever enable jitting for non-host architectures, we should re-write these checks in terms of
+// runtime-derived properties (e.g., via the target triple).
+constexpr bool simd_layout_matches_array =
+#if BOOST_ARCH_ARM || BOOST_ARCH_X86 || BOOST_ARCH_PPC
+    true;
+#else
+    false;
+#endif
+
+} // namespace
+
+// Helper to load into a vector of size vector_size the sequential scalar data of type tp starting at ptr.
+//
+// If vector_size is 1, a scalar is loaded instead. It is assumed that the alignment of ptr is at least the alignment of
+// tp.
+llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *const tp, llvm::Value *const ptr,
+                                     const std::uint32_t vector_size)
 {
     // LCOV_EXCL_START
     assert(vector_size > 0u);
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
-    assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
+    assert(!tp->isVectorTy());
     // LCOV_EXCL_STOP
 
     if (vector_size == 1u) {
         // Scalar case.
         return builder.CreateLoad(tp, ptr);
+    } else {
+        // Create the vector type.
+        auto *vector_t = make_vector_type(tp, vector_size);
+        assert(vector_t != nullptr); // LCOV_EXCL_LINE
+
+        // NOTE: the only guaranteed portable way of loading a vector from an array of scalars is to load the scalars
+        // one by one and then pack them in a vector. We are counting on the optimiser to be able to translate this
+        // process into a single vector load whenever possible.
+        //
+        // In order to reduce the number of IR operations emitted, we implement an optimisation which is gated behind
+        // platform-specific and type-specific checks. Specifically, if we are on an architecture where SIMD vectors are
+        // guaranteed to match the layout of plain arrays and if the memory representation of the scalar type tp has no
+        // padding, then we emit a single vector load using the alignment of the scalar type.
+        //
+        // This gating ensures that the optimised codepath is (correctly) not taken for types such as x86_fp80.
+        //
+        // NOTE: this optimisation affects only the performance of code generation, the runtime performance of the code
+        // should be unaffected (again, assuming the optimiser does its job).
+        if constexpr (simd_layout_matches_array) {
+            using safe_size_t = boost::safe_numerics::safe<llvm::TypeSize::ScalarTy>;
+            assert(builder.GetInsertBlock() != nullptr);
+            const auto *const md = builder.GetInsertBlock()->getModule();
+            const auto &dl = md->getDataLayout();
+
+            // NOTE: this condition checks that the memory representation of tp has no padding.
+            if (dl.getTypeAllocSize(tp).getFixedValue() * safe_size_t(CHAR_BIT) == tp->getScalarSizeInBits()) {
+                const auto al = get_alignment(*md, tp);
+
+                return builder.CreateAlignedLoad(vector_t, ptr, llvm::Align(al));
+            }
+        }
+
+        // The portable approach.
+        llvm::Value *ret = llvm::PoisonValue::get(vector_t);
+        for (std::uint32_t i = 0; i < vector_size; ++i) {
+            auto *p = builder.CreateInBoundsGEP(tp, ptr, builder.getInt32(i));
+            ret = builder.CreateInsertElement(ret, builder.CreateLoad(tp, p), i);
+        }
+
+        return ret;
     }
-
-    // Create the vector type.
-    auto *vector_t = make_vector_type(tp, vector_size);
-    assert(vector_t != nullptr); // LCOV_EXCL_LINE
-
-    // Create the mask (all 1s).
-    auto *mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
-
-    // Create the passthrough value. This can stay undefined as it is never used
-    // due to the mask being all 1s.
-    auto *passthru = llvm::UndefValue::get(vector_t);
-
-    // Invoke the intrinsic.
-    auto *ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
-
-    return ret;
 }
 
-// This is like load_vector_from_memory(), except that the pointee of ptr might differ from the type of the loaded
-// value (e.g., in the case of real). This is supposed to be used when loading data created outside the LLVM
-// JIT world.
-llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+// This is like load_vector_from_memory(), except that the pointee of ptr might differ from the type of the loaded value
+// (e.g., in the case of real). This is supposed to be used when loading data created outside the LLVM JIT world.
+llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, llvm::Value *const ptr,
+                                         const std::uint32_t vector_size)
 {
+    // LCOV_EXCL_START
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    // LCOV_EXCL_STOP
+
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
-        // LCOV_EXCL_START
-        if (tp->isVectorTy()) {
-            throw std::invalid_argument("Cannot load a vector of reals");
-        }
-        // LCOV_EXCL_STOP
+    if (const auto real_prec = llvm_is_real(tp)) {
+        // NOTE: vectors of reals are not possible in LLVM, thus we should never get to a point in which we request any
+        // sort of operation on them.
+        assert(vector_size == 1u);
 
         auto &context = s.context();
 
-        // Fetch the limb type.
-        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
-
         // Fetch the external real struct type.
         auto *real_t = to_external_llvm_type<mppp::real>(context);
+
+        // Fetch the limb type.
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -1077,7 +1133,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 #endif
 
         // Init the return value.
-        llvm::Value *ret = llvm::UndefValue::get(tp);
+        llvm::Value *ret = llvm::PoisonValue::get(tp);
 
         // Read and insert the sign.
         auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
@@ -1110,52 +1166,70 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 #endif
 }
 
-// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
-// a plain store will be performed.
-void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
+// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector, a plain store will be
+// performed.
+//
+// It is assumed that the alignment of ptr is at least the alignment of the scalar type of vec.
+void store_vector_to_memory(ir_builder &builder, llvm::Value *const ptr, llvm::Value *const vec)
 {
     // LCOV_EXCL_START
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
-    assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
     // LCOV_EXCL_STOP
 
-    if (auto *vector_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
-        // Determine the vector size.
-        const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
+        // Fetch the scalar type and the vector size.
+        auto *scal_t = vec_t->getScalarType();
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
 
-        // Create the mask (all 1s).
-        auto *mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+        // NOTE: this is the mirror image of the loading code in load_vector_from_memory(). See there for explanations
+        // of this optimised codepath.
+        if constexpr (simd_layout_matches_array) {
+            using safe_size_t = boost::safe_numerics::safe<llvm::TypeSize::ScalarTy>;
+            assert(builder.GetInsertBlock() != nullptr);
+            const auto *const md = builder.GetInsertBlock()->getModule();
+            const auto &dl = md->getDataLayout();
 
-        // Invoke the intrinsic.
-        llvm_invoke_intrinsic(builder, "llvm.masked.compressstore", {vector_t}, {vec, ptr, mask});
+            if (dl.getTypeAllocSize(scal_t).getFixedValue() * safe_size_t(CHAR_BIT) == scal_t->getScalarSizeInBits()) {
+                const auto al = get_alignment(*md, scal_t);
+
+                builder.CreateAlignedStore(vec, ptr, llvm::Align(al));
+
+                return;
+            }
+        }
+
+        // NOTE: this is the mirror image of the portable load performed in load_vector_from_memory(), i.e., we unpack
+        // the vector and store the scalars one by one.
+        for (std::uint32_t i = 0; i < vector_size; ++i) {
+            auto *p = builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i));
+            builder.CreateStore(builder.CreateExtractElement(vec, i), p);
+        }
     } else {
-        // Not a vector, store vec directly.
+        // Scalar case, plain store.
         builder.CreateStore(vec, ptr);
     }
 }
 
-// This is like store_vector_to_memory(), except that the pointee of ptr might differ from the type of the value to
-// be stored (e.g., in the case of real). This is supposed to be used when storing data created created inside LLVM into
-// a pointer that will then be used by code outside the LLVM realm.
-void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *vec)
+// This is like store_vector_to_memory(), except that the pointee of ptr might differ from the type of the value to be
+// stored (e.g., in the case of real). This is supposed to be used when storing data created created inside LLVM into a
+// pointer that will then be used by code outside the LLVM realm.
+void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Value *const vec)
 {
+    // LCOV_EXCL_START
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    // LCOV_EXCL_STOP
+
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (const auto real_prec = llvm_is_real(vec->getType()->getScalarType())) {
-        // LCOV_EXCL_START
-        if (vec->getType()->isVectorTy()) {
-            throw std::invalid_argument("Cannot store a vector of reals");
-        }
-        // LCOV_EXCL_STOP
-
+    if (const auto real_prec = llvm_is_real(vec->getType())) {
         auto &context = s.context();
-
-        // Fetch the limb type.
-        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_external_llvm_type<mppp::real>(context);
+
+        // Fetch the limb type.
+        auto *limb_t = to_external_llvm_type<mp_limb_t>(context);
 
         // Compute the number of limbs in the internal real type.
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
@@ -1204,15 +1278,15 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
 // Gather a vector of type vec_tp from ptrs.
 //
-// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values
-// of type vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
+// ptrs is assumed to be either a single pointer or a vector of pointers into an array of scalar values of type
+// vec_tp->getScalarType(). The array is assumed to be properly aligned for the scalar values.
 //
-// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value
-// will be a vector of values gathered from the addresses specified in ptrs.
+// If vec_tp is a vector type, then ptrs must be a vector of the same size. The returned value will be a vector of
+// values gathered from the addresses specified in ptrs.
 //
-// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function
-// behaves like a scalar load from ptrs).
-llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
+// Otherwise, ptrs must be a single pointer and the returned value is a scalar (that is, the function behaves like a
+// scalar load from ptrs).
+llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *const vec_tp, llvm::Value *const ptrs)
 {
     assert(ptrs->getType()->getScalarType()->isPointerTy());
 
@@ -1237,24 +1311,20 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 }
 
 // Same as above, but for external loads.
-llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr)
+llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *const tp, llvm::Value *const ptrs)
 {
+    assert(ptrs->getType()->getScalarType()->isPointerTy());
+
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (llvm_is_real(tp->getScalarType()) != 0) {
-        // LCOV_EXCL_START
-        if (tp->isVectorTy()) {
-            throw std::invalid_argument("Cannot gather from memory a vector of reals");
-        }
-        // LCOV_EXCL_STOP
+    if (llvm_is_real(tp) != 0) {
+        assert(!llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
 
-        assert(!llvm::isa<llvm::FixedVectorType>(ptr->getType()));
-
-        return ext_load_vector_from_memory(s, tp, ptr, 1);
+        return ext_load_vector_from_memory(s, tp, ptrs, 1);
     } else {
 #endif
-        return gather_vector_from_memory(builder, tp, ptr);
+        return gather_vector_from_memory(builder, tp, ptrs);
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
@@ -1295,21 +1365,20 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
     }
 }
 
-// Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
-// return {vec}.
+// Convert the input LLVM vector to a std::vector of values. If vec is not a vector, return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto *vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
+    if (const auto *const vec_t = llvm::dyn_cast<llvm::FixedVectorType>(vec->getType())) {
         // Fetch the vector width.
-        auto vector_size = vec_t->getNumElements();
-
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
         assert(vector_size != 0u); // LCOV_EXCL_LINE
 
         // Extract the vector elements one by one.
         std::vector<llvm::Value *> ret;
-        for (decltype(vector_size) i = 0; i < vector_size; ++i) {
-            ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
-            assert(ret.back() != nullptr); // LCOV_EXCL_LINE
+        ret.reserve(vector_size);
+        for (std::uint32_t i = 0; i < vector_size; ++i) {
+            // NOTE: the extraction index has type std::uint64_t, no overflow risks here.
+            ret.push_back(builder.CreateExtractElement(vec, i));
         }
 
         return ret;
@@ -1319,33 +1388,34 @@ std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *v
 }
 
 // Convert a std::vector of values into an LLVM vector of the corresponding size.
-// If scalars contains only 1 value, return that value.
+//
+// If scalars contains only 1 value, return that value. The scalars must all be of the same type.
 llvm::Value *scalars_to_vector(ir_builder &builder, const std::vector<llvm::Value *> &scalars)
 {
     assert(!scalars.empty());
 
     // Fetch the vector size.
-    const auto vector_size = scalars.size();
+    const auto vector_size = boost::numeric_cast<std::uint32_t>(scalars.size());
 
     if (vector_size == 1u) {
         return scalars[0];
     }
 
     // Fetch the scalar type.
-    auto *scalar_t = scalars[0]->getType();
+    auto *const scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
-    auto *vector_t = make_vector_type(scalar_t, boost::numeric_cast<std::uint32_t>(vector_size));
+    auto *const vector_t = make_vector_type(scalar_t, vector_size);
     assert(vector_t != nullptr);
 
     // Create an empty vector.
-    llvm::Value *vec = llvm::UndefValue::get(vector_t);
+    llvm::Value *vec = llvm::PoisonValue::get(vector_t);
     assert(vec != nullptr);
 
     // Fill it up.
-    for (auto i = 0u; i < vector_size; ++i) {
+    for (std::uint32_t i = 0; i < vector_size; ++i) {
         assert(scalars[i]->getType() == scalar_t);
-
+        // NOTE: the insertion index has type std::uint64_t, no overflow risks here.
         vec = builder.CreateInsertElement(vec, scalars[i], i);
     }
 
@@ -1363,7 +1433,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         // The function does not exist yet, make the prototype.
         std::vector<llvm::Type *> arg_types;
         arg_types.reserve(args.size());
-        for (auto *a : args) {
+        for (const auto *const a : args) {
             arg_types.push_back(a->getType());
         }
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
@@ -1524,12 +1594,15 @@ HEYOKA_DLL_PUBLIC void llvm_assert([[maybe_unused]] llvm_state &s, [[maybe_unuse
 
     // Check it.
     llvm_if_then_else(
-        s, cond, []() {},
-        [&s, &bld, file_name, function_name, &loc]() {
+        s, cond, [] {},
+        [&s, &bld, file_name, function_name, &loc] {
             llvm_invoke_external(s, "heyoka_llvm_assertion_failure", bld.getVoidTy(),
-                                 {bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
-                                  bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())), file_name,
-                                  function_name});
+                                 {
+                                     bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.line())),
+                                     bld.getInt64(boost::numeric_cast<std::uint64_t>(loc.column())),
+                                     file_name,
+                                     function_name,
+                                 });
         });
 
 #endif

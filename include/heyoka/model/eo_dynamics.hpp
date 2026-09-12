@@ -57,7 +57,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     auto sw_data = p(kw::sw_data, heyoka::sw_data{});
 
     // Parse the ballistic coefficient expression.
-    auto Cb_opt = [&p]() -> std::optional<expression> {
+    auto Cb_opt = [&p] -> std::optional<expression> {
         if constexpr (p.has(kw::Cb)) {
             return make_optional<expression>(p(kw::Cb));
         } else {
@@ -66,7 +66,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
     }();
 
     // Parse the ELP2000 and VSOP2013 thresholds.
-    const auto elp2000_thresh_opt = [&p]() -> std::optional<double> {
+    const auto elp2000_thresh_opt = [&p] -> std::optional<double> {
         if constexpr (p.has(kw::elp2000_thresh)) {
             return make_optional<double>(p(kw::elp2000_thresh));
         } else {
@@ -74,7 +74,7 @@ auto eo_dynamics_opts(const KwArgs &...kw_args)
         }
     }();
 
-    const auto vsop2013_thresh_opt = [&p]() -> std::optional<double> {
+    const auto vsop2013_thresh_opt = [&p] -> std::optional<double> {
         if constexpr (p.has(kw::vsop2013_thresh)) {
             return make_optional<double>(p(kw::vsop2013_thresh));
         } else {
@@ -120,6 +120,7 @@ inline constexpr auto eo_dynamics_kw_cfg
 //   (which disables third-body perturbations altogether).
 inline constexpr auto eo_dynamics = []<typename... KwArgs>
     requires igor::validate<eo_dynamics_kw_cfg, KwArgs...>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
 (KwArgs &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::eo_dynamics_impl, detail::eo_dynamics_opts(std::forward<KwArgs>(kw_args)...));
 };

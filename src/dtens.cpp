@@ -53,7 +53,7 @@ bool dtens_sv_idx_cmp_impl(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2)
     using su32 = boost::safe_numerics::safe<std::uint32_t>;
 
     // The accumulator.
-    auto acc = [](const auto &val, const auto &p) { return val + p.second; };
+    const auto acc = [](const auto &val, const auto &p) { return val + p.second; };
 
     const auto deg1 = std::accumulate(v1.second.begin(), v1.second.end(), su32(0), acc);
     const auto deg2 = std::accumulate(v2.second.begin(), v2.second.end(), su32(0), acc);
@@ -166,12 +166,12 @@ bool dtens_v_idx_cmp_impl(const dtens::v_idx_t &v1, const dtens::v_idx_t &v2)
 
 bool dtens_sv_idx_cmp::operator()(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2) const
 {
-    auto ret = dtens_sv_idx_cmp_impl(v1, v2);
+    const auto ret = dtens_sv_idx_cmp_impl(v1, v2);
 
 #if !defined(NDEBUG)
 
     // Convert to dense and re-run the same comparison.
-    auto to_dense = [](const dtens_sv_idx_t &v) {
+    const auto to_dense = [](const dtens_sv_idx_t &v) {
         dtens::v_idx_t dv{v.first};
 
         std::uint32_t cur_d_idx = 0;

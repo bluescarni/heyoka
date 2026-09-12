@@ -56,8 +56,13 @@ public:
     // NOTE: no need to implement move semantics here, copy semantics is sufficient.
     aligned_allocator(const aligned_allocator &) noexcept = default;
     template <class U>
-    // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
-    aligned_allocator(const aligned_allocator<U> &other) noexcept : m_al(other.m_al){};
+    // NOTE: clang-tidy really does not like this constructor, but we are just trying to match the corresponding
+    // std::allocator behaviour here.
+    //
+    // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions,cppcoreguidelines-explicit-constructor,misc-explicit-constructor)
+    aligned_allocator(const aligned_allocator<U> &other) noexcept : m_al(other.m_al)
+    {
+    }
     ~aligned_allocator() = default;
     aligned_allocator &operator=(const aligned_allocator &) noexcept = default;
 

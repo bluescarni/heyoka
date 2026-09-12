@@ -79,7 +79,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 
 // The global type map to associate a C++ type to an LLVM type.
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
-const auto type_map = []() {
+const auto type_map = [] {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 
     // Try to associate C++ float to LLVM float.
@@ -125,10 +125,14 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret
-            = llvm::StructType::create({to_external_llvm_type<mpfr_prec_t>(c), to_external_llvm_type<mpfr_sign_t>(c),
-                                        to_external_llvm_type<mpfr_exp_t>(c), llvm::PointerType::getUnqual(c)},
-                                       "heyoka.real");
+        auto *ret = llvm::StructType::create(
+            {
+                to_external_llvm_type<mpfr_prec_t>(c),
+                to_external_llvm_type<mpfr_sign_t>(c),
+                to_external_llvm_type<mpfr_exp_t>(c),
+                llvm::PointerType::getUnqual(c),
+            },
+            "heyoka.real");
 
         assert(ret != nullptr);
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
@@ -152,7 +156,12 @@ const auto type_map = []() {
 } // namespace
 
 // Implementation of the function to associate a C++ type to an LLVM type.
-llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bool err_throw)
+//
+// NOTE: clang-tidy would like c to be const here, but this is not possible because in the functions in type_map c must
+// be non-const.
+//
+// NOLINTNEXTLINE(misc-const-correctness)
+llvm::Type *to_external_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, const bool err_throw)
 {
     const auto it = type_map.find(tp);
 
@@ -182,11 +191,11 @@ std::string llvm_mangle_type(llvm::Type *t)
 {
     assert(t != nullptr);
 
-    if (auto *v_t = llvm::dyn_cast<llvm::FixedVectorType>(t)) {
+    if (const auto *const v_t = llvm::dyn_cast<llvm::FixedVectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return fmt::format("{}_{}", llvm_type_name(v_t->getElementType()), v_t->getNumElements());
-    } else if (auto *arr_t = llvm::dyn_cast<llvm::ArrayType>(t)) {
+    } else if (const auto *const arr_t = llvm::dyn_cast<llvm::ArrayType>(t)) {
         // Similar idea if the type is an array.
         return fmt::format("array_{}_{}", llvm_type_name(arr_t->getElementType()), arr_t->getNumElements());
     } else {
@@ -209,7 +218,7 @@ std::uint32_t get_vector_size(llvm::Type *const tp)
 
 // Helper to determine the vector size of the type of a value. If the type is not llvm::FixedVectorType, 1 will be
 // returned.
-std::uint32_t get_vector_size(llvm::Value *const x)
+std::uint32_t get_vector_size(const llvm::Value *const x)
 {
     assert(x != nullptr);
 
@@ -224,7 +233,7 @@ std::uint32_t gl_arr_size(llvm::Value *v)
 }
 
 // Fetch the alignment of a type.
-std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
+std::uint64_t get_alignment(const llvm::Module &md, llvm::Type *tp)
 {
     return md.getDataLayout().getABITypeAlign(tp).value();
 }
@@ -232,7 +241,7 @@ std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 // Fetch the alloc size of a type. This should be
 // equivalent to the sizeof() operator in C++.
 // Requires a non-scalable type.
-std::uint64_t get_size(llvm::Module &md, llvm::Type *tp)
+std::uint64_t get_size(const llvm::Module &md, llvm::Type *tp)
 {
     assert(!md.getDataLayout().getTypeAllocSize(tp).isScalable());
 
@@ -274,7 +283,7 @@ llvm::Value *to_size_t(llvm_state &s, llvm::Value *n)
 
 // Small helper to fetch a string representation
 // of an LLVM type.
-std::string llvm_type_name(llvm::Type *t)
+std::string llvm_type_name(const llvm::Type *t)
 {
     assert(t != nullptr);
 
@@ -370,8 +379,6 @@ template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<mppp::real>(llvm_st
 template <typename T>
 llvm::Type *internal_llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
-    auto &c = s.context();
-
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return to_internal_llvm_type<T>(s, x.get_prec());
@@ -379,7 +386,7 @@ llvm::Type *internal_llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 #endif
         // NOTE: for anything else than mppp::real, the internal and
         // external types coincide.
-        return to_external_llvm_type<T>(c);
+        return to_external_llvm_type<T>(s.context());
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
@@ -505,7 +512,7 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 // NOTE: LLVM<=20 had an isIEEE() method for this, but it got slightly changed in LLVM 21 so that now it is called
 // isIEEELikeFPTy() and it *excludes* 80-bit extended precision. For our internal use, we want to consider 80-bit
 // extended precision as IEEE-like.
-bool llvm_is_ieee_like_fp(llvm::Type *tp)
+bool llvm_is_ieee_like_fp(const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 

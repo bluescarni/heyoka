@@ -197,8 +197,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     detail::llvm_while_loop(
         m_llvm_state,
-        [&]() { return builder.CreateICmpNE(builder.CreateLoad(builder.getInt32Ty(), count), builder.getInt32(0)); },
-        [&]() {
+        [&] { return builder.CreateICmpNE(builder.CreateLoad(builder.getInt32Ty(), count), builder.getInt32(0)); },
+        [&] {
             // tidx = first.
             builder.CreateStore(builder.CreateLoad(builder.getInt32Ty(), first), tidx);
             // step = count / 2.
@@ -225,7 +225,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
             detail::llvm_if_then_else(
                 m_llvm_state, cond,
-                [&]() {
+                [&] {
                     // ++tidx.
                     builder.CreateStore(
                         builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), tidx), builder.getInt32(1)), tidx);
@@ -238,7 +238,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
                             builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), step), builder.getInt32(1))),
                         count);
                 },
-                [&]() {
+                [&] {
                     // count = step.
                     builder.CreateStore(builder.CreateLoad(builder.getInt32Ty(), step), count);
                 });
@@ -256,18 +256,18 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // or the last possible set of TCs.
     detail::llvm_if_then_else(
         m_llvm_state, builder.CreateICmpEQ(tc_idx, builder.getInt32(0)),
-        []() {
+        [] {
             // first == 0, do nothing.
         },
-        [&]() {
+        [&] {
             detail::llvm_if_then_else(
                 m_llvm_state,
                 builder.CreateICmpEQ(tc_idx, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size()))),
-                [&]() {
+                [&] {
                     // first == range size.
                     builder.CreateStore(builder.CreateSub(tc_idx, builder.getInt32(2)), first);
                 },
-                [&]() {
+                [&] {
                     // The normal path.
                     builder.CreateStore(builder.CreateSub(tc_idx, builder.getInt32(1)), first);
                 });
@@ -683,7 +683,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
         dir_vec = builder.getInt1(dir);
     } else {
-        dir_vec = llvm::UndefValue::get(bool_vector_t);
+        dir_vec = llvm::PoisonValue::get(bool_vector_t);
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             const detail::dfloat<T> df_t_start(m_times_hi[i], m_times_lo[i]),
                 // NOTE: we load from the padding values here.
@@ -725,7 +725,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
         // In scalar mode, use a single value.
         batch_offset = builder.getInt32(0);
     } else {
-        batch_offset = llvm::UndefValue::get(int32_vec_t);
+        batch_offset = llvm::PoisonValue::get(int32_vec_t);
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             batch_offset = builder.CreateInsertElement(batch_offset, builder.getInt32(i), i);
         }
@@ -746,14 +746,14 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
     detail::llvm_while_loop(
         m_llvm_state,
-        [&]() -> llvm::Value * {
+        [&] -> llvm::Value * {
             // NOTE: the condition here is that any value in count is not zero.
             auto *cmp = builder.CreateICmpNE(builder.CreateLoad(int32_vec_t, count), zero_vec_i32);
 
             // NOTE: in scalar mode, no reduction is needed.
             return (m_batch_size == 1u) ? cmp : builder.CreateOrReduce(cmp);
         },
-        [&]() {
+        [&] {
             // tidx = first.
             builder.CreateStore(builder.CreateLoad(int32_vec_t, first), tidx);
             // step = count / 2.
@@ -838,8 +838,11 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                                            {builder.getInt32(0), builder.getInt32(0)});
         detail::store_vector_to_memory(builder, tc_idx_debug_ptr, tc_idx);
         detail::llvm_invoke_external(m_llvm_state, "heyoka_continuous_output_batch_tc_idx_debug", builder.getVoidTy(),
-                                     {tc_idx_debug_ptr, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())),
-                                      builder.getInt32(m_batch_size)});
+                                     {
+                                         tc_idx_debug_ptr,
+                                         builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())),
+                                         builder.getInt32(m_batch_size),
+                                     });
     }
 
 #endif

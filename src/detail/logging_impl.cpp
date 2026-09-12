@@ -38,7 +38,7 @@ auto make_logger()
 
 spdlog::logger *get_logger()
 {
-    static auto ret = make_logger();
+    static const auto ret = make_logger();
 
     return ret.get();
 }

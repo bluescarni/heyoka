@@ -61,10 +61,9 @@
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
-// NOTE: this is a helper macro to reduce typing when accessing the
-// data members of i_data.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
+// NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
 #define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) [[maybe_unused]] auto &name = m_i_data->name
+#define HEYOKA_TAYLOR_CREF_FROM_I_DATA(name) [[maybe_unused]] const auto &name = m_i_data->name
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -118,8 +117,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
@@ -639,10 +638,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_delta_ts);
@@ -674,7 +673,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
-    auto check_nf_batch = [&](std::uint32_t batch_idx) {
+    const auto check_nf_batch = [&](std::uint32_t batch_idx) {
         for (std::uint32_t i = 0; i < m_dim; ++i) {
             if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
                 return true;
@@ -722,7 +721,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     // max_delta_ts, stored at the end of m_delta_ts,
                     // in case max_delta_ts aliases integrator data
                     // which was modified during the step.
-                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success,
+                    h,
+                };
             }
         }
     } else {
@@ -797,7 +798,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
+            const auto cmp
+                = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
             std::sort(edd.m_d_tes[i].begin(), edd.m_d_tes[i].end(), cmp);
             std::sort(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), cmp);
 
@@ -866,7 +868,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 if (cd) {
                     // Check if the timestep we just took
                     // brought this event outside the cooldown.
-                    auto tmp = cd->first + h;
+                    const auto tmp = cd->first + h;
 
                     if (abs(tmp) >= cd->second) {
                         // We are now outside the cooldown period
@@ -969,7 +971,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     // max_delta_ts, stored at the end of m_delta_ts,
                     // in case max_delta_ts aliases integrator data
                     // which was modified during the step.
-                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success,
+                    h,
+                };
             } else {
                 // Terminal event detected. Fetch its index.
                 const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[i][0]));
@@ -1038,7 +1042,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch<T>::step(bool wtc)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
 
     step_impl(m_pinf, wtc);
 }
@@ -1046,7 +1050,7 @@ void taylor_adaptive_batch<T>::step(bool wtc)
 template <typename T>
 void taylor_adaptive_batch<T>::step_backward(bool wtc)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_minf);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_minf);
 
     step_impl(m_minf, wtc);
 }
@@ -1054,7 +1058,7 @@ void taylor_adaptive_batch<T>::step_backward(bool wtc)
 template <typename T>
 void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
 
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1150,7 +1154,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_prop_res);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ts_count);
@@ -1273,7 +1277,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
     }
 
     // Helper to create the continuous output object.
-    auto make_c_out = [&]() -> std::optional<continuous_output_batch<T>> {
+    const auto make_c_out = [&] -> std::optional<continuous_output_batch<T>> {
         if (with_c_out) {
             if (c_out_times_hi.size() / m_batch_size < 2u) {
                 // NOTE: this means that no successful steps
@@ -1314,7 +1318,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
     };
 
     // Helper to update the continuous output data after a timestep.
-    auto update_c_out = [&]() {
+    const auto update_c_out = [&] {
         if (with_c_out) {
 #if !defined(NDEBUG)
             std::vector<detail::dfloat<T>> prev_times;
@@ -1556,7 +1560,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_prop_res);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ts_count);
@@ -1568,7 +1572,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
 
     // Helper to detect if an input value is nonfinite.
-    auto is_nf = [](const T &t) {
+    const auto is_nf = [](const T &t) {
         using std::isfinite;
         return !isfinite(t);
     };
@@ -1766,7 +1770,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
 
     // NOTE: small helper to detect if there are still unprocessed
     // grid points for at least one batch element.
-    auto cont_cond = [n_grid_points, &cur_grid_idx]() {
+    const auto cont_cond = [n_grid_points, &cur_grid_idx] {
         return std::any_of(cur_grid_idx.begin(), cur_grid_idx.end(),
                            [n_grid_points](auto idx) { return idx < n_grid_points; });
     };
@@ -2005,7 +2009,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [&]() {
+        const auto wrap_cb_call = [&] {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
@@ -2257,7 +2261,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vecto
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
@@ -2301,7 +2305,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
@@ -2339,7 +2343,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns()
 template <typename T>
 void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
 
     if (!m_i_data->m_ed_data) [[unlikely]] {
         throw std::invalid_argument("No events were defined for this integrator");
@@ -2371,8 +2375,8 @@ void taylor_adaptive_batch<T>::check_variational(const char *fname) const
 template <typename T>
 void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_step_f = m_ta_jit_data->m_step_f;
     auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
@@ -2494,8 +2498,10 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std
 
     const auto rng = dt.get_derivatives(order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>
@@ -2508,8 +2514,10 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std
 
     const auto rng = dt.get_derivatives(component, order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>
@@ -2546,3 +2554,5 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(mppp::real128)
 HEYOKA_END_NAMESPACE
 
 #undef HEYOKA_TAYLOR_REF_FROM_I_DATA
+
+#undef HEYOKA_TAYLOR_CREF_FROM_I_DATA

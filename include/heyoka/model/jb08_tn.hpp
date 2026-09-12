@@ -30,7 +30,6 @@ namespace detail
 {
 
 // Macro to reduce typing when handling kwargs.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
 #define HEYOKA_MODEL_JB08_KWARG(name) auto name = expression(p(kw::name));
 
 // Common options for the jb08_tn functions.
@@ -57,9 +56,11 @@ auto jb08_tn_common_opts(const KwArgs &...kw_args)
     // 00:00:00 UTC).
     HEYOKA_MODEL_JB08_KWARG(time_expr);
 
-    return std::tuple{std::move(geodetic), std::move(f107a),  std::move(f107),     std::move(s107a),
-                      std::move(s107),     std::move(m107a),  std::move(m107),     std::move(y107a),
-                      std::move(y107),     std::move(dDstdT), std::move(time_expr)};
+    return std::tuple{
+        std::move(geodetic), std::move(f107a),  std::move(f107),      std::move(s107a),
+        std::move(s107),     std::move(m107a),  std::move(m107),      std::move(y107a),
+        std::move(y107),     std::move(dDstdT), std::move(time_expr),
+    };
 }
 
 #undef HEYOKA_MODEL_JB08_KWARG
@@ -72,7 +73,6 @@ HEYOKA_DLL_PUBLIC expression jb08_tn_impl(const std::vector<expression> &, const
 } // namespace detail
 
 // Macro to reduce typing when handling kwargs descriptors.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
 #define HEYOKA_MODEL_JB08_KWARG_DESCR(name) kw::descr::constructible_from<expression, kw::name, true>
 
 inline constexpr auto jb08_tn_kw_cfg

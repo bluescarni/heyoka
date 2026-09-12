@@ -30,7 +30,6 @@ namespace detail
 {
 
 // Macro to reduce typing when handling kwargs.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
 #define HEYOKA_MODEL_NRLMSISE00_KWARG(name) auto name = expression(p(kw::name));
 
 // Common options for the nrlmsise00_tn functions.
@@ -62,7 +61,6 @@ HEYOKA_DLL_PUBLIC expression nrlmsise00_tn_impl(const std::vector<expression> &,
 } // namespace detail
 
 // Macro to reduce typing when handling kwargs descriptors.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
 #define HEYOKA_MODEL_NRLMSISE00_KWARG_DESCR(name) kw::descr::constructible_from<expression, kw::name, true>
 
 inline constexpr auto nrlmsise00_tn_kw_cfg

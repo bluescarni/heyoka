@@ -159,7 +159,7 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
     }
 
     // Helper to clean up the uninserted blocks in case of exceptions.
-    auto bb_cleanup = [&cases_blocks]() {
+    const auto bb_cleanup = [&cases_blocks] {
         for (auto *bb : cases_blocks) {
             bb->deleteValue();
         }

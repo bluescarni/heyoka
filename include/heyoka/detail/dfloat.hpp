@@ -103,8 +103,12 @@ inline bool isfinite(const dfloat<F> &x)
 template <typename F>
 inline std::pair<F, F> eft_add_dekker(const F &a, const F &b)
 {
+    // NOTE: in general we do not want x/y to be const, so that they can effectively be moved.
+    //
+    // NOLINTBEGIN(misc-const-correctness)
     auto x = a + b;
     auto y = (a - x) + b;
+    // NOLINTEND(misc-const-correctness)
 
     return std::make_pair(std::move(x), std::move(y));
 }
@@ -117,9 +121,13 @@ inline std::pair<F, F> eft_add_dekker(const F &a, const F &b)
 template <typename F>
 inline std::pair<F, F> eft_add_knuth(const F &a, const F &b)
 {
+    // NOTE: in general we do not want x/y to be const, so that they can effectively be moved.
+    //
+    // NOLINTBEGIN(misc-const-correctness)
     auto x = a + b;
-    auto z = x - a;
+    const auto z = x - a;
     auto y = (a - (x - z)) + (b - z);
+    // NOLINTEND(misc-const-correctness)
 
     return std::make_pair(std::move(x), std::move(y));
 }

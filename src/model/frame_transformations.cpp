@@ -37,9 +37,11 @@ namespace
 {
 
 // FK5@J2000->ICRS rotation matrix, stored in row-major format.
-constexpr std::array fk5j2000_icrs_rot = {9.9999999999999278e-01,  1.1102233723050031e-07, 4.4118034269763241e-08,
-                                          -1.1102233297408340e-07, 9.9999999999998912e-01, -9.6477927438885170e-08,
-                                          -4.4118044980967761e-08, 9.6477922540797404e-08, 9.9999999999999434e-01};
+constexpr std::array fk5j2000_icrs_rot = {
+    9.9999999999999278e-01,  1.1102233723050031e-07, 4.4118034269763241e-08,
+    -1.1102233297408340e-07, 9.9999999999998912e-01, -9.6477927438885170e-08,
+    -4.4118044980967761e-08, 9.6477922540797404e-08, 9.9999999999999434e-01,
+};
 
 // Implementation of the FK5@J2000<->ICRS rotations. If Layout == right, we get the FK5@J2000->ICRS rotation,
 // while with Layout == left we get the ICRS->FK5@J2000 rotation. I.e., changing the layout transposes
@@ -207,8 +209,11 @@ std::array<expression, 3> rot_cirs_icrs(const std::array<expression, 3> &xyz, co
     const auto z_tmp = z;
 
     // Second step: rotation by R_mat.
-    return {sum({R00 * x_tmp, R01 * y_tmp, R02 * z_tmp}), sum({R10 * x_tmp, R11 * y_tmp, R12 * z_tmp}),
-            sum({R20 * x_tmp, R21 * y_tmp, R22 * z_tmp})};
+    return {
+        sum({R00 * x_tmp, R01 * y_tmp, R02 * z_tmp}),
+        sum({R10 * x_tmp, R11 * y_tmp, R12 * z_tmp}),
+        sum({R20 * x_tmp, R21 * y_tmp, R22 * z_tmp}),
+    };
 }
 
 } // namespace

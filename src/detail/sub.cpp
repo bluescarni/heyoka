@@ -230,14 +230,14 @@ llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order zero, run the codegen.
                 auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
                 auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(llvm_fsub(s, num_vec, ret), retval);
             },
-            [&]() {
+            [&] {
                 // Load the derivative.
                 auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
                 // Negate it.
@@ -306,14 +306,14 @@ llvm::Function *taylor_c_diff_func_sub_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order zero, run the codegen.
                 auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.getInt32(0), var_idx);
                 auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
 
                 builder.CreateStore(llvm_fsub(s, ret, num_vec), retval);
             },
-            [&]() {
+            [&] {
                 // Create the return value.
                 builder.CreateStore(taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx), retval);
             });

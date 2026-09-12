@@ -366,7 +366,7 @@ llvm::Function *eop_sw_impl<Data>::taylor_c_diff_func(llvm_state &s, llvm::Type 
 
                 hd::llvm_if_then_else(
                     s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
-                    [&]() {
+                    [&] {
                         // For order 0, compute the EOP/SW quantity for the order 0 of b_idx.
 
                         // Load b^[0].
@@ -378,7 +378,7 @@ llvm::Function *eop_sw_impl<Data>::taylor_c_diff_func(llvm_state &s, llvm::Type 
                         // Store the result.
                         bld.CreateStore(x_val, retval);
                     },
-                    [&]() {
+                    [&] {
                         // For order > 0, we must compute xp*b^[n].
 
                         // Load b^[n].
@@ -589,7 +589,7 @@ llvm::Function *eop_sw_p_impl<Data>::taylor_c_diff_func(llvm_state &s, llvm::Typ
 
                 hd::llvm_if_then_else(
                     s, bld.CreateICmpEQ(ord, bld.getInt32(0)),
-                    [&]() {
+                    [&] {
                         // For order 0, compute the derivative of the EOP/SW quantity for the order 0 of b_idx.
 
                         // Load b^[0].
@@ -601,7 +601,7 @@ llvm::Function *eop_sw_p_impl<Data>::taylor_c_diff_func(llvm_state &s, llvm::Typ
                         // Store the result.
                         bld.CreateStore(xp_val, retval);
                     },
-                    [&]() {
+                    [&] {
                         // For order > 0, we return 0.
                         bld.CreateStore(llvm_codegen(s, val_t, number{0.}), retval);
                     });

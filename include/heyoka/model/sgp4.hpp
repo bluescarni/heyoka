@@ -114,14 +114,14 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         // and concurrent usages.
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
-            [&cf_init, &funcs, &kw_args...]() {
+            [&cf_init, &funcs, &kw_args...] {
                 cf_init = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
                     [&funcs](const auto &...args) {
                         return cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second), args...);
                     },
                     kw_args...);
             },
-            [&cf_prop, &funcs, &kw_args...]() {
+            [&cf_prop, &funcs, &kw_args...] {
                 cf_prop = igor::filter_invoke<cfunc<T>::ctor_kw_cfg>(
                     [&funcs](const auto &...args) {
                         return cfunc<T>(std::move(funcs.tprop.first), std::move(funcs.tprop.second), args...);

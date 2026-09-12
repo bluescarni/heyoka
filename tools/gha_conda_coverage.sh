@@ -28,6 +28,10 @@ unset CXXFLAGS
 unset CFLAGS
 
 # Configure.
+#
+# NOTE: -fprofile-update=atomic is necessary because the default (i.e., 'single') updates the gcov counters
+# non-atomically. Since heyoka runs instrumented code concurrently from multiple TBB threads, the counter updates race
+# with each other, which results in corrupted counters and in lcov erroring out with negative hit counts.
 cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -36,7 +40,7 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_UTILS=ON \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DCMAKE_CXX_FLAGS="--coverage" \
+    -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"
 
 # Build.
@@ -46,7 +50,7 @@ ninja -v
 ctest -VV -j4
 
 # Create lcov report
-lcov --capture --directory . --output-file coverage.info
+lcov --capture --directory . --output-file coverage.info --ignore-errors inconsistent,inconsistent
 
 set +e
 set +x

@@ -34,7 +34,7 @@ namespace detail
 template <typename Archive, typename... Args, std::size_t... Is>
 void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std::size_t idx, std::index_sequence<Is...>)
 {
-    auto loader = [&ar, &var, idx](auto val) {
+    const auto loader = [&ar, &var, idx](auto val) {
         constexpr auto N = decltype(val)::value;
 
         if (N == idx) {
@@ -57,7 +57,7 @@ void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std::size_t
     };
 
     // LCOV_EXCL_START
-    [[maybe_unused]] auto ret = (loader(std::integral_constant<std::size_t, Is>{}) || ...);
+    [[maybe_unused]] const auto ret = (loader(std::integral_constant<std::size_t, Is>{}) || ...);
 
     assert(ret);
     assert(var.index() == idx);

@@ -172,7 +172,7 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
     auto st = s.make_similar();
 
     // Setup the prec argument for the compiled function.
-    const auto prec = [&]() -> long long {
+    const auto prec = [&] -> long long {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::same_as<mppp::real, T>) {
             // NOTE: here we know that m_state is not empty and that it contains

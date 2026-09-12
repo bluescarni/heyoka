@@ -66,7 +66,6 @@
 #include <heyoka/detail/ranges_to.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -109,7 +108,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
 
     // Helper that takes in input the definition ex of a u variable, and returns
     // in output the list of indices of the u variables on which ex depends.
-    auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
+    const auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
             [](const auto &v) -> std::vector<std::uint32_t> {
                 using type = std::remove_cvref_t<decltype(v)>;
@@ -222,7 +221,7 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
             = llvm::ArrayType::get(builder.getInt32Ty(), boost::numeric_cast<std::uint64_t>(sv_funcs_dc.size()));
         std::vector<llvm::Constant *> sv_funcs_dc_const;
         sv_funcs_dc_const.reserve(sv_funcs_dc.size());
-        for (auto idx : sv_funcs_dc) {
+        for (const auto idx : sv_funcs_dc) {
             sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
         }
         auto *sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
@@ -252,7 +251,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, llvm::Type *fp_t, const expre
 
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
-            using type = uncvref_t<decltype(v)>;
+            using type = std::remove_cvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, variable>) {
                 // Extract the index of the u variable in the expression
@@ -315,7 +314,7 @@ taylor_c_make_sv_diff_globals(llvm_state &s, llvm::Type *fp_t, const taylor_dc_t
     for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
         std::visit(
             [&](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     ++n_der_vars;
@@ -485,13 +484,13 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // derivative.
         llvm_if_then_else(
             s, builder.CreateICmpEQ(order, builder.getInt32(1)),
-            [&]() {
+            [&] {
                 // Derivative of order 1. Fetch the value from par_ptr.
                 // NOTE: param{0} is unused, its only purpose is type tagging.
                 taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx,
                                     taylor_c_diff_numparam_codegen(s, fp_t, param{0}, par_idx, par_ptr, batch_size));
             },
-            [&]() {
+            [&] {
                 // Derivative of order > 1, return 0.
                 taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, llvm_constantfp(s, fp_vec_t, 0.));
             });
@@ -640,7 +639,7 @@ void taylor_cm_codegen_segment_diff_sequential(llvm_state &s, llvm::Type *fp_vec
                                                const taylor_cm_seg_f_list_t &seg_map, std::uint32_t n_uvars)
 {
     // Fetch the current builder.
-    auto &bld = s.builder();
+    const auto &bld = s.builder();
 
     // Fetch the arguments from the driver prototype.
     auto *driver_f = bld.GetInsertBlock()->getParent();
@@ -816,8 +815,15 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
 
     // Invoke heyoka_taylor_cm_par_segment().
     llvm_invoke_external(s, "heyoka_taylor_cm_par_segment", void_tp,
-                         {workers_ptr, ncalls_ptr, bld.getInt32(boost::numeric_cast<std::uint32_t>(seg_map.size())),
-                          tape_ptr, par_ptr, time_ptr, order},
+                         {
+                             workers_ptr,
+                             ncalls_ptr,
+                             bld.getInt32(boost::numeric_cast<std::uint32_t>(seg_map.size())),
+                             tape_ptr,
+                             par_ptr,
+                             time_ptr,
+                             order,
+                         },
                          llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
                                                   {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 }
@@ -940,7 +946,7 @@ taylor_cm_seg_f_list_t taylor_cm_codegen_segment_diff(const auto &seg, std::uint
         for (const auto &v : vv) {
             it->second.second.push_back(std::visit(
                 [&s, fp_t](const auto &x) {
-                    using type = uncvref_t<decltype(x)>;
+                    using type = std::remove_cvref_t<decltype(x)>;
 
                     if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                         return cm_make_arg_gen_vidx(s, x);
@@ -1054,7 +1060,7 @@ std::vector<llvm_state> taylor_compute_jet_multi(llvm_state &main_state, llvm::T
     auto start_u_idx = n_eq;
 
     // Helper to finalise the current driver function and create a new one.
-    auto start_new_driver = [&cur_state, &states, &main_state, &n_evalf, &cur_state_idx, &main_driver_decls]() {
+    const auto start_new_driver = [&cur_state, &states, &main_state, &n_evalf, &cur_state_idx, &main_driver_decls] {
         // Finalise the current driver.
         cur_state->builder().CreateRetVoid();
 
@@ -1199,7 +1205,7 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     std::uint32_t batch_size, bool high_accuracy, bool parallel_mode)
 {
     auto &main_bld = main_state.builder();
-    auto &main_md = main_state.module();
+    const auto &main_md = main_state.module();
 
     // Determine the vector type corresponding to main_fp_t.
     auto *main_fp_vec_t = make_vector_type(main_fp_t, batch_size);
@@ -1407,7 +1413,7 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
                 retval.push_back(taylor_fetch_diff(diff_arr, var_idx, o, n_uvars));
             }
-            for (auto idx : sv_funcs_dc) {
+            for (const auto idx : sv_funcs_dc) {
                 retval.push_back(taylor_fetch_diff(diff_arr, idx, o, n_uvars));
             }
         }

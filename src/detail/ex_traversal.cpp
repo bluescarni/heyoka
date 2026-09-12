@@ -93,7 +93,7 @@ expression ex_traverse_transform_nodes(void_ptr_map<const expression> &func_map,
                 }
 
                 // Create the new copy of the function.
-                auto ex_copy = [&]() {
+                auto ex_copy = [&] {
                     if (shared_args) {
                         // NOTE: if the function manages its arguments via a shared reference, we must make
                         // sure to record the new arguments in sargs_map, so that when we run again into the

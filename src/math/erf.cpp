@@ -188,7 +188,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_imp
     auto *ret = pairwise_sum(s, sum);
 
     // Generate the factor n * sqrt(pi) / 2.
-    auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);
+    const auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);
     auto *fac_s = vector_splat(builder, llvm_codegen(s, fp_t, fac), batch_size);
 
     // Multiply and return.
@@ -304,12 +304,12 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, con
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
+            [&] {
                 // For order 0, invoke the function on the order 0 of b_idx.
                 builder.CreateStore(
                     llvm_erf(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
-            [&]() {
+            [&] {
                 // Compute the fp version of the order.
                 auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 

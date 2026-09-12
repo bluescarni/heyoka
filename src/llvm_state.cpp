@@ -13,6 +13,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <ios>
 #include <limits>
 #include <memory>
@@ -23,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <tuple>
@@ -136,6 +138,19 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 
 #endif
 
+// Helper to turn an LLVM error into a C++ exception.
+//
+// NOTE: LLVM reports failures via llvm::Error/llvm::Expected rather than exceptions, and a failed error must be
+// consumed before it is destroyed (LLVM builds with ABI-breaking checks abort otherwise). Taking the error by value and
+// converting it to a string via llvm::toString() consumes it.
+//
+// LCOV_EXCL_START
+[[noreturn]] void throw_llvm_error(const std::string_view msg, llvm::Error err)
+{
+    throw std::invalid_argument(fmt::format("{} The full error message:\n{}", msg, llvm::toString(std::move(err))));
+}
+// LCOV_EXCL_STOP
+
 // LCOV_EXCL_START
 
 // Regex to match the PowerPC ISA version from the
@@ -143,11 +158,11 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // NOTE: the pattern reported by LLVM here seems to be pwrN
 // (sample size of 1, on travis...).
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
-const boost::regex ppc_regex_pattern("pwr([1-9]*)");
+const boost::regex ppc_regex_pattern("pwr([1-9][0-9]*)");
 
 // Regex to check for AMD Zen processors.
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
-const boost::regex zen_regex_pattern("znver([1-9]*)");
+const boost::regex zen_regex_pattern("znver([1-9][0-9]*)");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -155,12 +170,12 @@ target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
     if (!jtmb) [[unlikely]] {
-        throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
+        throw_llvm_error("Error creating a JITTargetMachineBuilder for the host system.", jtmb.takeError());
     }
 
     auto tm = jtmb->createTargetMachine();
     if (!tm) [[unlikely]] {
-        throw std::invalid_argument("Error creating the target machine");
+        throw_llvm_error("Error creating the target machine.", tm.takeError());
     }
 
     // Init the return value.
@@ -195,15 +210,13 @@ target_features get_target_features_impl()
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
         boost::cmatch m;
         if (boost::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
-            if (m.size() == 2u) {
-                // The CPU name matches and contains a subgroup.
-                // Extract the N from "znverN".
-                std::uint32_t zen_version{};
-                const auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
+            // The CPU name matches and contains a subgroup.
+            // Extract the N from "znverN".
+            std::uint32_t zen_version{};
+            const auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
 
-                if (ret.ec == std::errc{} && zen_version >= 4u) {
-                    zen4_or_later = true;
-                }
+            if (ret.ec == std::errc{} && zen_version >= 4u) {
+                zen4_or_later = true;
             }
         }
     }
@@ -220,23 +233,21 @@ target_features get_target_features_impl()
         boost::cmatch m;
 
         if (boost::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
-            if (m.size() == 2u) {
-                // The CPU name matches and contains a subgroup.
-                // Extract the N from "pwrN".
-                std::uint32_t pwr_idx{};
-                const auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
+            // The CPU name matches and contains a subgroup.
+            // Extract the N from "pwrN".
+            std::uint32_t pwr_idx{};
+            const auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
 
-                // NOTE: it looks like VSX3 is supported from Power9,
-                // VSX from Power7.
-                // https://packages.gentoo.org/useflags/cpu_flags_ppc_vsx3
-                if (ret.ec == std::errc{}) {
-                    if (pwr_idx >= 9) {
-                        retval.vsx3 = true;
-                    }
+            // NOTE: it looks like VSX3 is supported from Power9,
+            // VSX from Power7.
+            // https://packages.gentoo.org/useflags/cpu_flags_ppc_vsx3
+            if (ret.ec == std::errc{}) {
+                if (pwr_idx >= 9) {
+                    retval.vsx3 = true;
+                }
 
-                    if (pwr_idx >= 7) {
-                        retval.vsx = true;
-                    }
+                if (pwr_idx >= 7) {
+                    retval.vsx = true;
                 }
             }
         }
@@ -270,7 +281,7 @@ HEYOKA_CONSTINIT std::once_flag nt_inited;
 
 void init_native_target()
 {
-    std::call_once(nt_inited, []() {
+    std::call_once(nt_inited, [] {
         llvm::InitializeNativeTarget();
         llvm::InitializeNativeTargetAsmPrinter();
         llvm::InitializeNativeTargetAsmParser();
@@ -284,11 +295,11 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
 
     // Try creating the target machine builder.
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
-    // LCOV_EXCL_START
     if (!jtmb) [[unlikely]] {
-        throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
+        // LCOV_EXCL_START
+        throw_llvm_error("Error creating a JITTargetMachineBuilder for the host system.", jtmb.takeError());
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 
     // Set the codegen optimisation level.
     switch (opt_level) {
@@ -333,14 +344,9 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
 
     // LCOV_EXCL_START
 
-    // NOTE: the code model setup is working only on LLVM>=19 (or at least LLVM 18 + patches, as in the conda-forge LLVM
-    // package), due to this bug:
-    //
-    // https://github.com/llvm/llvm-project/issues/88115
-    //
-    // Additionally, there are indications from our CI that attempting to set the code model on Windows might just be
-    // buggy, as we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model
-    // setting on Windows altogether. We can revisit this at a later stage if needed.
+    // NOTE: there are indications from our CI that attempting to set the code model on Windows might just be buggy, as
+    // we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model setting
+    // on Windows altogether. We can revisit this at a later stage if needed.
 #if !defined(_WIN32)
 
     // Setup the code model.
@@ -368,7 +374,7 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
 
 #endif
 
-    //  LCOV_EXCL_STOP
+    // LCOV_EXCL_STOP
 
     return std::move(*jtmb);
 }
@@ -402,7 +408,7 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
     auto &ctx = M.getContext();
 
     for (auto &f : M) {
-        auto attrs = f.getAttributes();
+        const auto attrs = f.getAttributes();
 
         llvm::AttrBuilder new_attrs(ctx);
 
@@ -411,7 +417,7 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
         }
 
         if (!features.empty()) {
-            auto old_features = f.getFnAttribute("target-features").getValueAsString();
+            const auto old_features = f.getFnAttribute("target-features").getValueAsString();
 
             if (old_features.empty()) {
                 new_attrs.addAttribute("target-features", features);
@@ -516,23 +522,15 @@ void optimise_module(llvm::Module &M, llvm::TargetMachine &tm, const unsigned op
 // Helper to add a module to an lljt, throwing on error.
 void add_module_to_lljit(llvm::orc::LLJIT &lljit, std::unique_ptr<llvm::Module> m, llvm::orc::ThreadSafeContext ctx)
 {
-    auto err = lljit.addIRModule(llvm::orc::ThreadSafeModule(std::move(m), std::move(ctx)));
-
-    // LCOV_EXCL_START
-    if (err) {
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
-
-        ostr << err;
-
-        throw std::invalid_argument(
-            fmt::format("The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
+    if (auto err = lljit.addIRModule(llvm::orc::ThreadSafeModule(std::move(m), std::move(ctx)))) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw_llvm_error("The function for adding a module to the jit failed.", std::move(err));
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 }
 
 // Helper to fetch the bitcode from a module.
-std::string bc_from_module(llvm::Module &m)
+std::string bc_from_module(const llvm::Module &m)
 {
     std::string out;
     llvm::raw_string_ostream ostr(out);
@@ -543,7 +541,7 @@ std::string bc_from_module(llvm::Module &m)
 }
 
 // Helper to fetch the textual IR from a module.
-std::string ir_from_module(llvm::Module &m)
+std::string ir_from_module(const llvm::Module &m)
 {
     std::string out;
     llvm::raw_string_ostream ostr(out);
@@ -598,19 +596,11 @@ void add_obj_to_lljit(llvm::orc::LLJIT &lljit, const std::string &obj)
     }
 
     // Add the object file.
-    auto err = lljit.addObjectFile(std::make_unique<string_view_mem_buffer>(obj));
-
-    // LCOV_EXCL_START
-    if (err) {
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
-
-        ostr << err;
-
-        throw std::invalid_argument(fmt::format(
-            "The function for adding an object file to an lljit failed. The full error message:\n{}", ostr.str()));
+    if (auto err = lljit.addObjectFile(std::make_unique<string_view_mem_buffer>(obj))) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw_llvm_error("The function for adding an object file to an lljit failed.", std::move(err));
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 }
 
 // Helper to verify a module, throwing if verification fails.
@@ -633,7 +623,7 @@ void verify_module(const llvm::Module &m)
 // containing info about the host machine.
 const target_features &get_target_features()
 {
-    static const target_features retval = []() {
+    static const target_features retval = [] {
         // NOTE: need to init the native target
         // in order to get its features.
         init_native_target();
@@ -714,49 +704,57 @@ struct llvm_state::jit {
 
         // Create the jit.
         auto lljit = lljit_builder.create();
-        // LCOV_EXCL_START
-        if (!lljit) {
-            auto err = lljit.takeError();
-
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            ostr << err;
-
-            throw std::invalid_argument(
-                fmt::format("Could not create an LLJIT object. The full error message is:\n{}", ostr.str()));
+        if (!lljit) [[unlikely]] {
+            // LCOV_EXCL_START
+            detail::throw_llvm_error("Could not create an LLJIT object.", lljit.takeError());
+            // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
 
-        // Setup the machinery to store the module's binary code
-        // when it is generated.
-        m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
-            assert(obj_buffer);
+        // Setup the machinery to store the module's binary code when it is generated.
+        //
+        // NOTE: this callback is invoked from within LLVM's ORC library, which is compiled without exception support.
+        // Thus, exceptions must not escape from it: we catch them and convert them into an llvm::Error instead, which
+        // is how ORC expects transform callbacks to report failures.
+        m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer)
+                                                         -> llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> {
+            try {
+                assert(obj_buffer);
 
-            // NOTE: this callback will be invoked the first time a jit lookup is performed,
-            // even if the object code was manually injected via llvm_state_add_obj_to_jit()
-            // (e.g., during copy, des11n, etc.). In such a case, m_object_file has already been set up properly and we
-            // just sanity check in debug mode that the content of m_object_file matches the content of obj_buffer.
-            if (m_object_file) {
-                assert(obj_buffer->getBufferSize() == m_object_file->size());
-                assert(std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), m_object_file->begin()));
-            } else {
-                // Copy obj_buffer to the local m_object_file member.
-                m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+                // NOTE: this callback will be invoked the first time a jit lookup is performed,
+                // even if the object code was manually injected via llvm_state_add_obj_to_jit()
+                // (e.g., during copy, des11n, etc.). In such a case, m_object_file has already been set up properly and
+                // we just sanity check in debug mode that the content of m_object_file matches the content of
+                // obj_buffer.
+                if (m_object_file) {
+                    assert(obj_buffer->getBufferSize() == m_object_file->size());
+                    assert(
+                        std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), m_object_file->begin()));
+                } else {
+                    // Copy obj_buffer to the local m_object_file member.
+                    m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+                }
+
+                return {std::move(obj_buffer)};
+                // LCOV_EXCL_START
+            } catch (const std::exception &e) {
+                return llvm::make_error<llvm::StringError>(e.what(), llvm::inconvertibleErrorCode());
+            } catch (...) {
+                return llvm::make_error<llvm::StringError>(
+                    "An unknown exception was thrown while attempting to store the module's binary code",
+                    llvm::inconvertibleErrorCode());
             }
-
-            return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
+            // LCOV_EXCL_STOP
         });
 
         // Keep a target machine around to fetch various
         // properties of the host CPU.
         auto tm = jtmb.createTargetMachine();
-        // LCOV_EXCL_START
-        if (!tm) {
-            throw std::invalid_argument("Error creating the target machine");
+        if (!tm) [[unlikely]] {
+            // LCOV_EXCL_START
+            detail::throw_llvm_error("Error creating the target machine.", tm.takeError());
+            // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_STOP
         m_tm = std::move(*tm);
 
         // Create the context.
@@ -881,18 +879,11 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
     // Parse the bitcode.
     auto ret = llvm::parseBitcodeFile(mb->getMemBufferRef(), ctx);
 
-    // LCOV_EXCL_START
-    if (!ret) {
-        const auto err = ret.takeError();
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
-
-        ostr << err;
-
-        throw std::invalid_argument(
-            fmt::format("LLVM bitcode parsing failed. The full error message:\n{}", ostr.str()));
+    if (!ret) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw_llvm_error("LLVM bitcode parsing failed.", ret.takeError());
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 
     // Set the module name.
     ret.get()->setModuleIdentifier(module_name);
@@ -910,11 +901,11 @@ void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
     // Setup the jit so that it can look up symbols from the current process.
     auto dlsg
         = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(lljit->getDataLayout().getGlobalPrefix());
-    // LCOV_EXCL_START
     if (!dlsg) [[unlikely]] {
-        throw std::invalid_argument("Could not create the dynamic library search generator");
+        // LCOV_EXCL_START
+        throw_llvm_error("Could not create the dynamic library search generator.", dlsg.takeError());
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
     lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
 
     // NOTE: we also want to manually inject the symbols from the heyoka shared library into the JIT runtime.
@@ -945,14 +936,13 @@ void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
 
         auto new_dlsg
             = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
-        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
-        if (new_dlsg) [[likely]] {
-            lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
-        } else {
+        if (!new_dlsg) [[unlikely]] {
             // LCOV_EXCL_START
-            throw std::invalid_argument("Could not create the dynamic library search generator for the heyoka library");
+            throw_llvm_error("Could not create the dynamic library search generator for the heyoka library.",
+                             new_dlsg.takeError());
             // LCOV_EXCL_STOP
         }
+        lljit->getMainJITDylib().addGenerator(std::move(*new_dlsg));
 
 #endif
     }
@@ -1304,7 +1294,7 @@ void llvm_state::load_impl(Archive &ar, const unsigned version)
         // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
         //
         // NOLINTNEXTLINE(bugprone-exception-escape)
-        *this = []() noexcept { return llvm_state{}; }();
+        *this = [] noexcept { return llvm_state{}; }();
 
         throw;
         // LCOV_EXCL_STOP
@@ -1494,9 +1484,9 @@ std::uint32_t assemble_comp_flag(const unsigned opt_level, const bool force_avx5
     assert(static_cast<unsigned>(c_model) <= 7u);
     static_assert(std::numeric_limits<unsigned>::digits >= 7u);
 
-    return static_cast<std::uint32_t>(opt_level + (static_cast<unsigned>(force_avx512) << 2)
-                                      + (static_cast<unsigned>(slp_vectorize) << 3)
-                                      + (static_cast<unsigned>(c_model) << 4));
+    return static_cast<std::uint32_t>(opt_level + (static_cast<unsigned>(force_avx512) << 2u)
+                                      + (static_cast<unsigned>(slp_vectorize) << 3u)
+                                      + (static_cast<unsigned>(c_model) << 4u));
 }
 
 } // namespace
@@ -1588,7 +1578,7 @@ void llvm_state::compile()
         // Reset to a def-cted state in case of error, as it looks like there's no way of recovering.
         //
         // NOLINTNEXTLINE(bugprone-exception-escape)
-        *this = []() noexcept { return llvm_state{}; }();
+        *this = [] noexcept { return llvm_state{}; }();
 
         throw;
         // LCOV_EXCL_STOP
@@ -1608,8 +1598,9 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
     check_compiled(__func__);
 
     auto sym = m_jitter->lookup(name);
-    if (!sym) {
-        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
+    if (!sym) [[unlikely]] {
+        detail::throw_llvm_error(fmt::format("Could not find the symbol '{}' in the compiled module.", name),
+                                 sym.takeError());
     }
 
     return static_cast<std::uintptr_t>((*sym).getValue());
@@ -1753,7 +1744,7 @@ class tbb_task_dispatcher : public llvm::orc::TaskDispatcher
 public:
     void dispatch(std::unique_ptr<llvm::orc::Task> T) override
     {
-        m_tg.run([T = std::move(T)]() { T->run(); });
+        m_tg.run([T = std::move(T)] { T->run(); });
     }
     void shutdown() override
     {
@@ -1797,7 +1788,7 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
     // NOTE: other settable properties may
     // be of interest:
     // https://www.llvm.org/doxygen/classllvm_1_1orc_1_1LLJITBuilder.html
-    lljit_builder.setJITTargetMachineBuilder(jtmb);
+    lljit_builder.setJITTargetMachineBuilder(std::move(jtmb));
 
 // NOTE: keep this around as a tentative implementation of a TBB-based dispatcher.
 // NOLINTNEXTLINE
@@ -1809,19 +1800,11 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
         // Create an ExecutorProcessControl.
         auto epc = llvm::orc::SelfExecutorProcessControl::Create(nullptr, std::move(tdisp));
-        // LCOV_EXCL_START
-        if (!epc) {
-            auto err = epc.takeError();
-
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            ostr << err;
-
-            throw std::invalid_argument(fmt::format(
-                "Could not create a SelfExecutorProcessControl. The full error message is:\n{}", ostr.str()));
+        if (!epc) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw_llvm_error("Could not create a SelfExecutorProcessControl.", epc.takeError());
+            // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_STOP
 
         // Set it in the lljit builder.
         lljit_builder.setExecutorProcessControl(std::move(*epc));
@@ -1846,55 +1829,66 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
     // Create the jit.
     auto lljit = lljit_builder.create();
-    // LCOV_EXCL_START
-    if (!lljit) {
-        auto err = lljit.takeError();
-
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
-
-        ostr << err;
-
-        throw std::invalid_argument(
-            fmt::format("Could not create an LLJIT object. The full error message is:\n{}", ostr.str()));
+    if (!lljit) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw_llvm_error("Could not create an LLJIT object.", lljit.takeError());
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
     m_lljit = std::move(*lljit);
 
-    // Setup the machinery to store the modules' binary code
-    // when it is generated.
-    m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
-        assert(obj_buffer);
+    // Setup the machinery to store the modules' binary code when it is generated.
+    //
+    // NOTE: this callback is invoked from within LLVM's ORC library, which is compiled without exception support. Thus,
+    // exceptions must not escape from it: we catch them and convert them into an llvm::Error instead, which is how ORC
+    // expects transform callbacks to report failures.
+    m_lljit->getObjTransformLayer().setTransform(
+        [this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) -> llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> {
+            try {
+                assert(obj_buffer);
 
-        // Lock down for access to m_object_files.
-        const std::scoped_lock lock{m_object_files_mutex};
+                // Lock down for access to m_object_files.
+                const std::scoped_lock lock{m_object_files_mutex};
 
-        assert(m_object_files.size() <= m_n_modules);
+                assert(m_object_files.size() <= m_n_modules);
 
-        // NOTE: this callback will be invoked the first time a jit lookup is performed,
-        // even if the object code was manually injected. In such a case, m_object_files
-        // has already been set up properly and we just sanity check in debug mode that
-        // one object file matches the content of obj_buffer.
-        if (m_object_files.size() < m_n_modules) {
-            // Add obj_buffer.
-            m_object_files.emplace_back(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
-        } else {
-            // Check that at least one buffer in m_object_files is exactly
-            // identical to obj_buffer.
-            assert(std::ranges::any_of(m_object_files, [&obj_buffer](const auto &cur) {
-                return obj_buffer->getBufferSize() == cur.size()
-                       && std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), cur.begin());
-                ;
-            }));
-        }
+                // NOTE: this callback will be invoked the first time a jit lookup is performed,
+                // even if the object code was manually injected. In such a case, m_object_files
+                // has already been set up properly and we just sanity check in debug mode that
+                // one object file matches the content of obj_buffer.
+                if (m_object_files.size() < m_n_modules) {
+                    // Add obj_buffer.
+                    m_object_files.emplace_back(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+                } else {
+                    // Check that at least one buffer in m_object_files is exactly
+                    // identical to obj_buffer.
+                    assert(std::ranges::any_of(m_object_files, [&obj_buffer](const auto &cur) {
+                        return obj_buffer->getBufferSize() == cur.size()
+                               && std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), cur.begin());
+                        ;
+                    }));
+                }
 
-        return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
-    });
+                return {std::move(obj_buffer)};
+                // LCOV_EXCL_START
+            } catch (const std::exception &e) {
+                return llvm::make_error<llvm::StringError>(e.what(), llvm::inconvertibleErrorCode());
+            } catch (...) {
+                return llvm::make_error<llvm::StringError>(
+                    "An unknown exception was thrown while attempting to store the module's binary code",
+                    llvm::inconvertibleErrorCode());
+            }
+            // LCOV_EXCL_STOP
+        });
 
     // Setup the machinery to run the optimisation passes on the modules.
+    //
+    // NOTE: this callback is invoked from within LLVM's ORC library, which is compiled without exception support. Thus,
+    // exceptions must not escape from it: we catch them and convert them into an llvm::Error instead, which is how ORC
+    // expects transform callbacks to report failures.
     m_lljit->getIRTransformLayer().setTransform(
-        [this, opt_level, force_avx512, slp_vectorize, c_model](llvm::orc::ThreadSafeModule TSM,
-                                                                llvm::orc::MaterializationResponsibility &) {
+        [this, opt_level, force_avx512, slp_vectorize,
+         c_model](llvm::orc::ThreadSafeModule TSM,
+                  llvm::orc::MaterializationResponsibility &) -> llvm::Expected<llvm::orc::ThreadSafeModule> {
             // See here for an explanation of what withModuleDo() entails:
             //
             // https://groups.google.com/g/llvm-dev/c/QauU4L_bHac
@@ -1904,7 +1898,7 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
             //
             // https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
             // https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
-            TSM.withModuleDo([this, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
+            const auto process_module = [this, opt_level, force_avx512, slp_vectorize, c_model](llvm::Module &M) {
                 // NOTE: don't run any optimisation on the master module.
                 if (M.getModuleIdentifier() != master_module_name) {
                     // NOTE: running the optimisation passes requires mutable access to a target
@@ -1916,11 +1910,11 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
                     // Try creating the target machine.
                     auto tm = jtmb.createTargetMachine();
-                    // LCOV_EXCL_START
                     if (!tm) [[unlikely]] {
-                        throw std::invalid_argument("Error creating the target machine");
+                        // LCOV_EXCL_START
+                        detail::throw_llvm_error("Error creating the target machine.", tm.takeError());
+                        // LCOV_EXCL_STOP
                     }
-                    // LCOV_EXCL_STOP
 
                     // NOTE: we used to fetch the target triple from the lljit object,
                     // but recently we switched to asking the target triple directly
@@ -1951,9 +1945,20 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
                 m_bc_snapshots.push_back(std::move(bc_snap));
                 m_ir_snapshots.push_back(std::move(ir_snap));
-            });
+            };
 
-            return llvm::Expected<llvm::orc::ThreadSafeModule>(std::move(TSM));
+            try {
+                TSM.withModuleDo(process_module);
+                // LCOV_EXCL_START
+            } catch (const std::exception &e) {
+                return llvm::make_error<llvm::StringError>(e.what(), llvm::inconvertibleErrorCode());
+            } catch (...) {
+                return llvm::make_error<llvm::StringError>("An unknown exception was thrown while optimising a module",
+                                                           llvm::inconvertibleErrorCode());
+            }
+            // LCOV_EXCL_STOP
+
+            return {std::move(TSM)};
         });
 
     // Create the master context.
@@ -2097,7 +2102,7 @@ llvm_multi_state::llvm_multi_state(std::vector<llvm_state> states_, bool parjit)
     }
 
     // Settings in all states must be consistent.
-    auto states_differ = [](const llvm_state &s1, const llvm_state &s2) {
+    const auto states_differ = [](const llvm_state &s1, const llvm_state &s2) {
         if (s1.get_opt_level() != s2.get_opt_level()) {
             return true;
         }
@@ -2153,10 +2158,12 @@ llvm_multi_state::llvm_multi_state(const llvm_multi_state &other)
     // This will work regardless of whether other is compiled or not.
     // No need to do any validation on the states are they are coming
     // from a llvm_multi_state and they have been checked already.
-    impl imp{.m_states = other.m_impl->m_states,
-             .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
-                                                          other.get_code_model(), other.force_avx512(),
-                                                          other.get_slp_vectorize(), other.get_parjit())};
+    impl imp{
+        .m_states = other.m_impl->m_states,
+        .m_jit = std::make_unique<detail::multi_jit>(other.m_impl->m_jit->m_n_modules, other.get_opt_level(),
+                                                     other.get_code_model(), other.force_avx512(),
+                                                     other.get_slp_vectorize(), other.get_parjit()),
+    };
     m_impl = std::make_unique<impl>(std::move(imp));
 
     if (other.is_compiled()) {
@@ -2522,9 +2529,11 @@ void llvm_multi_state::compile()
 
             // Try to insert obc into the cache.
             detail::llvm_state_memcache_try_insert(std::move(obc), comp_flag,
-                                                   {.opt_bc = m_impl->m_jit->m_bc_snapshots,
-                                                    .opt_ir = m_impl->m_jit->m_ir_snapshots,
-                                                    .obj = m_impl->m_jit->m_object_files});
+                                                   {
+                                                       .opt_bc = m_impl->m_jit->m_bc_snapshots,
+                                                       .opt_ir = m_impl->m_jit->m_ir_snapshots,
+                                                       .obj = m_impl->m_jit->m_object_files,
+                                                   });
             // LCOV_EXCL_START
         }
     } catch (...) {
@@ -2542,8 +2551,9 @@ std::uintptr_t llvm_multi_state::jit_lookup(const std::string &name)
     check_compiled(__func__);
 
     auto sym = m_impl->m_jit->m_lljit->lookup(name);
-    if (!sym) {
-        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in an llvm_multi_state", name));
+    if (!sym) [[unlikely]] {
+        detail::throw_llvm_error(fmt::format("Could not find the symbol '{}' in an llvm_multi_state.", name),
+                                 sym.takeError());
     }
 
     return static_cast<std::uintptr_t>((*sym).getValue());

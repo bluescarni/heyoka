@@ -106,15 +106,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface : callable_ref_iface<boo
 
 // Configuration.
 template <typename TA>
-inline constexpr auto step_cb_wrap_config
-    = tanuki::config<void, step_cb_ref_iface<TA>>{// Similarly to std::function, ensure that step_callback can store
-                                                  // in static storage pointers and reference wrappers.
-                                                  // NOTE: reference wrappers are not guaranteed to have the size
-                                                  // of a pointer, but in practice that should always be the case.
-                                                  .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
-                                                  .invalid_default_ctor = true,
-                                                  .pointer_interface = false,
-                                                  .explicit_ctor = tanuki::wrap_ctor::always_implicit};
+inline constexpr auto step_cb_wrap_config = tanuki::config<void, step_cb_ref_iface<TA>>{
+    // Similarly to std::function, ensure that step_callback can store
+    // in static storage pointers and reference wrappers.
+    // NOTE: reference wrappers are not guaranteed to have the size
+    // of a pointer, but in practice that should always be the case.
+    .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
+    .invalid_default_ctor = true,
+    .pointer_interface = false,
+    .explicit_ctor = tanuki::wrap_ctor::always_implicit,
+};
 
 // Definition of the step_cb wrap.
 template <typename TA>

@@ -124,8 +124,10 @@ std::array<expression, 3> iau2006_impl(const expression &tm, double thresh)
     const auto p_A_eval = horner_eval(arg_p_A, tm);
 
     // Store the evaluated arguments in an array for later use.
-    const std::array<expression, 14> args = {l_eval,   lp_eval,   F_eval,   D_eval,    Om_eval,  L_Me_eval, L_Ve_eval,
-                                             L_E_eval, L_Ma_eval, L_J_eval, L_Sa_eval, L_U_eval, L_Ne_eval, p_A_eval};
+    const std::array<expression, 14> args = {
+        l_eval,   lp_eval,   F_eval,   D_eval,    Om_eval,  L_Me_eval, L_Ve_eval,
+        L_E_eval, L_Ma_eval, L_J_eval, L_Sa_eval, L_U_eval, L_Ne_eval, p_A_eval,
+    };
 
     // Seed the trig eval dictionary with powers of 0, 1 and -1 for each argument.
     trig_eval_dict_t trig_eval;
@@ -234,9 +236,9 @@ std::array<expression, 3> iau2006_impl(const expression &tm, double thresh)
         = horner_eval(std::array{sum(s_terms_0), sum(s_terms_1), sum(s_terms_2), sum(s_terms_3), sum(s_terms_4)}, tm);
 
     // Assemble the return values.
-    auto X = poly_X_eval + X_trig;
-    auto Y = poly_Y_eval + Y_trig;
-    auto s = sum({poly_s_eval, s_trig, -(X * Y) / 2.});
+    const auto X = poly_X_eval + X_trig;
+    const auto Y = poly_Y_eval + Y_trig;
+    const auto s = sum({poly_s_eval, s_trig, -(X * Y) / 2.});
 
     return {X, Y, s};
 }

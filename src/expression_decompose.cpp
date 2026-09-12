@@ -113,7 +113,11 @@ expression_decompose_impl(void_ptr_map<const typename std::vector<T>::size_type>
                 }
 
                 // Create the decomposed copy of the function.
-                auto f_copy = [&]() {
+                //
+                // NOTE: clang-tidy is not realising this is being moved below.
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
+                auto f_copy = [&] {
                     if (shared_args) {
                         // NOTE: if the function manages its arguments via a shared reference, we must make
                         // sure to record the new arguments in sargs_map, so that when we run again into the
@@ -149,6 +153,10 @@ expression_decompose_impl(void_ptr_map<const typename std::vector<T>::size_type>
                     if (const auto it = sargs_map.find(&*shared_args); it != sargs_map.end()) {
                         // The arguments have been decomposed before. Fetch them from the cache and
                         // use them to construct a decomposed copy of the function.
+                        //
+                        // NOTE: clang-tidy is not realising this is being moved below.
+                        //
+                        // NOLINTNEXTLINE(misc-const-correctness)
                         auto f_copy = f.make_copy_with_new_args(it->second);
 
                         // Decompose f_copy.

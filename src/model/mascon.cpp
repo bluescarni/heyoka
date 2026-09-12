@@ -45,8 +45,8 @@ expression mascon_energy_impl(const expression &Gconst, const std::vector<expres
                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                               const std::vector<expression> &positions, const std::vector<expression> &omega)
 {
-    auto fc_en = fixed_centres_energy_impl(Gconst, masses, positions);
-    auto rot_pot = rotating_potential_impl(omega);
+    const auto fc_en = fixed_centres_energy_impl(Gconst, masses, positions);
+    const auto rot_pot = rotating_potential_impl(omega);
 
     return fc_en + rot_pot;
 }
@@ -55,8 +55,8 @@ expression mascon_potential_impl(const expression &Gconst, const std::vector<exp
                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                  const std::vector<expression> &positions, const std::vector<expression> &omega)
 {
-    auto fc_pot = fixed_centres_potential_impl(Gconst, masses, positions);
-    auto rot_pot = rotating_potential_impl(omega);
+    const auto fc_pot = fixed_centres_potential_impl(Gconst, masses, positions);
+    const auto rot_pot = rotating_potential_impl(omega);
 
     return fc_pot + rot_pot;
 }

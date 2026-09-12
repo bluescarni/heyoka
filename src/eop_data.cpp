@@ -294,6 +294,8 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
 
         // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision rounds
         // correctly, but better safe than sorry.
+        //
+        // NOLINTNEXTLINE(modernize-use-structured-binding)
         std::tie(era_hi, era_lo) = eft_add_knuth(era_hi, era_lo);
 
         if (!std::isfinite(era_hi) || !std::isfinite(era_lo)) [[unlikely]] {
@@ -305,8 +307,11 @@ llvm::Value *llvm_get_eop_data_era(llvm_state &s, const eop_data &data, llvm::Ty
         }
 
         // Pack the values into an array and return.
-        return llvm::ConstantArray::get(value_t, {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_hi})),
-                                                  llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_lo}))});
+        return llvm::ConstantArray::get(value_t,
+                                        {
+                                            llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_hi})),
+                                            llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{era_lo})),
+                                        });
     };
 
     return llvm_get_eop_sw_data(s, data, value_t, "era", value_getter, "eop");
@@ -388,6 +393,8 @@ llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm:
 
         // Normalise them for peace of mind. This should not be necessary assuming Boost multiprecision rounds
         // correctly, but better safe than sorry.
+        //
+        // NOLINTNEXTLINE(modernize-use-structured-binding)
         std::tie(gmst82_hi, gmst82_lo) = eft_add_knuth(gmst82_hi, gmst82_lo);
 
         if (!std::isfinite(gmst82_hi) || !std::isfinite(gmst82_lo)) [[unlikely]] {
@@ -400,8 +407,10 @@ llvm::Value *llvm_get_eop_data_gmst82(llvm_state &s, const eop_data &data, llvm:
 
         // Pack the values into an array and return.
         return llvm::ConstantArray::get(value_t,
-                                        {llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_hi})),
-                                         llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_lo}))});
+                                        {
+                                            llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_hi})),
+                                            llvm::cast<llvm::Constant>(llvm_codegen(s, scal_t, number{gmst82_lo})),
+                                        });
     };
 
     return llvm_get_eop_sw_data(s, data, value_t, "gmst82", value_getter, "eop");

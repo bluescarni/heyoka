@@ -213,7 +213,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
 
         llvm_if_then_else(
             s, llvm_fcmp_oeq(s, fhi, x_hi),
-            [&]() {
+            [&] {
                 // floor(x_hi) == x_hi, that is, x_hi is already
                 // an integral value.
 
@@ -228,7 +228,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
                 builder.CreateStore(z, ret_hi_ptr);
                 builder.CreateStore(zz, ret_lo_ptr);
             },
-            [&]() {
+            [&] {
                 // floor(x_hi) != x_hi. Just need to set the low part to zero.
                 builder.CreateStore(fhi, ret_hi_ptr);
                 builder.CreateStore(llvm_constantfp(s, fp_t, 0.), ret_lo_ptr);

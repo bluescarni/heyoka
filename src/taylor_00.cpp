@@ -220,7 +220,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         }
 
         // Find the maxima via pairwise reduction.
-        auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_max(s, a, b); };
+        const auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_max(s, a, b); };
         max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
         max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
@@ -844,12 +844,12 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(context));
     llvm_if_then_else(
         s, builder.CreateICmpNE(tc_ptr, nptr),
-        [&]() {
+        [&] {
             // tc_ptr is not null: copy the Taylor coefficients
             // for the state variables.
             taylor_write_tc(s, fp_t, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size, tape_ptr);
         },
-        []() {
+        [] {
             // Taylor coefficients were not requested,
             // don't do anything in this branch.
         });

@@ -78,7 +78,6 @@
 #include <heyoka/detail/sincos_combine.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -137,7 +136,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     for (auto i = nvars; i < dc.size() - nouts; ++i) {
         std::visit(
             [i](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     for (const auto &arg : v.args()) {
@@ -162,7 +161,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
         std::visit(
             [&dc, nouts](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
@@ -425,7 +424,7 @@ std::vector<expression> function_sort_dc(const std::vector<expression> &dc,
         // - check if the target vertex of the edge
         //   has other incoming edges;
         // - if it does not, insert it into tmp.
-        for (auto &e : tmp_edges) {
+        for (const auto &e : tmp_edges) {
             // Fetch the target of the edge.
             const auto t = boost::target(e, g);
 
@@ -743,7 +742,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     for (const auto &ex : vars) {
         if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
             // Check if this is a duplicate variable.
-            if (auto res = var_set.emplace(var_ptr->name()); !res.second) [[unlikely]] {
+            if (const auto res = var_set.emplace(var_ptr->name()); !res.second) [[unlikely]] {
                 // Duplicate, error out.
                 throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the variable '{}' "
                                                         "appears in the user-provided list of variables twice",
@@ -997,7 +996,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
 
         std::visit(
             [&](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     // Fetch the index of the variable.
@@ -1032,7 +1031,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 
     // Helper that takes in input the definition ex of a u variable, and returns
     // in output the list of indices of the u variables on which ex depends.
-    auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
+    const auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
             []<typename T>(const T &v) -> std::vector<std::uint32_t> {
                 if constexpr (std::is_same_v<T, func>) {
@@ -1180,7 +1179,7 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
     for (auto i = nuvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
         std::visit(
             [&](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
+                using type = std::remove_cvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     ++n_out_vars;
@@ -1569,8 +1568,9 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     // - time ptr (pointer to scalar),
     // - stride value.
     auto *ptr_t = llvm::PointerType::getUnqual(c);
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), ptr_t, ptr_t, ptr_t,
-                                    to_external_llvm_type<std::size_t>(c)};
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(c), ptr_t, ptr_t, ptr_t, to_external_llvm_type<std::size_t>(c),
+    };
 
     // Add the mangling and LLVM arg types for the argument types.
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
@@ -1672,6 +1672,9 @@ llvm::Function *llvm_c_eval_func(const func &fn, llvm_state &s, llvm::Type *fp_t
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
         auto *arg = std::visit(
             [&]<typename T>(const T &) -> llvm::Value * {
+                // NOTE: generally we need this to be non-const but clang-tidy complains anyway.
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto *const cur_f_arg = f->args().begin() + 5 + i;
 
                 if constexpr (std::same_as<T, number>) {
@@ -1781,7 +1784,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
     const auto const_stride = llvm::isa<llvm::ConstantInt>(main_stride);
 
     // Helper to create and return the prototype of a driver function in the state s.
-    auto make_driver_proto = [&base_name, const_stride](llvm_state &s, unsigned cur_idx) {
+    const auto make_driver_proto = [&base_name, const_stride](llvm_state &s, unsigned cur_idx) {
         auto &builder = s.builder();
         auto &md = s.module();
         auto &ctx = s.context();
@@ -1835,7 +1838,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
     };
 
     // Helper to invoke a driver function from the main state.
-    auto main_invoke_driver
+    const auto main_invoke_driver
         = [&main_state, main_eval_arr, main_par_ptr, main_time_ptr, main_stride, const_stride](llvm::Function *f) {
               std::vector fargs = {main_eval_arr, main_par_ptr, main_time_ptr};
               if (!const_stride) {
@@ -2003,7 +2006,7 @@ void multi_cfunc_evaluate_segments(llvm::Type *main_fp_t, std::list<llvm_state> 
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
                     [cur_state, fp_t](const auto &x) {
-                        using type = uncvref_t<decltype(x)>;
+                        using type = std::remove_cvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(*cur_state, x);
@@ -2132,7 +2135,7 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
 {
     // Fetch the main state, module, etc.
     auto &main_state = states.back();
-    auto &main_md = main_state.module();
+    const auto &main_md = main_state.module();
     auto &main_builder = main_state.builder();
 
     // Fetch the fp types for the main state.
@@ -2390,12 +2393,12 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
     // would not be worth it, perhaps we can reconsider in the future. It is also not clear how
     // to deal with thread-unsafe type cloning in this hypothetical scenario.
     if (batch_size == 1u) {
-        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
-                                     [&create_cfunc]() { create_cfunc(true, 1); });
+        tbb_isolated_parallel_invoke([&create_cfunc] { create_cfunc(false, 1); },
+                                     [&create_cfunc] { create_cfunc(true, 1); });
     } else {
-        tbb_isolated_parallel_invoke([&create_cfunc]() { create_cfunc(false, 1); },
-                                     [&create_cfunc]() { create_cfunc(true, 1); },
-                                     [&create_cfunc, batch_size]() { create_cfunc(true, batch_size); });
+        tbb_isolated_parallel_invoke([&create_cfunc] { create_cfunc(false, 1); },
+                                     [&create_cfunc] { create_cfunc(true, 1); },
+                                     [&create_cfunc, batch_size] { create_cfunc(true, batch_size); });
     }
 
     // Consolidate all the state lists into a single one.

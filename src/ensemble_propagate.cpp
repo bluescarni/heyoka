@@ -266,7 +266,7 @@ ensemble_propagate_grid_batch_impl(
     // Splat out the time grid.
     std::vector<T> grid;
     grid.reserve(boost::safe_numerics::safe<decltype(grid.size())>(grid_.size()) * batch_size);
-    for (auto gval : grid_) {
+    for (const auto gval : grid_) {
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             grid.push_back(gval);
         }

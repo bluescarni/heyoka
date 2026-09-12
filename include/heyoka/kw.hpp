@@ -135,8 +135,7 @@ namespace descr
 
 template <auto NArg, typename T>
     requires igor::any_named_argument<NArg>
-inline constexpr auto same_as
-    = igor::descr<NArg, []<typename U>() { return std::same_as<std::remove_cvref_t<U>, T>; }>{};
+inline constexpr auto same_as = igor::descr<NArg, []<typename U> { return std::same_as<std::remove_cvref_t<U>, T>; }>{};
 
 template <auto NArg>
     requires igor::any_named_argument<NArg>
@@ -144,29 +143,30 @@ inline constexpr auto boolean = same_as<NArg, bool>;
 
 template <auto NArg, typename T>
     requires igor::any_named_argument<NArg>
-inline constexpr auto convertible_to = igor::descr<NArg, []<typename U>() { return std::convertible_to<U, T>; }>{};
+inline constexpr auto convertible_to = igor::descr<NArg, []<typename U> { return std::convertible_to<U, T>; }>{};
 
 template <typename T, auto NArg, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto constructible_from
-    = igor::descr<NArg, []<typename U>() { return std::constructible_from<T, U>; }>{.required = Mandatory};
+    = igor::descr<NArg, []<typename U> { return std::constructible_from<T, U>; }>{.required = Mandatory};
 
 template <auto NArg, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto integral
-    = igor::descr<NArg, []<typename U>() { return std::integral<std::remove_cvref_t<U>>; }>{.required = Mandatory};
+    = igor::descr<NArg, []<typename U> { return std::integral<std::remove_cvref_t<U>>; }>{.required = Mandatory};
 
 template <auto NArg, typename T, bool Mandatory = false>
     requires igor::any_named_argument<NArg>
 inline constexpr auto constructible_input_range
-    = igor::descr<NArg, []<typename U>() { return heyoka::detail::constructible_input_range<U, T>; }>{.required
-                                                                                                      = Mandatory};
+    = igor::descr<NArg, []<typename U> { return heyoka::detail::constructible_input_range<U, T>; }>{
+        .required = Mandatory,
+    };
 
 // NOTE: this descriptor will be satisfied either by types from which a std::optional<T> can be constructed via the
 // in-place constructor, or by std::optional<T> itself.
 template <typename T, auto NArg>
     requires igor::any_named_argument<NArg>
-inline constexpr auto optional_from = igor::descr<NArg, []<typename U>() { return can_make_optional<T, U>; }>{};
+inline constexpr auto optional_from = igor::descr<NArg, []<typename U> { return can_make_optional<T, U>; }>{};
 
 } // namespace descr
 

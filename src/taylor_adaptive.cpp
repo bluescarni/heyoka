@@ -65,10 +65,9 @@
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
-// NOTE: this is a helper macro to reduce typing when accessing the
-// data members of i_data.
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
+// NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
 #define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) [[maybe_unused]] auto &name = m_i_data->name
+#define HEYOKA_TAYLOR_CREF_FROM_I_DATA(name) [[maybe_unused]] const auto &name = m_i_data->name
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -185,10 +184,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
@@ -586,7 +584,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     if constexpr (std::is_same_v<T, mppp::real>) {
         // Fix the precision of m_last_h, which was inited from '0'.
-        m_last_h.prec_round(this->get_prec());
+        m_i_data->m_last_h.prec_round(this->get_prec());
 
 #if !defined(NDEBUG)
 
@@ -746,7 +744,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
 #endif
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
@@ -811,21 +809,28 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
         // in edd.detect_events() we skip event detection altogether.
-        const auto g_eps = [&]() {
+        const auto g_eps = [&] {
             if (isfinite(max_abs_state)) {
                 // Are we in absolute or relative error control mode?
                 const auto abs_or_rel = max_abs_state < 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
+                // Estimate the size of the largest remainder in the Taylor series of both the dynamical equations and
+                // the events.
+                //
+                // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-                // integration error cannot be too small due to floating-point truncation.
-                // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real integration error cannot be
+                // too small due to floating-point truncation. This is the case for instance if we use sub-epsilon
+                // integration tolerances to achieve Brouwer's law. In such a case, we cap the value of g_eps, using eps
+                // * max_abs_state as an estimation of the smallest number that can be resolved with the current
+                // floating-point type.
+                //
+                // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
                 auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
 
                 // NOTE: the if condition in the next line is equivalent, in relative
@@ -869,7 +874,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // happen closer to the beginning of the timestep.
         // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
-        auto cmp = [](const auto &ev0, const auto &ev1) { return detail::abs_lt(std::get<1>(ev0), std::get<1>(ev1)); };
+        const auto cmp
+            = [](const auto &ev0, const auto &ev1) { return detail::abs_lt(std::get<1>(ev0), std::get<1>(ev1)); };
         std::sort(edd.m_d_tes.begin(), edd.m_d_tes.end(), cmp);
         std::sort(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), cmp);
 
@@ -910,7 +916,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             if (cd) {
                 // Check if the timestep we just took
                 // brought this event outside the cooldown.
-                auto tmp = cd->first + h;
+                const auto tmp = cd->first + h;
 
                 if (abs(tmp) >= cd->second) {
                     // We are now outside the cooldown period
@@ -1113,7 +1119,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
 
     // Check the current time.
@@ -1190,7 +1196,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     const auto t_dir = (rem_time >= static_cast<T>(0));
 
     // Helper to create the continuous output object.
-    auto make_c_out = [&]() -> std::optional<continuous_output<T>> {
+    const auto make_c_out = [&] -> std::optional<continuous_output<T>> {
         if (with_c_out) {
             if (c_out_times_hi.size() < 2u) {
                 // NOTE: this means that no successful steps
@@ -1222,7 +1228,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     };
 
     // Helper to update the continuous output data after a timestep.
-    auto update_c_out = [&]() {
+    const auto update_c_out = [&] {
         if (with_c_out) {
 #if !defined(NDEBUG)
             const detail::dfloat<T> prev_time(c_out_times_hi.back(), c_out_times_lo.back());
@@ -1275,6 +1281,9 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
+        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+        //
+        // NOLINTNEXTLINE(misc-const-correctness)
         auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
                               : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
@@ -1324,12 +1333,10 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 
             if (!ret_cb) {
                 // Interruption via callback.
-                return std::tuple{taylor_outcome::cb_stop,
-                                  std::move(min_h),
-                                  std::move(max_h),
-                                  step_counter,
-                                  make_c_out(),
-                                  std::move(cb)};
+                return std::tuple{
+                    taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter, make_c_out(),
+                    std::move(cb),
+                };
             }
         }
 
@@ -1354,12 +1361,14 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
         // then this condition will never trigger (modulo wraparound)
         // as by this point we are sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit,
-                              std::move(min_h),
-                              std::move(max_h),
-                              step_counter,
-                              make_c_out(),
-                              std::move(cb)};
+            return std::tuple{
+                taylor_outcome::step_limit,
+                std::move(min_h),
+                std::move(max_h),
+                step_counter,
+                make_c_out(),
+                std::move(cb),
+            };
         }
 
         // Update the remaining time.
@@ -1399,7 +1408,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
 
     if (!isfinite(m_time)) {
@@ -1636,6 +1645,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
+        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+        //
+        // NOLINTNEXTLINE(misc-const-correctness)
         auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
                               : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         const auto [oc, h] = step_impl(std::move(dt_limit.hi), true);
@@ -1665,7 +1677,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [&]() {
+        const auto wrap_cb_call = [&] {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
@@ -1722,12 +1734,14 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
     // Return time_limit or the interrupt condition, if the integration
     // was stopped early.
-    return std::tuple{interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt,
-                      std::move(min_h),
-                      std::move(max_h),
-                      step_counter,
-                      std::move(cb),
-                      std::move(retval)};
+    return std::tuple{
+        interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt,
+        std::move(min_h),
+        std::move(max_h),
+        step_counter,
+        std::move(cb),
+        std::move(retval),
+    };
 }
 
 template <typename T>
@@ -1969,8 +1983,8 @@ void taylor_adaptive<T>::check_variational(const char *fname) const
 template <typename T>
 void taylor_adaptive<T>::assign_stepper(bool with_events)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ta_jit_data);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_step_f = m_ta_jit_data->m_step_f;
     auto &m_llvm_state = m_ta_jit_data->m_llvm_state;
@@ -2076,8 +2090,10 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint
 
     const auto rng = dt.get_derivatives(order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>
@@ -2090,8 +2106,10 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint
 
     const auto rng = dt.get_derivatives(component, order);
 
-    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
-            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+    return {
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+        boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end())),
+    };
 }
 
 template <typename T>
@@ -2138,3 +2156,5 @@ HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
 HEYOKA_END_NAMESPACE
 
 #undef HEYOKA_TAYLOR_REF_FROM_I_DATA
+
+#undef HEYOKA_TAYLOR_CREF_FROM_I_DATA
