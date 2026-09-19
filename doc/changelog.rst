@@ -19,6 +19,8 @@ Changes
 Fix
 ~~~
 
+- Fix compilation errors when using Clang 23
+  (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).
 - An issue that could lead to suboptimal code generation on AVX-512
   has been resolved
   (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).

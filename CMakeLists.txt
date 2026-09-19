@@ -155,9 +155,14 @@ check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 19 OR ${LLVM_VERSION_MAJOR} GREATER 23)
-  message(FATAL_ERROR "LLVM >= 19 and <= 23 is required.")
+# Version checks.
+set(_HEYOKA_MIN_LLVM_VERSION 19)
+set(_HEYOKA_MAX_LLVM_VERSION 23)
+if(${LLVM_VERSION_MAJOR} LESS ${_HEYOKA_MIN_LLVM_VERSION} OR ${LLVM_VERSION_MAJOR} GREATER ${_HEYOKA_MAX_LLVM_VERSION})
+  message(WARNING "The supported LLVM range is ${_HEYOKA_MIN_LLVM_VERSION}-${_HEYOKA_MAX_LLVM_VERSION}, but LLVM version ${LLVM_VERSION} was detected instead.")
 endif()
+unset(_HEYOKA_MIN_LLVM_VERSION)
+unset(_HEYOKA_MAX_LLVM_VERSION)
 
 message(STATUS "LLVM version: ${LLVM_VERSION}")
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
