@@ -83,6 +83,8 @@ namespace
 {
 
 // Taylor decomposition for erf and erfc.
+//
+// NOTE: this will consume self.
 taylor_dc_t::size_type erf_common_taylor_decompose(auto &self, taylor_dc_t &u_vars_defs)
 {
     assert(self.args().size() == 1u);
@@ -103,7 +105,7 @@ taylor_dc_t::size_type erf_common_taylor_decompose(auto &self, taylor_dc_t &u_va
     // Add the hidden dep.
     (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
-    // Compute the return value (pointing to the decomposed erf).
+    // Compute the return value (pointing to the decomposed erf/erfc).
     return u_vars_defs.size() - 1u;
 }
 
@@ -211,14 +213,17 @@ llvm::Value *taylor_diff_erf_common_impl(llvm_state &s, llvm::Type *fp_t, const 
 
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_erf_common_impl(llvm_state &, llvm::Type *, const auto &, const std::vector<std::uint32_t> &,
-                                         const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+llvm::Value *taylor_diff_erf_common_impl(llvm_state &, llvm::Type *, const auto &self,
+                                         const std::vector<std::uint32_t> &, const U &,
+                                         const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
                                          std::uint32_t, std::uint32_t, std::uint32_t, const auto &, const number &)
 {
-    throw std::invalid_argument(
-        "An invalid argument type was encountered while trying to build the Taylor derivative of erf/erfc");
+    throw std::invalid_argument(fmt::format(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of {}", self.get_name()));
 }
 
+// NOTE: 'evaluator' performs the order-0 evaluation, while 'cfac' is the reciprocal of the constant in the first
+// derivative, i.e. sqrt(pi)/2 for erf and -sqrt(pi)/2 for erfc. The two arguments must be consistent with each other.
 llvm::Value *taylor_diff_erf_common(llvm_state &s, llvm::Type *fp_t, const auto &f,
                                     const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
                                     llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
@@ -229,8 +234,8 @@ llvm::Value *taylor_diff_erf_common(llvm_state &s, llvm::Type *fp_t, const auto 
     if (deps.size() != 1u) {
         throw std::invalid_argument(
             fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-                        "derivative of erf/erfc, but a vector of size {} was passed instead",
-                        deps.size()));
+                        "derivative of {}, but a vector of size {} was passed instead",
+                        f.get_name(), deps.size()));
     }
 
     return std::visit(
@@ -366,13 +371,17 @@ llvm::Function *taylor_c_diff_func_erf_common_impl(llvm_state &s, llvm::Type *fp
 
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_erf_common_impl(llvm_state &, llvm::Type *, const auto &, const U &, std::uint32_t,
-                                                   std::uint32_t, const auto &, const number &)
+llvm::Function *taylor_c_diff_func_erf_common_impl(llvm_state &, llvm::Type *, const auto &self, const U &,
+                                                   std::uint32_t, std::uint32_t, const auto &, const number &)
 {
-    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of erf/erfc in compact mode");
+    throw std::invalid_argument(
+        fmt::format("An invalid argument type was encountered while trying to build the Taylor derivative "
+                    "of {} in compact mode",
+                    self.get_name()));
 }
 
+// NOTE: 'evaluator' performs the order-0 evaluation, while 'cfac' is the reciprocal of the constant in the first
+// derivative, i.e. sqrt(pi)/2 for erf and -sqrt(pi)/2 for erfc. The two arguments must be consistent with each other.
 llvm::Function *taylor_c_diff_func_erf_common(llvm_state &s, llvm::Type *fp_t, const auto &fn, std::uint32_t n_uvars,
                                               std::uint32_t batch_size, const auto &evaluator, const number &cfac)
 {
