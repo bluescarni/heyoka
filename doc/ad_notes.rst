@@ -585,6 +585,21 @@ and :eq:`eq_leibniz_00` to obtain, for :math:`n > 0`:
 
    a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
 
+.. _ad_erfc:
+
+Complementary error function
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The derivation is identical to the :ref:`error function <ad_erf>`, apart from a sign change, and it employs the
+same auxiliary function :math:`c\left( t \right) = \exp{\left[ -b^2\left( t \right)\right]}`.
+Given :math:`a\left( t \right) = \operatorname{erfc} b\left( t \right)`,
+the final result is, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = -\frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
 Celestial mechanics
 -------------------
 
