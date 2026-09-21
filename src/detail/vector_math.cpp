@@ -11,8 +11,9 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <fmt/core.h>
 
@@ -30,7 +31,7 @@ namespace detail
 namespace
 {
 
-using vf_map_t = std::unordered_map<std::string, std::vector<vf_info>>;
+using vf_map_t = boost::unordered_flat_map<std::string, std::vector<vf_info>>;
 
 // Function to construct a vf_info instance.
 //
@@ -63,20 +64,26 @@ using vf_map_t = std::unordered_map<std::string, std::vector<vf_info>>;
 
 #if defined(HEYOKA_WITH_SLEEF)
 
-// Helper to fetch the suffix of the low-precision version of the mathematical function "sleef_base_name" in SLEEF.
-//
-// NOTE: by default, the low-precision versions are denoted by the "u35" suffix (indicating 3.5 ULPs of precision). For
-// some functions, the "u35" versions are not available and we return the standard-precision suffix instead ("u10").
-std::string sleef_get_lp_suffix(const std::string &sleef_base_name)
-{
-    static const std::unordered_map<std::string, std::string> lp_suffix_map
-        = {{"acosh", "u10"}, {"asinh", "u10"}, {"atanh", "u10"}, {"erf", "u10"}, {"exp", "u10"}, {"pow", "u10"}};
+// Machinery to look up the precision suffixes of SLEEF functions.
+struct sleef_suffixes {
+    std::string_view hp;
+    std::string_view lp;
+};
 
-    if (const auto it = lp_suffix_map.find(sleef_base_name); it == lp_suffix_map.end()) {
-        return "u35";
-    } else {
-        return it->second;
-    }
+sleef_suffixes sleef_get_suffixes(const std::string_view base_name)
+{
+    // NOTE: by default SLEEF ships a high-precision "u10" (1 ULP) and a low-precision "u35" (3.5 ULPs) variant of each
+    // function. Listed here are the exceptions: functions with no low-precision variant, and/or whose high-precision
+    // variant does not carry the "u10" suffix.
+    static const boost::unordered_flat_map<std::string_view, sleef_suffixes> sleef_suffixes_map = {
+        {"acosh", {.hp = "u10", .lp = "u10"}}, {"asinh", {.hp = "u10", .lp = "u10"}},
+        {"atanh", {.hp = "u10", .lp = "u10"}}, {"erf", {.hp = "u10", .lp = "u10"}},
+        {"erfc", {.hp = "u15", .lp = "u15"}},  {"exp", {.hp = "u10", .lp = "u10"}},
+        {"pow", {.hp = "u10", .lp = "u10"}},
+    };
+
+    const auto it = sleef_suffixes_map.find(base_name);
+    return (it == sleef_suffixes_map.end()) ? sleef_suffixes{.hp = "u10", .lp = "u35"} : it->second;
 }
 
 // Helper to add to retval a SLEEF-based vf_info instance for the scalar function called 'scalar_name'.
@@ -90,10 +97,11 @@ void add_vfinfo_sleef(vf_map_t &retval, const char *const scalar_name, const cha
     assert(nargs > 0u);
 
     const auto make_sleef_vfinfo = [&](const std::uint32_t width, const char *const iset) {
-        return make_vfinfo(scalar_name, fmt::format("Sleef_{}{}{}_u10{}", sleef_base_name, sleef_tp, width, iset),
-                           fmt::format("Sleef_{}{}{}_{}{}", sleef_base_name, sleef_tp, width,
-                                       sleef_get_lp_suffix(sleef_base_name), iset),
-                           width, nargs, {});
+        const auto [hp, lp] = sleef_get_suffixes(sleef_base_name);
+
+        return make_vfinfo(scalar_name, fmt::format("Sleef_{}{}{}_{}{}", sleef_base_name, sleef_tp, width, hp, iset),
+                           fmt::format("Sleef_{}{}{}_{}{}", sleef_base_name, sleef_tp, width, lp, iset), width, nargs,
+                           {});
     };
 
     const auto &features = get_target_features();
@@ -264,6 +272,7 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "atanhf", "atanh", "f");
     add_vfinfo_sleef(retval, "atan2f", "atan2", "f", 2);
     add_vfinfo_sleef(retval, "erff", "erf", "f");
+    add_vfinfo_sleef(retval, "erfcf", "erfc", "f");
 
     // Double-precision.
     add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d");
@@ -283,6 +292,7 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "atanh", "atanh", "d");
     add_vfinfo_sleef(retval, "atan2", "atan2", "d", 2);
     add_vfinfo_sleef(retval, "erf", "erf", "d");
+    add_vfinfo_sleef(retval, "erfc", "erfc", "d");
 
     // Combined sleef wrappers.
 

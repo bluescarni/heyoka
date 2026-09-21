@@ -131,6 +131,12 @@ llvm::Value *llvm_erf(llvm_state &s, llvm::Value *x)
     return llvm_math_cmath(s, "erf", {x});
 }
 
+// Complementary error function.
+llvm::Value *llvm_erfc(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "erfc", {x});
+}
+
 // Natural logarithm.
 llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
 {

@@ -1,0 +1,337 @@
+// Copyright 2020-2026 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+//
+// This file is part of the heyoka library.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#include <heyoka/config.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <initializer_list>
+#include <limits>
+#include <random>
+#include <sstream>
+#include <tuple>
+#include <type_traits>
+#include <variant>
+#include <vector>
+
+#include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
+#include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/math/constants.hpp>
+#include <heyoka/math/erf.hpp>
+#include <heyoka/math/exp.hpp>
+#include <heyoka/math/pow.hpp>
+#include <heyoka/math/sqrt.hpp>
+#include <heyoka/mdspan.hpp>
+#include <heyoka/s11n.hpp>
+
+#include "catch.hpp"
+#include "test_utils.hpp"
+
+static std::mt19937 rng;
+
+using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<float, double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+constexpr bool skip_batch_ld = false;
+
+TEST_CASE("erfc")
+{
+    using std::erfc;
+    auto x = make_vars("x");
+    // Test the textual output
+    std::ostringstream stream;
+    stream << erfc(x);
+    REQUIRE(stream.str() == "erfc(x)");
+}
+
+TEST_CASE("erfc diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(erfc(x * x - y), x) == (-2_dbl / sqrt(pi) * exp(-pow(x * x - y, 2_dbl))) * (x + x));
+    REQUIRE(diff(erfc(x * x + y), y) == (-2_dbl / sqrt(pi) * exp(-pow(x * x + y, 2_dbl))));
+
+    REQUIRE(diff(erfc(par[0] * par[0] - y), par[0])
+            == (-2_dbl / sqrt(pi) * exp((-pow(par[0] * par[0] - y, 2_dbl)))) * (par[0] + par[0]));
+    REQUIRE(diff(erfc(x * x + par[1]), par[1]) == (-2_dbl / sqrt(pi) * exp((-pow(x * x + par[1], 2_dbl)))));
+}
+
+TEST_CASE("erfc s11n")
+{
+    std::stringstream ss;
+
+    auto x = make_vars("x");
+
+    auto ex = erfc(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == erfc(x));
+}
+
+TEST_CASE("cfunc")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::erfc;
+
+        using fp_t = decltype(fp_x);
+
+        auto x = make_vars("x");
+
+        std::uniform_real_distribution<double> rdist(-1., 1.);
+
+        auto gen = [&rdist]() { return static_cast<fp_t>(rdist(rng)); };
+
+        std::vector<fp_t> outs, ins, pars;
+
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
+            outs.resize(batch_size * 3u);
+            ins.resize(batch_size);
+            pars.resize(batch_size);
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
+
+            cfunc<fp_t> cf({erfc(x), erfc(expression{fp_t(-.5)}), erfc(par[0])}, {x}, kw::batch_size = batch_size,
+                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                           kw::opt_level = opt_level);
+
+            if (opt_level == 0u && compact_mode) {
+                const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.erfc."); }));
+            }
+
+            cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
+               mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 1u, batch_size),
+               kw::pars = mdspan<const fp_t, dextents<std::size_t, 2>>(pars.data(), 1u, batch_size));
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(outs[i] == approximately(erfc(ins[i]), fp_t(100)));
+                REQUIRE(outs[i + batch_size] == approximately(erfc(static_cast<fp_t>(-.5)), fp_t(100)));
+                REQUIRE(outs[i + 2u * batch_size] == approximately(erfc(pars[i]), fp_t(100)));
+            }
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto x = make_vars("x");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            cfunc<mppp::real> cf({erfc(x), erfc(expression{mppp::real{1.5, prec}}), erfc(par[0])}, {x},
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
+
+            const std::vector ins{mppp::real{"1.7", prec}};
+            const std::vector pars{mppp::real{"2.1", prec}};
+            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+
+            cf(outs, ins, kw::pars = pars);
+
+            auto i = 0u;
+            REQUIRE(outs[i] == erfc(ins[i]));
+            REQUIRE(outs[i + 1u] == erfc(mppp::real{1.5, prec}));
+            REQUIRE(outs[i + 2u * 1u] == erfc(pars[i]));
+        }
+    }
+}
+
+#endif
+
+// Tests to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi double")
+{
+    for (auto fast_math : {false, true}) {
+        llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
+
+        auto [a, b] = make_vars("a", "b");
+
+        add_cfunc<double>(s, "cfunc", {erfc(a), erfc(b)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {erfc(a), erfc(b)}, {a, b}, kw::strided = true);
+
+        s.compile();
+
+        auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            s.jit_lookup("cfunc"));
+
+        const std::vector ins{.1, .2};
+        std::vector<double> outs(2u, 0.);
+
+        cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+        REQUIRE(outs[0] == approximately(std::erfc(.1)));
+        REQUIRE(outs[1] == approximately(std::erfc(.2)));
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+        const auto &tf = detail::get_target_features();
+
+        auto ir = s.get_ir();
+
+        using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+        auto count = 0u;
+        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@erfc", boost::is_iequal()));
+             it != string_find_iterator(); ++it) {
+            ++count;
+        }
+
+        // NOTE: at the moment we have comprehensive coverage of LLVM versions
+        // in the CI only for x86_64.
+        if (tf.sse2) {
+            // NOTE: occurrences of the scalar version:
+            // - 2 calls in the strided cfunc,
+            // - 1 declaration.
+            //
+            // NOTE: we check with <= rather than == because newer LLVM versions may vectorise more
+            // aggressively (e.g., the calls in the strided cfunc), resulting in fewer scalar calls.
+            REQUIRE(count <= 3u);
+        }
+
+        if (tf.aarch64) {
+            REQUIRE(count <= 3u);
+        }
+
+        // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+        // to the way the target machine is being set up by orc/lljit (it works
+        // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+        // if (tf.vsx) {
+        //     REQUIRE(count <= 3u);
+        // }
+
+#endif
+    }
+}
+
+TEST_CASE("vfabi float")
+{
+    for (auto fast_math : {false, true}) {
+        llvm_state s{kw::slp_vectorize = true, kw::fast_math = fast_math};
+
+        auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+
+        add_cfunc<float>(s, "cfunc", {erfc(a), erfc(b), erfc(c), erfc(d)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {erfc(a), erfc(b), erfc(c), erfc(d)}, {a, b, c, d}, kw::strided = true);
+
+        s.compile();
+
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s.jit_lookup("cfunc"));
+
+        const std::vector<float> ins{.1f, .2f, .3f, .4f};
+        std::vector<float> outs(4u, 0.);
+
+        cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+        REQUIRE(outs[0] == approximately(std::erfc(.1f)));
+        REQUIRE(outs[1] == approximately(std::erfc(.2f)));
+        REQUIRE(outs[2] == approximately(std::erfc(.3f)));
+        REQUIRE(outs[3] == approximately(std::erfc(.4f)));
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+        const auto &tf = detail::get_target_features();
+
+        auto ir = s.get_ir();
+
+        using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+        auto count = 0u;
+        for (auto it = boost::make_find_iterator(ir, boost::first_finder("@erfcf", boost::is_iequal()));
+             it != string_find_iterator(); ++it) {
+            ++count;
+        }
+
+        // NOTE: at the moment we have comprehensive coverage of LLVM versions
+        // in the CI only for x86_64.
+        if (tf.sse2) {
+            // NOTE: occurrences of the scalar version:
+            // - 4 calls in the strided cfunc,
+            // - 1 declaration.
+            //
+            // NOTE: we check with <= rather than == because newer LLVM versions may vectorise more
+            // aggressively (e.g., the calls in the strided cfunc), resulting in fewer scalar calls.
+            REQUIRE(count <= 5u);
+        }
+
+        if (tf.aarch64) {
+            REQUIRE(count <= 5u);
+        }
+
+        // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+        // to the way the target machine is being set up by orc/lljit (it works
+        // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+        // if (tf.vsx) {
+        //     REQUIRE(count <= 5u);
+        // }
+
+#endif
+    }
+}
