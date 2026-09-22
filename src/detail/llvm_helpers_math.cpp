@@ -93,6 +93,12 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
                           {x});
 }
 
+// Exponential minus one.
+llvm::Value *llvm_expm1(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "expm1", {x});
+}
+
 // Cosine.
 llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
 {
@@ -131,6 +137,12 @@ llvm::Value *llvm_erf(llvm_state &s, llvm::Value *x)
     return llvm_math_cmath(s, "erf", {x});
 }
 
+// Complementary error function.
+llvm::Value *llvm_erfc(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "erfc", {x});
+}
+
 // Natural logarithm.
 llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
 {
@@ -142,6 +154,12 @@ llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
                           "mpfr_log",
 #endif
                           {x});
+}
+
+// Natural logarithm of 1+x.
+llvm::Value *llvm_log1p(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "log1p", {x});
 }
 
 // Inverse sine.
