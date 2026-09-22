@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -68,45 +69,54 @@ llvm::Value *log_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Valu
 namespace
 {
 
-// Derivative of log(number).
-template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_impl &, const U &num,
+// Derivative of log(number)/log1p(number).
+template <typename F, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const F &, const U &num,
                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return llvm_log(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        auto *const arg = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
+        return std::same_as<F, log_impl> ? llvm_log(s, arg) : llvm_log1p(s, arg);
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
-// Derivative of log(variable).
-llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_impl &, const variable &var,
+// Derivative of log(variable)/log1p(variable).
+template <typename F>
+llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const F &, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                   std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
+    constexpr auto islog = std::same_as<F, log_impl>;
+
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto b_idx = uname_to_index(var.name());
 
+    // Load b[0].
+    auto *const b0 = taylor_fetch_diff(arr, b_idx, 0, n_uvars);
+
     if (order == 0u) {
-        return llvm_log(s, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
+        return islog ? llvm_log(s, b0) : llvm_log1p(s, b0);
     }
 
     // Create the fp version of the order.
     auto *ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
-    // Compute n*b^[0].
-    auto *nb0 = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
+    // Compute the outside divisor (n*b^[0] or n*(b^[0]+1)).
+    auto *const div
+        = islog ? llvm_fmul(s, ord_fp, b0)
+                : llvm_fmul(s, ord_fp,
+                            llvm_fadd(s, b0, vector_splat(builder, llvm_codegen(s, fp_t, number(1.)), batch_size)));
 
     // Init ret with n*b^[n].
     auto *ret = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
-    // Run the summation only if order is > 1, otherwise
-    // pairwise_sum() will error out.
+    // Run the summation only if order is > 1, otherwise pairwise_sum() will error out.
     if (order > 1u) {
         std::vector<llvm::Value *> sum;
 
@@ -124,21 +134,22 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
         ret = llvm_fsub(s, ret, pairwise_sum(s, sum));
     }
 
-    // Divide by n*b[0] and return.
-    return llvm_fdiv(s, ret, nb0);
+    // Divide by div and return.
+    return llvm_fdiv(s, ret, div);
 }
 
 // All the other cases.
-template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_log_impl(llvm_state &, llvm::Type *, const log_impl &, const U &,
+template <typename F, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_log_impl(llvm_state &, llvm::Type *, const F &self, const U &,
                                   const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
                                   std::uint32_t, std::uint32_t)
 {
-    throw std::invalid_argument(
-        "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
+    throw std::invalid_argument(fmt::format(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of {}", self.get_name()));
 }
 
-llvm::Value *taylor_diff_log(llvm_state &s, llvm::Type *fp_t, const log_impl &f, const std::vector<std::uint32_t> &deps,
+template <typename F>
+llvm::Value *taylor_diff_log(llvm_state &s, llvm::Type *fp_t, const F &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
@@ -147,9 +158,8 @@ llvm::Value *taylor_diff_log(llvm_state &s, llvm::Type *fp_t, const log_impl &f,
     if (!deps.empty()) {
         throw std::invalid_argument(
             fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
-                        "derivative of the logarithm, but a vector of size {} was passed "
-                        "instead",
-                        deps.size()));
+                        "derivative of {}, but a vector of size {} was passed instead",
+                        f.get_name(), deps.size()));
     }
 
     return std::visit(
@@ -172,28 +182,31 @@ llvm::Value *log_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::v
 namespace
 {
 
-// Derivative of log(number).
-template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, const log_impl &, const U &num,
+// Derivative of log(number)/log1p(number).
+template <typename F, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, const F &self, const U &num,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_numpar(
-        s, fp_t, n_uvars, batch_size, "log", 0,
+        s, fp_t, n_uvars, batch_size, self.get_name(), 0,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_log(s, args[0]);
+            return std::same_as<F, log_impl> ? llvm_log(s, args[0]) : llvm_log1p(s, args[0]);
         },
         num);
 }
 
-// Derivative of log(variable).
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, const log_impl &, const variable &var,
+// Derivative of log(variable)/log1p(variable).
+template <typename F>
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, const F &self, const variable &var,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    constexpr auto islog = std::same_as<F, log_impl>;
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -201,7 +214,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "log", n_uvars, batch_size, {var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, self.get_name(), n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -235,20 +248,22 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
         // Create the accumulator.
         auto *acc = builder.CreateAlloca(val_t);
 
+        // Load b[0].
+        auto *const b0 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&] {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(
-                    llvm_log(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
+                builder.CreateStore(islog ? llvm_log(s, b0) : llvm_log1p(s, b0), retval);
             },
             [&] {
                 // Create the fp version of the order.
                 auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
-                // Compute n*b^[0].
-                auto *nb0
-                    = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx));
+                // Compute the outside divisor (n*b^[0] or n*(b^[0]+1)).
+                auto *div = islog ? llvm_fmul(s, ord_fp, b0)
+                                  : llvm_fmul(s, ord_fp, llvm_fadd(s, b0, llvm_codegen(s, val_t, number{1.})));
 
                 // Compute n*b^[n].
                 auto *nbn = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
@@ -268,8 +283,8 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, bnj, aj))), acc);
                 });
 
-                // ret = (n*b^[n] - acc) / (n*b^[0]).
-                builder.CreateStore(llvm_fdiv(s, llvm_fsub(s, nbn, builder.CreateLoad(val_t, acc)), nb0), retval);
+                // ret = (n*b^[n] - acc) / div.
+                builder.CreateStore(llvm_fdiv(s, llvm_fsub(s, nbn, builder.CreateLoad(val_t, acc)), div), retval);
             });
 
         // Return the result.
@@ -283,15 +298,18 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
 }
 
 // All the other cases.
-template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &, llvm::Type *, const log_impl &, const U &, std::uint32_t,
+template <typename F, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &, llvm::Type *, const F &self, const U &, std::uint32_t,
                                             std::uint32_t)
 {
-    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of a logarithm in compact mode");
+    throw std::invalid_argument(
+        fmt::format("An invalid argument type was encountered while trying to build the Taylor derivative "
+                    "of {} in compact mode",
+                    self.get_name()));
 }
 
-llvm::Function *taylor_c_diff_func_log(llvm_state &s, llvm::Type *fp_t, const log_impl &fn, std::uint32_t n_uvars,
+template <typename F>
+llvm::Function *taylor_c_diff_func_log(llvm_state &s, llvm::Type *fp_t, const F &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
@@ -332,7 +350,61 @@ expression log(expression e)
     }
 }
 
+namespace detail
+{
+
+log1p_impl::log1p_impl(expression e) : func_base("log1p", std::vector{std::move(e)}) {}
+
+log1p_impl::log1p_impl() : log1p_impl(0_dbl) {}
+
+llvm::Value *log1p_impl::llvm_evaluate(llvm_state &s, const std::vector<llvm::Value *> &args, llvm::Type *,
+                                       llvm::Value *, bool)
+{
+    assert(args.size() == 1u);
+    return llvm_log1p(s, args[0]);
+}
+
+llvm::Value *log1p_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                     std::uint32_t batch_size, bool) const
+{
+    return taylor_diff_log(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Function *log1p_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                               std::uint32_t batch_size, bool) const
+{
+    return taylor_c_diff_func_log(s, fp_t, *this, n_uvars, batch_size);
+}
+
+[[nodiscard]] std::vector<expression> log1p_impl::gradient() const
+{
+    assert(args().size() == 1u);
+
+    return {pow(1_dbl + args()[0], -1_dbl)};
+}
+
+} // namespace detail
+
+expression log1p(expression e)
+{
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::log1p;
+
+                return expression{log1p(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::log1p_impl(std::move(e))}};
+    }
+}
+
 HEYOKA_END_NAMESPACE
 
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::log_impl)
+// NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::log1p_impl)

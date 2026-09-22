@@ -156,6 +156,12 @@ llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
                           {x});
 }
 
+// Natural logarithm of 1+x.
+llvm::Value *llvm_log1p(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "log1p", {x});
+}
+
 // Inverse sine.
 llvm::Value *llvm_asin(llvm_state &s, llvm::Value *x)
 {

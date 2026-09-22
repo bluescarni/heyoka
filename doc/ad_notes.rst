@@ -239,6 +239,8 @@ After applying the normalised derivative of order :math:`n-1` to both sides, we 
 Logarithms
 ----------
 
+.. _ad_log:
+
 Natural logarithm
 ^^^^^^^^^^^^^^^^^
 
@@ -263,6 +265,22 @@ and re-arrange to obtain, for :math:`n > 0`:
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
+
+.. _ad_log1p:
+
+Logarithm of one plus the argument
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \operatorname{log1p} \left[b\left( t \right)\right] = \log \left[1 + b\left( t \right)\right]`,
+the derivation is identical to the :ref:`natural logarithm <ad_log>`, with :math:`b\left( t \right)` replaced by
+:math:`1 + b\left( t \right)`. The normalised derivatives of :math:`1 + b\left( t \right)` of order :math:`n > 0`
+coincide with those of :math:`b\left( t \right)`, and thus only the order-0 coefficient is affected. The final
+result is, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ b^{\left[ 0 \right]}\left( t \right) + 1 \right]} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
 
 Trigonometric functions
 -----------------------

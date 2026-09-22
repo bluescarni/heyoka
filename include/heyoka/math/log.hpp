@@ -49,12 +49,39 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
+class HEYOKA_DLL_PUBLIC log1p_impl : public func_base
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
+public:
+    log1p_impl();
+    explicit log1p_impl(expression);
+
+    [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] static llvm::Value *llvm_evaluate(llvm_state &, const std::vector<llvm::Value *> &, llvm::Type *,
+                                                    llvm::Value *, bool);
+
+    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+
+    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+};
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression log(expression);
+HEYOKA_DLL_PUBLIC expression log1p(expression);
 
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::log_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::log1p_impl)
 
 #endif
