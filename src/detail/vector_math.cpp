@@ -79,7 +79,7 @@ sleef_suffixes sleef_get_suffixes(const std::string_view base_name)
         {"acosh", {.hp = "u10", .lp = "u10"}}, {"asinh", {.hp = "u10", .lp = "u10"}},
         {"atanh", {.hp = "u10", .lp = "u10"}}, {"erf", {.hp = "u10", .lp = "u10"}},
         {"erfc", {.hp = "u15", .lp = "u15"}},  {"exp", {.hp = "u10", .lp = "u10"}},
-        {"pow", {.hp = "u10", .lp = "u10"}},
+        {"expm1", {.hp = "u10", .lp = "u10"}}, {"pow", {.hp = "u10", .lp = "u10"}},
     };
 
     const auto it = sleef_suffixes_map.find(base_name);
@@ -259,6 +259,7 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "llvm.cos.f32", "cos", "f");
     add_vfinfo_sleef(retval, "llvm.log.f32", "log", "f");
     add_vfinfo_sleef(retval, "llvm.exp.f32", "exp", "f");
+    add_vfinfo_sleef(retval, "expm1f", "expm1", "f");
     add_vfinfo_sleef(retval, "llvm.pow.f32", "pow", "f", 2);
     add_vfinfo_sleef(retval, "sinhf", "sinh", "f");
     add_vfinfo_sleef(retval, "coshf", "cosh", "f");
@@ -279,6 +280,7 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "llvm.cos.f64", "cos", "d");
     add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d");
     add_vfinfo_sleef(retval, "llvm.exp.f64", "exp", "d");
+    add_vfinfo_sleef(retval, "expm1", "expm1", "d");
     add_vfinfo_sleef(retval, "llvm.pow.f64", "pow", "d", 2);
     add_vfinfo_sleef(retval, "sinh", "sinh", "d");
     add_vfinfo_sleef(retval, "cosh", "cosh", "d");

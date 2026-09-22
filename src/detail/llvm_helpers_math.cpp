@@ -93,6 +93,12 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
                           {x});
 }
 
+// Exponential minus one.
+llvm::Value *llvm_expm1(llvm_state &s, llvm::Value *x)
+{
+    return llvm_math_cmath(s, "expm1", {x});
+}
+
 // Cosine.
 llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
 {

@@ -136,6 +136,8 @@ for :math:`n > 0`:
 Exponentials
 ------------
 
+.. _ad_exp:
+
 Natural exponential
 ^^^^^^^^^^^^^^^^^^^
 
@@ -153,6 +155,45 @@ and obtain, for :math:`n > 0`:
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
+.. _ad_expm1:
+
+Exponential minus one
+^^^^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \operatorname{expm1} \left[b\left( t \right)\right] = e^{b\left( t \right)} - 1`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = e^{b\left( t \right)}b^\prime\left( t \right).
+
+In contrast to the :ref:`natural exponential <ad_exp>`, the exponential on the right-hand side is not
+:math:`a\left( t \right)` but :math:`a\left( t \right) + 1`. Reconstructing it that way would however
+reintroduce, in the computation of the derivatives, exactly the cancellation that
+:math:`\operatorname{expm1}` exists to avoid: for large negative :math:`b\left( t \right)`,
+:math:`a\left( t \right)` approaches :math:`-1` and the sum loses all significance. We thus introduce
+the auxiliary function
+
+.. math::
+   :label:
+
+   c\left( t \right)  = e^{b\left( t \right)},
+
+so that
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).
+
+After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`
+and :eq:`eq_leibniz_00` to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
 
 Standard logistic function
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
