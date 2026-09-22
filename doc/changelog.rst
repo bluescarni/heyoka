@@ -7,7 +7,7 @@ Changelog
 New
 ~~~
 
-- New mathematical functions: ``erfc()``, ``expm1()`` and ``log1p()``
+- Add support for new mathematical functions: ``erfc()``, ``expm1()`` and ``log1p()``
   (`#551 <https://github.com/bluescarni/heyoka/pull/551>`__).
 - Add support for LLVM 23
   (`#550 <https://github.com/bluescarni/heyoka/pull/550>`__).
