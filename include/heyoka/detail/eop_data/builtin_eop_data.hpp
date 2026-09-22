@@ -19,7 +19,7 @@ namespace detail
 
 extern const char *const builtin_eop_data_ts;
 
-extern const eop_data_row builtin_eop_data[19628];
+extern const eop_data_row builtin_eop_data[19684];
 
 } // namespace detail
 
