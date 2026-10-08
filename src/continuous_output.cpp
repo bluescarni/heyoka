@@ -1272,10 +1272,9 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
 
         oss << "Directions  : [";
         for (std::uint32_t i = 0; i < batch_size; ++i) {
-            const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
-                df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
-                         co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
-            const auto dir = df_t_start < df_t_end;
+            // NOTE: the direction is encoded in the sign of the (infinite) padding value. A "zero" direction (meaning
+            // that the time does not change) counts as a "forward" direction.
+            const auto dir = co.m_times_hi[co.m_times_hi.size() - batch_size + i] > 0;
 
             oss << (dir ? "forward" : "backward");
 
@@ -1287,10 +1286,13 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
 
         oss << "Time ranges : [";
         for (std::uint32_t i = 0; i < batch_size; ++i) {
+            // NOTE: the direction is encoded in the sign of the (infinite) padding value. A "zero" direction (meaning
+            // that the time does not change) counts as a "forward" direction.
+            const auto dir = co.m_times_hi[co.m_times_hi.size() - batch_size + i] > 0;
+
             const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
                          co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
-            const auto dir = df_t_start < df_t_end;
             oss << (dir ? fmt::format("[{}, {})", fp_to_string(df_t_start.hi), fp_to_string(df_t_end.hi))
                         : fmt::format("({}, {}]", fp_to_string(df_t_end.hi), fp_to_string(df_t_start.hi)));
 

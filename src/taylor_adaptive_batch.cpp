@@ -1122,29 +1122,32 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
 }
 
 // NOTE: possible outcomes:
-// - all time_limit iff all batch elements
-//   were successfully propagated up to the final times; else,
-// - all cb_interrupt if the integration was interrupted via
-//   a callback; else,
-// - 1 or more err_nf_state if 1 or more batch elements generated
-//   a non-finite state. The other elements will have their outcome
-//   set by the last step taken; else,
-// - 1 or more event indices if 1 or more batch elements generated
-//   a stopping terminal event. The other elements will have their outcome
-//   set by the last step taken.
-// The callback is always executed at the end of each timestep, unless
-// a non-finite state was detected in any batch element.
-// The continuous output is always updated at the end of each timestep,
-// unless a non-finite state was detected in any batch element.
+//
+// - 1 or more err_nf_state if 1 or more batch elements generated a non-finite state. The other elements will have their
+//   outcome set by the last step taken; else,
+// - all cb_stop if the integration was interrupted via a callback; else,
+// - 1 or more event indices if 1 or more batch elements generated a stopping terminal event. The other elements will
+//   have their outcome set by the last step taken; else,
+// - all time_limit if all batch elements were propagated up to the final times; else,
+// - all step_limit if the max_steps limit was reached.
+//
+// The callback is always executed at the end of each timestep, unless a non-finite state was detected in any batch
+// element. The continuous output is always updated at the end of each timestep, unless a non-finite state was detected
+// in any batch element.
 template <typename T>
 std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::size_t max_steps,
-                                               const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb, bool wtc,
-                                               bool with_c_out)
+taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const std::size_t max_steps,
+                                               const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb,
+                                               const bool wtc_, const bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
     using std::isnan;
+
+    using safe_size_t = boost::safe_numerics::safe<std::size_t>;
+
+    // Small helper to reduce typing below.
+    constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -1169,8 +1172,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
 
     assert(m_pfor_ts.size() == m_batch_size);
 
-    // Compute the final times and store them in m_pfor_ts, if they
-    // are not already there.
+    // Compute the final times and store them in m_pfor_ts, if they are not already there.
     std::visit(
         [&]<typename V>(const V &v) {
             if constexpr (std::same_as<V, T>) {
@@ -1180,12 +1182,11 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
                 using vec_t = std::remove_cvref_t<std::unwrap_reference_t<V>>;
 
                 if constexpr (std::same_as<T, typename vec_t::value_type>) {
-                    // Vector of single-length final times. Convert to double-length
-                    // and copy into m_pfor_ts.
+                    // Vector of single-length final times. Convert to double-length and copy into m_pfor_ts.
                     const auto &vec = v.get();
 
                     // Check the dimensionality of v.
-                    if (vec.size() != m_batch_size) {
+                    if (vec.size() != m_batch_size) [[unlikely]] {
                         throw std::invalid_argument(fmt::format(
                             "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
                             "batch size is {}, but the number of specified time limits is {}",
@@ -1197,9 +1198,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
                     }
                 } else {
                     // Vector of double-length final times.
-                    // NOTE: this is possible only if propagate_until() is called
-                    // from propagate_for(), in which case v must point
-                    // to m_pfor_ts.
+                    //
+                    // NOTE: this is possible only if propagate_until() is called from propagate_for(), in which case v
+                    // must point to m_pfor_ts.
                     assert(&v.get() == &m_pfor_ts);
                 }
             }
@@ -1213,42 +1214,41 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
     const auto &max_delta_ts = max_delta_ts_.empty() ? m_pinf : max_delta_ts_;
 
     // Check the current times.
-    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
-        || std::any_of(m_time_lo.begin(), m_time_lo.end(), [](const auto &t) { return !isfinite(t); })) {
+    if (!std::ranges::all_of(m_time_hi, is_finite) || !std::ranges::all_of(m_time_lo, is_finite)) [[unlikely]] {
         throw std::invalid_argument(
             "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
             "one of the current times is not finite");
     }
 
     // Check the final times.
-    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !isfinite(t); })) {
+    if (!std::ranges::all_of(ts, is_finite)) [[unlikely]] {
         throw std::invalid_argument("A non-finite time was passed to the propagate_until() function of an adaptive "
                                     "Taylor integrator in batch mode");
     }
 
     // Check max_delta_ts.
-    if (max_delta_ts.size() != m_batch_size) {
+    if (max_delta_ts.size() != m_batch_size) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
             "but the number of specified timesteps is {}",
             m_batch_size, max_delta_ts.size()));
     }
     for (const auto &dt : max_delta_ts) {
-        if (isnan(dt)) {
+        if (isnan(dt)) [[unlikely]] {
             throw std::invalid_argument("A nan max_delta_t was passed to the propagate_until() function of an adaptive "
                                         "Taylor integrator in batch mode");
         }
-        if (dt <= 0) {
+        if (dt <= 0) [[unlikely]] {
             throw std::invalid_argument("A non-positive max_delta_t was passed to the propagate_until() function of an "
                                         "adaptive Taylor integrator in batch mode");
         }
     }
 
     // If with_c_out is true, we always need to write the Taylor coefficients.
-    wtc = wtc || with_c_out;
+    const auto wtc = wtc_ || with_c_out;
 
-    // These vectors are used in the construction of the continuous output.
-    // If continuous output is not requested, they will remain empty.
+    // These vectors are used in the construction of the continuous output. If continuous output is not requested, they
+    // will remain empty.
     std::vector<T> c_out_tcs, c_out_times_hi, c_out_times_lo;
     if (with_c_out) {
         // Push in the starting time.
@@ -1257,31 +1257,34 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
     }
 
     // Reset the counters and the min/max abs(h) vectors.
-    std::size_t iter_counter = 0;
+    safe_size_t iter_counter = 0;
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_ts_count[i] = 0;
         m_min_abs_h[i] = std::numeric_limits<T>::infinity();
         m_max_abs_h[i] = 0;
     }
 
-    // Compute the integration directions and init
-    // the remaining times.
+    // Helper to compute the sign of an input rem_time: -1, 0 or 1.
+    const auto sgn_rem_time = [](const auto &rem_time) {
+        return static_cast<int>(static_cast<T>(0) < rem_time) - static_cast<int>(static_cast<T>(0) > rem_time);
+    };
+
+    // Compute the integration directions and init the remaining times.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_rem_time[i] = ts[i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
-        if (!isfinite(m_rem_time[i])) {
+        if (!is_finite(m_rem_time[i])) [[unlikely]] {
             throw std::invalid_argument("The final time passed to the propagate_until() function of an adaptive Taylor "
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
+        m_t_dir[i] = sgn_rem_time(m_rem_time[i]);
     }
 
     // Helper to create the continuous output object.
     const auto make_c_out = [&] -> std::optional<continuous_output_batch<T>> {
         if (with_c_out) {
             if (c_out_times_hi.size() / m_batch_size < 2u) {
-                // NOTE: this means that no successful steps
-                // were taken.
+                // NOTE: this means that the first step resulted in a non-finite state in at least one batch element.
                 return {};
             }
 
@@ -1294,11 +1297,10 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             ret.m_times_hi = std::move(c_out_times_hi);
             ret.m_times_lo = std::move(c_out_times_lo);
 
-            // Add padding to the times vectors to make the
-            // vectorised upper_bound implementation well defined.
+            // Add padding to the times vectors to make the vectorised upper_bound implementation well defined.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                ret.m_times_hi.push_back(m_t_dir[i] != 0 ? std::numeric_limits<T>::infinity()
-                                                         : -std::numeric_limits<T>::infinity());
+                ret.m_times_hi.push_back((m_t_dir[i] >= 0) ? std::numeric_limits<T>::infinity()
+                                                           : -std::numeric_limits<T>::infinity());
                 ret.m_times_lo.push_back(static_cast<T>(0));
             }
 
@@ -1337,9 +1339,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time)); // LCOV_EXCL_LINE
-                if (m_t_dir[i] != 0) {
+                if (m_t_dir[i] == 1) {
                     assert(!(new_time < prev_times[i]));
-                } else {
+                } else if (m_t_dir[i] == -1) {
                     assert(!(new_time > prev_times[i]));
                 }
             }
@@ -1359,103 +1361,143 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
 
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate
-        // (either via pre_hook() or via its call operator, as shown later).
-        // NOTE: the hi/lo copies are guaranteed to be finite due to the
-        // checks performed earlier.
-        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
-        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
+        // operator, as shown later).
+        //
+        // NOTE: the hi/lo copies are guaranteed to be finite due to the checks performed earlier.
+        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
         cb.pre_hook(*this);
 
-        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
             throw std::runtime_error(cb_time_errmsg);
         }
     }
 
     while (true) {
         // Compute the max integration times for this timestep.
-        // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly above
-        // and we keep on decreasing its magnitude at the following iterations.
-        // If some non-finite state/time is generated in
-        // the step function, the integration will be stopped.
+        //
+        // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly both on creation and every time it is
+        // updated. We also make sure that its sign at most changes to zero (this signals that a batch element is
+        // done).
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
+            assert(sgn_rem_time(m_rem_time[i]) == m_t_dir[i] || m_rem_time[i] == detail::dfloat<T>(static_cast<T>(0)));
 
             // Compute the time limit.
-            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
-                                                  : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
+            const auto dt_limit = (m_t_dir[i] >= 0) ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
+                                                    : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
 
             // Store it.
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
         }
 
         // Run the integration timestep.
+        //
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         step_impl(m_cur_max_delta_ts, wtc);
 
-        // Check the outcomes of the step for each batch element,
-        // update the step counters, min_h/max_h and the remaining times
-        // (if meaningful), and keep track of:
-        // - the number of batch elements which reached the time limit,
+        // Check the outcomes of the step for each batch element, update the step counters, min_h/max_h and the
+        // remaining times, and keep track of:
+        //
+        // - the number of batch elements which reached the time limit (n_done),
         // - whether or not any non-finite state was detected,
         // - whether or not any stopping terminal event triggered.
         std::uint32_t n_done = 0;
         bool nfs_detected = false, ste_detected = false;
 
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto [oc, h] = m_step_res[i];
+            auto [oc, h] = m_step_res[i];
 
-            if (oc == taylor_outcome::err_nf_state) {
+            if (oc == taylor_outcome::err_nf_state) [[unlikely]] {
                 // Non-finite state: flag it and do nothing else.
                 nfs_detected = true;
             } else {
                 // Step outcome is one of:
+                //
                 // - success,
                 // - time_limit,
                 // - terminal event.
-
+                //
                 // Update the local step counters.
-                // NOTE: the local step counters increase only if we integrated
-                // for a nonzero time.
-                m_ts_count[i] += static_cast<std::size_t>(h != 0);
+                //
+                // NOTE: a step is counted unless the batch element had already finished before the current step, in
+                // which case it is only taking zero-length steps while waiting for the other batch elements. A zero
+                // remaining time means the element has finished, except on the first iteration, where it means that
+                // the final time is the current time: in that case the zero-length step is counted, consistently with
+                // the scalar integrator.
+                const auto lane_active
+                    = (m_rem_time[i] != detail::dfloat<T>(static_cast<T>(0))) || (iter_counter == 0u);
+                m_ts_count[i] = safe_size_t(m_ts_count[i]) + static_cast<std::size_t>(lane_active);
 
-                // Update min_h/max_h only if the outcome is success (otherwise
-                // the step was artificially clamped either by a time limit or
-                // by a terminal event).
+                // Update min_h/max_h only if the outcome is success (otherwise the step was artificially clamped either
+                // by a time limit or by a terminal event).
                 if (oc == taylor_outcome::success) {
                     const auto abs_h = abs(h);
                     m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
                     m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
                 }
 
-                // Flag if we encountered a terminal event.
-                ste_detected = ste_detected || (oc > taylor_outcome::success && oc < taylor_outcome{0});
-
-                // Check if this batch element is done.
-                // NOTE: we check h == rem_time, instead of just
-                // oc == time_limit, because clamping via max_delta_t
+                // Check if this batch element reached the time limit.
+                //
+                // NOTE: we check h == rem_time.hi, instead of just oc == time_limit, because clamping via max_delta_t
                 // could also result in time_limit.
-                const auto cur_done = (h == static_cast<T>(m_rem_time[i]));
+                const auto cur_time_limit_reached = (h == m_rem_time[i].hi);
+                assert(!cur_time_limit_reached || oc == taylor_outcome::time_limit);
+
+                // Flag if we encountered a stopping terminal event.
+                const auto cur_ste = (oc > taylor_outcome::success && oc < taylor_outcome{0});
+                ste_detected = ste_detected || cur_ste;
+
+                // Compute the new remaining time and check it.
+                const auto new_rem_time = ts[i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                // NOTE: this is likely impossible to trigger, but the check is cheap.
+                if (!is_finite(new_rem_time)) [[unlikely]] {
+                    // LCOV_EXCL_START
+                    // NOTE: just flag the non-finiteness, fill in m_prop_res[i] and continue to the next batch element.
+                    nfs_detected = true;
+                    m_prop_res[i]
+                        = std::tuple{taylor_outcome::err_nf_state, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                    continue;
+                    // LCOV_EXCL_STOP
+                }
+
+                // Detect if rem_time changed sign. This happens if t_dir is not zero and:
+                //
+                // - we landed exactly on t, or
+                // - we overshot t due to floating-point rounding, or
+                // - the current batch element had finished already before the current step.
+                //
+                // A sign flip is regarded the same as reaching the time limit.
+                const auto rem_time_sign_flip = (sgn_rem_time(new_rem_time) != m_t_dir[i]);
+
+                // Check if this batch element is done, meaning that it reached its time limite. A sign change in
+                // rem_time counts as reaching the time limit.
+                const auto cur_done = cur_time_limit_reached || rem_time_sign_flip;
                 n_done += cur_done;
 
-                // Update the remaining times.
-                if (cur_done) {
-                    assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
+                // Update the remaining time, forcibly setting it to zero in case the current batch element is done.
+                m_rem_time[i] = cur_done ? detail::dfloat<T>(static_cast<T>(0)) : new_rem_time;
 
-                    // Force m_rem_time[i] to zero so that
-                    // zero-length steps will be taken
-                    // for all remaining iterations.
-                    // NOTE: if m_rem_time[i] was previously set to zero, it
-                    // will end up being repeatedly set to zero here. This
-                    // should be harmless.
-                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
-                } else {
-                    // NOTE: this should never flip the time direction of the
-                    // integration for the same reasons as explained in the
-                    // scalar implementation.
-                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
-                    m_rem_time[i] = ts[i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                // If the current batch element is done, snap the time coordinate to ts[i] and make sure oc is set to
+                // time_limit (if we did not run into a stopping terminal event).
+                //
+                // NOTE: the snapping is done in order to improve the user experience, i.e., if a user asks for a
+                // propagation up to t, the final time is guaranteed to be t exactly. Strictly speaking, this can
+                // introduce a small error, at the level of the floating-point epsilon. See also the explanation in
+                // taylor_adaptive::propagate_until_impl().
+                if (cur_done) {
+                    m_time_hi[i] = ts[i].hi;
+                    m_time_lo[i] = ts[i].lo;
+
+                    // If the current batch element did *not* encounter a stopping terminal event, make sure that oc
+                    // contains time_limit.
+                    //
+                    // NOTE: we need to do this because we could be in a situation in which oc is success but we
+                    // detected a rem_time sign flip, which is regarded the same as reaching the time limit.
+                    if (!cur_ste) {
+                        oc = taylor_outcome::time_limit;
+                    }
                 }
             }
 
@@ -1463,10 +1505,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
         }
 
-        if (nfs_detected) {
-            // At least 1 batch element generated a non-finite state. In this situation,
-            // we do *not* want to execute the propagate() callback and we do *not* want
-            // to update the continuous output. Just exit.
+        if (nfs_detected) [[unlikely]] {
+            // At least 1 batch element generated a non-finite state. In this situation, we do *not* want to execute the
+            // propagate() callback and we do *not* want to update the continuous output. Just exit.
             return std::make_tuple(make_c_out(), std::move(cb));
         }
 
@@ -1478,25 +1519,25 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
 
         // Execute the propagate() callback, if applicable.
         if (with_cb) {
-            // Store the current time coordinate before
-            // executing the cb, so that we can check if
-            // the cb changes the time coordinate.
-            // NOTE: the hi/lo copies are guaranteed to be finite because no
-            // non-finite outcomes were detected in the step.
-            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
-            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
+            // time coordinate.
+            //
+            // NOTE: the hi/lo copies are guaranteed to be finite because no non-finite outcomes were detected in the
+            // step.
+            std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+            std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
             // Execute the cb.
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
-            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
                 throw std::runtime_error(cb_time_errmsg);
             }
 
             if (!ret_cb) {
-                // Change m_prop_res before exiting by setting all outcomes
-                // to cb_stop regardless of the timestep outcome.
+                // Change m_prop_res before exiting by setting all outcomes to cb_stop regardless of the timestep
+                // outcome.
                 for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                     std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
                 }
@@ -1505,23 +1546,21 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             }
         }
 
-        // We need to break out if either we reached the final time
-        // for all batch elements, or we encountered at least 1 stopping
-        // terminal event. In either case, m_prop_res was already set up
-        // in the loop where we checked the outcomes.
+        // We need to break out if either we reached the final time for all batch elements, or we encountered at least 1
+        // stopping terminal event. In either case, m_prop_res was already set up in the loop where we checked the
+        // outcomes.
         if (n_done == m_batch_size || ste_detected) {
             return std::make_tuple(make_c_out(), std::move(cb));
         }
 
         // Check the iteration limit.
-        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
-        // then this condition will never trigger (modulo wraparound) as by this point we are
-        // sure iter_counter is at least 1.
+        //
+        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps), then this condition will never trigger as,
+        // by this point, we are sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            // We reached the max_steps limit: set the outcome for all batch elements
-            // to step_limit.
-            // NOTE: this is the same logic adopted when the integration is stopped
-            // by the callback (see above).
+            // We reached the max_steps limit: set the outcome for all batch elements to step_limit.
+            //
+            // NOTE: this is the same logic adopted when the integration is stopped by the callback (see above).
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 std::get<0>(m_prop_res[i]) = taylor_outcome::step_limit;
             }
@@ -1529,12 +1568,6 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             return std::make_tuple(make_c_out(), std::move(cb));
         }
     }
-
-    // LCOV_EXCL_START
-    assert(false);
-
-    return {};
-    // LCOV_EXCL_STOP
 }
 
 // NOTE: possible outcomes:

@@ -1096,20 +1096,19 @@ void taylor_adaptive<T>::reset_cooldowns()
 }
 
 // NOTE: possible outcomes:
-// - time_limit iff the propagation was performed
-//   up to the final time, else
-// - cb_interrupt if the propagation was interrupted
-//   via callback, else
+//
 // - err_nf_state if a non-finite state was generated, else
-// - an event index if a stopping terminal event was encountered.
-// The callback is always executed at the end of each timestep, unless
-// a non-finite state was detected.
-// The continuous output is always updated at the end of each timestep,
-// unless a non-finite state was detected.
+// - cb_stop if the propagation was interrupted via callback, else
+// - an event index if a stopping terminal event was encountered, else
+// - time_limit if the propagation was performed up to the final time, else
+// - step_limit if the max_steps limit was reached.
+//
+// The callback is always executed at the end of each timestep, unless a non-finite state was detected. The continuous
+// output is always updated at the end of each timestep, unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
-taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps, T max_delta_t, step_callback<T> cb,
-                                         bool wtc, bool with_c_out)
+taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t max_steps, T max_delta_t,
+                                         step_callback<T> cb, const bool wtc_, const bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -1123,13 +1122,13 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
 
     // Check the current time.
-    if (!isfinite(m_time)) {
+    if (!isfinite(m_time)) [[unlikely]] {
         throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
                                     "the current time is not finite");
     }
 
     // Check the final time.
-    if (!isfinite(t)) {
+    if (!isfinite(t)) [[unlikely]] {
         throw std::invalid_argument(
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
@@ -1147,20 +1146,20 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 #endif
 
     // Check max_delta_t.
-    if (isnan(max_delta_t)) {
+    if (isnan(max_delta_t)) [[unlikely]] {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
-    if (max_delta_t <= 0) {
+    if (max_delta_t <= 0) [[unlikely]] {
         throw std::invalid_argument(
             "A non-positive max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
     // If with_c_out is true, we always need to write the Taylor coefficients.
-    wtc = wtc || with_c_out;
+    const auto wtc = wtc_ || with_c_out;
 
-    // These vectors are used in the construction of the continuous output.
-    // If continuous output is not requested, they will remain empty.
+    // These vectors are used in the construction of the continuous output. If continuous output is not requested, they
+    // will remain empty.
     std::vector<T> c_out_tcs, c_out_times_hi, c_out_times_lo;
     if (with_c_out) {
         // Push in the starting time.
@@ -1168,39 +1167,37 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
         c_out_times_lo.push_back(m_time.lo);
     }
 
-    // Initial values for the counters
-    // and the min/max abs of the integration
-    // timesteps.
-    // NOTE: iter_counter is for keeping track of the max_steps
-    // limits, step_counter counts the number of timesteps performed
-    // with a nonzero h. Most of the time these two quantities
-    // will be identical, apart from corner cases.
-    std::size_t iter_counter = 0, step_counter = 0;
-    // NOTE: in case of mppp::real, we know that max_delta_t has the correct
-    // precision by now.
+    // Initial values for the step counter and the min/max abs of the integration timesteps.
+    boost::safe_numerics::safe<std::size_t> step_counter = 0;
+    // NOTE: in case of mppp::real, we know that max_delta_t has the correct precision by now.
     T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
     // Init the remaining time.
-    // NOTE: for mppp::real, manipulations on rem_time involve only t and m_time: t's precision
-    // has been checked, m_time is manipulated only by step(), which enforces the correct
-    // precision is maintained. Thus, rem_time will always keep the correct precision.
+    //
+    // NOTE: for mppp::real, manipulations on rem_time involve only t and m_time: t has been rounded to the integrator
+    // precision, and m_time is modified only by step_impl() and by the snap to t below (both of which preserve the
+    // precision). Thus, rem_time will always keep the correct precision.
     auto rem_time = t - m_time;
 
     // Check it.
-    if (!isfinite(rem_time)) {
+    if (!isfinite(rem_time)) [[unlikely]] {
         throw std::invalid_argument("The final time passed to the propagate_until() function of an adaptive Taylor "
                                     "integrator results in an overflow condition");
     }
 
-    // Cache the integration direction.
-    const auto t_dir = (rem_time >= static_cast<T>(0));
+    // Helper to compute the sign of rem_time: -1, 0 or 1.
+    const auto sgn_rem_time = [&rem_time]() {
+        return static_cast<int>(static_cast<T>(0) < rem_time) - static_cast<int>(static_cast<T>(0) > rem_time);
+    };
+
+    // Cache the integration direction: this is the initial sign of rem_time.
+    const auto t_dir = sgn_rem_time();
 
     // Helper to create the continuous output object.
     const auto make_c_out = [&] -> std::optional<continuous_output<T>> {
         if (with_c_out) {
             if (c_out_times_hi.size() < 2u) {
-                // NOTE: this means that no successful steps
-                // were taken.
+                // NOTE: this means that the first step resulted in a non-finite state.
                 return {};
             }
 
@@ -1213,8 +1210,8 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
             ret.m_times_lo = std::move(c_out_times_lo);
 
             // Prepare the output vector.
-            // NOTE: in case of mppp::real, we know that max_delta_t has the correct
-            // precision by now.
+            //
+            // NOTE: in case of mppp::real, we know that max_delta_t has the correct precision by now.
             ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim),
                                 detail::num_zero_like(max_delta_t));
 
@@ -1240,9 +1237,11 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 #if !defined(NDEBUG)
             const detail::dfloat<T> new_time(c_out_times_hi.back(), c_out_times_lo.back());
             assert(isfinite(new_time));
-            if (t_dir) {
+            // NOTE: these assertions are written in this non-strict form because there are cases in which consecutive
+            // equal times may occur.
+            if (t_dir == 1) {
                 assert(!(new_time < prev_time));
-            } else {
+            } else if (t_dir == -1) {
                 assert(!(new_time > prev_time));
             }
 #endif
@@ -1261,123 +1260,144 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate
-        // (either via pre_hook() or via its call operator, as shown later).
-        // NOTE: orig_time is guaranteed to be finite
-        // due to the checks done earlier on m_time.
+        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
+        // operator, as shown later).
+        //
+        // NOTE: orig_time is guaranteed to be finite due to the checks done earlier on m_time.
         const auto orig_time = m_time;
 
         cb.pre_hook(*this);
 
-        if (m_time != orig_time) {
+        if (m_time != orig_time) [[unlikely]] {
             throw std::runtime_error(cb_time_errmsg);
         }
     }
 
+    // Small helper to construct the return value.
+    //
+    // NOTE: this will consume min_h, max_h, cb and, via make_c_out, the continuous output data.
+    const auto make_retval = [&min_h, &max_h, &cb, &step_counter, &make_c_out](const taylor_outcome oc) {
+        return std::tuple{
+            oc, std::move(min_h), std::move(max_h), static_cast<std::size_t>(step_counter), make_c_out(), std::move(cb),
+        };
+    };
+
     while (true) {
+        // NOTE: rem_time is guaranteed to be finite: we check it explicitly both on creation and every time it is
+        // updated. We also make sure to exit the loop if its sign changes, so that this assertion can never fire.
+        assert(sgn_rem_time() == t_dir);
+
         // Compute the max integration times for this timestep.
-        // NOTE: rem_time is guaranteed to be finite: we check it explicitly above
-        // and we keep on decreasing its magnitude at the following iterations.
-        // If some non-finite state/time is generated in
-        // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
+        //
         // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
         //
         // NOLINTNEXTLINE(misc-const-correctness)
-        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        auto dt_limit = (t_dir >= 0) ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                                     : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         const auto [oc, h] = step_impl(std::move(dt_limit.hi), wtc);
 
-        if (oc == taylor_outcome::err_nf_state) {
-            // If a non-finite state is detected, we do *not* want
-            // to execute the propagate() callback and we do *not* want
-            // to update the continuous output. Just exit.
-            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out(), std::move(cb)};
+        if (oc == taylor_outcome::err_nf_state) [[unlikely]] {
+            // If a non-finite state is detected, we do *not* want to execute the propagate() callback and we do *not*
+            // want to update the continuous output. Just exit.
+            return make_retval(oc);
         }
 
         // Update the number of steps.
-        step_counter += static_cast<std::size_t>(h != 0);
+        ++step_counter;
 
-        // Update min_h/max_h, but only if the outcome is success (otherwise
-        // the step was artificially clamped either by a time limit or
-        // by a terminal event).
+        // Update min_h/max_h, but only if the outcome is success (otherwise the step was artificially clamped either by
+        // a time limit or by a terminal event).
         if (oc == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
         }
 
+        // Establish whether we hit the time limit and/or a stopping terminal event.
+        //
+        // NOTE: we check h == rem_time.hi, instead of just oc == time_limit, because clamping via max_delta_t could
+        // also result in time_limit.
+        const auto time_limit_reached = (h == rem_time.hi);
+        const bool ste_detected = (oc > taylor_outcome::success) && (oc < taylor_outcome{0});
+
+        // Update the remaining time.
+        rem_time = t - m_time;
+
+        // Check finiteness.
+        //
+        // NOTE: this is likely impossible to trigger, but the check is cheap.
+        if (!isfinite(rem_time)) [[unlikely]] {
+            return make_retval(taylor_outcome::err_nf_state); // LCOV_EXCL_LINE
+        }
+
+        // Detect if rem_time changed sign. This happens if t_dir is not zero and either we landed exactly on t or we
+        // overshot t due to floating-point rounding.
+        //
+        // NOTE: a sign change will be regarded equivalent to reaching the time limit.
+        const auto rem_time_sign_flip = (sgn_rem_time() != t_dir);
+
+        // If we hit the time limit, or if rem_time changed sign, snap the time coordinate to t before updating the
+        // continuous output and returning.
+        //
+        // NOTE: due to rounding, reaching the time limit does not necessarily mean that m_time is exactly t, since, in
+        // floating-point arithmetic, a + (b - a) may differ from b. By snapping, we are technically committing an
+        // error, since the single step we took did not bring us exactly to t, but rather to a very small distance from
+        // it. This difference will be at the level of the floating-point epsilon, thus we accept it with the goal of
+        // providing a more polished UX (i.e., if a user asks for a propagation up to t, the final time is guaranteed to
+        // be t exactly).
+        //
+        // NOTE: the snapping won't take place if an exception is thrown between the step_impl() call and here, or if
+        // the assignment below throws. This is ok, since an exception signals failure in any case.
+        if (time_limit_reached || rem_time_sign_flip) {
+            m_time = t;
+        }
+
         // Update the continuous output data.
         update_c_out();
 
-        // Update the number of iterations.
-        ++iter_counter;
-
         // Execute the propagate() callback, if applicable.
         if (with_cb) {
-            // Store the current time coordinate before
-            // executing the cb, so that we can check if
-            // the cb changes the time coordinate.
-            // NOTE: orig_time is guaranteed to be finite
-            // because the outcome of the step is not err_nf_state.
+            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
+            // time coordinate.
+            //
+            // NOTE: orig_time is guaranteed to be finite because the outcome of the step is not err_nf_state.
             const auto orig_time = m_time;
 
             // Execute the cb.
             const auto ret_cb = cb(*this);
 
-            // Check the time coordinate.
-            if (m_time != orig_time) {
+            // Check that the callback did not change the time coordinate.
+            if (m_time != orig_time) [[unlikely]] {
                 throw std::runtime_error(cb_time_errmsg);
             }
 
             if (!ret_cb) {
                 // Interruption via callback.
-                return std::tuple{
-                    taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter, make_c_out(),
-                    std::move(cb),
-                };
+                return make_retval(taylor_outcome::cb_stop);
             }
         }
 
-        // The breakout conditions:
-        // - a step of rem_time was used, or
-        // - a stopping terminal event was detected.
-        // NOTE: we check h == rem_time, instead of just
-        // oc == time_limit, because clamping via max_delta_t
-        // could also result in time_limit.
-        const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
-        if (h == rem_time.hi || ste_detected) {
-#if !defined(NDEBUG)
-            if (h == rem_time.hi) {
-                assert(oc == taylor_outcome::time_limit);
-            }
-#endif
-            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out(), std::move(cb)};
+        // After having invoked the propagate() callback, we can now break out if necessary.
+
+        // Stopping terminal event.
+        if (ste_detected) {
+            return make_retval(oc);
         }
 
-        // Check the iteration limit.
-        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
-        // then this condition will never trigger (modulo wraparound)
-        // as by this point we are sure iter_counter is at least 1.
-        if (iter_counter == max_steps) {
-            return std::tuple{
-                taylor_outcome::step_limit,
-                std::move(min_h),
-                std::move(max_h),
-                step_counter,
-                make_c_out(),
-                std::move(cb),
-            };
+        // Time limit or rem_time sign flip.
+        if (time_limit_reached || rem_time_sign_flip) {
+            assert(!time_limit_reached || oc == taylor_outcome::time_limit);
+            return make_retval(taylor_outcome::time_limit);
         }
 
-        // Update the remaining time.
-        // NOTE: at this point, we are sure
-        // that abs(h) < abs(rem_time.hi). This implies
-        // that t - m_time cannot undergo a sign
-        // flip and invert the integration direction.
-        assert(abs(h) < abs(rem_time.hi));
-        rem_time = t - m_time;
+        // Step limit reached.
+        //
+        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps), then this condition will never trigger as,
+        // by this point, we are sure step_counter is at least 1.
+        if (step_counter == max_steps) {
+            return make_retval(taylor_outcome::step_limit);
+        }
     }
 }
 
