@@ -517,7 +517,9 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
     } else {
         const detail::dfloat<T> df_t_start(co.m_times_hi[0], co.m_times_lo[0]),
             df_t_end(co.m_times_hi.back(), co.m_times_lo.back());
-        const auto dir = df_t_start < df_t_end;
+        // NOTE: a "zero" direction (meaning that the time does not change) counts as a "forward" direction,
+        // consistently with the batch implementation.
+        const auto dir = !(df_t_end < df_t_start);
         oss << "Direction   : " << (dir ? "forward" : "backward") << '\n';
         oss << "Time range  : "
             << (dir ? fmt::format("[{}, {})", fp_to_string(co.m_times_hi[0]), fp_to_string(co.m_times_hi.back()))
