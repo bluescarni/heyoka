@@ -20,6 +20,8 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -57,6 +59,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
@@ -1570,33 +1573,43 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
                 std::get<0>(m_prop_res[i]) = taylor_outcome::step_limit;
             }
 
-            return std::make_tuple(make_c_out(), std::move(cb));
+            return make_retval();
         }
     }
 }
 
 // NOTE: possible outcomes:
-// - all time_limit (the happy path),
-// - at least 1 err_nf_state if a non-finite state was detected,
-// - all cb_stop or all step_limit in case of interruption by,
-//   respectively, callback or iteration limit,
-// - at least 1 stopping terminal event.
-// The callback is always executed at the end of each timestep, unless
-// a non-finite state was detected.
+//
+// - the outcomes of the initial propagation up to the first grid points, if they are not all time_limit; else,
+// - 1 or more err_nf_state if 1 or more batch elements generated a non-finite state. The other elements will have their
+//   outcome set by the last step taken; else,
+// - all cb_stop if the integration was interrupted via a callback; else,
+// - 1 or more event indices if 1 or more batch elements generated a stopping terminal event. The other elements will
+//   have their outcome set by the last step taken; else,
+// - all time_limit if all batch elements were propagated up to the last grid points; else,
+// - all step_limit if the max_steps limit was reached.
+//
+// In case of interruption via callback, stopping terminal event or step limit, the grid points falling within the last
+// timestep are processed before returning. In the returned vector, the grid points which were not processed are set
+// to NaN.
+//
+// The callback is executed at the end of each timestep taken after the initial propagation up to the first grid points,
+// unless a non-finite state was detected in any batch element.
 template <typename T>
 std::tuple<step_callback_batch<T>, std::vector<T>>
-taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const std::size_t max_steps,
                                               const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb)
 {
     using std::abs;
     using std::isnan;
+
+    using safe_size_t = boost::safe_numerics::safe<std::size_t>;
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
@@ -1610,27 +1623,26 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
 
     // Helper to detect if an input value is nonfinite.
-    const auto is_nf = [](const T &t) {
+    constexpr auto is_nf = [](const auto &t) {
         using std::isfinite;
         return !isfinite(t);
     };
 
-    if (grid.empty()) {
+    if (grid_.empty()) [[unlikely]] {
         throw std::invalid_argument(
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if the time grid is empty");
     }
 
     // Check that the grid size is a multiple of m_batch_size.
-    if (grid.size() % m_batch_size != 0u) {
+    if (grid_.size() % m_batch_size != 0u) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
             "the grid has a size of {}, which is not a multiple of the batch size ({})",
-            grid.size(), m_batch_size));
+            grid_.size(), m_batch_size));
     }
 
     // Check the current time coordinates.
-    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), is_nf)
-        || std::any_of(m_time_lo.begin(), m_time_lo.end(), is_nf)) {
+    if (std::ranges::any_of(m_time_hi, is_nf) || std::ranges::any_of(m_time_lo, is_nf)) [[unlikely]] {
         throw std::invalid_argument("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
                                     "the current time is not finite");
     }
@@ -1639,28 +1651,37 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     const auto &max_delta_ts = max_delta_ts_.empty() ? m_pinf : max_delta_ts_;
 
     // Check max_delta_ts.
-    if (max_delta_ts.size() != m_batch_size) {
+    if (max_delta_ts.size() != m_batch_size) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
             "but the number of specified timesteps is {}",
             m_batch_size, max_delta_ts.size()));
     }
     for (const auto &dt : max_delta_ts) {
-        if (isnan(dt)) {
+        if (isnan(dt)) [[unlikely]] {
             throw std::invalid_argument("A nan max_delta_t was passed to the propagate_grid() function of an adaptive "
                                         "Taylor integrator in batch mode");
         }
-        if (dt <= 0) {
+        if (dt <= 0) [[unlikely]] {
             throw std::invalid_argument("A non-positive max_delta_t was passed to the propagate_grid() function of an "
                                         "adaptive Taylor integrator in batch mode");
         }
     }
 
-    // The number of grid points.
-    const auto n_grid_points = grid.size() / m_batch_size;
+    // The number of batched grid points.
+    const auto n_grid_points = grid_.size() / m_batch_size;
 
-    // Pointer to the grid data.
-    const auto *const grid_ptr = grid.data();
+    // Create a span over the grid for ease of access.
+    using grid_size_t = decltype(grid_.size());
+    const mdspan<const T, dextents<grid_size_t, 2>> grid_span(grid_.data(), n_grid_points, m_batch_size);
+
+    // Small utility to extract a row from grid_span as a std::span, so we can run range algorithms.
+    const auto grid_row = [grid_span, n_grid_points](const grid_size_t i) {
+        static_cast<void>(n_grid_points);
+        assert(i < n_grid_points);
+
+        return std::span(&grid_span[i, 0], boost::numeric_cast<std::size_t>(grid_span.extent(1)));
+    };
 
     // Check the input grid points.
     constexpr auto nf_err_msg
@@ -1668,92 +1689,97 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     constexpr auto ig_err_msg = "A non-monotonic time grid was passed to propagate_grid() in an adaptive "
                                 "Taylor integrator in batch mode";
 
-    // Check the first point.
-    if (std::any_of(grid_ptr, grid_ptr + m_batch_size, is_nf)) {
+    // Check the first row for finiteness.
+    if (std::ranges::any_of(grid_row(0), is_nf)) [[unlikely]] {
         throw std::invalid_argument(nf_err_msg);
     }
+
     if (n_grid_points > 1u) {
-        // Establish the direction of the grid from
-        // the first two batches of points.
-        if (std::any_of(grid_ptr + m_batch_size, grid_ptr + m_batch_size + m_batch_size, is_nf)) {
+        // Establish the direction of the grid from the first elements of the first two batches of points.
+        if (std::ranges::any_of(grid_row(1), is_nf)) [[unlikely]] {
             throw std::invalid_argument(nf_err_msg);
         }
-        if (grid_ptr[m_batch_size] == grid_ptr[0]) {
+        if (grid_span[1, 0] == grid_span[0, 0]) [[unlikely]] {
             throw std::invalid_argument(ig_err_msg);
         }
+        const auto grid_direction = grid_span[1, 0] > grid_span[0, 0];
 
-        const auto grid_direction = grid_ptr[m_batch_size] > grid_ptr[0];
-        for (std::uint32_t i = 1; i < m_batch_size; ++i) {
-            if ((grid_ptr[m_batch_size + i] > grid_ptr[i]) != grid_direction) {
+        // Small helper to check the monotonicity of the grid. Given row/column indices i/j in the grid, it will compare
+        // the value at [i, j] with the value at [i-1, j], and check that the two values differ and that they obey the
+        // grid direction.
+        const auto check_monotonicity = [grid_direction, grid_span](const grid_size_t i, const grid_size_t j) {
+            assert(i > 0u);
+            const auto cur_value = grid_span[i, j];
+            const auto prev_value = grid_span[i - 1u, j];
+
+            if ((cur_value == prev_value) || (cur_value > prev_value) != grid_direction) [[unlikely]] {
                 throw std::invalid_argument(ig_err_msg);
             }
+        };
+
+        // Check monotonicity for the remaining batch lanes in the first two batches.
+        for (std::uint32_t j = 1; j < m_batch_size; ++j) {
+            check_monotonicity(1, j);
         }
 
-        // Check that the remaining points are finite and that
-        // they are ordered monotonically.
-        for (decltype(grid.size()) i = 2; i < n_grid_points; ++i) {
-            if (std::any_of(grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size, is_nf)) {
-                throw std::invalid_argument(nf_err_msg);
-            }
-
-            if (std::any_of(grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
-                            [&](const T &t) { return (t > *(&t - m_batch_size)) != grid_direction; })) {
-                throw std::invalid_argument(ig_err_msg);
+        // Check that the remaining points are finite and that they are ordered monotonically.
+        for (grid_size_t i = 2; i < n_grid_points; ++i) {
+            for (std::uint32_t j = 0; j < m_batch_size; ++j) {
+                if (is_nf(grid_span[i, j])) [[unlikely]] {
+                    throw std::invalid_argument(nf_err_msg);
+                }
+                check_monotonicity(i, j);
             }
         }
     }
 
-    // Require that the user provides a grid starting from the
-    // current integrator time, modulo the double-length correction.
+    // Require that the user provides a grid starting from the current integrator time, modulo the double-length
+    // correction.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        if (m_time_hi[i] != grid_ptr[i]) {
+        if (m_time_hi[i] != grid_span[0, i]) [[unlikely]] {
             throw std::invalid_argument(
-                fmt::format("When invoking propagate_grid(), the first element of the time grid "
-                            "must match the current time coordinate - however, the first element of the time grid at "
-                            "batch index {} has a "
+                fmt::format("When invoking propagate_grid(), the first element of the time grid must match the current "
+                            "time coordinate - however, the first element of the time grid at batch index {} has a "
                             "value of {}, while the current time coordinate is {}",
-                            i, grid_ptr[i], m_time_hi[i]));
+                            i, grid_span[0, i], m_time_hi[i]));
         }
     }
 
     // Pre-allocate the return value.
     std::vector<T> retval;
-    // NOTE: fill with NaNs, so that the missing entries
-    // are signalled with NaN if we exit early.
-    retval.resize(boost::safe_numerics::safe<decltype(retval.size())>(grid.size()) * get_dim(),
+    // NOTE: fill with NaNs, so that the missing entries are signalled with NaN if we exit early.
+    retval.resize(boost::safe_numerics::safe<decltype(retval.size())>(grid_.size()) * get_dim(),
                   std::numeric_limits<T>::quiet_NaN());
 
-    // NOTE: this is a buffer of size m_batch_size
-    // that is used in various places as temp storage.
+    // Define a span over retval for ease of indexing.
+    const mdspan<T, dextents<decltype(retval.size()), 3>> ret_span(retval.data(), n_grid_points, get_dim(),
+                                                                   m_batch_size);
+
+    // Define a span over m_d_out for ease of indexing.
+    const mdspan<const T, dextents<decltype(m_d_out.size()), 2>> d_out_span(m_d_out.data(), get_dim(), m_batch_size);
+
+    // NOTE: this is a buffer of size m_batch_size that is used in various places as temp storage.
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
 
-    // Propagate the system up to the first batch of grid points.
-    // This is necessary in order to account for the fact
-    // that the user cannot pass as starting point in the grid
-    // a time coordinate which is *exactly* equal to m_time,
-    // due to the usage of a double-length representation.
-    // NOTE: we pass write_tc = true because some grid
-    // points after the first one might end up being
-    // calculated via dense output *before*
-    // taking additional steps, and, in such case, we
-    // must ensure the TCs are up to date.
-    // NOTE: if the integrator time is already at grid[0],
-    // then propagate_until() will take a zero timestep,
-    // resulting in m_last_h also going to zero and no event
-    // detection being performed.
-    // NOTE: use the same max_steps for the initial propagation,
-    // and don't pass the callback.
-    std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
-    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps, kw::write_tc = true);
+    // Small helper to create the return value. It will consume cb and retval.
+    const auto make_retval = [&cb, &retval]() { return std::make_tuple(std::move(cb), std::move(retval)); };
+
+    // Propagate the system up to the first batch of grid points. This is necessary in order to account for the fact
+    // that the user cannot pass as starting point in the grid a time coordinate which is *exactly* equal to m_time, due
+    // to the usage of a double-length representation.
+    //
+    // NOTE: if the integrator time is already *exactly* at the first grid points, then propagate_until() will take a
+    // zero timestep, resulting in no event detection being performed.
+    //
+    // NOTE: use the same max_steps for the initial propagation, and don't pass the callback.
+    std::ranges::copy(grid_row(0), pgrid_tmp.begin());
+    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
 
     // Check the result of the integration.
-    if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
-            // Check if any outcome is not time_limit.
-            return std::get<0>(t) != taylor_outcome::time_limit;
-        })) {
-        // NOTE: for consistency with the scalar implementation,
-        // keep the outcomes from propagate_until() but we reset
+    if (std::ranges::any_of(m_prop_res, [](const auto &t) { return std::get<0>(t) != taylor_outcome::time_limit; }))
+        [[unlikely]] {
+        // NOTE: for consistency with the scalar implementation, keep the outcomes from propagate_until() but reset
         // min/max h and the step counter.
         for (auto &[_, min_h, max_h, ts_count] : m_prop_res) {
             min_h = std::numeric_limits<T>::infinity();
@@ -1761,57 +1787,44 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
             ts_count = 0;
         }
 
-        return std::make_tuple(std::move(cb), std::move(retval));
+        return make_retval();
     }
 
     // Add the first result to retval.
-    std::copy(m_state.begin(), m_state.end(), retval.begin());
+    std::ranges::copy(m_state, retval.begin());
 
-    // Init the remaining times and directions.
+    // Double-length zero used in several places below.
+    const auto dl_zero = detail::dfloat<T>(static_cast<T>(0));
+
+    // Helper to compute the sign of an input rem_time: -1, 0 or 1.
+    const auto sgn_rem_time = [dl_zero](const auto &rem_time) {
+        return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time);
+    };
+
+    // Init m_rem_time and m_t_dir.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_rem_time[i]
-            = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+        m_rem_time[i] = grid_span[n_grid_points - 1u, i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
 
         // Check it.
-        if (!isfinite(m_rem_time[i])) {
+        if (is_nf(m_rem_time[i])) [[unlikely]] {
             throw std::invalid_argument("The final time passed to the propagate_grid() function of an adaptive Taylor "
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
+        m_t_dir[i] = sgn_rem_time(m_rem_time[i]);
+        assert((m_t_dir[i] == 0) == (n_grid_points == 1u));
     }
 
-    // Reset the counters and the min/max abs(h) vectors.
-    std::size_t iter_counter = 0;
+    // Reset the counters and the min/max abs(h) vectors. Also reset m_prop_res, so that, for a single-point grid, the
+    // propagation results report zero steps (like in the scalar version), instead of the results of the initial
+    // propagate_until().
+    safe_size_t iter_counter = 0;
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_ts_count[i] = 0;
         m_min_abs_h[i] = std::numeric_limits<T>::infinity();
         m_max_abs_h[i] = 0;
+        m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
     }
-
-    // NOTE: in general, an integration timestep will cover a different number
-    // of grid points for each batch element. We thus need to track the grid
-    // index separately for each batch element. We will start with index
-    // 1 for all batch elements, since all batch elements have been propagated to
-    // index 0 already.
-    std::vector<decltype(grid.size())> cur_grid_idx(
-        boost::numeric_cast<typename std::vector<decltype(grid.size())>::size_type>(m_batch_size), 1);
-
-    // Vectors to keep track of the time range of the last taken timestep.
-    std::vector<detail::dfloat<T>> t0(
-        boost::numeric_cast<typename std::vector<detail::dfloat<T>>::size_type>(m_batch_size)),
-        t1(t0);
-
-    // Vector of flags to keep track of the batch elements
-    // we can compute dense output for.
-    std::vector<unsigned> dflags(boost::numeric_cast<std::vector<unsigned>::size_type>(m_batch_size));
-
-    // NOTE: small helper to detect if there are still unprocessed
-    // grid points for at least one batch element.
-    const auto cont_cond = [n_grid_points, &cur_grid_idx] {
-        return std::any_of(cur_grid_idx.begin(), cur_grid_idx.end(),
-                           [n_grid_points](auto idx) { return idx < n_grid_points; });
-    };
 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
@@ -1823,96 +1836,98 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
 
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate
-        // (either via pre_hook() or via its call operator, as shown later).
-        // NOTE: the hi/lo copies are guaranteed to contain finite values
-        // because propagate_until() did not return err_nf_state.
-        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
-        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
+        // operator, as shown later).
+        //
+        // NOTE: the hi/lo copies are guaranteed to contain finite values because propagate_until() did not return
+        // err_nf_state.
+        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
         cb.pre_hook(*this);
 
-        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
             throw std::runtime_error(cb_time_errmsg);
         }
     }
 
-    while (cont_cond()) {
-        // Establish the time ranges of the last
-        // taken timestep.
-        // NOTE: t0 < t1.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const detail::dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]), cmp = cur_time - m_last_h[i];
+    // NOTE: in general, an integration timestep will cover a different number of grid points for each batch element. We
+    // thus need to track the grid index separately for each batch element. We will start with index 1 for all batch
+    // elements, since all batch elements have been propagated to index 0 already.
+    std::vector<grid_size_t> cur_grid_idx(
+        boost::numeric_cast<typename std::vector<grid_size_t>::size_type>(m_batch_size), static_cast<grid_size_t>(1));
 
-            t0[i] = std::min(cur_time, cmp);
-            t1[i] = std::max(cur_time, cmp);
-        }
+    // Vector of flags to keep track of the batch elements we can compute dense output for.
+    //
+    // NOTE: this is scratch space, reset at each iteration of the outer while loop below.
+    std::vector<unsigned> dflags(boost::numeric_cast<std::vector<unsigned>::size_type>(m_batch_size));
 
+    // Small helper to detect if there are still unprocessed grid points left for at least one batch element.
+    const auto cont_cond = [n_grid_points, &cur_grid_idx] {
+        return std::ranges::any_of(cur_grid_idx, [n_grid_points](const auto idx) { return idx < n_grid_points; });
+    };
+
+    // Keep on iterating until we have processed all grid points for all batch elements.
+    while (true) {
         // Reset dflags.
         std::ranges::fill(dflags, 1u);
 
-        // Compute the state of the system via dense output for as many grid
-        // points as possible, i.e., as long as the grid times
-        // fall within the last taken step of at least
-        // one batch element.
+        // Compute the state of the system via dense output for as many grid points as possible.
         while (true) {
-            // Establish and count for which batch elements we
-            // can still compute dense output.
+            // Establish and count for which batch elements we can still compute dense output.
             std::uint32_t counter = 0;
+
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 // Fetch the grid index for the current batch element.
                 const auto gidx = cur_grid_idx[i];
 
                 if (dflags[i] && gidx < n_grid_points) {
-                    // The current batch element has not been eliminated
-                    // yet from the candidate list and it still has grid
-                    // points available. Determine if the current grid point
-                    // falls within the last taken step.
-                    // NOTE: if we are at the last timestep for this batch
-                    // element, force processing of all remaining grid points.
-                    // We do this to avoid numerical issues when deciding if
-                    // he last grid point falls within the range of validity
-                    // of the dense output.
-                    const auto idx = gidx * m_batch_size + i;
-                    const auto d_avail = (grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i])
-                                         || (m_rem_time[i] == detail::dfloat<T>(static_cast<T>(0)));
-                    dflags[i] = d_avail;
-                    counter += d_avail;
+                    // The current batch element has not been eliminated yet from dflags and it still has grid points
+                    // available. Determine if we can use dense output.
 
-                    // Copy over the grid point to pgrid_tmp regardless
-                    // of whether d_avail is true or false.
-                    pgrid_tmp[i] = grid_ptr[idx];
+                    // Fetch the grid target time and integrator time for the current batch element.
+                    const auto cur_tt = grid_span[gidx, i];
+                    const auto cur_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+
+                    // NOTE: see the explanation in the scalar propagate_grid() as to why this works.
+                    assert(m_t_dir[i] != 0);
+                    const auto can_use_d_output
+                        = ((m_t_dir[i] > 0) ? (cur_tt < cur_time) : (cur_tt > cur_time)) || (m_rem_time[i] == dl_zero);
+                    dflags[i] = can_use_d_output;
+                    counter += can_use_d_output;
+
+                    // Copy over the grid target time to pgrid_tmp regardless of whether can_use_d_output is true or
+                    // false. If we can compute the dense output this is needed, otherwise it is a meaningless value
+                    // (the result of dense output at this point will be ignored).
+                    pgrid_tmp[i] = cur_tt;
                 } else {
-                    // Either the batch element had already been eliminated
-                    // previously, or there are no more grid points available.
-                    // Make sure the batch element is marked as eliminated.
+                    // Either the batch element had already been eliminated previously, or there are no more grid points
+                    // available. Make sure the batch element is marked as eliminated.
                     dflags[i] = 0;
                 }
             }
 
             if (counter == 0u) {
-                // Cannot use dense output on any of the batch elements,
-                // need to take another step.
+                // Cannot use dense output on any of the batch elements, need to take another step.
                 break;
             }
 
             // Compute the dense output.
-            // NOTE: for some batch elements, the data in pgrid_tmp
-            // may be meaningless/wrong. This should be ok, as below
-            // we filter out from the dense output vector
-            // the wrong data.
+            //
+            // NOTE: for some batch elements, the data in pgrid_tmp may be meaningless/wrong. This should be ok, as
+            // below we filter out from the dense output vector the wrong data.
             update_d_output(pgrid_tmp);
 
-            // Add the results to retval and bump up the values in cur_grid_idx.
+            // For the active batch elements, add the results to retval and bump up the values in cur_grid_idx.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 if (dflags[i] != 0u) {
                     const auto gidx = cur_grid_idx[i];
+                    assert(gidx < n_grid_points);
 
                     for (std::uint32_t j = 0; j < m_dim; ++j) {
-                        retval[gidx * m_batch_size * m_dim + j * m_batch_size + i] = m_d_out[j * m_batch_size + i];
+                        ret_span[gidx, j, i] = d_out_span[j, i];
                     }
 
-                    assert(cur_grid_idx[i] < n_grid_points); // LCOV_EXCL_LINE
                     ++cur_grid_idx[i];
                 }
             }
@@ -1925,22 +1940,20 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
 
         // Check if we exhausted all grid points for all batch elements.
         if (!cont_cond()) {
-            assert(std::all_of(m_prop_res.begin(), m_prop_res.end(),
-                               [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
-
             break;
         }
 
-        // If the last step we took led to an interrupt condition,
-        // we will also break out.
-        // NOTE: the first time we execute this code, m_prop_res
-        // is guaranteed to contain only time_limit outcomes after
-        // the initial propagate_until().
+        // If the last step we took led to an interrupt condition, we will also break out.
+        //
+        // NOTE: the first time we execute this code, m_prop_res is guaranteed to contain only time_limit outcomes which
+        // were explicitly written after the initial (successful) propagate_until().
+        //
         // NOTE: interruption is signalled by an outcome of either:
+        //
         // - cb_stop, or
         // - a stopping terminal event, or
         // - step_limit.
-        if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
+        if (std::ranges::any_of(m_prop_res, [](const auto &t) {
                 const auto t_oc = std::get<0>(t);
 
                 // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
@@ -1950,83 +1963,135 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
             break;
         }
 
-        // Take the next step, making sure to write the Taylor coefficients
-        // and to cap the timestep size so that we don't go past the
-        // last grid point and we don't use a timestep exceeding max_delta_t.
-        // NOTE: m_rem_time is guaranteed to be finite: we check it explicitly above
-        // and we keep on decreasing its magnitude at the following iterations.
-        // If some non-finite state/time is generated in
-        // the step function, the integration will be stopped.
+        // Compute the max integration times for this timestep, storing them in pgrid_tmp.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly both on creation and every time it
+            // is updated. We also make sure that its sign at most changes to zero (this signals that a batch element is
+            // done).
+            assert(sgn_rem_time(m_rem_time[i]) == m_t_dir[i] || m_rem_time[i] == dl_zero);
+
             // Max delta_t for the current batch element.
             const auto max_delta_t = max_delta_ts[i];
 
             // Compute the step limit for the current batch element.
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
-            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
-                                                  : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
+            const auto dt_limit = (m_t_dir[i] >= 0) ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
+                                                    : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
 
             pgrid_tmp[i] = static_cast<T>(dt_limit);
         }
+
+        // Take the next step, making sure to write the Taylor coefficients and to cap the timestep size so that we
+        // don't go past the last grid point and we don't use a timestep exceeding max_delta_t.
+        //
+        // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         step_impl(pgrid_tmp, true);
 
-        // Check the outcomes of the step for each batch element,
-        // update the step counters, min_h/max_h and the remaining times
-        // (if meaningful), and keep track of
-        // whether or not any non-finite state was detected.
-        // This loop will also write into m_prop_res the outcomes,
-        // taking them from the step() outcomes.
-        bool nfs_detected = false;
+        // Check the outcomes of the step for each batch element, update the step counters, min_h/max_h and the
+        // remaining times, and keep track of:
+        //
+        // - the number of batch elements which reached the time limit (n_done),
+        // - whether or not any non-finite state was detected,
+        // - whether or not any stopping terminal event triggered.
+        std::uint32_t n_done = 0;
+        bool nfs_detected = false, ste_detected = false;
 
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto [oc, h] = m_step_res[i];
+            auto [oc, h] = m_step_res[i];
 
-            if (oc == taylor_outcome::err_nf_state) {
+            if (oc == taylor_outcome::err_nf_state) [[unlikely]] {
                 // Non-finite state: flag it and do nothing else.
                 nfs_detected = true;
             } else {
                 // Step outcome is one of:
+                //
                 // - success,
                 // - time_limit,
                 // - terminal event.
-
+                //
                 // Update the local step counters.
-                // NOTE: the local step counters increase only if we integrated
-                // for a nonzero time.
-                m_ts_count[i] += static_cast<std::size_t>(h != 0);
+                //
+                // NOTE: a step is counted unless the batch element had already finished before the current step, in
+                // which case it is only taking zero-length steps while waiting for the other batch elements. A zero
+                // remaining time means the element has finished.
+                //
+                // NOTE: unlike in propagate_until(), no special casing is needed for the first step: we can get here
+                // only if the grid has at least 2 points, in which case all remaining times are nonzero before the
+                // first step.
+                const auto lane_active = (m_rem_time[i] != dl_zero);
+                m_ts_count[i] = safe_size_t(m_ts_count[i]) + static_cast<std::size_t>(lane_active);
 
-                // Update min_h/max_h only if the outcome is success (otherwise
-                // the step was artificially clamped either by a time limit or
-                // by a terminal event).
+                // Update min_h/max_h only if the outcome is success (otherwise the step was artificially clamped either
+                // by a time limit or by a terminal event).
                 if (oc == taylor_outcome::success) {
                     const auto abs_h = abs(h);
                     m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
                     m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
                 }
 
-                // Update the remaining times.
-                // NOTE: if static_cast<T>(m_rem_time[i]) was used as a timestep,
-                // it means that we hit the time limit. Force rem_time to zero
-                // to signal this, so that zero-length steps will be taken
-                // for all remaining iterations, thus always triggering the
-                // time_limit outcome. A zero m_rem_time[i]
-                // will also force the processing of all remaining grid points.
-                // NOTE: if m_rem_time[i] was previously set to zero, it
-                // will end up being repeatedly set to zero here. This
-                // should be harmless.
-                // NOTE: we check h == rem_time, instead of just
-                // oc == time_limit, because clamping via max_delta_t
+                // Check if this batch element reached the time limit.
+                //
+                // NOTE: we check h == rem_time.hi, instead of just oc == time_limit, because clamping via max_delta_t
                 // could also result in time_limit.
-                if (h == static_cast<T>(m_rem_time[i])) {
-                    assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
-                } else {
-                    // NOTE: this should never flip the time direction of the
-                    // integration for the same reasons as explained in the
-                    // scalar implementation of propagate_until().
-                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
-                    m_rem_time[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i]
-                                    - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                //
+                // NOTE: once a batch element has finished, all subsequent steps have size zero and m_rem_time[i] stays
+                // exactly zero, hence cur_time_limit_reached is always true and oc is always time_limit.
+                const auto cur_time_limit_reached = (h == m_rem_time[i].hi);
+                assert(!cur_time_limit_reached || oc == taylor_outcome::time_limit);
+
+                // Flag if we encountered a stopping terminal event.
+                const auto cur_ste = (oc > taylor_outcome::success) && (oc < taylor_outcome{0});
+                ste_detected = ste_detected || cur_ste;
+
+                // Compute the new remaining time and check it.
+                const auto new_rem_time
+                    = grid_span[n_grid_points - 1u, i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                // NOTE: this is likely impossible to trigger, but the check is cheap.
+                if (is_nf(new_rem_time)) [[unlikely]] {
+                    // LCOV_EXCL_START
+                    // NOTE: just flag the non-finiteness, fill in m_prop_res[i] and continue to the next batch element.
+                    nfs_detected = true;
+                    m_prop_res[i]
+                        = std::tuple{taylor_outcome::err_nf_state, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                    continue;
+                    // LCOV_EXCL_STOP
+                }
+
+                // Detect if rem_time changed sign. This happens if:
+                //
+                // - we landed exactly on the last grid point, or
+                // - we overshot the last grid point due to floating-point rounding, or
+                // - the current batch element had finished already before the current step.
+                //
+                // A sign flip is regarded the same as reaching the time limit.
+                const auto rem_time_sign_flip = (sgn_rem_time(new_rem_time) != m_t_dir[i]);
+
+                // Check if this batch element is done, meaning that it reached its time limit. A sign change in
+                // rem_time counts as reaching the time limit.
+                const auto cur_done = cur_time_limit_reached || rem_time_sign_flip;
+                n_done += cur_done;
+
+                // Update the remaining time, forcibly setting it to zero in case the current batch element is done.
+                m_rem_time[i] = cur_done ? dl_zero : new_rem_time;
+
+                // If the current batch element is done, snap the time coordinate to grid_span[n_grid_points - 1u, i]
+                // and make sure oc is set to time_limit (if we did not run into a stopping terminal event).
+                //
+                // NOTE: the snapping is done in order to improve the user experience, i.e., the final time is
+                // guaranteed to be exactly the last grid point. Strictly speaking, this can introduce a small error, at
+                // the level of the floating-point epsilon. See also the explanation in
+                // taylor_adaptive::propagate_until_impl().
+                if (cur_done) {
+                    m_time_hi[i] = grid_span[n_grid_points - 1u, i];
+                    m_time_lo[i] = 0;
+
+                    // If the current batch element did *not* encounter a stopping terminal event, make sure that oc
+                    // contains time_limit.
+                    //
+                    // NOTE: we need to do this because we could be in a situation in which oc is success but we
+                    // detected a rem_time sign flip, which is regarded the same as reaching the time limit.
+                    if (!cur_ste) {
+                        oc = taylor_outcome::time_limit;
+                    }
                 }
             }
 
@@ -2034,35 +2099,32 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
             m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
         }
 
-        if (nfs_detected) {
-            // At least 1 batch element generated a non-finite state. In this situation,
-            // we do *not* want to execute the propagate() callback or modify retval
-            // any further. Just break and return what we have.
+        if (nfs_detected) [[unlikely]] {
+            // At least 1 batch element generated a non-finite state. In this situation, we do *not* want to execute the
+            // propagate() callback or modify retval any further. Just break and return what we have.
             break;
         }
 
         // Update the number of iterations.
         ++iter_counter;
 
-        // Small helper to wrap the invocation of the callback
-        // while checking that the callback does not change the
-        // time coordinate.
+        // Small helper to wrap the invocation of the callback while checking that the callback does not change the time
+        // coordinate.
         const auto wrap_cb_call = [&] {
-            // Store the current time coordinate before
-            // executing the cb, so that we can check if
-            // the cb changes the time coordinate.
-            // NOTE: the hi/lo copies are guaranteed to contain
-            // finite values because no err_nf_state outcome was
+            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
+            // time coordinate.
+            //
+            // NOTE: the hi/lo copies are guaranteed to contain finite values because no err_nf_state outcome was
             // detected in the step.
-            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
-            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+            std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+            std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
             // Execute the cb.
             assert(cb);
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
-            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
                 throw std::runtime_error(cb_time_errmsg);
             }
 
@@ -2070,17 +2132,20 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         };
 
         // Check the early interruption conditions.
-        // NOTE: in case of cb_stop or step_limit,
-        // we will overwrite the outcomes in m_prop_res.
-        // The outcome for a stopping terminal event is already
-        // set up properly in the previous loop.
+        //
+        // NOTE: in case of interruption, we don't exit immediately: the grid points falling within the most recent
+        // step are processed first, at the beginning of the next loop iteration. After that, the loop exit is
+        // guaranteed either because we processed all grid points or because of the interruption condition check.
         if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             for (auto &t : m_prop_res) {
                 std::get<0>(t) = taylor_outcome::cb_stop;
             }
-        } else if (iter_counter == max_steps) {
+        } else if (!ste_detected && n_done != m_batch_size && iter_counter == max_steps) {
             // Interruption via max iteration limit.
+            //
+            // NOTE: a stopping terminal event and the completion of the propagation for all batch elements take
+            // precedence over step_limit.
             for (auto &t : m_prop_res) {
                 std::get<0>(t) = taylor_outcome::step_limit;
             }
@@ -2088,12 +2153,12 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
     }
 
     // NOTE: at this point, we have the following possibilities:
+    //
     // - a non-finite state was detected -> at least one outcome is err_nf_state,
-    // - the integration was interrupted early -> at least one outcome
-    //   is either cb_stop, step_limit or a stopping terminal event,
-    // - the integration finished successfully, in which case we consumed
-    //   all grid points and all outcomes are time_limit.
-    return std::make_tuple(std::move(cb), std::move(retval));
+    // - the integration was interrupted -> all outcomes are cb_stop or step_limit, or at least one outcome is a
+    //   stopping terminal event,
+    // - otherwise, all grid points were processed and all outcomes are time_limit.
+    return make_retval();
 }
 
 template <typename T>

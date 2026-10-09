@@ -1411,13 +1411,21 @@ taylor_adaptive<T>::propagate_for_impl(T delta_t, std::size_t max_steps, T max_d
 }
 
 // NOTE: possible outcomes:
-// - time_limit (the happy path),
-// - nf_err_state in case of non-finite state
-//   detected,
-// - cb_stop in case of stop by callback,
-// - the index of a stopping terminal event.
-// The callback is always executed at the end of each timestep, unless
-// a non-finite state was detected.
+//
+// - the outcome of the initial propagation up to grid[0] (err_nf_state, step_limit or the index of a stopping terminal
+//   event), if it is not time_limit, else
+// - err_nf_state if a non-finite state was generated, else
+// - cb_stop if the propagation was interrupted via callback, else
+// - an event index if a stopping terminal event was encountered, else
+// - time_limit if the propagation was performed up to the last grid point, else
+// - step_limit if the max_steps limit was reached.
+//
+// In case of interruption via callback, stopping terminal event or step limit, the grid points falling within the last
+// timestep are processed before returning. The returned vector contains the state only for the grid points that were
+// processed.
+//
+// The callback is executed at the end of each timestep taken after the initial propagation up to grid[0], unless a
+// non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
 taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps, T max_delta_t, step_callback<T> cb)
@@ -1428,10 +1436,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
 
-    if (!isfinite(m_time)) {
+    if (!isfinite(m_time)) [[unlikely]] {
         throw std::invalid_argument(
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
@@ -1445,17 +1452,17 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 #endif
 
     // Check max_delta_t.
-    if (isnan(max_delta_t)) {
+    if (isnan(max_delta_t)) [[unlikely]] {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
     }
-    if (max_delta_t <= 0) {
+    if (max_delta_t <= 0) [[unlikely]] {
         throw std::invalid_argument(
             "A non-positive max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
     }
 
     // Check the grid.
-    if (grid.empty()) {
+    if (grid.empty()) [[unlikely]] {
         throw std::invalid_argument(
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
     }
@@ -1466,7 +1473,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         = "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator";
 
     // Check the first point.
-    if (!isfinite(grid[0])) {
+    if (!isfinite(grid[0])) [[unlikely]] {
         throw std::invalid_argument(nf_err_msg);
     }
 
@@ -1482,33 +1489,30 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 #endif
 
     if (grid.size() > 1u) {
-        // Establish the direction of the grid from
-        // the first two points.
-        if (!isfinite(grid[1])) {
+        // Establish the direction of the grid from the first two points.
+        if (!isfinite(grid[1])) [[unlikely]] {
             throw std::invalid_argument(nf_err_msg);
         }
-        if (grid[1] == grid[0]) {
+        if (grid[1] == grid[0]) [[unlikely]] {
             throw std::invalid_argument(ig_err_msg);
         }
-
         const auto grid_direction = grid[1] > grid[0];
 
-        // Check that the remaining points are finite and that
-        // they are ordered monotonically.
+        // Check that the remaining points are finite and that they are ordered monotonically.
         for (decltype(grid.size()) i = 2; i < grid.size(); ++i) {
-            if (!isfinite(grid[i])) {
+            if (!isfinite(grid[i])) [[unlikely]] {
                 throw std::invalid_argument(nf_err_msg);
             }
 
-            if ((grid[i] > grid[i - 1u]) != grid_direction) {
+            if ((grid[i] == grid[i - 1u]) || (grid[i] > grid[i - 1u]) != grid_direction) [[unlikely]] {
                 throw std::invalid_argument(ig_err_msg);
             }
         }
     }
 
-    // Require that the user provides a grid starting from the
-    // current integrator time, modulo the double-length correction.
-    if (m_time.hi != grid[0]) {
+    // Require that the user provides a grid starting from the current integrator time, modulo the double-length
+    // correction.
+    if (m_time.hi != grid[0]) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("When invoking propagate_grid(), the first element of the time grid "
                         "must match the current time coordinate - however, the first element of the time grid has a "
@@ -1520,72 +1524,76 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     std::vector<T> retval;
     retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(grid.size()) * get_dim());
 
-    // Initial values for the counters
-    // and the min/max abs of the integration
-    // timesteps.
-    // NOTE: iter_counter is for keeping track of the max_steps
-    // limits, step_counter counts the number of timesteps performed
-    // with a nonzero h. Most of the time these two quantities
-    // will be identical, apart from corner cases.
-    std::size_t iter_counter = 0, step_counter = 0;
-    // NOTE: in case of mppp::real, we know that max_delta_t has the correct
-    // precision by now.
+    // Initial values for the counter and the min/max abs of the integration timesteps.
+    boost::safe_numerics::safe<std::size_t> step_counter = 0;
+    // NOTE: in case of mppp::real, we know that max_delta_t has the correct precision by now.
     T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
-    // Propagate the system up to the first grid point.
-    // This is necessary in order to account for the fact
-    // that the user cannot pass as starting point in the grid
-    // a time coordinate which is *exactly* equal to m_time,
-    // due to the usage of a double-length representation.
-    // NOTE: we pass write_tc = true because some grid
-    // points after the first one might end up being
-    // calculated via dense output *before*
-    // taking additional steps, and, in such case, we
-    // must ensure the TCs are up to date.
-    // NOTE: if the integrator time is already at grid[0],
-    // then propagate_until() will take a zero timestep,
-    // resulting in m_last_h also going to zero and no event
-    // detection being performed.
-    // NOTE: use the same max_steps for the initial propagation,
-    // and don't pass the callback.
-    const auto oc_until = std::get<0>(
-        propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps, kw::write_tc = true));
+    // Small helper to construct the return value.
+    //
+    // NOTE: this will consume min_h, max_h, cb and retval.
+    const auto make_retval = [&min_h, &max_h, &step_counter, &cb, &retval](const taylor_outcome oc) {
+        return std::tuple{
+            oc,
+            std::move(min_h),
+            std::move(max_h),
+            static_cast<std::size_t>(step_counter),
+            std::move(cb),
+            std::move(retval),
+        };
+    };
 
-    if (oc_until != taylor_outcome::time_limit) {
+    // Propagate the system up to the first grid point.
+    //
+    // This is necessary because the user cannot pass as starting point in the grid a time coordinate which is *exactly*
+    // equal to m_time, due to the usage of a double-length representation. Thus, we take a small step to ensure that we
+    // will be starting with the time coordinate *exactly* at grid[0].
+    //
+    // NOTE: if the integrator time is already exactly at grid[0], then propagate_until() will take a zero timestep,
+    // resulting in no event detection being performed.
+    //
+    // NOTE: use the same max_steps for the initial propagation, and don't pass the callback.
+    const auto oc_until
+        = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
+
+    if (oc_until != taylor_outcome::time_limit) [[unlikely]] {
         // The outcome is not time_limit, exit now.
-        return std::tuple{oc_until, std::move(min_h), std::move(max_h), step_counter, std::move(cb), std::move(retval)};
+        return make_retval(oc_until);
     }
 
-    // Add the first result to retval.
-    // NOTE: in principle here we could have a state
-    // with incorrect precision being added to retval - this
-    // happens in case an event callback changes the state precision
-    // at the last step of the propagate_until(). This won't have
-    // ill effects on the propagate_grid() logic as retval
-    // is only written to (we don't use its values in the
-    // function logic).
+    // Add the first result (i.e., the state at t=grid[0]) to retval.
+    //
+    // NOTE: in principle here we could have a state with incorrect precision being added to retval - this happens in
+    // case an event callback changes the state precision at the last step of the propagate_until(). This won't have ill
+    // effects on the propagate_grid() logic as retval is only written to (we don't use its values in the function
+    // logic).
     retval.insert(retval.end(), m_state.begin(), m_state.end());
 
     // Cache a double-length zero for several uses later.
     const auto dl_zero = detail::dfloat<T>(detail::num_zero_like(max_delta_t));
 
     // Init the remaining time.
-    // NOTE: m_time is guaranteed to have the correct precision,
-    // grid was checked above - thus rem_time will have the correct
-    // precision.
+    //
+    // NOTE: m_time is guaranteed to have the correct precision, grid was rounded to the integrator precision above -
+    // thus rem_time will have the correct precision.
     auto rem_time = grid.back() - m_time;
 
     // Check it.
-    if (!isfinite(rem_time)) {
+    if (!isfinite(rem_time)) [[unlikely]] {
         throw std::invalid_argument("The final time passed to the propagate_grid() function of an adaptive Taylor "
                                     "integrator results in an overflow condition");
     }
 
-    // Cache the integration direction.
-    const auto t_dir = (rem_time >= dl_zero);
+    // Helper to compute the sign of rem_time: -1, 0 or 1.
+    const auto sgn_rem_time = [&rem_time, &dl_zero]() {
+        return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time);
+    };
 
-    // This flag, if set to something else than success,
-    // is used to signal the early interruption of the integration.
+    // Cache the integration direction.
+    const auto t_dir = sgn_rem_time();
+    assert((t_dir == 0) == (grid.size() == 1u));
+
+    // This flag, if set to something else than success, is used to signal the early interruption of the integration.
     auto interrupt = taylor_outcome::success;
 
     // Cache the presence/absence of a callback.
@@ -1598,111 +1606,148 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate
-        // (either via pre_hook() or via its call operator, as shown later).
-        // NOTE: orig_time is guaranteed to be finite
-        // because propagate_until() did not return err_nf_state.
+        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
+        // operator, as shown later).
+        //
+        // NOTE: orig_time is guaranteed to be finite because propagate_until() did not return err_nf_state.
         const auto orig_time = m_time;
 
         cb.pre_hook(*this);
 
-        if (m_time != orig_time) {
+        if (m_time != orig_time) [[unlikely]] {
             throw std::runtime_error(cb_time_errmsg);
         }
     }
 
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
-        // Establish the time range of the last
-        // taken timestep.
-        // NOTE: this is computed so that t0 < t1,
-        // regardless of the integration direction.
-        const auto t0 = std::min(m_time, m_time - m_last_h);
-        const auto t1 = std::max(m_time, m_time - m_last_h);
-
-        // Compute the state of the system via dense output for as many grid
-        // points as possible, i.e., as long as the grid times
-        // fall within the time range of the last step.
+        // Compute the state of the system via dense output for as many grid points as possible.
         while (true) {
-            // Fetch the current time target.
+            // Fetch the current time target from the grid.
             const auto &cur_tt = grid[cur_grid_idx];
 
-            // NOTE: we force processing of all remaining grid points
-            // if we are at the last timestep. We do this in order to avoid
-            // numerical issues when deciding if the last grid point
-            // falls within the range of the last step.
-            if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == dl_zero)) {
-                // The current time target falls within the range of
-                // the last step. Compute the dense output in cur_tt.
+            // Check whether cur_tt falls within the most recent step, so that we can use dense output.
+            //
+            // Integrator steps cover time intervals back-to-back in the direction of integration, and the grid points
+            // are also ordered in the integration direction. As a consequence, a grid point "belongs" to the first
+            // integration step that includes it, and this can be checked by comparing cur_tt with m_time. Once a grid
+            // point has been processed, we can move to the next one, which may or may not require taking another step.
+            //
+            // As usual, we regard the integration steps as half-open intervals.
+            //
+            // NOTE: on the first iteration of the outer loop (m_time == grid[0]), can_use_d_output is guaranteed to be
+            // false, since, for forward integrations, grid[1] > grid[0] == m_time (and conversely for backward
+            // integrations). Hence, we will immediately break out, and take as many steps as necessary until cur_tt
+            // falls within the most recent step.
+            assert(t_dir != 0);
+            const auto can_use_d_output = (t_dir > 0) ? (cur_tt < m_time) : (cur_tt > m_time);
+
+            // NOTE: rem_time is zero only after the step reaching grid.back(), where m_time is snapped to grid.back().
+            // grid.back() is thus excluded by the half-open check above, hence we force the processing of all remaining
+            // grid points in this case.
+            if (can_use_d_output || (rem_time == dl_zero)) {
+                // The current time target falls within the range of the most recent step. Compute the dense output in
+                // cur_tt.
                 update_d_output(cur_tt);
 
                 // Add the result to retval.
                 retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
             } else {
-                // Cannot use dense output on the current time target,
-                // need to take another step.
+                // Cannot use dense output on the current time target, need to take another step.
                 break;
             }
 
-            // Move to the next time target, or break out
-            // if we have no more.
+            // Move to the next time target, or break out if we have no more.
             if (++cur_grid_idx == grid.size()) {
                 break;
             }
         }
 
         if (cur_grid_idx == grid.size() || interrupt != taylor_outcome::success) {
-            // Either we ran out of grid points, or the last step() invocation
-            // resulted in early termination.
+            // Either we ran out of grid points, or the last step() invocation resulted in early termination.
             break;
         }
 
-        // Take the next step, making sure to write the Taylor coefficients
-        // and to cap the timestep size so that we don't go past the
-        // last grid point and we don't use a timestep exceeding max_delta_t.
-        // NOTE: rem_time is guaranteed to be finite: we check it explicitly above
-        // and we keep on decreasing its magnitude at the following iterations.
-        // If some non-finite state/time is generated in
-        // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
+        // NOTE: rem_time is guaranteed to be finite: we check it explicitly both on creation and every time it is
+        // updated. We also make sure to exit the loop if its sign changes, so that this assertion can never fire.
+        assert(sgn_rem_time() == t_dir);
+
+        // Take the next step, making sure to write the Taylor coefficients and to cap the timestep size so that we
+        // don't go past the last grid point and we don't use a timestep exceeding max_delta_t.
+        //
         // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
         //
         // NOLINTNEXTLINE(misc-const-correctness)
-        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        auto dt_limit = (t_dir >= 0) ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                                     : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         const auto [oc, h] = step_impl(std::move(dt_limit.hi), true);
 
-        if (oc == taylor_outcome::err_nf_state) {
-            // If a non-finite state is detected, we do *not* want
-            // to execute the propagate() callback and we do *not* want
-            // to update the return value. Just exit.
-            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, std::move(cb), std::move(retval)};
+        if (oc == taylor_outcome::err_nf_state) [[unlikely]] {
+            // If a non-finite state is detected, we do *not* want to execute the propagate() callback and we do *not*
+            // want to update the return value. Just exit.
+            return make_retval(oc);
         }
 
         // Update the number of steps.
-        step_counter += static_cast<std::size_t>(h != 0);
+        ++step_counter;
 
-        // Update min_h/max_h, but only if the outcome is success (otherwise
-        // the step was artificially clamped either by a time limit or
-        // by a terminal event).
+        // Update min_h/max_h, but only if the outcome is success (otherwise the step was artificially clamped either by
+        // a time limit or by a terminal event).
         if (oc == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
         }
 
-        // Update the number of iterations.
-        ++iter_counter;
+        // Establish whether we hit the time limit and/or a stopping terminal event.
+        //
+        // NOTE: we check h == rem_time.hi, instead of just oc == time_limit, because clamping via max_delta_t could
+        // also result in time_limit.
+        const auto time_limit_reached = (h == rem_time.hi);
+        assert(!time_limit_reached || oc == taylor_outcome::time_limit);
+        const bool ste_detected = (oc > taylor_outcome::success) && (oc < taylor_outcome{0});
 
-        // Small helper to wrap the invocation of the callback
-        // while checking that the callback does not change the
-        // time coordinate.
+        // Update the remaining time.
+        rem_time = grid.back() - m_time;
+
+        // Check finiteness.
+        //
+        // NOTE: this is likely impossible to trigger, but the check is cheap.
+        if (!isfinite(rem_time)) [[unlikely]] {
+            return make_retval(taylor_outcome::err_nf_state); // LCOV_EXCL_LINE
+        }
+
+        // Detect if rem_time changed sign. This happens if we landed exactly on grid.back() or we overshot grid.back()
+        // due to floating-point rounding.
+        //
+        // NOTE: a sign change will be regarded equivalent to reaching the time limit.
+        const auto rem_time_sign_flip = (sgn_rem_time() != t_dir);
+
+        // If we hit the time limit, or if rem_time changed sign, snap the time coordinate to grid.back() and force
+        // rem_time to zero. A zero rem_time will force the processing of all remaining grid points.
+        //
+        // NOTE: due to rounding, reaching the time limit does not necessarily mean that m_time is exactly grid.back(),
+        // since, in floating-point arithmetic, a + (b - a) may differ from b. By snapping, we are technically
+        // committing an error, since the single step we took did not bring us exactly to grid.back(), but rather to a
+        // very small distance from it. This difference will be at the level of the floating-point epsilon, thus we
+        // accept it with the goal of providing a more polished UX (i.e., if a user asks for a propagation up to
+        // grid.back(), the final time is guaranteed to be grid.back() exactly).
+        //
+        // NOTE: the snapping won't take place if an exception is thrown between the step_impl() call and here, or if
+        // the assignment below throws. This is ok, since an exception signals failure in any case.
+        const auto last_step = time_limit_reached || rem_time_sign_flip;
+        if (last_step) {
+            m_time = detail::dfloat<T>(grid.back());
+            rem_time = dl_zero;
+        }
+
+        // Small helper to wrap the invocation of the callback while checking that the callback does not change the time
+        // coordinate.
         const auto wrap_cb_call = [&] {
-            // Store the current time coordinate before
-            // executing the cb, so that we can check if
-            // the cb changes the time coordinate.
-            // NOTE: orig_time is guaranteed to contain
-            // a finite value because the outcome of the step
+            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
+            // time coordinate.
+            //
+            // NOTE: orig_time is guaranteed to contain a finite value because the outcome of the step
             // was not err_nf_state.
             const auto orig_time = m_time;
 
@@ -1711,57 +1756,33 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
-            if (m_time != orig_time) {
+            if (m_time != orig_time) [[unlikely]] {
                 throw std::runtime_error(cb_time_errmsg);
             }
 
             return ret_cb;
         };
 
-        // Check the early interruption conditions.
+        // Check the interruption conditions.
+        //
         // NOTE: only one of them must be set.
-        // NOTE: if the integration is stopped via callback,
-        // we don't exit immediately, we process any remaining
-        // grid points first.
+        //
+        // NOTE: in case of interruption, we don't exit immediately: the grid points falling within the most recent step
+        // are processed first, at the beginning of the next loop iteration.
         if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             interrupt = taylor_outcome::cb_stop;
-        } else if (oc > taylor_outcome::success && oc < taylor_outcome{0}) {
+        } else if (ste_detected) {
             // Interruption via stopping terminal event.
             interrupt = oc;
-        } else if (iter_counter == max_steps) {
-            // Interruption via max iteration limit.
+        } else if (!last_step && step_counter == max_steps) {
+            // Interruption via max step limit *before* the last step.
             interrupt = taylor_outcome::step_limit;
-        }
-
-        // Update the remaining time.
-        // NOTE: if rem_time.hi was used as a timestep,
-        // it means that we hit the time limit. Force rem_time to zero
-        // to signal this, avoiding inconsistencies with grid.back() - m_time
-        // not going exactly to zero due to numerical issues. A zero rem_time
-        // will also force the processing of all remaining grid points.
-        if (h == rem_time.hi) {
-            assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-            rem_time = dl_zero;
-        } else {
-            // NOTE: this should never flip the time direction of the
-            // integration for the same reasons as explained in the
-            // scalar implementation of propagate_until().
-            assert(abs(h) < abs(static_cast<T>(rem_time))); // LCOV_EXCL_LINE
-            rem_time = grid.back() - m_time;
         }
     }
 
-    // Return time_limit or the interrupt condition, if the integration
-    // was stopped early.
-    return std::tuple{
-        interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt,
-        std::move(min_h),
-        std::move(max_h),
-        step_counter,
-        std::move(cb),
-        std::move(retval),
-    };
+    // Return time_limit or the interrupt condition, if the integration was stopped early.
+    return make_retval(interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt);
 }
 
 template <typename T>
