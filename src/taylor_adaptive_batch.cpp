@@ -1264,9 +1264,12 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
         m_max_abs_h[i] = 0;
     }
 
+    // Double-length zero used in several places below.
+    const auto dl_zero = detail::dfloat<T>(static_cast<T>(0));
+
     // Helper to compute the sign of an input rem_time: -1, 0 or 1.
-    const auto sgn_rem_time = [](const auto &rem_time) {
-        return static_cast<int>(static_cast<T>(0) < rem_time) - static_cast<int>(static_cast<T>(0) > rem_time);
+    const auto sgn_rem_time = [dl_zero](const auto &rem_time) {
+        return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time);
     };
 
     // Compute the integration directions and init the remaining times.
@@ -1382,7 +1385,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
         // updated. We also make sure that its sign at most changes to zero (this signals that a batch element is
         // done).
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            assert(sgn_rem_time(m_rem_time[i]) == m_t_dir[i] || m_rem_time[i] == detail::dfloat<T>(static_cast<T>(0)));
+            assert(sgn_rem_time(m_rem_time[i]) == m_t_dir[i] || m_rem_time[i] == dl_zero);
 
             // Compute the time limit.
             const auto dt_limit = (m_t_dir[i] >= 0) ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
@@ -1426,8 +1429,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
                 // remaining time means the element has finished, except on the first iteration, where it means that
                 // the final time is the current time: in that case the zero-length step is counted, consistently with
                 // the scalar integrator.
-                const auto lane_active
-                    = (m_rem_time[i] != detail::dfloat<T>(static_cast<T>(0))) || (iter_counter == 0u);
+                const auto lane_active = (m_rem_time[i] != dl_zero) || (iter_counter == 0u);
                 m_ts_count[i] = safe_size_t(m_ts_count[i]) + static_cast<std::size_t>(lane_active);
 
                 // Update min_h/max_h only if the outcome is success (otherwise the step was artificially clamped either
@@ -1477,7 +1479,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
                 n_done += cur_done;
 
                 // Update the remaining time, forcibly setting it to zero in case the current batch element is done.
-                m_rem_time[i] = cur_done ? detail::dfloat<T>(static_cast<T>(0)) : new_rem_time;
+                m_rem_time[i] = cur_done ? dl_zero : new_rem_time;
 
                 // If the current batch element is done, snap the time coordinate to ts[i] and make sure oc is set to
                 // time_limit (if we did not run into a stopping terminal event).
