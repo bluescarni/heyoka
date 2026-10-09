@@ -1378,6 +1378,10 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
         }
     }
 
+    // Small helper to create the return value. It will consume c_out_tcs, c_out_times_hi and c_out_times_lo via
+    // make_c_out, and cb.
+    const auto make_retval = [&make_c_out, &cb]() { return std::make_tuple(make_c_out(), std::move(cb)); };
+
     while (true) {
         // Compute the max integration times for this timestep.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -1509,7 +1513,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
         if (nfs_detected) [[unlikely]] {
             // At least 1 batch element generated a non-finite state. In this situation, we do *not* want to execute the
             // propagate() callback and we do *not* want to update the continuous output. Just exit.
-            return std::make_tuple(make_c_out(), std::move(cb));
+            return make_retval();
         }
 
         // Update the continuous output.
@@ -1543,7 +1547,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
                     std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
                 }
 
-                return std::make_tuple(make_c_out(), std::move(cb));
+                return make_retval();
             }
         }
 
@@ -1551,7 +1555,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
         // stopping terminal event. In either case, m_prop_res was already set up in the loop where we checked the
         // outcomes.
         if (n_done == m_batch_size || ste_detected) {
-            return std::make_tuple(make_c_out(), std::move(cb));
+            return make_retval();
         }
 
         // Check the iteration limit.
