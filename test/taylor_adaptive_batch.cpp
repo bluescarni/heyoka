@@ -565,6 +565,18 @@ TEST_CASE("propagate for_until")
         REQUIRE_THROWS_MATCHES(ta.propagate_until({10., 11.}, kw::max_delta_t = {1., -1.}), std::invalid_argument,
                                Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
                                        "adaptive Taylor integrator in batch mode"));
+        REQUIRE_THROWS_MATCHES(ta.propagate_until(std::vector{10.}), std::invalid_argument,
+                               Message("Invalid number of time limits specified in a Taylor integrator in batch mode: "
+                                       "the batch size is 2, but the number of specified time limits is 1"));
+        REQUIRE_THROWS_MATCHES(ta.propagate_until({10., 11., 12.}), std::invalid_argument,
+                               Message("Invalid number of time limits specified in a Taylor integrator in batch mode: "
+                                       "the batch size is 2, but the number of specified time limits is 3"));
+
+        ta.set_time({0., std::numeric_limits<double>::infinity()});
+
+        REQUIRE_THROWS_MATCHES(ta.propagate_until({10., 11.}), std::invalid_argument,
+                               Message("Cannot invoke the propagate_until() function of an adaptive Taylor integrator "
+                                       "in batch mode if one of the current times is not finite"));
 
         ta.set_time({0., std::numeric_limits<double>::lowest()});
 
