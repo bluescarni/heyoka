@@ -1186,7 +1186,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
     }
 
     // Helper to compute the sign of rem_time: -1, 0 or 1.
-    const auto sgn_rem_time = [&rem_time, dl_zero = detail::dfloat<T>(detail::num_zero_like(max_delta_t))]() {
+    const auto sgn_rem_time = [&rem_time, dl_zero = detail::dfloat<T>(detail::num_zero_like(max_delta_t))] {
         return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time);
     };
 
@@ -1585,9 +1585,8 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     }
 
     // Helper to compute the sign of rem_time: -1, 0 or 1.
-    const auto sgn_rem_time = [&rem_time, &dl_zero]() {
-        return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time);
-    };
+    const auto sgn_rem_time
+        = [&rem_time, &dl_zero] { return static_cast<int>(dl_zero < rem_time) - static_cast<int>(dl_zero > rem_time); };
 
     // Cache the integration direction.
     const auto t_dir = sgn_rem_time();

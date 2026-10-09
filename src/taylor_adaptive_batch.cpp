@@ -1383,7 +1383,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
 
     // Small helper to create the return value. It will consume c_out_tcs, c_out_times_hi and c_out_times_lo via
     // make_c_out, and cb.
-    const auto make_retval = [&make_c_out, &cb]() { return std::make_tuple(make_c_out(), std::move(cb)); };
+    const auto make_retval = [&make_c_out, &cb] { return std::make_tuple(make_c_out(), std::move(cb)); };
 
     while (true) {
         // Compute the max integration times for this timestep.
@@ -1763,7 +1763,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
 
     // Small helper to create the return value. It will consume cb and retval.
-    const auto make_retval = [&cb, &retval]() { return std::make_tuple(std::move(cb), std::move(retval)); };
+    const auto make_retval = [&cb, &retval] { return std::make_tuple(std::move(cb), std::move(retval)); };
 
     // Propagate the system up to the first batch of grid points. This is necessary in order to account for the fact
     // that the user cannot pass as starting point in the grid a time coordinate which is *exactly* equal to m_time, due
