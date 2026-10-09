@@ -1380,11 +1380,10 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
 
     while (true) {
         // Compute the max integration times for this timestep.
-        //
-        // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly both on creation and every time it is
-        // updated. We also make sure that its sign at most changes to zero (this signals that a batch element is
-        // done).
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly both on creation and every time it
+            // is updated. We also make sure that its sign at most changes to zero (this signals that a batch element is
+            // done).
             assert(sgn_rem_time(m_rem_time[i]) == m_t_dir[i] || m_rem_time[i] == dl_zero);
 
             // Compute the time limit.
@@ -1395,7 +1394,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
         }
 
-        // Run the integration timestep.
+        // Run the integration timestep, making sure that we don't go past the time limit.
         //
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         step_impl(m_cur_max_delta_ts, wtc);
@@ -1473,7 +1472,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
                 // A sign flip is regarded the same as reaching the time limit.
                 const auto rem_time_sign_flip = (sgn_rem_time(new_rem_time) != m_t_dir[i]);
 
-                // Check if this batch element is done, meaning that it reached its time limite. A sign change in
+                // Check if this batch element is done, meaning that it reached its time limit. A sign change in
                 // rem_time counts as reaching the time limit.
                 const auto cur_done = cur_time_limit_reached || rem_time_sign_flip;
                 n_done += cur_done;
