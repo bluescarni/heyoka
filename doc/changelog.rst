@@ -1,6 +1,22 @@
 Changelog
 =========
 
+7.14.0 (unreleased)
+-------------------
+
+Changes
+~~~~~~~
+
+- The time-limited propagation functions now guarantee that, at the end of a successful propagation,
+  the integrator time matches exactly the end time of the propagation
+  (`#555 <https://github.com/bluescarni/heyoka/pull/555>`__).
+
+Fix
+~~~
+
+- Fix a number of inconsistencies and corner-case issues in the time-limited propagation functions
+  (`#555 <https://github.com/bluescarni/heyoka/pull/555>`__).
+
 7.13.0 (2026-09-23)
 -------------------
 
