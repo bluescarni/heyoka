@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
@@ -131,6 +132,21 @@ TEST_CASE("propagate to current time")
         REQUIRE(oss.str().find("Direction   : forward") != std::string::npos);
         REQUIRE(ta.get_dtime() == std::pair{1.5, 0.});
         REQUIRE(ta.get_state() == state);
+
+        // Evaluate the continuous output at the current time and on both sides of it.
+        //
+        // NOTE: at the current time, the evaluation must return exactly the state. Elsewhere, the result must match
+        // the dense output of the integrator, which evaluates the same Taylor polynomial from the same starting time.
+        auto c_out = *std::get<4>(res);
+        REQUIRE(c_out(1.5) == state);
+        for (const auto tm : {0.5, 2.5}) {
+            const auto &c_out_res = c_out(tm);
+            const auto &d_out_res = ta.update_d_output(tm);
+            REQUIRE(c_out_res.size() == d_out_res.size());
+            for (std::size_t j = 0; j < c_out_res.size(); ++j) {
+                REQUIRE(std::abs(c_out_res[j] - d_out_res[j]) <= 1e-14);
+            }
+        }
     }
 
     // propagate_grid() with a single grid point: no steps are reported.

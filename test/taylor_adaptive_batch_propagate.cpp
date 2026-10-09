@@ -165,6 +165,23 @@ TEST_CASE("propagate to current time")
         REQUIRE(ta.get_dtime().first == std::vector{1.5, -0.5});
         REQUIRE(ta.get_dtime().second == std::vector{0., 0.});
         REQUIRE(ta.get_state() == state);
+
+        // Evaluate the continuous output at the current times and on both sides of them, also on different sides
+        // for the two batch elements.
+        //
+        // NOTE: at the current times, the evaluation must return exactly the state. Elsewhere, the result must match
+        // the dense output of the integrator, which evaluates the same Taylor polynomials from the same starting
+        // times.
+        auto c_out_copy = *c_out;
+        REQUIRE(c_out_copy({1.5, -0.5}) == state);
+        for (const auto &tm : {std::vector{0.5, -1.5}, std::vector{2.5, 0.5}, std::vector{0.5, 0.5}}) {
+            const auto &c_out_res = c_out_copy(tm);
+            const auto &d_out_res = ta.update_d_output(tm);
+            REQUIRE(c_out_res.size() == d_out_res.size());
+            for (std::size_t j = 0; j < c_out_res.size(); ++j) {
+                REQUIRE(std::abs(c_out_res[j] - d_out_res[j]) <= 1e-14);
+            }
+        }
     }
 
     // propagate_grid() with a single grid point: no steps are reported.
@@ -621,9 +638,10 @@ TEST_CASE("terminal event max_steps")
     }
 }
 
-// In the screen output of the batch continuous output, a batch element whose time coordinate does not change must be
-// reported as forward, consistently with the direction used internally.
-TEST_CASE("c_out stream zero direction")
+// Continuous output in which a batch element is propagated backward, while the time coordinate of the other batch
+// element does not change. In the screen output, the latter must be reported as forward, consistently with the direction
+// used internally. The evaluation must work for both batch elements, inside and outside their time ranges.
+TEST_CASE("c_out zero direction")
 {
     auto [x, v] = make_vars("x", "v");
 
@@ -631,10 +649,22 @@ TEST_CASE("c_out stream zero direction")
     ta.set_time({0., 1.5});
 
     // Batch element 0 is propagated backward, batch element 1 is propagated up to its current time.
-    const auto c_out = std::get<0>(ta.propagate_until({-1., 1.5}, kw::c_output = true));
+    auto c_out = std::get<0>(ta.propagate_until({-1., 1.5}, kw::c_output = true));
     REQUIRE(c_out);
 
     std::ostringstream oss;
     oss << *c_out;
     REQUIRE(oss.str().find("Directions  : [backward, forward]") != std::string::npos);
+
+    // Evaluate the continuous output inside and outside the time ranges of the batch elements, and compare with the
+    // analytical solutions.
+    //
+    // NOTE: both batch elements start from x = 0, v = 1, batch element 0 at t = 0 and batch element 1 at t = 1.5.
+    for (const auto &tm : {std::vector{-0.5, 1.5}, std::vector{0.5, 1.}, std::vector{-1.5, 2.}}) {
+        const auto &out = (*c_out)(tm);
+        REQUIRE(std::abs(out[0] - std::sin(tm[0])) <= 1e-12);
+        REQUIRE(std::abs(out[1] - std::sin(tm[1] - 1.5)) <= 1e-12);
+        REQUIRE(std::abs(out[2] - std::cos(tm[0])) <= 1e-12);
+        REQUIRE(std::abs(out[3] - std::cos(tm[1] - 1.5)) <= 1e-12);
+    }
 }
