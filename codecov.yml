@@ -10,7 +10,7 @@ coverage:
   - "src/detail/egm2008.cpp"
   - "include/heyoka/detail/igor.hpp"
   - "include/heyoka/detail/tanuki*"
-  - "include/heyoka/detail/mdspan*"
+  - "include/heyoka/detail/mdspan/.*"
   - "src/detail/erfa/.*"
   - "utils/.*"
 
