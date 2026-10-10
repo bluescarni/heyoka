@@ -30,6 +30,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/vector.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -1694,41 +1695,44 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
         throw std::invalid_argument(nf_err_msg);
     }
 
+    // Check the remaining rows, if present.
     if (n_grid_points > 1u) {
-        // Establish the direction of the grid from the first elements of the first two batches of points.
-        if (std::ranges::any_of(grid_row(1), is_nf)) [[unlikely]] {
-            throw std::invalid_argument(nf_err_msg);
-        }
-        if (grid_span[1, 0] == grid_span[0, 0]) [[unlikely]] {
-            throw std::invalid_argument(ig_err_msg);
-        }
-        const auto grid_direction = grid_span[1, 0] > grid_span[0, 0];
+        // Establish the direction of each batch element from the first two rows of the grid.
+        //
+        // NOTE: use boost's vector, instead of std::vector, in order to avoid the bool specialisation.
+        boost::container::vector<bool> grid_directions;
+        grid_directions.reserve(m_batch_size);
+        for (std::uint32_t j = 0; j < m_batch_size; ++j) {
+            // Finiteness check for the second row.
+            const auto cur_value = grid_span[1, j];
+            if (is_nf(cur_value)) [[unlikely]] {
+                throw std::invalid_argument(nf_err_msg);
+            }
 
-        // Small helper to check the monotonicity of the grid. Given row/column indices i/j in the grid, it will compare
-        // the value at [i, j] with the value at [i-1, j], and check that the two values differ and that they obey the
-        // grid direction.
-        const auto check_monotonicity = [grid_direction, grid_span](const grid_size_t i, const grid_size_t j) {
-            assert(i > 0u);
-            const auto cur_value = grid_span[i, j];
-            const auto prev_value = grid_span[i - 1u, j];
-
-            if ((cur_value == prev_value) || (cur_value > prev_value) != grid_direction) [[unlikely]] {
+            // Check that the values in the first and second rows for the current batch element are not equal.
+            const auto prev_value = grid_span[0, j];
+            if (cur_value == prev_value) [[unlikely]] {
                 throw std::invalid_argument(ig_err_msg);
             }
-        };
 
-        // Check monotonicity for the remaining batch lanes in the first two batches.
-        for (std::uint32_t j = 1; j < m_batch_size; ++j) {
-            check_monotonicity(1, j);
+            // Compute and add the grid direction.
+            grid_directions.push_back(cur_value > prev_value);
         }
 
-        // Check that the remaining points are finite and that they are ordered monotonically.
+        // Check the remaining rows.
         for (grid_size_t i = 2; i < n_grid_points; ++i) {
             for (std::uint32_t j = 0; j < m_batch_size; ++j) {
-                if (is_nf(grid_span[i, j])) [[unlikely]] {
+                // Finiteness check.
+                const auto cur_value = grid_span[i, j];
+                if (is_nf(cur_value)) [[unlikely]] {
                     throw std::invalid_argument(nf_err_msg);
                 }
-                check_monotonicity(i, j);
+
+                // Monotonicity check.
+                const auto prev_value = grid_span[i - 1u, j];
+                if ((cur_value == prev_value) || (cur_value > prev_value) != grid_directions[j]) [[unlikely]] {
+                    throw std::invalid_argument(ig_err_msg);
+                }
             }
         }
     }

@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- The ``propagate_grid()`` function of the batch integrator now supports
+  grids in which different batch elements are propagated in different directions
+  (`#558 <https://github.com/bluescarni/heyoka/pull/558>`__).
 - A ``quick`` version of the test suite is now available, disabled by default
   (`#557 <https://github.com/bluescarni/heyoka/pull/557>`__). The
   :ref:`installation instructions <installation_from_source>` have been updated accordingly.
