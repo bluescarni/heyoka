@@ -60,16 +60,24 @@ private:
 
 #if defined(HEYOKA_HAVE_REAL)
 
-// NOTE: we have a specialised implementation for this
-// in order to ensure the ctors always set the components
-// to the same precision (and if they can't, they will throw).
+// NOTE: we have a specialised implementation for this in order to ensure the ctors always set the components to the
+// same precision (and if they can't, they will throw).
+//
+// NOTE: in case one day we start writing optimised implementations for mppp::real, we must be extra careful to ensure
+// that exceptions do not break normalisation. This is not a concern for the other types since all their operations are
+// noexcept.
 template <>
 struct HEYOKA_DLL_PUBLIC dfloat<mppp::real> {
     mppp::real hi, lo;
 
     dfloat();
+    dfloat(const dfloat &);
+    dfloat(dfloat &&) noexcept;
     explicit dfloat(mppp::real);
     explicit dfloat(mppp::real, mppp::real);
+    dfloat &operator=(const dfloat &);
+    dfloat &operator=(dfloat &&) noexcept;
+    ~dfloat();
 
     explicit operator mppp::real() const &;
     explicit operator mppp::real() &&;
@@ -238,6 +246,12 @@ template <typename F>
 inline bool operator<(const dfloat<F> &x, const dfloat<F> &y)
 {
     return (x.hi < y.hi) || (x.hi == y.hi && x.lo < y.lo);
+}
+
+template <typename F>
+inline bool operator<(const F &x, const dfloat<F> &y)
+{
+    return dfloat<F>(x) < y;
 }
 
 template <typename F>

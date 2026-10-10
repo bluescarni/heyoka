@@ -629,6 +629,8 @@ TEST_CASE("propagate for_until")
 
             REQUIRE(ta.get_state() == ta_copy.get_state());
             REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+            REQUIRE(ta.get_dtime().first.get_prec() == prec);
+            REQUIRE(ta.get_dtime().second.get_prec() == prec);
 
             // Same with propagate_for and the max_delta_t argument.
             ta.propagate_for(fp_t(2, prec - 5), kw::max_delta_t = fp_t(0.03125, prec - 5));
@@ -636,6 +638,8 @@ TEST_CASE("propagate for_until")
 
             REQUIRE(ta.get_state() == ta_copy.get_state());
             REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+            REQUIRE(ta.get_dtime().first.get_prec() == prec);
+            REQUIRE(ta.get_dtime().second.get_prec() == prec);
         }
     }
 }
@@ -809,6 +813,10 @@ TEST_CASE("propagate grid scalar")
             REQUIRE(std::get<0>(out2) == taylor_outcome::time_limit);
             REQUIRE(std::get<5>(out2).size() == 2000u);
             REQUIRE(ta_copy.get_time() == grid.back());
+            REQUIRE(ta.get_dtime().first.get_prec() == prec);
+            REQUIRE(ta.get_dtime().second.get_prec() == prec);
+            REQUIRE(ta_copy.get_dtime().first.get_prec() == prec);
+            REQUIRE(ta_copy.get_dtime().second.get_prec() == prec);
             REQUIRE(std::get<0>(out) == std::get<0>(out2));
             REQUIRE(std::get<1>(out) == std::get<1>(out2));
             REQUIRE(std::get<2>(out) == std::get<2>(out2));

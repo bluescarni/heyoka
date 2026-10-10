@@ -163,8 +163,7 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {};
 
 } // namespace fmt
 
@@ -453,8 +452,7 @@ private:
 
     // NOTE: we need to go through a private non-template constructor
     // in order to avoid having to provide definitions for the pimpled data.
-    struct private_ctor_t {
-    };
+    struct private_ctor_t {};
     explicit taylor_adaptive(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
@@ -876,8 +874,7 @@ private:
 
     // NOTE: we need to go through a private non-template constructor
     // in order to avoid having to provide definitions for the pimpled data.
-    struct private_ctor_t {
-    };
+    struct private_ctor_t {};
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;

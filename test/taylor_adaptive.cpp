@@ -1114,6 +1114,12 @@ TEST_CASE("propagate for_until")
                            Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
                                    "adaptive Taylor integrator"));
 
+    ta.set_time(std::numeric_limits<double>::infinity());
+
+    REQUIRE_THROWS_MATCHES(ta.propagate_until(10.), std::invalid_argument,
+                           Message("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
+                                   "the current time is not finite"));
+
     ta.set_time(std::numeric_limits<double>::lowest());
 
     REQUIRE_THROWS_MATCHES(ta.propagate_until(std::numeric_limits<double>::max()), std::invalid_argument,

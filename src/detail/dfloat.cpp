@@ -35,17 +35,36 @@ namespace detail
 
 dfloat<mppp::real>::dfloat() = default;
 
+dfloat<mppp::real>::dfloat(const dfloat &) = default;
+
+dfloat<mppp::real>::dfloat(dfloat &&) noexcept = default;
+
 dfloat<mppp::real>::dfloat(mppp::real x) : hi(std::move(x)), lo(mppp::real_kind::zero, hi.get_prec()) {}
 
 dfloat<mppp::real>::dfloat(mppp::real h, mppp::real l) : hi(std::move(h)), lo(std::move(l))
 {
-    if (hi.get_prec() != lo.get_prec()) {
+    if (hi.get_prec() != lo.get_prec()) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Mismatched precisions in the components of a dfloat<mppp::real>: the high component has a "
                         "precision of {}, while the low component has a precision of {}",
                         hi.get_prec(), lo.get_prec()));
     }
 }
+
+// NOTE: custom implementation of the copy-assignment operator that prevents leaving this in an unnormalised state in
+// case of exceptions.
+dfloat<mppp::real> &dfloat<mppp::real>::operator=(const dfloat &other)
+{
+    if (this != &other) [[likely]] {
+        *this = dfloat(other);
+    }
+
+    return *this;
+}
+
+dfloat<mppp::real> &dfloat<mppp::real>::operator=(dfloat &&) noexcept = default;
+
+dfloat<mppp::real>::~dfloat() = default;
 
 dfloat<mppp::real>::operator mppp::real() const &
 {
