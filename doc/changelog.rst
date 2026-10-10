@@ -24,6 +24,9 @@ Changes
 Fix
 ~~~
 
+- Fix link-time errors when mixing code compiled with GCC and Clang
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
+
 - Fix a number of inconsistencies and corner-case issues in the time-limited propagation functions
   (`#555 <https://github.com/bluescarni/heyoka/pull/555>`__).
 
