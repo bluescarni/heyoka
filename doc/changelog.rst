@@ -4,8 +4,18 @@ Changelog
 7.14.0 (unreleased)
 -------------------
 
+New
+~~~
+
+- The mdspan layouts, ``default_accessor``, ``full_extent`` and ``submdspan()``
+  are now available in the ``heyoka`` namespace
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
+
 Changes
 ~~~~~~~
+
+- Update the bundled copy of :cpp:type:`~heyoka::mdspan`
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
 
 - The time-limited propagation functions now guarantee that, at the end of a successful propagation,
   the integrator time matches exactly the end time of the propagation

@@ -75,13 +75,13 @@ std::array<expression, 3> rot_fk5j2000_icrs_impl(const std::array<expression, 3>
 // https://github.com/astropy/astropy/blob/07b8873e0f78fbdb7787960eabf19fe48914218c/astropy/coordinates/builtin_frames/icrs_fk5_transforms.py
 std::array<expression, 3> rot_fk5j2000_icrs(const std::array<expression, 3> &xyz)
 {
-    return detail::rot_fk5j2000_icrs_impl<std::experimental::layout_right>(xyz);
+    return detail::rot_fk5j2000_icrs_impl<layout_right>(xyz);
 }
 
 // Inverse of fk5j2000_icrs().
 std::array<expression, 3> rot_icrs_fk5j2000(const std::array<expression, 3> &xyz)
 {
-    return detail::rot_fk5j2000_icrs_impl<std::experimental::layout_left>(xyz);
+    return detail::rot_fk5j2000_icrs_impl<layout_left>(xyz);
 }
 
 namespace detail
