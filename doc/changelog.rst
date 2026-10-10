@@ -4,8 +4,18 @@ Changelog
 7.14.0 (unreleased)
 -------------------
 
+New
+~~~
+
+- The mdspan layouts, ``default_accessor``, ``full_extent`` and ``submdspan()``
+  are now available in the ``heyoka`` namespace
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
+
 Changes
 ~~~~~~~
+
+- Update the bundled copy of :cpp:type:`~heyoka::mdspan`
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
 
 - The time-limited propagation functions now guarantee that, at the end of a successful propagation,
   the integrator time matches exactly the end time of the propagation
@@ -13,6 +23,9 @@ Changes
 
 Fix
 ~~~
+
+- Fix link-time errors when mixing code compiled with GCC and Clang
+  (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
 
 - Fix a number of inconsistencies and corner-case issues in the time-limited propagation functions
   (`#555 <https://github.com/bluescarni/heyoka/pull/555>`__).

@@ -52,10 +52,10 @@
 #endif
 
 // Versioning.
-#define TANUKI_VERSION_MAJOR 3
+#define TANUKI_VERSION_MAJOR 4
 #define TANUKI_VERSION_MINOR 0
 #define TANUKI_VERSION_PATCH 0
-#define TANUKI_ABI_VERSION 3
+#define TANUKI_ABI_VERSION 4
 
 // NOTE: indirection to allow token pasting/stringification:
 //
@@ -405,8 +405,7 @@ concept noncv_rvalue_reference
 // Composite interface.
 template <typename IFace0, typename IFace1, typename... IFaceN>
 // NOLINTNEXTLINE(misc-multiple-inheritance,cppcoreguidelines-virtual-class-destructor)
-struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFaceN... {
-};
+struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFaceN... {};
 
 // Concept to detect any wrap instance.
 template <typename T>
@@ -428,8 +427,7 @@ template <typename IFace0, typename IFace1, typename... IFaceN>
 inline constexpr bool is_composite_interface_v<composite_iface<IFace0, IFace1, IFaceN...>> = true;
 
 // Private base for the unspecialised iface_impl.
-struct iface_impl_base {
-};
+struct iface_impl_base {};
 
 } // namespace detail
 
@@ -439,8 +437,7 @@ struct iface_impl_base {
 // NOTE: prohibit the definition of an external implementation for the composite interface.
 template <typename IFace, typename Base, typename T>
     requires(!detail::is_composite_interface_v<IFace>)
-struct TANUKI_VISIBLE iface_impl final : detail::iface_impl_base {
-};
+struct TANUKI_VISIBLE iface_impl final : detail::iface_impl_base {};
 
 namespace detail
 {
@@ -460,8 +457,7 @@ concept iface_has_intrusive_impl = requires() { typename IFace::template impl<Ba
 
 // Helper to fetch the implementation of a non-composite interface
 template <typename, typename, typename>
-struct get_nc_iface_impl {
-};
+struct get_nc_iface_impl {};
 
 // External interface implementation.
 //
@@ -484,8 +480,7 @@ concept with_external_or_intrusive_iface_impl = requires() { typename get_nc_ifa
 
 // Meta-programming to select the implementation of an interface.
 template <typename, typename, wrap_semantics>
-struct impl_from_iface_impl {
-};
+struct impl_from_iface_impl {};
 
 // NOTE: this is a typed wrapper for _tanuki_value_iface.
 //
@@ -494,8 +489,7 @@ struct impl_from_iface_impl {
 // which in turn allows us - in the implementation of getval() - to static_cast a pointer to an implementation to the
 // holder for that implementation. We would not be able to perform this static_cast without the information about T.
 template <typename T, typename IFace, wrap_semantics Sem>
-struct TANUKI_VISIBLE _tanuki_typed_value_iface : _tanuki_value_iface<IFace, Sem> {
-};
+struct TANUKI_VISIBLE _tanuki_typed_value_iface : _tanuki_value_iface<IFace, Sem> {};
 
 // For non-composite interfaces, the Base for the interface implementation is _tanuki_typed_value_iface<T, IFace, Sem>
 // (which transitively makes IFace also a base for the implementation).
@@ -513,8 +507,7 @@ template <typename IFace, typename T, wrap_semantics Sem>
 // For composite interfaces, we synthesize a class hierarchy in which every implementation derives from the previous
 // one, and the first implementation derives from _tanuki_typed_value_iface of the composite interface.
 template <typename T, typename CurIFace, typename CurBase, typename NextIFace, typename... IFaceN>
-struct c_iface_assembler {
-};
+struct c_iface_assembler {};
 
 template <typename T, typename CurIFace, typename CurBase, typename NextIFace, typename... IFaceN>
     requires requires() {
@@ -931,10 +924,6 @@ struct TANUKI_VISIBLE wrap_storage<IFace, StaticStorageSize, StaticStorageAlignm
     std::shared_ptr<_tanuki_value_iface<IFace, wrap_semantics::reference>> m_pv_iface;
 };
 
-// NOTE: this is used to check that a config instance is a specialisation from the primary config template.
-struct config_base {
-};
-
 } // namespace detail
 
 // Helpers to determine the size and alignment of a holder instance, given the value type T and the interface IFace.
@@ -958,8 +947,7 @@ inline constexpr auto holder_align = alignof(detail::_tanuki_holder<T, IFace, wr
 struct TANUKI_VISIBLE no_ref_iface {
     template <typename>
     // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility)
-    struct impl {
-    };
+    struct impl {};
 };
 
 // Composite reference interface.
@@ -968,8 +956,7 @@ struct TANUKI_VISIBLE composite_ref_iface {
     template <typename Wrap>
     struct impl : public IFace0::template impl<Wrap>,
                   public IFace1::template impl<Wrap>,
-                  public IFaceN::template impl<Wrap>... {
-    };
+                  public IFaceN::template impl<Wrap>... {};
 };
 
 // Enum to select the explicitness of the generic wrap ctors.
@@ -985,8 +972,7 @@ namespace detail
 // a substitution error occurs, then the concept is considered not satisfied.
 
 template <template <typename> typename>
-struct single_tt {
-};
+struct single_tt {};
 
 // NOTE: the purpose of this concept is to yield alwas true for any input template-template TT depending on a single
 // parameter. We cannot simply use "concept single_tt_id = true" because of reasons that have to do with constraint
@@ -1006,6 +992,9 @@ concept single_tt_id = requires() { typename single_tt<TT>; };
 template <typename T>
 concept with_impl_tt = single_tt_id<T::template impl>;
 
+// NOTE: tag used to check that a config instance is a specialisation from the primary config template.
+struct config_tag {};
+
 } // namespace detail
 
 // Concept for checking that RefIFace is a valid reference interface. In C++>=23, anything goes, in C++20 we need to
@@ -1022,7 +1011,13 @@ concept valid_ref_iface = std::is_class_v<RefIFace> && std::same_as<RefIFace, st
 // NOTE: the DefaultValueType is subject to the constraints for valid value types.
 template <typename DefaultValueType = void, typename RefIFace = no_ref_iface>
     requires(std::same_as<DefaultValueType, void> || valid_value_type<DefaultValueType>) && valid_ref_iface<RefIFace>
-struct TANUKI_VISIBLE config final : detail::config_base {
+struct TANUKI_VISIBLE config final {
+    // NOTE: this is a "hidden" tag, not meant to be documented or seen by the user, utilised to verify that a config
+    // instance is an instantiation of the primary template, rather than a user-provided specialisation. It is a member
+    // type rather than a base class because an (empty) base class would become part of the mangled names of config
+    // values, and GCC and Clang mangle it differently, which breaks linking code compiled with different compilers.
+    using _config_tag = detail::config_tag;
+
     using default_value_type = DefaultValueType;
 
     // Size of the static storage.
@@ -1068,7 +1063,7 @@ using ctp_t = std::remove_cvref_t<decltype(X)>;
 template <auto Cfg>
 concept valid_config =
     // This checks that the type of Cfg is a specialisation from the primary config template.
-    std::derived_from<detail::ctp_t<Cfg>, detail::config_base> &&
+    std::same_as<typename detail::ctp_t<Cfg>::_config_tag, detail::config_tag> &&
     // The static alignment value must be a power of 2.
     detail::power_of_two<Cfg.static_align> &&
     // Cfg.explicit_ctor must be set to one of the valid enumerators.
@@ -1172,14 +1167,12 @@ struct TANUKI_VISIBLE wrap_pointer_iface {
 };
 
 template <typename Wrap, typename IFace>
-struct TANUKI_VISIBLE wrap_pointer_iface<false, Wrap, IFace> {
-};
+struct TANUKI_VISIBLE wrap_pointer_iface<false, Wrap, IFace> {};
 
 } // namespace detail
 
 // Tag structure to construct/assign a wrap into the invalid state.
-struct invalid_wrap_t {
-};
+struct invalid_wrap_t {};
 
 inline constexpr invalid_wrap_t invalid_wrap{};
 
@@ -1189,8 +1182,7 @@ namespace detail
 // NOTE: this section contains code for fetching the reference interface type for a wrap instance.
 
 template <typename>
-struct cfg_ref_type {
-};
+struct cfg_ref_type {};
 
 template <typename DefaultValueType, typename RefIFace>
 struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
@@ -1201,8 +1193,7 @@ template <auto Cfg>
 using cfg_ref_t = cfg_ref_type<ctp_t<Cfg>>::type;
 
 template <typename T, typename Wrap>
-struct get_ref_iface {
-};
+struct get_ref_iface {};
 
 template <typename T, typename Wrap>
     requires with_impl_tt<T>
@@ -2224,8 +2215,7 @@ namespace detail
 {
 
 template <typename>
-struct cfg_from_wrap {
-};
+struct cfg_from_wrap {};
 
 template <typename IFace, auto Cfg>
 struct cfg_from_wrap<wrap<IFace, Cfg>> {
@@ -2277,8 +2267,7 @@ struct tracking_level<tanuki::detail::_tanuki_value_iface<IFace, tanuki::wrap_se
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <tanuki::wrap_semantics Sem>                                                                              \
-    struct guid_defined<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {               \
-    };                                                                                                                 \
+    struct guid_defined<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {};             \
     template <>                                                                                                        \
     inline const char *guid<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>()     \
     {                                                                                                                  \
@@ -2295,8 +2284,7 @@ struct tracking_level<tanuki::detail::_tanuki_value_iface<IFace, tanuki::wrap_se
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <tanuki::wrap_semantics Sem>                                                                              \
-    struct guid_defined<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {               \
-    };                                                                                                                 \
+    struct guid_defined<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {};             \
     template <>                                                                                                        \
     inline const char *guid<tanuki::detail::_tanuki_holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>()     \
     {                                                                                                                  \

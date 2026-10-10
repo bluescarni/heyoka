@@ -56,6 +56,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/sgp4.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
@@ -1068,9 +1069,8 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms) const
     auto par_iter = [out, tms, init_span](cfunc<T> &cf, const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
             // Create the spans for this iteration.
-            const auto out_span
-                = std::experimental::submdspan(out, i, std::experimental::full_extent, std::experimental::full_extent);
-            const auto tm_span = std::experimental::submdspan(tms, i, std::experimental::full_extent);
+            const auto out_span = submdspan(out, i, full_extent, full_extent);
+            const auto tm_span = submdspan(tms, i, full_extent);
 
             // Run the propagation.
             cf(out_span, init_span, kw::time = tm_span);
@@ -1112,7 +1112,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates) const
             oneapi::tbb::blocked_range2d<std::size_t>(0, dates.extent(0), 0, dates.extent(1)),
             [&tms_vec, dates, this, n_sats](const auto &range) {
                 for (auto i = range.rows().begin(); i != range.rows().end(); ++i) {
-                    const auto cur_dates = std::experimental::submdspan(dates, i, std::experimental::full_extent);
+                    const auto cur_dates = submdspan(dates, i, full_extent);
 
                     for (auto j = range.cols().begin(); j != range.cols().end(); ++j) {
                         tms_vec[static_cast<tms_vec_size_t>(i) * n_sats + j] = detail::sgp4_date_to_tdelta(
@@ -1122,7 +1122,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates) const
             });
     } else {
         for (std::size_t i = 0; i < dates.extent(0); ++i) {
-            const auto cur_dates = std::experimental::submdspan(dates, i, std::experimental::full_extent);
+            const auto cur_dates = submdspan(dates, i, full_extent);
 
             for (std::size_t j = 0; j < dates.extent(1); ++j) {
                 tms_vec[static_cast<tms_vec_size_t>(i) * n_sats + j] = detail::sgp4_date_to_tdelta(
