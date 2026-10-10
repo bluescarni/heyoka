@@ -714,6 +714,13 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 if(HEYOKA_BUILD_TESTS)
+    # NOTE: the quick test suite skips the tests marked as LONG in test/CMakeLists.txt.
+    set(HEYOKA_TEST_SUITE "full" CACHE STRING "Test suite to build (quick or full).")
+    set_property(CACHE HEYOKA_TEST_SUITE PROPERTY STRINGS "quick" "full")
+    if(NOT HEYOKA_TEST_SUITE MATCHES "^(quick|full)$")
+        message(FATAL_ERROR "Invalid value '${HEYOKA_TEST_SUITE}' for HEYOKA_TEST_SUITE: it must be either 'quick' or 'full'.")
+    endif()
+    message(STATUS "Test suite: ${HEYOKA_TEST_SUITE}")
     enable_testing()
     add_subdirectory(test)
 endif()
