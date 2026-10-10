@@ -165,12 +165,18 @@ path, etc.). The available configuration options are:
 * ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (off by default),
 * ``HEYOKA_WITH_SLEEF``: enable features relying on the SLEEF library (off by default),
 * ``HEYOKA_BUILD_TESTS``: build the test suite (off by default),
+* ``HEYOKA_TEST_SUITE``: what type of test suite to build (``quick`` or ``full``), relevant
+  only if ``HEYOKA_BUILD_TESTS`` is enabled (``full`` by default),
 * ``HEYOKA_BUILD_BENCHMARKS``: build the benchmarking suite (off by default),
 * ``HEYOKA_BUILD_TUTORIALS``: build the tutorials (off by default),
 * ``HEYOKA_BUILD_STATIC_LIBRARY``: build heyoka as a static library, instead
   of a dynamic library (off by default),
 * ``HEYOKA_ENABLE_IPO``: enable link-time optimisations when building
   the heyoka library (requires compiler support, off by default).
+
+.. versionadded:: 7.14.0
+
+   The ``HEYOKA_TEST_SUITE`` option.
 
 The following advanced options are also available:
 
@@ -221,7 +227,9 @@ with the following command:
 
 .. code-block:: console
 
-   $ cmake  --build . --target test
+   $ ctest -j4
+
+The ``-j4`` option will run up to 4 tests concurrently.
 
 .. note::
 
@@ -229,6 +237,25 @@ with the following command:
    in order to execute the test or the benchmark suite you have to ensure that the
    ``PATH`` variable includes the directory that contains the heyoka
    DLL (otherwise the tests will fail to run).
+
+.. versionadded:: 7.14.0
+
+The test suite can be built in ``quick`` or ``full`` mode via the ``HEYOKA_TEST_SUITE`` CMake option.
+``quick`` mode disables long-running tests, while ``full`` mode builds the entire test suite. The tests that
+download data from the internet are classified as long-running, hence ``quick`` mode does not require network
+access. Long-running tests are tagged with the ``long`` label, so that, in ``full`` mode, one can limit the test
+execution to the ``long`` ones via:
+
+.. code-block:: console
+
+   $ ctest -j4 -L long
+
+Vice versa, one can limit the test execution to the quick tests via:
+
+.. code-block:: console
+
+   $ ctest -j4 -LE long
+
 
 Including heyoka in your project via CMake
 ------------------------------------------
