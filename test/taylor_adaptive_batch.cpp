@@ -207,13 +207,10 @@ TEST_CASE("propagate grid")
                                std::invalid_argument,
                                Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor "
                                        "integrator in batch mode"));
-        REQUIRE_THROWS_MATCHES(ta.propagate_grid({0., 0., 0., 0., 0., std::numeric_limits<double>::infinity(), 0., 0.}),
+        REQUIRE_THROWS_MATCHES(ta.propagate_grid({0., 0., 0., 0., 1., std::numeric_limits<double>::infinity(), 1., 1.}),
                                std::invalid_argument,
                                Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor "
                                        "integrator in batch mode"));
-        REQUIRE_THROWS_MATCHES(ta.propagate_grid({0., 0., 0., 0., 1., 1., -1., 1.}), std::invalid_argument,
-                               Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive "
-                                       "Taylor integrator in batch mode"));
         REQUIRE_THROWS_MATCHES(
             ta.propagate_grid({0., 0., 0., 0., 1., 1., 1., 1., std::numeric_limits<double>::infinity(),
                                std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),

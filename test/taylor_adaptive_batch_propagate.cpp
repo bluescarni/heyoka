@@ -48,10 +48,11 @@ TEST_CASE("grid monotonicity")
                           std::vector{0., 0., 1., 1., 1., 2.},
                           // Repeated later point in batch element 1.
                           std::vector{0., 0., 1., 1., 2., 1.},
-                          // Wrong direction in batch element 1, first two points.
-                          std::vector{0., 0., 1., -1., 2., -2.},
                           // Wrong direction in batch element 1, later points.
-                          std::vector{0., 0., 1., 1., 2., 0.}}) {
+                          std::vector{0., 0., 1., 1., 2., 0.},
+                          // Wrong direction in batch element 1, later points, with the two batch elements going in
+                          // opposite directions.
+                          std::vector{0., 0., 1., -1., 2., 0.}}) {
             for (auto &val : grid) {
                 val *= sign;
             }
@@ -76,6 +77,59 @@ TEST_CASE("grid monotonicity")
     }
 }
 
+// The batch elements can be propagated over grids in different directions. The results for each batch element must
+// match exactly those of a reference propagation in which both batch elements replicate it (so that the reference grid
+// has a single direction).
+TEST_CASE("grid mixed directions")
+{
+    constexpr auto inf = std::numeric_limits<double>::infinity();
+
+    auto [x, v] = make_vars("x", "v");
+
+    const auto make_ta = [x, v](const std::vector<double> &state) {
+        return taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, state, 2};
+    };
+
+    // NOTE: the state is stored as {x0, x1, v0, v1}.
+    const auto state = std::vector{0., .5, 1., .7};
+
+    for (const auto &max_delta_t : {std::vector{inf, inf}, std::vector{0.0123, 0.0071}}) {
+        for (const auto sign : {1., -1.}) {
+            // NOTE: batch element 0 is propagated in the direction of sign, batch element 1 in the opposite direction.
+            // The time coordinates of each grid point are stored contiguously.
+            const auto grid = std::vector{0.,          0.,         sign * .5,   -sign * .3, sign * 1.2,
+                                          -sign * 1.1, sign * 2.7, -sign * 2.4, sign * 5.1, -sign * 4.2};
+
+            auto ta = make_ta(state);
+            const auto out = std::get<1>(ta.propagate_grid(grid, kw::max_delta_t = max_delta_t));
+            for (const auto &res : ta.get_propagate_res()) {
+                REQUIRE(std::get<0>(res) == taylor_outcome::time_limit);
+            }
+            REQUIRE(ta.get_dtime().first == std::vector{sign * 5.1, -sign * 4.2});
+            REQUIRE(ta.get_dtime().second == std::vector{0., 0.});
+
+            for (std::size_t i = 0; i < 2u; ++i) {
+                // Reference integrator and grid in which both batch elements replicate batch element i.
+                auto ta_ref = make_ta({state[i], state[i], state[2u + i], state[2u + i]});
+                std::vector<double> grid_ref;
+                for (std::size_t j = i; j < grid.size(); j += 2u) {
+                    grid_ref.push_back(grid[j]);
+                    grid_ref.push_back(grid[j]);
+                }
+                const auto out_ref
+                    = std::get<1>(ta_ref.propagate_grid(grid_ref, kw::max_delta_t = {max_delta_t[i], max_delta_t[i]}));
+
+                // NOTE: in the output, the values for each batch element are stored at alternating positions.
+                REQUIRE(out_ref.size() == out.size());
+                for (std::size_t j = i; j < out.size(); j += 2u) {
+                    REQUIRE(out[j] == out_ref[j]);
+                }
+                REQUIRE(ta.get_propagate_res()[i] == ta_ref.get_propagate_res()[i]);
+            }
+        }
+    }
+}
+
 // At the end of a successful propagation, the time coordinate of each batch element must be exactly the final time.
 TEST_CASE("snap")
 {
@@ -96,8 +150,8 @@ TEST_CASE("snap")
 
     // NOTE: forward and backward targets, in some cases in different directions for the two batch elements. The last
     // targets bring the time coordinates back to zero.
-    const auto targets = std::vector<std::vector<double>>{{1.1, -2.3}, {10.3, 7.1}, {-0.7, 7.9},
-                                                          {-12.9, -0.3}, {3.3, -5.5}, {0., 0.}};
+    const auto targets
+        = std::vector<std::vector<double>>{{1.1, -2.3}, {10.3, 7.1}, {-0.7, 7.9}, {-12.9, -0.3}, {3.3, -5.5}, {0., 0.}};
 
     for (const auto &max_delta_t : {std::vector{inf, inf}, std::vector{0.0123, 0.0071}}) {
         // propagate_until().
@@ -107,11 +161,11 @@ TEST_CASE("snap")
         }
 
         // propagate_for(), back and forth from zero.
-        for (const auto &[delta_t, t] : std::vector<std::pair<std::vector<double>, std::vector<double>>>{
-                 {{1.1, -12.9}, {1.1, -12.9}},
-                 {{-1.1, 12.9}, {0., 0.}},
-                 {{-12.9, 1.1}, {-12.9, 1.1}},
-                 {{12.9, -1.1}, {0., 0.}}}) {
+        for (const auto &[delta_t, t] :
+             std::vector<std::pair<std::vector<double>, std::vector<double>>>{{{1.1, -12.9}, {1.1, -12.9}},
+                                                                              {{-1.1, 12.9}, {0., 0.}},
+                                                                              {{-12.9, 1.1}, {-12.9, 1.1}},
+                                                                              {{12.9, -1.1}, {0., 0.}}}) {
             ta.propagate_for(delta_t, kw::max_delta_t = max_delta_t);
             check(t);
         }
@@ -323,9 +377,8 @@ TEST_CASE("max_steps interruption")
 
     auto [x, v] = make_vars("x", "v");
 
-    const auto make_ta = [x, v]() {
-        return taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., .5, 1., .7}, 2};
-    };
+    const auto make_ta
+        = [x, v]() { return taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., .5, 1., .7}, 2}; };
 
     auto n_cb_calls = 0u;
     const auto cb = [&n_cb_calls](auto &) {
@@ -351,8 +404,8 @@ TEST_CASE("max_steps interruption")
             // Interrupted propagation.
             auto ta = make_ta();
             n_cb_calls = 0;
-            const auto c_out = std::get<0>(
-                ta.propagate_until(t_final, kw::max_steps = 3u, kw::callback = cb, kw::c_output = true));
+            const auto c_out
+                = std::get<0>(ta.propagate_until(t_final, kw::max_steps = 3u, kw::callback = cb, kw::c_output = true));
             for (const auto &res : ta.get_propagate_res()) {
                 REQUIRE(std::get<0>(res) == taylor_outcome::step_limit);
                 REQUIRE(std::get<3>(res) == 3u);
@@ -463,9 +516,9 @@ TEST_CASE("max_steps interruption")
             auto ta = make_ta();
             ta.set_dtime({sign * 1., sign * 1.}, {sign * 1e-17, -sign * 1e-17});
             n_cb_calls = 0;
-            const auto out = std::get<1>(ta.propagate_grid({sign * 1., sign * 1., sign * 2., sign * 2.},
-                                                           kw::max_steps = 3u, kw::max_delta_t = {3e-18, 3e-18},
-                                                           kw::callback = cb));
+            const auto out
+                = std::get<1>(ta.propagate_grid({sign * 1., sign * 1., sign * 2., sign * 2.}, kw::max_steps = 3u,
+                                                kw::max_delta_t = {3e-18, 3e-18}, kw::callback = cb));
             for (const auto &res : ta.get_propagate_res()) {
                 REQUIRE(res == std::tuple{taylor_outcome::step_limit, inf, 0., std::size_t(0)});
             }
@@ -482,9 +535,8 @@ TEST_CASE("callback last step")
 {
     auto [x, v] = make_vars("x", "v");
 
-    const auto make_ta = [x, v]() {
-        return taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., .5, 1., .7}, 2};
-    };
+    const auto make_ta
+        = [x, v]() { return taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., .5, 1., .7}, 2}; };
 
     for (const auto sign : {1., -1.}) {
         std::vector<double> t_final;
@@ -546,8 +598,8 @@ TEST_CASE("callback last step")
 }
 
 // A grid point which coincides with the end of a step belongs to the next step. Thus, if the propagation is interrupted
-// at the end of that step, the grid point is not processed, and the propagation can be resumed with a grid starting from
-// that point.
+// at the end of that step, the grid point is not processed, and the propagation can be resumed with a grid starting
+// from that point.
 TEST_CASE("grid interruption at step end")
 {
     auto x = make_vars("x");
@@ -564,9 +616,9 @@ TEST_CASE("grid interruption at step end")
 
         // Interrupt after 2 steps, that is, at the grid points sign * 0.5 (batch element 0) and sign * 0.25 (batch
         // element 1).
-        auto out = std::get<1>(ta.propagate_grid({0., 0., sign * .25, sign * .125, sign * .5, sign * .25, sign * .75,
-                                                  sign * .375, sign * 1., sign * .5},
-                                                 kw::max_delta_t = {.25, .125}, kw::max_steps = 2u));
+        auto out = std::get<1>(ta.propagate_grid(
+            {0., 0., sign * .25, sign * .125, sign * .5, sign * .25, sign * .75, sign * .375, sign * 1., sign * .5},
+            kw::max_delta_t = {.25, .125}, kw::max_steps = 2u));
         for (const auto &res : ta.get_propagate_res()) {
             REQUIRE(std::get<0>(res) == taylor_outcome::step_limit);
         }
@@ -592,9 +644,9 @@ TEST_CASE("terminal event max_steps")
     auto x = make_vars("x");
 
     for (const auto sign : {1., -1.}) {
-        // NOTE: with x' = 1 and max_delta_t = 0.25, the stopping terminal event triggers at t = sign * 0.6, in the third
-        // step, for batch element 0 (x(0) = 0). It never triggers for batch element 1 (x(0) = sign), which is propagated
-        // up to t = sign * 1 (4 steps).
+        // NOTE: with x' = 1 and max_delta_t = 0.25, the stopping terminal event triggers at t = sign * 0.6, in the
+        // third step, for batch element 0 (x(0) = 0). It never triggers for batch element 1 (x(0) = sign), which is
+        // propagated up to t = sign * 1 (4 steps).
         const auto make_ta = [x, sign]() {
             return taylor_adaptive_batch<double>{
                 {prime(x) = 1_dbl}, {0., sign}, 2, kw::t_events = {t_event_batch<double>(x - sign * 0.6)}};
@@ -639,8 +691,8 @@ TEST_CASE("terminal event max_steps")
 }
 
 // Continuous output in which a batch element is propagated backward, while the time coordinate of the other batch
-// element does not change. In the screen output, the latter must be reported as forward, consistently with the direction
-// used internally. The evaluation must work for both batch elements, inside and outside their time ranges.
+// element does not change. In the screen output, the latter must be reported as forward, consistently with the
+// direction used internally. The evaluation must work for both batch elements, inside and outside their time ranges.
 TEST_CASE("c_out zero direction")
 {
     auto [x, v] = make_vars("x", "v");

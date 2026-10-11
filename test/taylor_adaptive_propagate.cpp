@@ -399,8 +399,8 @@ TEST_CASE("callback last step")
 }
 
 // A grid point which coincides with the end of a step belongs to the next step. Thus, if the propagation is interrupted
-// at the end of that step, the grid point is not processed, and the propagation can be resumed with a grid starting from
-// that point.
+// at the end of that step, the grid point is not processed, and the propagation can be resumed with a grid starting
+// from that point.
 TEST_CASE("grid interruption at step end")
 {
     auto x = make_vars("x");
@@ -441,9 +441,9 @@ TEST_CASE("terminal event max_steps")
 
         // NOTE: each tuple contains max_steps, the expected outcome, the expected number of steps and the expected
         // size of the output of propagate_grid().
-        for (const auto &[max_steps, oc, n_steps, out_size] : {std::tuple{2u, taylor_outcome::step_limit, 2u, 2u},
-                                                               std::tuple{3u, taylor_outcome{-1}, 3u, 4u},
-                                                               std::tuple{4u, taylor_outcome{-1}, 3u, 4u}}) {
+        for (const auto &[max_steps, oc, n_steps, out_size] :
+             {std::tuple{2u, taylor_outcome::step_limit, 2u, 2u}, std::tuple{3u, taylor_outcome{-1}, 3u, 4u},
+              std::tuple{4u, taylor_outcome{-1}, 3u, 4u}}) {
             // propagate_until().
             auto ta = make_ta();
             const auto res = ta.propagate_until(sign * 1., kw::max_delta_t = 0.25, kw::max_steps = max_steps);
