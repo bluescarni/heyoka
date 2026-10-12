@@ -791,23 +791,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
         // integrator in a half-baked state.
 
-        // We now have to post-process the list of detected events, which are unordered and may contain duplicates. We
-        // begin by introducing a function object that compares detected events first by the absolute value of the event
-        // trigger time (so that events closer to the beginning of the timestep come first) and then, as a tie breaker,
-        // by the event index.
-        //
-        // NOTE: the time coordinates in m_d_(n)tes are relative to the beginning of the timestep. They will be negative
-        // for backward integration, hence the use of abs(). The checks inside edd.detect_events() ensure that we can
-        // safely sort the events' times.
-        constexpr auto cmp = [](const auto &ev0, const auto &ev1) {
-            const auto c = detail::cmp_abs(std::get<1>(ev0), std::get<1>(ev1));
-            if (c != 0) {
-                return c < 0;
-            }
-
-            return std::get<0>(ev0) < std::get<0>(ev1);
-        };
-
+        // We now have to post-process the list of detected events, which are unordered and may contain duplicates.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // For terminal events, we are interested only in the first event triggering in chronological order. It will
             // be placed at the first position of edd.m_d_tes[i]. Duplicates are irrelevant here, as only the first
@@ -816,7 +800,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index
             // takes precedence.
             if (!edd.m_d_tes[i].empty()) {
-                const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], cmp);
+                const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], detail::taylor_ev_cmp);
                 std::iter_swap(earliest_it, edd.m_d_tes[i].begin());
             }
 
@@ -824,13 +808,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             if (!edd.m_d_ntes[i].empty()) {
                 // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index
                 // and same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
-                std::ranges::sort(edd.m_d_ntes[i], cmp);
+                std::ranges::sort(edd.m_d_ntes[i], detail::taylor_ev_cmp);
 
                 // Remove duplicates.
-                constexpr auto eq = [](const auto &ev0, const auto &ev1) {
-                    return std::get<0>(ev0) == std::get<0>(ev1) && std::get<1>(ev0) == std::get<1>(ev1);
-                };
-                edd.m_d_ntes[i].erase(std::unique(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), eq),
+                edd.m_d_ntes[i].erase(std::unique(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), detail::taylor_ev_eq),
                                       edd.m_d_ntes[i].end());
             }
 
@@ -843,19 +824,19 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
-        // We will use this to capture exceptions thrown while
-        // executing callbacks.
+        // We will use this to capture exceptions thrown while executing callbacks.
         std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
 
         // Make a copy of the current times before invoking the callbacks, so that:
+        //
         // - we can notice if the callbacks change the time coordinate, and,
-        // - if they do, we will use the original time coordinate in the
-        //   time update logic, rather than the (wrong) time coordinate
-        //   that a callback invocation might set.
-        // In other words, m_time_copy will end up containing the correctly-updated
-        // time coordinate, while m_time is subject to arbitrary changes via callbacks.
-        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
-        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+        // - if they do, we will use the original time coordinate in the time update logic, rather than the (wrong) time
+        //   coordinate that a callback invocation might set.
+        //
+        // In other words, m_time_copy will end up containing the correctly-updated time coordinate, while m_time is
+        // subject to arbitrary changes via callbacks.
+        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
         // Run the finiteness check on the state vector
         // *before* executing the callbacks, as the execution of
@@ -916,11 +897,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // of *all* the non-terminal events. Otherwise, we need to figure
             // out which non-terminal events do not happen because their time
             // coordinate is past the the first terminal event.
-            const auto ntes_end_it
-                = edd.m_d_tes[i].empty()
-                      ? edd.m_d_ntes[i].end()
-                      : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
-                                         [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+            const auto ntes_end_it = edd.m_d_tes[i].empty()
+                                         ? edd.m_d_ntes[i].end()
+                                         : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
+                                                            [](const auto &ev, const auto &t) {
+                                                                return detail::cmp_abs(std::get<1>(ev), t) < 0;
+                                                            });
 
             // Flag to signal that the callback of a non-terminal event threw
             // an exception.

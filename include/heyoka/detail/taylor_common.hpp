@@ -191,26 +191,6 @@ std::uint32_t taylor_order_from_tol(const T &tol)
     return static_cast<std::uint32_t>(order_f);
 }
 
-// Small helper to compare the absolute
-// values of two input values.
-template <typename T>
-bool abs_lt(const T &a, const T &b)
-{
-    using std::abs;
-
-    return abs(a) < abs(b);
-}
-
-#if defined(HEYOKA_HAVE_REAL)
-
-template <>
-inline bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
-{
-    return mppp::cmpabs(a, b) < 0;
-}
-
-#endif
-
 // Three-way comparison of the absolute values of a and b.
 template <typename T>
 std::partial_ordering cmp_abs(const T &a, const T &b)
@@ -228,6 +208,29 @@ inline std::partial_ordering cmp_abs<mppp::real>(const mppp::real &a, const mppp
 }
 
 #endif
+
+// A function object that compares detected events in Taylor integrators first by the absolute value of the event
+// trigger time (so that events closer to the beginning of the timestep come first) and then, as a tie breaker, by the
+// event index.
+//
+// NOTE: the time coordinates in the vectors of detected events are relative to the beginning of the timestep. They will
+// be negative for backward integration, hence the use of abs(). The checks inside the event detection function ensure
+// that we can safely compare the events' times.
+inline constexpr auto taylor_ev_cmp = [](const auto &ev0, const auto &ev1) {
+    const auto c = cmp_abs(std::get<1>(ev0), std::get<1>(ev1));
+    if (c != 0) {
+        return c < 0;
+    }
+
+    return std::get<0>(ev0) < std::get<0>(ev1);
+};
+
+// A function object that compares for equality detected events in Taylor integrators.
+//
+// Two detected events are considered equal if both their indices and trigger times are identical.
+inline constexpr auto taylor_ev_eq = [](const auto &ev0, const auto &ev1) {
+    return (std::get<0>(ev0) == std::get<0>(ev1)) && (std::get<1>(ev0) == std::get<1>(ev1));
+};
 
 // Custom equality comparison that considers all NaN values equal.
 template <typename T>

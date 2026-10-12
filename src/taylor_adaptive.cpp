@@ -864,30 +864,14 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
         // integrator in a half-baked state.
 
-        // We now have to post-process the list of detected events, which are unordered and may contain duplicates. We
-        // begin by introducing a function object that compares detected events first by the absolute value of the event
-        // trigger time (so that events closer to the beginning of the timestep come first) and then, as a tie breaker,
-        // by the event index.
-        //
-        // NOTE: the time coordinates in m_d_(n)tes are relative to the beginning of the timestep. They will be negative
-        // for backward integration, hence the use of abs(). The checks inside edd.detect_events() ensure that we can
-        // safely sort the events' times.
-        constexpr auto cmp = [](const auto &ev0, const auto &ev1) {
-            const auto c = detail::cmp_abs(std::get<1>(ev0), std::get<1>(ev1));
-            if (c != 0) {
-                return c < 0;
-            }
-
-            return std::get<0>(ev0) < std::get<0>(ev1);
-        };
-
-        // For terminal events, we are interested only in the first event triggering in chronological order. It will be
+        // We now have to post-process the list of detected events, which are unordered and may contain duplicates. For
+        // terminal events, we are interested only in the first event triggering in chronological order. It will be
         // placed at the first position of edd.m_d_tes. Duplicates are irrelevant here, as only the first event is used.
         //
         // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index takes
         // precedence.
         if (!edd.m_d_tes.empty()) {
-            const auto earliest_it = std::ranges::min_element(edd.m_d_tes, cmp);
+            const auto earliest_it = std::ranges::min_element(edd.m_d_tes, detail::taylor_ev_cmp);
             std::iter_swap(earliest_it, edd.m_d_tes.begin());
         }
 
@@ -895,13 +879,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         if (!edd.m_d_ntes.empty()) {
             // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index and
             // same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
-            std::ranges::sort(edd.m_d_ntes, cmp);
+            std::ranges::sort(edd.m_d_ntes, detail::taylor_ev_cmp);
 
             // Remove duplicates.
-            constexpr auto eq = [](const auto &ev0, const auto &ev1) {
-                return std::get<0>(ev0) == std::get<0>(ev1) && std::get<1>(ev0) == std::get<1>(ev1);
-            };
-            edd.m_d_ntes.erase(std::unique(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), eq), edd.m_d_ntes.end());
+            edd.m_d_ntes.erase(std::unique(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), detail::taylor_ev_eq),
+                               edd.m_d_ntes.end());
         }
 
         // If we have terminal events we need to update the value of h.
@@ -961,8 +943,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         const auto ntes_end_it
             = edd.m_d_tes.empty()
                   ? edd.m_d_ntes.end()
-                  : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h,
-                                     [](const auto &ev, const auto &t) { return detail::abs_lt(std::get<1>(ev), t); });
+                  : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h, [](const auto &ev, const auto &t) {
+                        return detail::cmp_abs(std::get<1>(ev), t) < 0;
+                    });
 
         // Store the time coordinate before invoking the callbacks.
         const auto new_time = m_time;
