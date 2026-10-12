@@ -124,15 +124,6 @@ std::uint64_t num_digits_of([[maybe_unused]] const T &x)
 #endif
 }
 
-// NOTE: MSVC has a bug in which using declarations from an enclosing function scope are not visible inside nested
-// generic lambda bodies. This wrapper works around the issue for isfinite().
-template <typename T>
-bool adl_isfinite(const T &x)
-{
-    using std::isfinite;
-    return isfinite(x);
-}
-
 // LCOV_EXCL_START
 
 #if defined(HEYOKA_HAVE_STRERROR_R)
@@ -1194,7 +1185,7 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
             const auto add_d_event = [&](T root) {
                 // NOTE: we do one last check on the root in order to avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
-                if (!adl_isfinite(root)) [[unlikely]] {
+                if (!isfinite(root)) [[unlikely]] {
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
                                        fp_to_string(root));
@@ -1227,7 +1218,7 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
                 const auto der = poly_eval_1(ptr, root, order);
 
                 // Check it before proceeding.
-                if (!adl_isfinite(der)) [[unlikely]] {
+                if (!isfinite(der)) [[unlikely]] {
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
                                        "skipping the event",
@@ -1352,7 +1343,7 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
                 // detected.
                 bool root_at_lb = false;
                 if (tmp.v[0] == 0 && std::ranges::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order, [](const auto &x) {
-                        return adl_isfinite(x);
+                        return isfinite(x);
                     })) {
                     root_at_lb = true;
 
@@ -1897,7 +1888,7 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                 const auto add_d_event = [&](T root) {
                     // NOTE: we do one last check on the root in order to avoid non-finite event times. This guarantees
                     // that sorting the events by time is safe.
-                    if (!adl_isfinite(root)) [[unlikely]] {
+                    if (!isfinite(root)) [[unlikely]] {
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced a non-finite root of {} at the batch "
                                            "index {} - skipping the event",
@@ -1932,7 +1923,7 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                     const auto der = poly_eval_1(ptr, root, order);
 
                     // Check it before proceeding.
-                    if (!adl_isfinite(der)) [[unlikely]] {
+                    if (!isfinite(der)) [[unlikely]] {
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} "
                                            "at the batch index {} - skipping the event",
@@ -2047,7 +2038,7 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                     bool root_at_lb = false;
                     if (tmp.v[0] == 0
                         && std::ranges::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
-                                               [](const auto &x) { return adl_isfinite(x); })) {
+                                               [](const auto &x) { return isfinite(x); })) {
                         root_at_lb = true;
 
                         // NOTE: we will have to skip the event if we are dealing with a terminal event on cooldown and
