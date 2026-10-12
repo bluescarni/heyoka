@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <compare>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -206,6 +207,24 @@ template <>
 inline bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
 {
     return mppp::cmpabs(a, b) < 0;
+}
+
+#endif
+
+// Three-way comparison of the absolute values of a and b.
+template <typename T>
+std::partial_ordering cmp_abs(const T &a, const T &b)
+{
+    using std::abs;
+    return std::compare_partial_order_fallback(abs(a), abs(b));
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+inline std::partial_ordering cmp_abs<mppp::real>(const mppp::real &a, const mppp::real &b)
+{
+    return mppp::cmpabs(a, b) <=> 0;
 }
 
 #endif

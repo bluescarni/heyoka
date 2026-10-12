@@ -787,28 +787,54 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // Do the event detection.
         edd.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
 
-        // NOTE: before this point, we did not alter
-        // any user-visible data in the integrator (just
-        // temporary memory). From here until we start invoking
-        // the callbacks, everything is noexcept, so we don't
-        // risk leaving the integrator in a half-baked state.
+        // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary memory).
+        // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
+        // integrator in a half-baked state.
 
-        // Sort the events by time.
-        // NOTE: the time coordinates in m_d_(n)tes is relative
-        // to the beginning of the timestep. It will be negative
-        // for backward integration, thus we compare using
-        // abs() so that the first events are those which
-        // happen closer to the beginning of the timestep.
-        // NOTE: the checks inside edd.detect_events() ensure
-        // that we can safely sort the events' times.
+        // We now have to post-process the list of detected events, which are unordered and may contain duplicates. We
+        // begin by introducing a function object that compares detected events first by the absolute value of the event
+        // trigger time (so that events closer to the beginning of the timestep come first) and then, as a tie breaker,
+        // by the event index.
+        //
+        // NOTE: the time coordinates in m_d_(n)tes are relative to the beginning of the timestep. They will be negative
+        // for backward integration, hence the use of abs(). The checks inside edd.detect_events() ensure that we can
+        // safely sort the events' times.
+        constexpr auto cmp = [](const auto &ev0, const auto &ev1) {
+            const auto c = detail::cmp_abs(std::get<1>(ev0), std::get<1>(ev1));
+            if (c != 0) {
+                return c < 0;
+            }
+
+            return std::get<0>(ev0) < std::get<0>(ev1);
+        };
+
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto cmp
-                = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
-            std::sort(edd.m_d_tes[i].begin(), edd.m_d_tes[i].end(), cmp);
-            std::sort(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), cmp);
+            // For terminal events, we are interested only in the first event triggering in chronological order. It will
+            // be placed at the first position of edd.m_d_tes[i]. Duplicates are irrelevant here, as only the first
+            // event is used.
+            //
+            // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index
+            // takes precedence.
+            if (!edd.m_d_tes[i].empty()) {
+                const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], cmp);
+                std::iter_swap(earliest_it, edd.m_d_tes[i].begin());
+            }
 
-            // If we have terminal events we need
-            // to update the value of h.
+            // For non-terminal events, we want to sort the detected events and remove duplicates.
+            if (!edd.m_d_ntes[i].empty()) {
+                // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index
+                // and same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
+                std::ranges::sort(edd.m_d_ntes[i], cmp);
+
+                // Remove duplicates.
+                constexpr auto eq = [](const auto &ev0, const auto &ev1) {
+                    return std::get<0>(ev0) == std::get<0>(ev1) && std::get<1>(ev0) == std::get<1>(ev1);
+                };
+                edd.m_d_ntes[i].erase(std::unique(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), eq),
+                                      edd.m_d_ntes[i].end());
+            }
+
+            // If we have terminal events we need to update the value of h.
             if (!edd.m_d_tes[i].empty()) {
                 m_delta_ts[i] = std::get<1>(edd.m_d_tes[i][0]);
             }
