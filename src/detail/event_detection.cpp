@@ -601,7 +601,7 @@ void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32
     // The minimum width (in the [0, 1) range of the timestep) of the intervals that can be bisected in the real-root
     // isolation algorithm. Intervals narrower than this that would need further bisection are dropped.
     //
-    // NOTE: roots closer to each other than eps (in the [0, 1) range of the timestep) cannot be meaningfully separated.
+    // NOTE: roots closer to each other than eps (in the [0, 1) range of the timestep) cannot be meaningfully separated.
     // Additionally, because intervals are bisected only if their width is at least eps, all interval bounds are
     // multiples of 2**-digits in [0, 1], which are exactly representable. Thus, the bounds and their midpoints are
     // computed exactly.
@@ -643,7 +643,7 @@ void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32
             // [0, h) range.
             //
             // NOTE: root cannot exit the [0, h) range from the other side, because all interval bounds in the rescaled
-            // [0, 1) range are non-negative and root finding never moves outside the isolating intervals.
+            // [0, 1) range are non-negative and root finding never moves outside the isolating intervals.
             get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
                                "value, than the integration timestep {}",
                                fp_to_string(root), fp_to_string(h));
