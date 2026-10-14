@@ -411,7 +411,7 @@ template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<mppp::real>(llvm_
 
 #endif
 
-// Fetch the external llvm type corresponding to the input external llvm type.
+// Fetch the external llvm type corresponding to the input internal llvm type.
 llvm::Type *make_external_llvm_type(llvm::Type *fp_t)
 {
     if (fp_t->isFloatingPointTy() || fp_t->isIntegerTy()) {
