@@ -81,6 +81,8 @@ HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::
                                                        const std::vector<llvm::Value *> &);
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
                                                        const std::vector<llvm::Value *> &, const llvm::AttributeList &);
+llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &, const std::vector<llvm::Type *> &,
+                                      const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
 
