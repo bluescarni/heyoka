@@ -936,10 +936,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
         }
 
-        // If we don't have terminal events, we will invoke the callbacks
-        // of *all* the non-terminal events. Otherwise, we need to figure
-        // out which non-terminal events do not happen because their time
-        // coordinate is past the the first terminal event.
+        // If we don't have terminal events, we will invoke the callbacks of *all* the non-terminal events. Otherwise,
+        // we need to figure out which non-terminal events do not happen because their time coordinate is at or after
+        // the first terminal event.
         const auto ntes_end_it
             = edd.m_d_tes.empty()
                   ? edd.m_d_ntes.end()

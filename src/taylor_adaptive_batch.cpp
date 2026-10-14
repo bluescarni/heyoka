@@ -893,10 +893,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 }
             }
 
-            // If we don't have terminal events, we will invoke the callbacks
-            // of *all* the non-terminal events. Otherwise, we need to figure
-            // out which non-terminal events do not happen because their time
-            // coordinate is past the the first terminal event.
+            // If we don't have terminal events, we will invoke the callbacks of *all* the non-terminal events.
+            // Otherwise, we need to figure out which non-terminal events do not happen because their time coordinate is
+            // at or after the first terminal event.
             const auto ntes_end_it = edd.m_d_tes[i].empty()
                                          ? edd.m_d_ntes[i].end()
                                          : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
