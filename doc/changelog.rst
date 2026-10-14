@@ -20,6 +20,9 @@ New
 Changes
 ~~~~~~~
 
+- Events triggering at exactly the same time are now guaranteed to be processed in increasing order
+  of their index
+  (`#559 <https://github.com/bluescarni/heyoka/pull/559>`__).
 - Update the bundled copy of :cpp:type:`~heyoka::mdspan`
   (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
 - The time-limited propagation functions now guarantee that, at the end of a successful propagation,

@@ -212,6 +212,8 @@ Multiple events
 When multiple events trigger within the same timestep (or if the same event triggers
 multiple times), heyoka will process the events in chronological order
 (or reverse chronological order when integrating backwards in time).
+Events triggering at exactly the same time are processed in increasing order of their index
+(i.e., their position in the list of terminal or non-terminal events passed to the integrator's constructor).
 
 Let us demonstrate this with another example with the simple pendulum.
 We will now aim to detect two events defined by the equations:
@@ -292,8 +294,9 @@ It is important to understand how heyoka reacts to terminal events. At every int
 performs event detection for both terminal and non-terminal events. If one or more terminal events
 are detected, heyoka will sort the detected terminal events by time and will select the first
 terminal event triggering in chronological order (or reverse chronological order when integrating
-backwards in time). All the other terminal events and all the non-terminal events triggering *after*
-the first terminal event are discarded. heyoka then propagates the state of the system up to the
+backwards in time). If multiple terminal events trigger at exactly the same time, the one with the
+lowest index is selected. All the other terminal events and all the non-terminal events triggering
+*at or after* the first terminal event are discarded. heyoka then propagates the state of the system up to the
 trigger time of the first terminal event, executes the callbacks of the surviving non-terminal events
 in chronological order and finally executes the callback of the first terminal event (if provided).
 

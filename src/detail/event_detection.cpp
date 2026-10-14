@@ -109,13 +109,19 @@ namespace detail
 namespace
 {
 
-// NOTE: MSVC has a bug in which using declarations from an enclosing function scope are not visible inside nested
-// generic lambda bodies. This wrapper works around the issue for isfinite().
+// Helper to fetch the number of binary digits in the significand of x.
 template <typename T>
-bool adl_isfinite(const T &x)
+std::uint64_t num_digits_of([[maybe_unused]] const T &x)
 {
-    using std::isfinite;
-    return isfinite(x);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::same_as<T, mppp::real>) {
+        return boost::numeric_cast<std::uint64_t>(x.get_prec());
+    } else {
+#endif
+        return boost::numeric_cast<std::uint64_t>(std::numeric_limits<T>::digits);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 // LCOV_EXCL_START
@@ -401,12 +407,10 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
 
 // Helper to detect events of terminal type.
 template <typename>
-struct is_terminal_event : std::false_type {
-};
+struct is_terminal_event : std::false_type {};
 
 template <typename T, bool B>
-struct is_terminal_event<t_event_impl<T, B>> : std::true_type {
-};
+struct is_terminal_event<t_event_impl<T, B>> : std::true_type {};
 
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
@@ -556,6 +560,422 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 
         return 0;
         // LCOV_EXCL_STOP
+    }
+}
+
+// Helper to factor out common event detection code in the scalar and batch implementations.
+//
+// h is the integration timestep (assumed finite and nonzero). ptr is a pointer to the Taylor polynomial for the event,
+// whose order is 'order'. It must point to a scalar polynomial with order + 1 contiguous coefficients. poly_cache is
+// the polynomial cache. rtscc and pt are, respectively, the sign changes counting and polynomial translation functions.
+// back_int is a flag that will be 1 if the integration is backwards in time, 0 otherwise (it must be consistent with
+// the sign of h). isol is the list of isolating intervals. wlist the working list. out is the output vector for the
+// detected events. ev_vec is the vector of events. ev_idx is the index of the event being detected in ev_vec.
+// te_cooldowns is the vector of cooldowns for terminal events, relevant only if Event is a terminal event type. tmp,
+// tmp1 and tmp2 are temporary polynomials used in the bisection loop. poly_init is the value that will be used to
+// initialise the coefficients of newly-created polynomials in the caches.
+//
+// This function will detect the trigger time(s) of the event at index ev_idx in ev_vec and append the detected events
+// (possibly including duplicates) to the output vector out.
+template <typename T, typename Event>
+void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32_t order,
+                               taylor_poly_cache<T> &poly_cache, auto *const rtscc, auto *const pt,
+                               const std::uint32_t back_int, auto &isol, auto &wlist, auto &out,
+                               const std::vector<Event> &ev_vec, const std::uint32_t ev_idx,
+                               [[maybe_unused]] const auto &te_cooldowns, taylor_pwrap<T> &tmp, taylor_pwrap<T> &tmp1,
+                               taylor_pwrap<T> &tmp2, const T &poly_init)
+{
+    using std::abs;
+    using std::isfinite;
+    using std::nextafter;
+
+    assert(ptr != nullptr);
+    assert(order >= 2u);
+    assert(rtscc != nullptr);
+    assert(pt != nullptr);
+    assert(isfinite(h));
+    assert(h != 0);
+    assert((h < 0) == back_int);
+    assert(ev_idx < ev_vec.size());
+
+    // The minimum width (in the [0, 1) range of the timestep) of the intervals that can be bisected in the real-root
+    // isolation algorithm. Intervals narrower than this that would need further bisection are dropped.
+    //
+    // NOTE: roots closer to each other than eps (in the [0, 1) range of the timestep) cannot be meaningfully separated.
+    // Additionally, because intervals are bisected only if their width is at least eps, all interval bounds are
+    // multiples of 2**-digits in [0, 1], which are exactly representable. Thus, the bounds and their midpoints are
+    // computed exactly.
+    const auto min_width = num_eps_like(h);
+
+    // The maximum number of iterations in the real-root isolation algorithm.
+    //
+    // NOTE: due to min_width, the bisection depth is at most the number of binary digits in the significand of h. For
+    // a well-behaved polynomial, at most order intervals are processed at each depth level. We add a safety factor
+    // of 2.
+    const std::uint64_t max_iter = (boost::safe_numerics::safe<std::uint64_t>(num_digits_of(h)) + 1u) * order * 2u;
+
+    // Clear out the list of isolating intervals.
+    isol.clear();
+
+    // Reset the working list.
+    wlist.clear();
+
+    // Helper to add a detected event to out.
+    //
+    // NOTE: the root here is expected to be already rescaled to the [0, h) range.
+    const auto add_d_event = [&](T root) {
+        // NOTE: we do one last check on the root in order to avoid non-finite event times. This guarantees that sorting
+        // the events by time is safe.
+        if (!isfinite(root)) [[unlikely]] {
+            // LCOV_EXCL_START
+            get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
+                               fp_to_string(root));
+            return;
+            // LCOV_EXCL_STOP
+        }
+
+        if (abs(root) >= abs(h)) [[unlikely]] {
+            // LCOV_EXCL_START
+
+            // NOTE: although event detection nominally happens in the [0, h) range, due to floating-point rounding we
+            // may end up detecting an abs(root) >= abs(h) in corner cases. If that happens, let us clamp root to be
+            // strictly < h in absolute value in order to respect the guarantee that events are always detected in the
+            // [0, h) range.
+            //
+            // NOTE: root cannot exit the [0, h) range from the other side, because all interval bounds in the rescaled
+            // [0, 1) range are non-negative and root finding never moves outside the isolating intervals.
+            get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
+                               "value, than the integration timestep {}",
+                               fp_to_string(root), fp_to_string(h));
+
+            root = nextafter(h, static_cast<T>(0));
+
+            // LCOV_EXCL_STOP
+        }
+
+        // Evaluate the derivative.
+        const auto der = poly_eval_1(ptr, root, order);
+
+        // Check it before proceeding.
+        if (!isfinite(der)) [[unlikely]] {
+            // LCOV_EXCL_START
+            get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
+                               "skipping the event",
+                               fp_to_string(root), fp_to_string(der));
+            return;
+            // LCOV_EXCL_STOP
+        }
+
+        // Compute the sign of the derivative.
+        const auto d_sgn = detail::sgn(der);
+
+        // Fetch and cache the desired event direction.
+        const auto dir = ev_vec[ev_idx].get_direction();
+
+        // The event must be added if the event direction does not matter, or if it matches the sign of the
+        // derivative.
+        if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
+            if constexpr (is_terminal_event_v<Event>) {
+                out.emplace_back(ev_idx, std::move(root), d_sgn, abs(der));
+            } else {
+                out.emplace_back(ev_idx, std::move(root), d_sgn);
+            }
+        }
+    };
+
+    // NOTE: if we are dealing with a terminal event on cooldown, we will need to ignore roots within the cooldown
+    // period. lb_offset is the end of the cooldown in the [0, 1) range of the whole step.
+    const auto lb_offset = [&] {
+        if constexpr (is_terminal_event_v<Event>) {
+            if (te_cooldowns[ev_idx]) {
+                // NOTE: need to distinguish between forward and backward integration.
+                //
+                // NOTE: the division by abs(h) will ensure that, in case of mppp::real, the result is computed
+                // in a precision no less than h's.
+                //
+                // NOTE: the cooldown values are finite with |first| < second, thus the numerators are finite and
+                // non-negative. In these two computations, the worst outcome is the generation of a positive infinity
+                // (via overflow), which is correctly handled below.
+                if (back_int == 0u) {
+                    return (te_cooldowns[ev_idx]->second - te_cooldowns[ev_idx]->first) / abs(h);
+                } else {
+                    return (te_cooldowns[ev_idx]->second + te_cooldowns[ev_idx]->first) / abs(h);
+                }
+            }
+        }
+
+        // NOTE: we end up here if the event is not terminal or not on cooldown.
+        //
+        // NOTE: ensure this is inited properly, precision-wise.
+        return num_zero_like(h);
+    }();
+
+    if (lb_offset >= 1) {
+        // LCOV_EXCL_START
+
+        // NOTE: the whole integration range is in the cooldown range, move to the next event.
+        SPDLOG_LOGGER_DEBUG(
+            get_logger(),
+            "the integration timestep falls within the cooldown range for the terminal event {}, skipping", ev_idx);
+        return;
+
+        // LCOV_EXCL_STOP
+    }
+
+    // Rescale the event polynomial so that the range [0, h) becomes [0, 1), and write the resulting polynomial into
+    // tmp.
+    //
+    // NOTE: tmp has been constructed correctly outside this function. Below, tmp will first be moved into wlist (thus
+    // rendering it invalid) but it will immediately be revived at the first iteration of the do/while loop. Thus, tmp
+    // is in a well-formed state on exit.
+    assert(!tmp.v.empty());
+    assert(tmp.v.size() - 1u == order);
+    poly_rescale(tmp.v.data(), ptr, h, order);
+
+    // Place the first element in the working list.
+    //
+    // NOTE: it's important that the initial bounds are created with the appropriate precision, in case of mppp::real.
+    // Otherwise, we risk of running the bisection at 32 bits of precision.
+    wlist.emplace_back(num_zero_like(h), num_one_like(h), std::move(tmp));
+
+#if !defined(NDEBUG)
+    // NOTE: in debug mode, we keep track of the max sizes of wlist and isol.
+    auto max_wl_size = wlist.size();
+    auto max_isol_size = isol.size();
+#endif
+
+    // Flag to signal that the do-while loop below failed.
+    bool loop_failed = false;
+
+    // Iteration counter for the do-while loop below.
+    std::uint64_t n_iter = 0;
+
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
+    do {
+        // Fetch the current interval and polynomial from the working list.
+        //
+        // NOTE: from now on, tmp contains the polynomial referred to as q(x) in the real-root isolation wikipedia page.
+        //
+        // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will be looking for. lb and ub
+        // represent what 0 and 1 correspond to in the *original* [0, 1) range.
+        //
+        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+        //
+        // NOLINTNEXTLINE(misc-const-correctness)
+        auto lb = std::move(std::get<0>(wlist.back()));
+        // NOLINTNEXTLINE(misc-const-correctness)
+        auto ub = std::move(std::get<1>(wlist.back()));
+        // NOTE: this will either revive an invalid tmp (first iteration), or it will replace it with one of the
+        // bisecting polynomials.
+        tmp = std::move(std::get<2>(wlist.back()));
+        wlist.pop_back();
+
+        // Check for an event at the lower bound, which occurs if the constant term of the polynomial is zero. We also
+        // check for finiteness of all the other coefficients, otherwise we cannot really claim to have detected an
+        // event. Non-finite polynomials are otherwise dealt with by the finiteness checks on the root and on the
+        // derivative in add_d_event().
+        //
+        // NOTE: this is necessary because the sign-change counting algorithm provides information on the existence of
+        // real roots in the open interval (lb, ub) - if the root is exactly at lb, it will not be detected.
+        bool root_at_lb = false;
+        if (tmp.v[0] == 0 && std::ranges::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order, [](const auto &x) {
+                return isfinite(x);
+            })) {
+            root_at_lb = true;
+
+            // NOTE: we will have to skip the event if we are dealing with a terminal event on cooldown and the lower
+            // bound falls within the cooldown time.
+            std::conditional_t<is_terminal_event_v<Event>, bool, const bool> skip_event = false;
+            if constexpr (is_terminal_event_v<Event>) {
+                if (lb < lb_offset) {
+                    SPDLOG_LOGGER_DEBUG(get_logger(),
+                                        "terminal event {} detected at the lower bound of an interval is "
+                                        "subject to cooldown, ignoring",
+                                        ev_idx);
+                    skip_event = true;
+                }
+            }
+
+            if (!skip_event) {
+                // NOTE: the original range had been rescaled wrt to h. Thus, we need to rescale back when
+                // adding the detected event.
+                add_d_event(lb * h);
+            }
+        }
+
+        // Reverse tmp into tmp1, translate tmp1 by 1 with output in tmp2, and count the sign changes in tmp2.
+        std::uint32_t n_sc{};
+        rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
+
+        // NOTE: if root_at_lb is true and there is 1 sign change, the interval contains two distinct roots: one at lb
+        // and one in (lb, ub). Such an interval cannot be passed to the root finding below, which would return the root
+        // at lb instead of the one in (lb, ub). Thus, we keep on bisecting until the root in (lb, ub) ends up in an
+        // interval without a root at the lower bound.
+        if (n_sc == 1u && !root_at_lb) {
+            // Found isolating interval, add it to isol.
+            isol.emplace_back(std::move(lb), std::move(ub));
+        } else if (n_sc >= 1u) {
+            // Either more than one sign change, or one sign change and a root at the lower bound. Bisect, unless the
+            // interval is too small.
+            if (ub - lb < min_width) [[unlikely]] {
+                // NOTE: the roots in an interval narrower than min_width cannot be meaningfully separated. Drop
+                // the interval, but keep processing the other intervals.
+                SPDLOG_LOGGER_DEBUG(get_logger(),
+                                    "dropping an interval of width {} with {} sign change(s) during the "
+                                    "real-root isolation for the event {}",
+                                    fp_to_string(ub - lb), n_sc, ev_idx);
+            } else {
+                // First we transform q into 2**n * q(x/2) and store the result into tmp1.
+                poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
+                // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
+                pt(tmp2.v.data(), tmp1.v.data());
+
+                // Finally we add tmp1 and tmp2 to the working list.
+                //
+                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
+                auto mid = lb / 2 + ub / 2;
+
+                // NOTE: mid is computed exactly (see the explanation for min_width).
+                assert(lb < mid && mid < ub);
+
+                // NOTE: don't add the lower range if it falls entirely within the cooldown range.
+                if (lb_offset < mid) {
+                    wlist.emplace_back(std::move(lb), mid, std::move(tmp1));
+
+                    // Revive tmp1.
+                    tmp1 = taylor_pwrap<T>(poly_cache, order, poly_init);
+                } else {
+                    // LCOV_EXCL_START
+                    SPDLOG_LOGGER_DEBUG(get_logger(), "ignoring lower interval in a bisection that would fall "
+                                                      "entirely in the cooldown period");
+                    // LCOV_EXCL_STOP
+                }
+                wlist.emplace_back(std::move(mid), std::move(ub), std::move(tmp2));
+
+                // Revive tmp2.
+                tmp2 = taylor_pwrap<T>(poly_cache, order, poly_init);
+            }
+        }
+
+#if !defined(NDEBUG)
+        max_wl_size = std::max(max_wl_size, wlist.size());
+        max_isol_size = std::max(max_isol_size, isol.size());
+#endif
+
+        // LCOV_EXCL_START
+        // We want to put limits in order to avoid an endless loop when the algorithm fails. The first check is on the
+        // number of iterations (see the explanation for max_iter). The second check is that we cannot possibly find
+        // more isolating intervals than the degree of the polynomial.
+        if (++n_iter > max_iter || isol.size() > order) [[unlikely]] {
+            get_logger()->warn("the polynomial root isolation algorithm failed during event detection: the number of "
+                               "iterations is {} and the number of isolating intervals is {}",
+                               n_iter, isol.size());
+
+            loop_failed = true;
+
+            break;
+        }
+        // LCOV_EXCL_STOP
+
+    } while (!wlist.empty());
+
+#if !defined(NDEBUG)
+    SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
+    SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
+#endif
+
+    if (isol.empty() || loop_failed) {
+        // Don't do root finding for this event if the loop failed, or if the list of isolating intervals is empty. Just
+        // exit.
+        return;
+    }
+
+    // Reconstruct a version of the original event polynomial in which the range [0, h) is rescaled to [0, 1). We need
+    // to do root finding on the rescaled polynomial because the isolating intervals are also rescaled to [0, 1).
+    //
+    // NOTE: tmp1 was either created with the correct size outside this function, or it was re-created in the bisection
+    // above.
+    poly_rescale(tmp1.v.data(), ptr, h, order);
+
+    // Run the root finding in the isolating intervals.
+    for (auto &[lb, ub] : isol) {
+        if constexpr (is_terminal_event_v<Event>) {
+            // NOTE: if we are dealing with a terminal event subject to cooldown, we need to ensure that we don't look
+            // for roots before the cooldown has expired.
+            if (lb < lb_offset) {
+                // Make sure we move lb past the cooldown.
+                lb = lb_offset;
+
+                // NOTE: this should be ensured by the fact that we ensure above (lb_offset < mid) that we don't end up
+                // with an invalid interval.
+                assert(lb < ub);
+
+                // Check if the interval still contains a zero.
+                //
+                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
+                //
+                // NOLINTNEXTLINE(misc-const-correctness)
+                auto f_lb = poly_eval(tmp1.v.data(), lb, order);
+                // NOLINTNEXTLINE(misc-const-correctness)
+                auto f_ub = poly_eval(tmp1.v.data(), ub, order);
+
+                if (!(std::move(f_lb) * std::move(f_ub) < 0)) {
+                    SPDLOG_LOGGER_DEBUG(get_logger(), "terminal event {} is subject to cooldown, ignoring", ev_idx);
+                    continue;
+                }
+            }
+        }
+
+        // Run the root finding.
+        const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
+
+        if (cflag == 0) [[likely]] {
+            // Root finding finished successfully, record the event. The found root needs to be rescaled by h.
+            add_d_event(root * h);
+        } else {
+            // LCOV_EXCL_START
+            // Root finding encountered some issue. Ignore the event and log the issue.
+            if (cflag == -1) {
+                get_logger()->warn("polynomial root finding during event detection failed due to too many iterations");
+            } else {
+                // Helper to log with a default error message.
+                //
+                // NOLINTNEXTLINE(modernize-type-traits)
+                const auto log_default = [cflag] {
+                    get_logger()->warn("polynomial root finding during event detection returned a nonzero "
+                                       "errno with error code {}",
+                                       cflag);
+                };
+
+#if defined(HEYOKA_HAVE_STRERROR_R)
+                // We have strerror_r() available, try to use it to produce a better error message.
+
+                // Buffer for the error message.
+                char err_msg_buf[256u];
+
+                // Attempt to produce the error message.
+                const auto *const err_msg = errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
+
+                // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
+                if (err_msg == nullptr) [[unlikely]] {
+                    // Something went wrong while constructing the error message, log with the default error
+                    // message.
+                    log_default();
+                } else {
+                    // Log with the descriptive error message.
+                    get_logger()->warn("polynomial root finding during event detection returned a nonzero "
+                                       "errno with message '{}'",
+                                       err_msg);
+                }
+#else
+                // No strerror_r() available, log with the default error message.
+                log_default();
+#endif
+            }
+            // LCOV_EXCL_STOP
+        }
     }
 }
 
@@ -1075,10 +1495,11 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 }
 
 // Implementation of event detection.
+//
+// NOTE: the list of detected events may contain duplicates which will have to be removed outside this function.
 template <typename T>
-void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t dim, const T &g_eps)
+void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std::uint32_t dim, const T &g_eps)
 {
-    using std::abs;
     using std::isfinite;
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -1090,17 +1511,17 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
 #endif
 
     // Clear the vectors of detected events.
-    // NOTE: do it here as this is always necessary,
-    // regardless of issues with h/g_eps.
+    //
+    // NOTE: do it here as this is always necessary, regardless of issues with h/g_eps.
     m_d_tes.clear();
     m_d_ntes.clear();
 
     // LCOV_EXCL_START
-    if (!isfinite(h)) {
+    if (!isfinite(h)) [[unlikely]] {
         get_logger()->warn("event detection skipped due to an invalid timestep value of {}", fp_to_string(h));
         return;
     }
-    if (!isfinite(g_eps)) {
+    if (!isfinite(g_eps)) [[unlikely]] {
         get_logger()->warn("event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
                            "series of the event equations",
                            fp_to_string(g_eps));
@@ -1113,10 +1534,9 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
         return;
     }
 
-    assert(order >= 2u); // LCOV_EXCL_LINE
+    assert(order >= 2u);
 
-    // The value that will be used to initialise the coefficients
-    // of newly-created polynomials in the caches.
+    // The value that will be used to initialise the coefficients of newly-created polynomials in the caches.
     const auto poly_init = num_zero_like(h);
 
     // Temporary polynomials used in the bisection loop.
@@ -1124,416 +1544,37 @@ void ed_data<T>::detect_events(const T &h, std::uint32_t order, std::uint32_t di
         tmp(m_poly_cache, order, poly_init);
 
     // Determine if we are integrating backwards in time.
-    const std::uint32_t back_int = h < 0;
+    //
+    // NOTE: this must be a uint32_t so that it can be fed into the JITted functions.
+    const std::uint32_t back_int = (h < 0);
 
     // Fetch the function pointers.
-    auto *m_fex_check = m_jit_data->m_fex_check;
-    auto *m_rtscc = m_jit_data->m_rtscc;
-    auto *m_pt = m_jit_data->m_pt;
+    auto *const m_fex_check = m_jit_data->m_fex_check;
+    auto *const m_rtscc = m_jit_data->m_rtscc;
+    auto *const m_pt = m_jit_data->m_pt;
 
-    // Helper to run event detection on a vector of events
-    // (terminal or not). 'out' is the vector of detected
-    // events, 'ev_vec' the input vector of events to detect.
-    const auto run_detection = [&](auto &out, const auto &ev_vec) {
-        // Fetch the event type.
-        using ev_type = std::remove_cvref_t<decltype(ev_vec)>::value_type;
-
+    // Helper to run event detection on a vector of events (terminal or not). 'out' is the vector of detected events,
+    // 'ev_vec' the input vector of events to detect.
+    const auto run_detection = [&]<typename Event>(auto &out, const std::vector<Event> &ev_vec) {
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
-            // Extract the pointer to the Taylor polynomial for the
-            // current event.
-            const auto ptr
-                = m_ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u);
+            // Extract the pointer to the Taylor polynomial for the current event.
+            const auto *const ptr
+                = m_ev_jet.data() + (i + dim + (is_terminal_event_v<Event> ? 0u : m_tes.size())) * (order + 1u);
 
             // Run the fast exclusion check.
-            // NOTE: in case of non-finite values in the Taylor
-            // coefficients of the event equation, the worst that
-            // can happen here is that we end up skipping event
-            // detection altogether without a warning. This is ok,
-            // and non-finite Taylor coefficients will be caught in the
-            // step() implementations anyway.
+            //
+            // NOTE: in case of non-finite values in the Taylor coefficients of the event equation, the worst that can
+            // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
+            // non-finite Taylor coefficients will be caught in the step() implementations anyway.
             std::uint32_t fex_check_result{};
             m_fex_check(ptr, &h, &back_int, &fex_check_result);
             if (fex_check_result) {
                 continue;
             }
 
-            // Clear out the list of isolating intervals.
-            m_isol.clear();
-
-            // Reset the working list.
-            m_wlist.clear();
-
-            // Helper to add a detected event to out.
-            // NOTE: the root here is expected to be already rescaled
-            // to the [0, h) range.
-            const auto add_d_event = [&](T root) {
-                // NOTE: we do one last check on the root in order to
-                // avoid non-finite event times. This guarantees that
-                // sorting the events by time is safe.
-                if (!adl_isfinite(root)) {
-                    // LCOV_EXCL_START
-                    get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
-                                       fp_to_string(root));
-                    return;
-                    // LCOV_EXCL_STOP
-                }
-
-                if (abs(root) >= abs(h)) {
-                    // LCOV_EXCL_START
-                    // NOTE: although event detection nominally
-                    // happens in the [0, h) range, due to floating-point
-                    // rounding we may end up detecting a abs(root) >= abs(h) in
-                    // corner cases. If that happens, let us clamp
-                    // root to be strictly < h in absolute value
-                    // in order to respect
-                    // the guarantee that events are always detected
-                    // in the [0, h) range.
-                    // NOTE: because throughout the various iterations
-                    // of root finding the lower bound always remains exactly zero,
-                    // it should not be possible for root to exit the [0, h)
-                    // range from the other side.
-                    get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
-                                       "value, than the integration timestep {}",
-                                       fp_to_string(root), fp_to_string(h));
-
-                    using std::nextafter;
-                    root = nextafter(h, static_cast<T>(0));
-                    // LCOV_EXCL_STOP
-                }
-
-                // Evaluate the derivative and its absolute value.
-                const auto der = poly_eval_1(ptr, root, order);
-                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                //
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto abs_der = abs(der);
-
-                // Check it before proceeding.
-                if (!adl_isfinite(der)) {
-                    // LCOV_EXCL_START
-                    get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
-                                       "skipping the event",
-                                       fp_to_string(root), fp_to_string(der));
-                    return;
-                    // LCOV_EXCL_STOP
-                }
-
-                // Compute the sign of the derivative.
-                const auto d_sgn = detail::sgn(der);
-
-                // Fetch and cache the desired event direction.
-                const auto dir = ev_vec[i].get_direction();
-
-                if (dir == event_direction::any) {
-                    // If the event direction does not
-                    // matter, just add it.
-                    if constexpr (is_terminal_event_v<ev_type>) {
-                        out.emplace_back(i, std::move(root), d_sgn, std::move(abs_der));
-                    } else {
-                        out.emplace_back(i, std::move(root), d_sgn);
-                    }
-                } else {
-                    // Otherwise, we need to record the event only if its direction
-                    // matches the sign of the derivative.
-                    if (static_cast<event_direction>(d_sgn) == dir) {
-                        if constexpr (is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, std::move(root), d_sgn, std::move(abs_der));
-                        } else {
-                            out.emplace_back(i, std::move(root), d_sgn);
-                        }
-                    }
-                }
-            };
-
-            // NOTE: if we are dealing with a terminal event on cooldown,
-            // we will need to ignore roots within the cooldown period.
-            // lb_offset is the value in the original [0, 1) range corresponding
-            // to the end of the cooldown.
-            const auto lb_offset = [&] {
-                if constexpr (is_terminal_event_v<ev_type>) {
-                    if (m_te_cooldowns[i]) {
-                        // NOTE: need to distinguish between forward
-                        // and backward integration.
-                        // NOTE: the division by abs(h) will ensure that, in case
-                        // of mppp::real, the result is computed in a precision
-                        // no less than h's.
-                        if (h >= 0) {
-                            return (m_te_cooldowns[i]->second - m_te_cooldowns[i]->first) / abs(h);
-                        } else {
-                            return (m_te_cooldowns[i]->second + m_te_cooldowns[i]->first) / abs(h);
-                        }
-                    }
-                }
-
-                // NOTE: we end up here if the event is not terminal
-                // or not on cooldown.
-                // NOTE: ensure this is inited properly, precision-wise.
-                return num_zero_like(h);
-            }();
-
-            if (lb_offset >= 1) {
-                // LCOV_EXCL_START
-                // NOTE: the whole integration range is in the cooldown range,
-                // move to the next event.
-                SPDLOG_LOGGER_DEBUG(
-                    get_logger(),
-                    "the integration timestep falls within the cooldown range for the terminal event {}, skipping", i);
-                continue;
-                // LCOV_EXCL_STOP
-            }
-
-            // Rescale the event polynomial so that the range [0, h)
-            // becomes [0, 1), and write the resulting polynomial into tmp.
-            // NOTE: at the first iteration (i.e., for the first event),
-            // tmp has been constructed correctly outside this function.
-            // Below, tmp will first be moved into m_wlist (thus rendering
-            // it invalid) but it will immediately be revived at the
-            // first iteration of the do/while loop. Thus, when we get
-            // here again, tmp will be again in a well-formed state.
-            assert(!tmp.v.empty());             // LCOV_EXCL_LINE
-            assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
-            poly_rescale(tmp.v.data(), ptr, h, order);
-
-            // Place the first element in the working list.
-            // NOTE: it's important that the initial bounds
-            // are created with the appropriate precision, in
-            // case of mppp::real. Otherwise, we risk of running
-            // the bisection at 32 bits of precision.
-            m_wlist.emplace_back(num_zero_like(h), num_one_like(h), std::move(tmp));
-
-#if !defined(NDEBUG)
-            auto max_wl_size = m_wlist.size();
-            auto max_isol_size = m_isol.size();
-#endif
-
-            // Flag to signal that the do-while loop below failed.
-            bool loop_failed = false;
-
-            // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
-            do {
-                // Fetch the current interval and polynomial from the working list.
-                // NOTE: from now on, tmp contains the polynomial referred
-                // to as q(x) in the real-root isolation wikipedia page.
-                // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
-                // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
-                // [0, 1) range.
-                //
-                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                //
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto lb = std::move(std::get<0>(m_wlist.back()));
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto ub = std::move(std::get<1>(m_wlist.back()));
-                // NOTE: this will either revive an invalid tmp (first iteration),
-                // or it will replace it with one of the bisecting polynomials.
-                tmp = std::move(std::get<2>(m_wlist.back()));
-                m_wlist.pop_back();
-
-                // Check for an event at the lower bound, which occurs
-                // if the constant term of the polynomial is zero. We also
-                // check for finiteness of all the other coefficients, otherwise
-                // we cannot really claim to have detected an event.
-                // When we do proper root finding below, the
-                // algorithm should be able to detect non-finite
-                // polynomials.
-                // NOTE: it's not 100% clear to me why we have to special-case
-                // this, but if we don't, the root is not detected. Note that
-                // the wikipedia algorithm also has a special case for this.
-                if (tmp.v[0] == 0 // LCOV_EXCL_LINE
-                    && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
-                                   [](const auto &x) { return adl_isfinite(x); })) {
-                    // NOTE: we will have to skip the event if we are dealing
-                    // with a terminal event on cooldown and the lower bound
-                    // falls within the cooldown time.
-                    std::conditional_t<is_terminal_event_v<ev_type>, bool, const bool> skip_event = false;
-                    if constexpr (is_terminal_event_v<ev_type>) {
-                        if (lb < lb_offset) {
-                            SPDLOG_LOGGER_DEBUG(get_logger(),
-                                                "terminal event {} detected at the beginning of an isolating interval "
-                                                "is subject to cooldown, ignoring",
-                                                i);
-                            skip_event = true;
-                        }
-                    }
-
-                    if (!skip_event) {
-                        // NOTE: the original range had been rescaled wrt to h.
-                        // Thus, we need to rescale back when adding the detected
-                        // event.
-                        add_d_event(lb * h);
-                    }
-                }
-
-                // Reverse tmp into tmp1, translate tmp1 by 1 with output
-                // in tmp2, and count the sign changes in tmp2.
-                std::uint32_t n_sc{};
-                m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
-
-                if (n_sc == 1u) {
-                    // Found isolating interval, add it to isol.
-                    m_isol.emplace_back(std::move(lb), std::move(ub));
-                } else if (n_sc > 1u) {
-                    // No isolating interval found, bisect.
-
-                    // First we transform q into 2**n * q(x/2) and store the result
-                    // into tmp1.
-                    poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
-                    // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                    m_pt(tmp2.v.data(), tmp1.v.data());
-
-                    // Finally we add tmp1 and tmp2 to the working list.
-                    //
-                    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                    //
-                    // NOLINTNEXTLINE(misc-const-correctness)
-                    auto mid = lb / 2 + ub / 2;
-                    // NOTE: don't add the lower range if it falls
-                    // entirely within the cooldown range.
-                    if (lb_offset < mid) {
-                        m_wlist.emplace_back(std::move(lb), mid, std::move(tmp1));
-
-                        // Revive tmp1.
-                        tmp1 = taylor_pwrap<T>(m_poly_cache, order, poly_init);
-                    } else {
-                        // LCOV_EXCL_START
-                        SPDLOG_LOGGER_DEBUG(
-                            get_logger(),
-                            "ignoring lower interval in a bisection that would fall entirely in the cooldown period");
-                        // LCOV_EXCL_STOP
-                    }
-                    m_wlist.emplace_back(std::move(mid), std::move(ub), std::move(tmp2));
-
-                    // Revive tmp2.
-                    tmp2 = taylor_pwrap<T>(m_poly_cache, order, poly_init);
-                }
-
-#if !defined(NDEBUG)
-                max_wl_size = std::max(max_wl_size, m_wlist.size());
-                max_isol_size = std::max(max_isol_size, m_isol.size());
-#endif
-
-                // LCOV_EXCL_START
-                // We want to put limits in order to avoid an endless loop when the algorithm fails.
-                // The first check is on the working list size and it is based
-                // on heuristic observation of the algorithm's behaviour in pathological
-                // cases. The second check is that we cannot possibly find more isolating
-                // intervals than the degree of the polynomial.
-                if (m_wlist.size() > 250u || m_isol.size() > order) {
-                    get_logger()->warn(
-                        "the polynomial root isolation algorithm failed during event detection: the working "
-                        "list size is {} and the number of isolating intervals is {}",
-                        m_wlist.size(), m_isol.size());
-
-                    loop_failed = true;
-
-                    break;
-                }
-                // LCOV_EXCL_STOP
-
-            } while (!m_wlist.empty());
-
-#if !defined(NDEBUG)
-            SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
-            SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
-#endif
-
-            if (m_isol.empty() || loop_failed) {
-                // Don't do root finding for this event if the loop failed,
-                // or if the list of isolating intervals is empty. Just
-                // move to the next event.
-                continue;
-            }
-
-            // Reconstruct a version of the original event polynomial
-            // in which the range [0, h) is rescaled to [0, 1). We need
-            // to do root finding on the rescaled polynomial because the
-            // isolating intervals are also rescaled to [0, 1).
-            // NOTE: tmp1 was either created with the correct size outside this
-            // function, or it was re-created in the bisection above.
-            poly_rescale(tmp1.v.data(), ptr, h, order);
-
-            // Run the root finding in the isolating intervals.
-            for (auto &[lb, ub] : m_isol) {
-                if constexpr (is_terminal_event_v<ev_type>) {
-                    // NOTE: if we are dealing with a terminal event
-                    // subject to cooldown, we need to ensure that
-                    // we don't look for roots before the cooldown has expired.
-                    if (lb < lb_offset) {
-                        // Make sure we move lb past the cooldown.
-                        lb = lb_offset;
-
-                        // NOTE: this should be ensured by the fact that
-                        // we ensure above (lb_offset < mid) that we don't
-                        // end up with an invalid interval.
-                        assert(lb < ub); // LCOV_EXCL_LINE
-
-                        // Check if the interval still contains a zero.
-                        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                        //
-                        // NOLINTNEXTLINE(misc-const-correctness)
-                        auto f_lb = poly_eval(tmp1.v.data(), lb, order);
-                        // NOLINTNEXTLINE(misc-const-correctness)
-                        auto f_ub = poly_eval(tmp1.v.data(), ub, order);
-
-                        if (!(std::move(f_lb) * std::move(f_ub) < 0)) {
-                            SPDLOG_LOGGER_DEBUG(get_logger(), "terminal event {} is subject to cooldown, ignoring", i);
-                            continue;
-                        }
-                    }
-                }
-
-                // Run the root finding.
-                const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
-
-                if (cflag == 0) {
-                    // Root finding finished successfully, record the event.
-                    // The found root needs to be rescaled by h.
-                    add_d_event(root * h);
-                } else {
-                    // LCOV_EXCL_START
-                    // Root finding encountered some issue. Ignore the
-                    // event and log the issue.
-                    if (cflag == -1) {
-                        get_logger()->warn(
-                            "polynomial root finding during event detection failed due to too many iterations");
-                    } else {
-                        // Helper to log with a default error message.
-                        //
-                        // NOLINTNEXTLINE(modernize-type-traits)
-                        const auto log_default = [cflag] {
-                            get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                               "errno with error code {}",
-                                               cflag);
-                        };
-
-#if defined(HEYOKA_HAVE_STRERROR_R)
-                        // We have strerror_r() available, try to use it to produce a better error message.
-
-                        // Buffer for the error message.
-                        char err_msg_buf[256u];
-
-                        // Attempt to produce the error message.
-                        const auto *const err_msg = errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
-
-                        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
-                        if (err_msg == nullptr) [[unlikely]] {
-                            // Something went wrong while constructing the error message, log with the default error
-                            // message.
-                            log_default();
-                        } else {
-                            // Log with the descriptive error message.
-                            get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                               "errno with message '{}'",
-                                               err_msg);
-                        }
-#else
-                        // No strerror_r() available, log with the default error message.
-                        log_default();
-#endif
-                    }
-                    // LCOV_EXCL_STOP
-                }
-            }
+            // Run the event detection.
+            detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, back_int, m_isol, m_wlist,
+                                              out, ev_vec, i, m_te_cooldowns, tmp, tmp1, tmp2, poly_init);
         }
     };
 
@@ -1755,89 +1796,76 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 }
 
 // Implementation of event detection.
+//
+// NOTE: the list of detected events may contain duplicates which will have to be removed outside this function.
 template <typename T>
-void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
+void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t order, const std::uint32_t dim,
+                                     const std::uint32_t batch_size)
 {
-    using std::abs;
     using std::isfinite;
 
-    // Clear the vectors of detected events, and determine if we are integrating
-    // backwards in time.
+    // Clear the vectors of detected events, and determine if we are integrating backwards in time.
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_tes[i].clear();
         m_d_ntes[i].clear();
         m_back_int[i] = h_ptr[i] < 0;
     }
 
-    assert(order >= 2u); // LCOV_EXCL_LINE
+    assert(order >= 2u);
 
-    // The value that will be used to initialise the coefficients
-    // of newly-created polynomials in the caches.
+    // The value that will be used to initialise the coefficients of newly-created polynomials in the caches.
     const T poly_init = 0;
 
     // Temporary polynomials used in the bisection loop.
     taylor_pwrap<T> tmp1(m_poly_cache, order, poly_init), tmp2(m_poly_cache, order, poly_init),
         tmp(m_poly_cache, order, poly_init);
-    // The temporary polynomial used when extracting a specific batch element
-    // from a polynomial of batches.
+    // The temporary polynomial used when extracting a specific batch element from a polynomial of batches.
     taylor_pwrap<T> scal_poly(m_poly_cache, order, poly_init);
 
     // Fetch the function pointers.
-    auto *m_fex_check = m_jit_data->m_fex_check;
-    auto *m_rtscc = m_jit_data->m_rtscc;
-    auto *m_pt = m_jit_data->m_pt;
+    auto *const m_fex_check = m_jit_data->m_fex_check;
+    auto *const m_rtscc = m_jit_data->m_rtscc;
+    auto *const m_pt = m_jit_data->m_pt;
 
-    // Helper to run event detection on a vector of events
-    // (terminal or not). 'out_vec' is the vector of detected
+    // Helper to run event detection on a vector of events (terminal or not). 'out_vec' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
-    const auto run_detection = [&](auto &out_vec, const auto &ev_vec) {
-        // Fetch the event type.
-        using ev_type = std::remove_cvref_t<decltype(ev_vec)>::value_type;
-
+    const auto run_detection = [&]<typename Event>(auto &out_vec, const std::vector<Event> &ev_vec) {
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
-            // Extract the pointer to the Taylor polynomial for the
-            // current event.
-            const auto batch_ptr
+            // Extract the pointer to the Taylor polynomial for the current event.
+            const auto *const batch_ptr
                 = m_ev_jet.data()
-                  + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
+                  + (i + dim + (is_terminal_event_v<Event> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
 
             // Run the fast exclusion check.
-            // NOTE: in case of non-finite values in the Taylor
-            // coefficients of the event equation, the worst that
-            // can happen here is that we end up skipping event
-            // detection altogether without a warning. This is ok,
-            // and non-finite Taylor coefficients will be caught in the
-            // step() implementations anyway.
+            //
+            // NOTE: in case of non-finite values in the Taylor coefficients of the event equation, the worst that can
+            // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
+            // non-finite Taylor coefficients will be caught in the step() implementations anyway.
             m_fex_check(batch_ptr, h_ptr, m_back_int.data(), m_fex_check_res.data());
-            // NOTE: remove this check, or does this provide any performance
-            // benefit wrt just checking in the next for loop?
-            if (std::all_of(m_fex_check_res.begin(), m_fex_check_res.end(),
-                            [](auto f) { return static_cast<bool>(f); })) {
-                continue;
-            }
 
             // Run event detection on all the batch elements.
             for (std::uint32_t j = 0; j < batch_size; ++j) {
-                // See if the fast exclusion check was positive
-                // for the current batch element.
+                // See if the fast exclusion check was positive for the current batch element.
                 if (m_fex_check_res[j]) {
                     continue;
                 }
 
-                // Start by running the checks that are
-                // run at the very beginning of the scalar event detection
+                // Fetch the backwards integration flag.
+                const auto back_int = m_back_int[j];
+
+                // Start by running the checks that are run at the very beginning of the scalar event detection
                 // function.
                 const auto h = h_ptr[j];
                 const auto g_eps = m_g_eps[j];
 
                 // LCOV_EXCL_START
-                if (!isfinite(h)) {
+                if (!isfinite(h)) [[unlikely]] {
                     get_logger()->warn(
                         "event detection skipped due to an invalid timestep value of {} at the batch index {}",
                         fp_to_string(h), j);
                     continue;
                 }
-                if (!isfinite(g_eps)) {
+                if (!isfinite(g_eps)) [[unlikely]] {
                     get_logger()->warn(
                         "event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
                         "series of the event equations at the batch index {}",
@@ -1851,12 +1879,6 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                     continue;
                 }
 
-                // Clear out the list of isolating intervals.
-                m_isol.clear();
-
-                // Reset the working list.
-                m_wlist.clear();
-
                 // Fetch a reference to the vector of detected events.
                 auto &out = out_vec[j];
 
@@ -1864,332 +1886,11 @@ void ed_data_batch<T>::detect_events(const T *h_ptr, std::uint32_t order, std::u
                 for (std::uint32_t k = 0; k <= order; ++k) {
                     scal_poly.v[k] = *(batch_ptr + j + k * batch_size);
                 }
-                const auto ptr = std::as_const(scal_poly.v).data();
+                const auto *const ptr = std::as_const(scal_poly.v).data();
 
-                // Helper to add a detected event to out.
-                // NOTE: the root here is expected to be already rescaled
-                // to the [0, h) range.
-                const auto add_d_event = [&](T root) {
-                    // NOTE: we do one last check on the root in order to
-                    // avoid non-finite event times. This guarantees that
-                    // sorting the events by time is safe.
-                    if (!adl_isfinite(root)) {
-                        // LCOV_EXCL_START
-                        get_logger()->warn("polynomial root finding produced a non-finite root of {} at the batch "
-                                           "index {} - skipping the event",
-                                           fp_to_string(root), j);
-                        return;
-                        // LCOV_EXCL_STOP
-                    }
-
-                    if (abs(root) >= abs(h)) {
-                        // LCOV_EXCL_START
-                        // NOTE: although event detection nominally
-                        // happens in the [0, h) range, due to floating-point
-                        // rounding we may end up detecting a abs(root) >= abs(h) in
-                        // corner cases. If that happens, let us clamp
-                        // root to be strictly < h in absolute value
-                        // in order to respect
-                        // the guarantee that events are always detected
-                        // in the [0, h) range.
-                        // NOTE: because throughout the various iterations
-                        // of root finding the lower bound always remains exactly zero,
-                        // it should not be possible for root to exit the [0, h)
-                        // range from the other side.
-                        get_logger()->warn(
-                            "polynomial root finding produced the root {} which is not smaller, in absolute "
-                            "value, than the integration timestep {}",
-                            fp_to_string(root), fp_to_string(h));
-
-                        using std::nextafter;
-                        root = nextafter(h, static_cast<T>(0));
-                        // LCOV_EXCL_STOP
-                    }
-
-                    // Evaluate the derivative and its absolute value.
-                    const auto der = poly_eval_1(ptr, root, order);
-                    const auto abs_der = abs(der);
-
-                    // Check it before proceeding.
-                    if (!adl_isfinite(der)) {
-                        // LCOV_EXCL_START
-                        get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} "
-                                           "at the batch index {} - skipping the event",
-                                           fp_to_string(root), fp_to_string(der), j);
-                        return;
-                        // LCOV_EXCL_STOP
-                    }
-
-                    // Compute sign of the derivative.
-                    const auto d_sgn = detail::sgn(der);
-
-                    // Fetch and cache the desired event direction.
-                    const auto dir = ev_vec[i].get_direction();
-
-                    if (dir == event_direction::any) {
-                        // If the event direction does not
-                        // matter, just add it.
-                        if constexpr (is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, root, d_sgn, abs_der);
-                        } else {
-                            out.emplace_back(i, root, d_sgn);
-                        }
-                    } else {
-                        // Otherwise, we need to record the event only if its direction
-                        // matches the sign of the derivative.
-                        if (static_cast<event_direction>(d_sgn) == dir) {
-                            if constexpr (is_terminal_event_v<ev_type>) {
-                                out.emplace_back(i, root, d_sgn, abs_der);
-                            } else {
-                                out.emplace_back(i, root, d_sgn);
-                            }
-                        }
-                    }
-                };
-
-                // NOTE: if we are dealing with a terminal event on cooldown,
-                // we will need to ignore roots within the cooldown period.
-                // lb_offset is the value in the original [0, 1) range corresponding
-                // to the end of the cooldown.
-                const auto lb_offset = [&] {
-                    if constexpr (is_terminal_event_v<ev_type>) {
-                        if (m_te_cooldowns[j][i]) {
-                            // NOTE: need to distinguish between forward
-                            // and backward integration.
-                            if (h >= 0) {
-                                return (m_te_cooldowns[j][i]->second - m_te_cooldowns[j][i]->first) / abs(h);
-                            } else {
-                                return (m_te_cooldowns[j][i]->second + m_te_cooldowns[j][i]->first) / abs(h);
-                            }
-                        }
-                    }
-
-                    // NOTE: we end up here if the event is not terminal
-                    // or not on cooldown.
-                    return static_cast<T>(0);
-                }();
-
-                if (lb_offset >= 1) {
-                    // LCOV_EXCL_START
-                    // NOTE: the whole integration range is in the cooldown range,
-                    // move to the next event.
-                    SPDLOG_LOGGER_DEBUG(get_logger(),
-                                        "the integration timestep falls within the cooldown range for the terminal "
-                                        "event {} at the batch index {}, skipping",
-                                        i, j);
-                    continue;
-                    // LCOV_EXCL_STOP
-                }
-
-                // Rescale the event polynomial so that the range [0, h)
-                // becomes [0, 1), and write the resulting polynomial into tmp.
-                // NOTE: at the first iteration (i.e., for the first event),
-                // tmp has been constructed correctly outside this function.
-                // Below, tmp will first be moved into m_wlist (thus rendering
-                // it invalid) but it will immediately be revived at the
-                // first iteration of the do/while loop. Thus, when we get
-                // here again, tmp will be again in a well-formed state.
-                assert(!tmp.v.empty());             // LCOV_EXCL_LINE
-                assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
-                poly_rescale(tmp.v.data(), ptr, h, order);
-
-                // Place the first element in the working list.
-                m_wlist.emplace_back(0, 1, std::move(tmp));
-
-#if !defined(NDEBUG)
-                auto max_wl_size = m_wlist.size();
-                auto max_isol_size = m_isol.size();
-#endif
-
-                // Flag to signal that the do-while loop below failed.
-                bool loop_failed = false;
-
-                // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
-                do {
-                    // Fetch the current interval and polynomial from the working list.
-                    // NOTE: from now on, tmp contains the polynomial referred
-                    // to as q(x) in the real-root isolation wikipedia page.
-                    // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
-                    // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
-                    // [0, 1) range.
-                    const auto lb = std::get<0>(m_wlist.back());
-                    const auto ub = std::get<1>(m_wlist.back());
-                    // NOTE: this will either revive an invalid tmp (first iteration),
-                    // or it will replace it with one of the bisecting polynomials.
-                    tmp = std::move(std::get<2>(m_wlist.back()));
-                    m_wlist.pop_back();
-
-                    // Check for an event at the lower bound, which occurs
-                    // if the constant term of the polynomial is zero. We also
-                    // check for finiteness of all the other coefficients, otherwise
-                    // we cannot really claim to have detected an event.
-                    // When we do proper root finding below, the
-                    // algorithm should be able to detect non-finite
-                    // polynomials.
-                    if (tmp.v[0] == 0 // LCOV_EXCL_LINE
-                        && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
-                                       [](const auto &x) { return adl_isfinite(x); })) {
-                        // NOTE: we will have to skip the event if we are dealing
-                        // with a terminal event on cooldown and the lower bound
-                        // falls within the cooldown time.
-                        std::conditional_t<is_terminal_event_v<ev_type>, bool, const bool> skip_event = false;
-                        if constexpr (is_terminal_event_v<ev_type>) {
-                            if (lb < lb_offset) {
-                                SPDLOG_LOGGER_DEBUG(get_logger(),
-                                                    "terminal event {} detected at the beginning of an isolating "
-                                                    "interval at the batch index {} "
-                                                    "is subject to cooldown, ignoring",
-                                                    i, j);
-                                skip_event = true;
-                            }
-                        }
-
-                        if (!skip_event) {
-                            // NOTE: the original range had been rescaled wrt to h.
-                            // Thus, we need to rescale back when adding the detected
-                            // event.
-                            add_d_event(lb * h);
-                        }
-                    }
-
-                    // Reverse tmp into tmp1, translate tmp1 by 1 with output
-                    // in tmp2, and count the sign changes in tmp2.
-                    std::uint32_t n_sc{};
-                    m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
-
-                    if (n_sc == 1u) {
-                        // Found isolating interval, add it to isol.
-                        m_isol.emplace_back(lb, ub);
-                    } else if (n_sc > 1u) {
-                        // No isolating interval found, bisect.
-
-                        // First we transform q into 2**n * q(x/2) and store the result
-                        // into tmp1.
-                        poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
-                        // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                        m_pt(tmp2.v.data(), tmp1.v.data());
-
-                        // Finally we add tmp1 and tmp2 to the working list.
-                        // NOTE: not sure why this is not picked up by the code
-                        // coverage tool.
-                        const auto mid = lb / 2 + ub / 2; // LCOV_EXCL_LINE
-                        // NOTE: don't add the lower range if it falls
-                        // entirely within the cooldown range.
-                        if (lb_offset < mid) {
-                            m_wlist.emplace_back(lb, mid, std::move(tmp1));
-
-                            // Revive tmp1.
-                            tmp1 = taylor_pwrap<T>(m_poly_cache, order, poly_init);
-                        } else {
-                            // LCOV_EXCL_START
-                            SPDLOG_LOGGER_DEBUG(get_logger(),
-                                                "ignoring lower interval in a bisection that would fall "
-                                                "entirely in the cooldown period at the batch index {}",
-                                                j);
-                            // LCOV_EXCL_STOP
-                        }
-                        m_wlist.emplace_back(mid, ub, std::move(tmp2));
-
-                        // Revive tmp2.
-                        tmp2 = taylor_pwrap<T>(m_poly_cache, order, poly_init);
-                    }
-
-#if !defined(NDEBUG)
-                    max_wl_size = std::max(max_wl_size, m_wlist.size());
-                    max_isol_size = std::max(max_isol_size, m_isol.size());
-#endif
-
-                    // We want to put limits in order to avoid an endless loop when the algorithm fails.
-                    // The first check is on the working list size and it is based
-                    // on heuristic observation of the algorithm's behaviour in pathological
-                    // cases. The second check is that we cannot possibly find more isolating
-                    // intervals than the degree of the polynomial.
-                    // LCOV_EXCL_START
-                    if (m_wlist.size() > 250u || m_isol.size() > order) {
-                        get_logger()->warn("the polynomial root isolation algorithm failed during event detection at "
-                                           "the batch index {}: the working "
-                                           "list size is {} and the number of isolating intervals is {}",
-                                           j, m_wlist.size(), m_isol.size());
-
-                        loop_failed = true;
-
-                        break;
-                    }
-                    // LCOV_EXCL_STOP
-
-                } while (!m_wlist.empty());
-
-#if !defined(NDEBUG)
-                SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size at the batch index {}: {}", j, max_wl_size);
-                SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size at the batch index {}   : {}", j, max_isol_size);
-#endif
-
-                if (m_isol.empty() || loop_failed) {
-                    // Don't do root finding for this event if the loop failed,
-                    // or if the list of isolating intervals is empty. Just
-                    // move to the next event.
-                    continue;
-                }
-
-                // Reconstruct a version of the original event polynomial
-                // in which the range [0, h) is rescaled to [0, 1). We need
-                // to do root finding on the rescaled polynomial because the
-                // isolating intervals are also rescaled to [0, 1).
-                // NOTE: tmp1 was either created with the correct size outside this
-                // function, or it was re-created in the bisection above.
-                poly_rescale(tmp1.v.data(), ptr, h, order);
-
-                // Run the root finding in the isolating intervals.
-                for (auto &[lb, ub] : m_isol) {
-                    if constexpr (is_terminal_event_v<ev_type>) {
-                        // NOTE: if we are dealing with a terminal event
-                        // subject to cooldown, we need to ensure that
-                        // we don't look for roots before the cooldown has expired.
-                        if (lb < lb_offset) {
-                            // Make sure we move lb past the cooldown.
-                            lb = lb_offset;
-
-                            // NOTE: this should be ensured by the fact that
-                            // we ensure above (lb_offset < mid) that we don't
-                            // end up with an invalid interval.
-                            assert(lb < ub); // LCOV_EXCL_LINE
-
-                            // Check if the interval still contains a zero.
-                            const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
-                            const auto f_ub = poly_eval(tmp1.v.data(), ub, order);
-
-                            if (!(f_lb * f_ub < 0)) {
-                                SPDLOG_LOGGER_DEBUG(
-                                    get_logger(),
-                                    "terminal event {} at the batch index {} is subject to cooldown, ignoring", i, j);
-                                continue;
-                            }
-                        }
-                    }
-
-                    // Run the root finding.
-                    const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
-
-                    if (cflag == 0) {
-                        // Root finding finished successfully, record the event.
-                        // The found root needs to be rescaled by h.
-                        add_d_event(root * h);
-                    } else {
-                        // LCOV_EXCL_START
-                        // Root finding encountered some issue. Ignore the
-                        // event and log the issue.
-                        if (cflag == -1) {
-                            get_logger()->warn("polynomial root finding during event detection failed due to too many "
-                                               "iterations at the batch index {}",
-                                               j);
-                        } else {
-                            get_logger()->warn("polynomial root finding during event detection at the batch index {} "
-                                               "returned a nonzero errno with error code {}",
-                                               j, cflag);
-                        }
-                        // LCOV_EXCL_STOP
-                    }
-                }
+                // Run the event detection.
+                detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, back_int, m_isol, m_wlist,
+                                                  out, ev_vec, i, m_te_cooldowns[j], tmp, tmp1, tmp2, poly_init);
             }
         }
     };
