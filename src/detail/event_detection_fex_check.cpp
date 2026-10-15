@@ -176,15 +176,14 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Check if we can use avx512.
     const auto &target_features = get_target_features();
     if (target_features.avx512f) {
-        // AVX512 is available. Are we operating on float/double?
         const auto fp_is_float = fp_t->isFloatTy();
         const auto fp_is_double = fp_t->isDoubleTy();
 
-        if (fp_is_float || fp_is_double) {
-            // We are operating on float/double, check the batch size.
-            if (batch_size == 1u || (fp_is_double && batch_size == 8u) || (fp_is_float && batch_size == 16u)) {
-                impl = fex_check_impl::avx512;
-            }
+        // We can use the AVX512 implementation for float/double if the batch size is either 1 or the size of a 512-bit
+        // vector.
+        if ((fp_is_float && (batch_size == 1u || batch_size == 16u))
+            || (fp_is_double && (batch_size == 1u || batch_size == 8u))) {
+            impl = fex_check_impl::avx512;
         }
     }
 
