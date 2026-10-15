@@ -185,6 +185,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/var_ode_sys.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_fex_check.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_arith.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_cmp.cpp"

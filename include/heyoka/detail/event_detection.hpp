@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
+#include <string>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -67,6 +68,10 @@ mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
 // Machinery to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
                                                      bool = false);
+
+// Helper to add a fast event exclusion check function to an llvm_state.
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,
+                                                        std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
