@@ -9,6 +9,12 @@
 #ifndef HEYOKA_DETAIL_LLVM_FUNC_CREATE_HPP
 #define HEYOKA_DETAIL_LLVM_FUNC_CREATE_HPP
 
+#if !defined(HEYOKA_BUILD_LIBRARY)
+
+#error This header can be included only when building heyoka.
+
+#endif
+
 #include <cassert>
 #include <stdexcept>
 #include <string>
@@ -27,10 +33,10 @@ namespace detail
 {
 
 // Helper to create an LLVM function.
-// NOTE: the purpose of this helper is to check that the function was created with
-// the requested name: LLVM will silently change the name of the created function
-// if it already exists in a module, and in some cases we want to prevent
-// this from happening.
+//
+// NOTE: the purpose of this helper is to check that the function was created with the requested name: LLVM will
+// silently change the name of the created function if it already exists in a module, and in some cases we want to
+// prevent this from happening.
 template <typename... Args>
 llvm::Function *llvm_func_create(llvm::FunctionType *tp, llvm::Function::LinkageTypes linkage, const std::string &name,
                                  Args &&...args)
@@ -38,11 +44,14 @@ llvm::Function *llvm_func_create(llvm::FunctionType *tp, llvm::Function::Linkage
     llvm::Function *ret = llvm::Function::Create(tp, linkage, name, std::forward<Args>(args)...);
     assert(ret != nullptr);
 
-    if (ret->getName() != name) {
+    if (ret->getName() != name) [[unlikely]] {
         // Remove function before throwing.
         ret->eraseFromParent();
 
-        throw std::invalid_argument(fmt::format("Unable to create an LLVM function with name '{}'", name));
+        throw std::invalid_argument(
+            fmt::format("Unable to create an LLVM function with name '{}' - a global value with "
+                        "the same name already exists in the module",
+                        name));
     }
 
     return ret;
