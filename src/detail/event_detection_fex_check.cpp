@@ -416,9 +416,10 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     //
     // In any case, in case of issues, we can always revert to using the comparison + select.
     //
-    // NOTE: maximumnum is available since LLVM 20. With earlier versions, we always use the comparison + select.
+    // NOTE: maximumnum is available since LLVM 20, but LLVM 20 and 21 miscompile it on x86-64. With earlier versions,
+    // we always use the comparison + select.
     const auto max0 = [zero, &builder, fp_t, &lt](llvm::Value *const x) -> llvm::Value * {
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 22
         if (fp_t->isFloatTy() || fp_t->isDoubleTy()) {
             return builder.CreateMaximumNum(x, zero);
         }
