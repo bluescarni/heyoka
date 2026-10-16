@@ -239,6 +239,9 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
+    //
+    // NOTE: the comparison is ordered, thus a NaN max_abs_state results in false abs_or_rel. This ensures that the NaN
+    // is propagated to num_rho and then to the step size.
     auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
@@ -274,6 +277,8 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
+    //
+    // NOTE: max_h_vec is guaranteed to contain only non-NaN values, so no concerns with NaN propagation here.
     auto *backward = llvm_fcmp_olt(s, max_h_vec, llvm_constantfp(s, vec_t, 0.));
     auto *h_fac = builder.CreateSelect(backward, llvm_constantfp(s, vec_t, -1.), llvm_constantfp(s, vec_t, 1.));
     h = llvm_fmul(s, h_fac, h);
