@@ -68,15 +68,19 @@ namespace
 {
 
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
+//
+// NOTE: make sure that NaNs are propagated and not silently ignored in the computation of the timestep.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return llvm_max(s, x_v, llvm_abs(s, y_v));
+    return llvm_max_nan(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
+//
+// NOTE: make sure that NaNs are propagated and not silently ignored in the computation of the timestep.
 llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return llvm_min(s, x_v, llvm_abs(s, y_v));
+    return llvm_min_nan(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute the scaling + safety factor
@@ -220,7 +224,10 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         }
 
         // Find the maxima via pairwise reduction.
-        const auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_max(s, a, b); };
+        const auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * {
+            // NOTE: make sure that NaNs are not silently ignored.
+            return llvm_max_nan(s, a, b);
+        };
         max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
         max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
@@ -252,7 +259,9 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
             batch_size));
 
     // Take the minimum.
-    auto *rho_m = llvm_min(s, rho_o, rho_om1);
+    //
+    // NOTE: make sure that NaNs are not silently ignored.
+    auto *rho_m = llvm_min_nan(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
     const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
