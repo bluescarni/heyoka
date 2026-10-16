@@ -1499,6 +1499,9 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
 {
     using std::isfinite;
 
+    assert(isfinite(h));
+    assert(isfinite(g_eps));
+
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -1507,24 +1510,9 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
 
 #endif
 
-    // Clear the vectors of detected events.
-    //
-    // NOTE: do it here as this is always necessary, regardless of issues with h/g_eps.
+    // As a first step, the vectors of detected events must be cleared out.
     m_d_tes.clear();
     m_d_ntes.clear();
-
-    // LCOV_EXCL_START
-    if (!isfinite(h)) [[unlikely]] {
-        get_logger()->warn("event detection skipped due to an invalid timestep value of {}", fp_to_string(h));
-        return;
-    }
-    if (!isfinite(g_eps)) [[unlikely]] {
-        get_logger()->warn("event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
-                           "series of the event equations",
-                           fp_to_string(g_eps));
-        return;
-    }
-    // LCOV_EXCL_STOP
 
     if (h == 0) {
         // If the timestep is zero, skip event detection.
@@ -1560,9 +1548,8 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
 
             // Run the fast exclusion check.
             //
-            // NOTE: in case of non-finite values in the Taylor coefficients of the event equation, the worst that can
-            // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
-            // non-finite Taylor coefficients will be caught in the step() implementations anyway.
+            // NOTE: we are assuming that if we get here we have checked that all the finiteness preconditions for the
+            // invocation of m_fex_check() hold.
             std::uint32_t fex_check_result{};
             m_fex_check(ptr, &h, &fex_check_result, enc);
             if (fex_check_result) {

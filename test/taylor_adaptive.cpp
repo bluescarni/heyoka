@@ -2331,6 +2331,68 @@ TEST_CASE("event cb time")
                                    "time coordinate of the integrator - this is not supported"));
 }
 
+// Test that non-finite values in the Taylor coefficients of the event equations result in err_nf_state, without any
+// event callback being invoked.
+TEST_CASE("event nf inputs")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using nt_ev_t = taylor_adaptive<double>::nt_event_t;
+    using t_ev_t = taylor_adaptive<double>::t_event_t;
+
+    // Number of invocations of the event callbacks.
+    unsigned n_cb = 0;
+
+    // Factories of integrators with a non-terminal or a terminal event v + par[0], where par[0] is set to p.
+    //
+    // NOTE: the Taylor coefficients of order > 0 of the events are those of v, thus only the order-0 coefficient is
+    // affected by the value of p.
+    const auto make_nt_ta = [&](double p) {
+        return taylor_adaptive<double>({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.025}, kw::pars = {p},
+                                       kw::nt_events = {nt_ev_t(v + par[0], [&n_cb](auto &, auto, auto) { ++n_cb; })});
+    };
+    const auto make_t_ta = [&](double p) {
+        return taylor_adaptive<double>({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.025}, kw::pars = {p},
+                                       kw::t_events = {t_ev_t(
+                                           v + par[0], kw::callback = [&n_cb](auto &, auto) {
+                                               ++n_cb;
+                                               return true;
+                                           })});
+    };
+
+    // Run the checks on the integrators created by make_ta with par[0] set to p.
+    const auto check = [&n_cb](const auto &make_ta, double p) {
+        n_cb = 0;
+
+        // Single step.
+        auto ta = make_ta(p);
+        const auto [oc, h] = ta.step(10.);
+        REQUIRE(oc == taylor_outcome::err_nf_state);
+        REQUIRE(n_cb == 0u);
+
+        if (std::isnan(p)) {
+            // A NaN in the Taylor coefficients of the events propagates to the timestep.
+            REQUIRE(std::isnan(h));
+        } else {
+            // An infinite order-0 Taylor coefficient of the events makes the deduced timestep equal to max_delta_t.
+            // The time and the last timestep are updated nevertheless.
+            REQUIRE(h == 10.);
+            REQUIRE(ta.get_time() == 10.);
+            REQUIRE(ta.get_last_h() == 10.);
+        }
+
+        // propagate_until().
+        ta = make_ta(p);
+        REQUIRE(std::get<0>(ta.propagate_until(10.)) == taylor_outcome::err_nf_state);
+        REQUIRE(n_cb == 0u);
+    };
+
+    for (const auto p : {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        check(make_nt_ta, p);
+        check(make_t_ta, p);
+    }
+}
+
 // Test case for a propagate callback changing the time coordinate
 // in invalid ways.
 TEST_CASE("bug prop_cb time")

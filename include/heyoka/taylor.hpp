@@ -150,7 +150,7 @@ enum class taylor_outcome : std::int64_t {
     success = -4294967296ll - 1,      // Integration step was successful.
     step_limit = -4294967296ll - 2,   // Maximum number of steps reached.
     time_limit = -4294967296ll - 3,   // Time limit reached.
-    err_nf_state = -4294967296ll - 4, // Non-finite state detected at the end of the timestep.
+    err_nf_state = -4294967296ll - 4, // Non-finite values detected in the internal state of the integrator.
     cb_stop = -4294967296ll - 5,      // Propagation stopped by callback.
 };
 

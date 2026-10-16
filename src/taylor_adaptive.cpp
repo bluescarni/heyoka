@@ -704,31 +704,41 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 // The magnitude of the timestep is automatically deduced, but it will always be not greater than abs(max_delta_t). The
 // propagation is done forward in time if max_delta_t >= 0, backwards in time otherwise.
 //
-// The function will return a pair, containing a flag describing the outcome of the integration, and the integration
+// The function will return a tuple containing a flag describing the outcome of the integration, and the integration
 // timestep that was used.
 //
 // NOTE: for the docs:
 //
 // - outcome:
-//   - if nf state is detected, err_nf_state, else
-//   - if terminal events trigger, return the index of the first event triggering, else
+//   - if non-finite values are detected in the internal state of the integrator, err_nf_state. This happens if the time
+//     or the state vector are non-finite at the end of the timestep or, in the presence of events, if any of the inputs
+//     of event detection (the timestep, the maximum error on the Taylor series of the event equations and the Taylor
+//     coefficients of the event equations) is non-finite. In this case, the state vector, the time and the last
+//     timestep are updated nevertheless, and no event callback is invoked; else
+//   - if terminal events trigger, the index ev_idx of the first terminal event triggering, encoded as ev_idx if the
+//     integration should continue (i.e., the event has a callback which returned true), and as -ev_idx - 1 otherwise;
+//     else
 //   - either time_limit or success, depending on whether max_delta_t was used as a timestep or not;
 // - event detection happens in the [0, h) half-open range (that is, all detected events are guaranteed to trigger
 //   within the [0, h) range). Thus, if the timestep ends up being zero (either because max_delta_t == 0 or the inferred
 //   timestep is zero), then event detection is skipped altogether;
 // - the execution of the events' callbacks is guaranteed to proceed in chronological order;
 // - a timestep h == 0 will still result in m_last_h being updated (to zero) and the Taylor coefficients being recorded
-//   in the internal array (if wtc == true). That is, h == 0 is not treated in any special way.
+//   in the internal array (if wtc == true, or always in the presence of events). That is, h == 0 is not treated in any
+//   special way.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
 {
     using std::abs;
     using std::isfinite;
 
+    // Small helper to reduce typing below.
+    constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
+
 #if !defined(NDEBUG)
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
-    assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
+    assert(!isnan(max_delta_t));
 
     assert(m_i_data);
 #endif
@@ -762,7 +772,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     auto h = max_delta_t;
 
     if (m_step_f.index() == 0u || m_step_f.index() == 2u) {
-        assert(!m_ed_data); // LCOV_EXCL_LINE
+        assert(!m_ed_data);
 
         // Invoke the vanilla stepper.
         if (m_step_f.index() == 0u) {
@@ -781,20 +791,19 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // Store the last timestep.
         m_last_h = h;
 
-        // Check if the time or the state vector are non-finite at the
-        // end of the timestep.
-        if (!isfinite(m_time) || std::ranges::any_of(m_state, [](const auto &x) { return !isfinite(x); })) {
+        // Check if the time or the state vector are non-finite at the end of the timestep.
+        if (!is_finite(m_time) || !std::ranges::all_of(m_state, is_finite)) [[unlikely]] {
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
         return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
     } else {
-        assert(m_ed_data); // LCOV_EXCL_LINE
+        assert(m_ed_data);
 
         auto &edd = *m_ed_data;
 
-        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
-        // event equations at the beginning of the timestep for later use.
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector + event equations
+        // at the beginning of the timestep for later use.
         auto max_abs_state = detail::num_zero_like(h);
         if (m_step_f.index() == 1u) {
             std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
@@ -807,12 +816,15 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         }
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
-        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in edd.detect_events() we skip event detection altogether.
+        // automatic cooldown deduction. If max_abs_state is not finite, set g_eps to infinity so that event detection
+        // will be skipped and we exit early with err_nf_state.
+        //
+        // NOTE: a +inf g_eps can also be generated via overflow in the calculation. In that case, event detection will
+        // also be skipped and we exit early with err_nf_state.
         const auto g_eps = [&] {
-            if (isfinite(max_abs_state)) {
+            if (is_finite(max_abs_state)) {
                 // Are we in absolute or relative error control mode?
-                const auto abs_or_rel = max_abs_state < 1;
+                const auto abs_or_rel = max_abs_state <= 1;
 
                 // Estimate the size of the largest remainder in the Taylor series of both the dynamical equations and
                 // the events.
@@ -833,8 +845,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                 // NOLINTNEXTLINE(misc-const-correctness)
                 auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
 
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
+                // NOTE: the if condition in the next line is equivalent, in relative error control mode, to:
+                //
                 // if (m_tol < eps)
                 if (max_r_size < tmp) {
                     return tmp;
@@ -854,52 +866,64 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
 #endif
 
-        // Write unconditionally the tcs.
-        std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
-
-        // Do the event detection.
-        edd.detect_events(h, m_order, m_dim, g_eps);
-
-        // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary memory).
-        // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
-        // integrator in a half-baked state.
-
-        // We now have to post-process the list of detected events, which are unordered and may contain duplicates. For
-        // terminal events, we are interested only in the first event triggering in chronological order. It will be
-        // placed at the first position of edd.m_d_tes. Duplicates are irrelevant here, as only the first event is used.
+        // Flag to signal that all the input data for event detection is finite.
         //
-        // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index takes
-        // precedence.
-        if (!edd.m_d_tes.empty()) {
-            const auto earliest_it = std::ranges::min_element(edd.m_d_tes, detail::taylor_ev_cmp);
-            std::iter_swap(earliest_it, edd.m_d_tes.begin());
-        }
+        // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
+        // functions.
+        const auto ed_finite = is_finite(h) && is_finite(g_eps)
+                               && std::ranges::all_of(edd.m_ev_jet.data() + m_dim * (m_order + 1u),
+                                                      edd.m_ev_jet.data() + edd.m_ev_jet.size(), is_finite);
 
-        // For non-terminal events, we want to sort the detected events and remove duplicates.
-        if (!edd.m_d_ntes.empty()) {
-            // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index and
-            // same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
-            std::ranges::sort(edd.m_d_ntes, detail::taylor_ev_cmp);
+        // NOTE: run event detection only if all its input data is finite.
+        if (ed_finite) [[likely]] {
+            // Do the event detection.
+            edd.detect_events(h, m_order, m_dim, g_eps);
 
-            // Remove duplicates.
-            edd.m_d_ntes.erase(std::unique(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), detail::taylor_ev_eq),
-                               edd.m_d_ntes.end());
-        }
+            // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary
+            // memory). From here until we start invoking the callbacks, everything is noexcept, so we don't risk
+            // leaving the integrator in a half-baked state.
 
-        // If we have terminal events we need to update the value of h.
-        if (!edd.m_d_tes.empty()) {
-#if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
-                // NOTE: use set() so that no matter what happens during event detection,
-                // we will not change the precision of h to an invalid value.
-                h.set(std::get<1>(edd.m_d_tes[0]));
-            } else {
-#endif
-                h = std::get<1>(edd.m_d_tes[0]);
-#if defined(HEYOKA_HAVE_REAL)
+            // We now have to post-process the list of detected events, which are unordered and may contain duplicates.
+            // For terminal events, we are interested only in the first event triggering in chronological order. It will
+            // be placed at the first position of edd.m_d_tes. Duplicates are irrelevant here, as only the first event
+            // is used.
+            //
+            // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index
+            // takes precedence.
+            if (!edd.m_d_tes.empty()) {
+                const auto earliest_it = std::ranges::min_element(edd.m_d_tes, detail::taylor_ev_cmp);
+                std::iter_swap(earliest_it, edd.m_d_tes.begin());
             }
+
+            // For non-terminal events, we want to sort the detected events and remove duplicates.
+            if (!edd.m_d_ntes.empty()) {
+                // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index
+                // and same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
+                std::ranges::sort(edd.m_d_ntes, detail::taylor_ev_cmp);
+
+                // Remove duplicates.
+                edd.m_d_ntes.erase(std::unique(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), detail::taylor_ev_eq),
+                                   edd.m_d_ntes.end());
+            }
+
+            // If we have terminal events we need to update the value of h.
+            if (!edd.m_d_tes.empty()) {
+#if defined(HEYOKA_HAVE_REAL)
+                if constexpr (std::is_same_v<T, mppp::real>) {
+                    // NOTE: use set() so that no matter what happens during event detection,
+                    // we will not change the precision of h to an invalid value.
+                    h.set(std::get<1>(edd.m_d_tes[0]));
+                } else {
 #endif
+                    h = std::get<1>(edd.m_d_tes[0]);
+#if defined(HEYOKA_HAVE_REAL)
+                }
+#endif
+            }
         }
+
+        // Write unconditionally the tcs for the state.
+        std::ranges::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), &h);
@@ -910,27 +934,23 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // Store the last timestep.
         m_last_h = h;
 
-        // Check if the time or the state vector are non-finite at the
-        // end of the timestep.
-        if (!isfinite(m_time)
-            || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
+        // Exit early if time or the state vector are non-finite at the end of the timestep, or if event detection could
+        // not be performed due to non-finite inputs.
+        if (!ed_finite || !is_finite(m_time) || !std::ranges::all_of(m_state, is_finite)) [[unlikely]] {
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
         // Update the cooldowns.
         for (auto &cd : edd.m_te_cooldowns) {
             if (cd) {
-                // Check if the timestep we just took
-                // brought this event outside the cooldown.
+                // Check if the timestep we just took brought this event outside the cooldown.
                 const auto tmp = cd->first + h;
 
                 if (abs(tmp) >= cd->second) {
-                    // We are now outside the cooldown period
-                    // for this event, reset cd.
+                    // We are now outside the cooldown period for this event, reset cd.
                     cd.reset();
                 } else {
-                    // Still in cooldown, update the
-                    // time spent in cooldown.
+                    // Still in cooldown, update the time spent in cooldown.
                     cd->first = tmp;
                 }
             }
@@ -949,23 +969,21 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // Store the time coordinate before invoking the callbacks.
         const auto new_time = m_time;
 
-        // Invoke the callbacks of the non-terminal events, which are guaranteed
-        // to happen before the first terminal event.
+        // Invoke the callbacks of the non-terminal events, which are guaranteed to happen before the first terminal
+        // event.
         for (auto it = edd.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
-            assert(cb); // LCOV_EXCL_LINE
+            assert(cb);
 
-            // NOTE: use new_time, instead of m_time, in order to prevent
-            // passing the wrong time coordinate to the callback if an earlier
-            // callback changed it.
+            // NOTE: use new_time, instead of m_time, in order to prevent passing the wrong time coordinate to the
+            // callback if an earlier callback changed it.
 
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<T, mppp::real>) {
-                // NOTE: for mppp::real, we must ensure that the time coordinate
-                // of the event is computed with the correct precision (we are
-                // getting the time coordinate from the event detection machinery,
-                // which does not enforce preservation of the correct precision).
+                // NOTE: for mppp::real, we must ensure that the time coordinate of the event is computed with the
+                // correct precision (we are getting the time coordinate from the event detection machinery, which does
+                // not enforce preservation of the correct precision).
                 auto tc = static_cast<T>((new_time - m_last_h + std::get<1>(t)));
                 tc.prec_round(this->get_prec());
                 cb(*this, tc, std::get<2>(t));
@@ -977,15 +995,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 #endif
         }
 
-        // The return value of the first
-        // terminal event's callback. It will be
-        // unused if there are no terminal events.
+        // The return value of the first terminal event's callback. It will be unused if there are no terminal events.
         bool te_cb_ret = false;
 
         if (!edd.m_d_tes.empty()) {
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(edd.m_d_tes[0]);
-            assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
+            assert(te_idx < edd.m_tes.size());
             auto &te = edd.m_tes[te_idx];
 
             // Set the corresponding cooldown.
@@ -994,9 +1010,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                 edd.m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                // NOTE: if g_eps is not finite, we skipped event detection
-                // altogether and thus we never end up here. If the derivative
-                // of the event equation is not finite, the event is also skipped.
+                //
+                // NOTE: if g_eps is not finite, we never end up here. If the derivative of the event equation is not
+                // finite, the event is also skipped.
                 edd.m_te_cooldowns[te_idx].emplace(0,
                                                    detail::taylor_deduce_cooldown(g_eps, std::get<3>(edd.m_d_tes[0])));
             }
@@ -1007,14 +1023,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
         }
 
-        // NOTE: event callbacks - terminal or not - cannot modify the time
-        // variable, as this is going to mess up the internal time keeping logic
-        // in the propagate_*() functions.
-        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
-        // This is necessary in case something goes wrong in the integration step
-        // and the time coordinate goes NaN - in such a case, the standard equality operator
-        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
-        if (!detail::cmp_nan_eq(m_time.hi, new_time.hi) || !detail::cmp_nan_eq(m_time.lo, new_time.lo)) {
+        // NOTE: event callbacks - terminal or not - cannot modify the time variable, as this is going to mess up the
+        // internal time keeping logic in the propagate_*() functions.
+        if (m_time != new_time) [[unlikely]] {
             throw std::runtime_error("The invocation of one or more event callbacks resulted in the alteration of the "
                                      "time coordinate of the integrator - this is not supported");
         }
@@ -1026,11 +1037,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // Terminal event detected. Fetch its index.
             const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[0]));
 
-            // NOTE: if te_cb_ret is true, it means that the terminal event has
-            // a callback and its invocation returned true (meaning that the
-            // integration should continue). Otherwise, either the terminal event
-            // has no callback or its callback returned false, meaning that the
-            // integration must stop.
+            // NOTE: if te_cb_ret is true, it means that the terminal event has a callback and its invocation returned
+            // true (meaning that the integration should continue). Otherwise, either the terminal event has no callback
+            // or its callback returned false, meaning that the integration must stop.
+            //
             // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
             return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, std::move(h)};
         }
