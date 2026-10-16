@@ -15,6 +15,8 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/predef/architecture.h>
+
 #include <fmt/core.h>
 
 #include <llvm/ADT/FloatingPointMode.h>
@@ -118,6 +120,100 @@ llvm::Value *avx512_binop_up(llvm_state &s, const std::string_view op, llvm::Val
                                 {}, {a_vec, b_vec, poison_vec, builder.getInt8(0xff), rnd});
 
     return builder.CreateExtractElement(res_vec, static_cast<std::uint64_t>(0));
+}
+
+// Wrapper to set the rounding mode to UP for a scalar floating-point type fp_t.
+//
+// Normally, we use llvm.get/set.rounding() to manipulate the rounding mode, but on some platforms this leads to
+// suboptimal code that can be improved with a custom implementation.
+//
+// The return value is the original rounding mode (i.e., before the change), a platform-specific 32-bit int value that
+// can be passed to llvm_restore_rounding() to restore the original rounding mode.
+llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] llvm::Type *const fp_t)
+{
+    assert(!fp_t->isVectorTy());
+
+    auto &builder = s.builder();
+
+    // NOTE: on x86-64 we assume that all float/double operations use the SSE-family instructions, rather than the
+    // x87 instructions. Under this assumption, we can ignore the x87 rounding mode (which would be read/set by
+    // llvm.get/set.rounding()) and operate only on the MXCSR rounding mode.
+    //
+    // NOTE: this is a compile-time check, which happens to work correctly because currently we are always jitting for
+    // the host. If we ever enable jitting for non-host architectures, we should re-write these checks in terms of
+    // runtime-derived properties (e.g., via the target triple).
+#if BOOST_ARCH_X86_64
+
+    if (fp_t->isDoubleTy() || fp_t->isFloatTy()) {
+        // Mask of the rounding control field (bits 13 and 14) in the MXCSR register.
+        constexpr std::uint32_t mxcsr_rc_mask = 0x6000;
+
+        // Mask of all the bits of the MXCSR register except the rounding control field.
+        constexpr std::uint32_t mxcsr_non_rc_mask = 0xFFFF9FFF;
+
+        // Value of the rounding control field for rounding up.
+        constexpr std::uint32_t mxcsr_rc_up = 0x4000;
+
+        // Load the current value of the MXCSR register via a stack slot.
+        auto *const mxcsr_ptr = builder.CreateAlloca(builder.getInt32Ty());
+        llvm_invoke_intrinsic(builder, "llvm.x86.sse.stmxcsr", {}, {mxcsr_ptr});
+        auto *const mxcsr = builder.CreateLoad(builder.getInt32Ty(), mxcsr_ptr);
+
+        // Replace the rounding control field with the value for rounding up, leaving the other bits unchanged, and
+        // write the result back into the MXCSR register via the same stack slot.
+        builder.CreateStore(builder.CreateOr(builder.CreateAnd(mxcsr, mxcsr_non_rc_mask), mxcsr_rc_up), mxcsr_ptr);
+        llvm_invoke_intrinsic(builder, "llvm.x86.sse.ldmxcsr", {}, {mxcsr_ptr});
+
+        // Return the original rounding control field.
+        return builder.CreateAnd(mxcsr, mxcsr_rc_mask);
+    }
+
+#endif
+
+    // Fetch the current rounding mode.
+    auto *const ret = llvm_invoke_intrinsic(builder, "llvm.get.rounding", {}, {});
+
+    // Switch to rounding toward +inf.
+    llvm_invoke_intrinsic(builder, "llvm.set.rounding", {},
+                          {builder.getInt32(static_cast<std::uint32_t>(llvm::RoundingMode::TowardPositive))});
+
+    return ret;
+}
+
+// Wrapper to restore the original rounding mode returned by llvm_set_rounding_up() for a scalar floating-point type
+// fp_t.
+void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_unused]] llvm::Type *const fp_t)
+{
+    assert(!fp_t->isVectorTy());
+
+    auto &builder = s.builder();
+
+    assert(rounding->getType() == builder.getInt32Ty());
+
+    // NOTE: see the explanation in llvm_set_rounding_up().
+#if BOOST_ARCH_X86_64
+
+    if (fp_t->isDoubleTy() || fp_t->isFloatTy()) {
+        // Mask of all the bits of the MXCSR register except the rounding control field (bits 13 and 14).
+        constexpr std::uint32_t mxcsr_non_rc_mask = 0xFFFF9FFF;
+
+        // Load the current value of the MXCSR register via a stack slot.
+        auto *const mxcsr_ptr = builder.CreateAlloca(builder.getInt32Ty());
+        llvm_invoke_intrinsic(builder, "llvm.x86.sse.stmxcsr", {}, {mxcsr_ptr});
+        auto *const mxcsr = builder.CreateLoad(builder.getInt32Ty(), mxcsr_ptr);
+
+        // Replace the rounding control field with the original one, leaving the other bits unchanged, and write the
+        // result back into the MXCSR register via the same stack slot.
+        builder.CreateStore(builder.CreateOr(builder.CreateAnd(mxcsr, mxcsr_non_rc_mask), rounding), mxcsr_ptr);
+        llvm_invoke_intrinsic(builder, "llvm.x86.sse.ldmxcsr", {}, {mxcsr_ptr});
+
+        return;
+    }
+
+#endif
+
+    // Restore the original rounding mode.
+    llvm_invoke_intrinsic(builder, "llvm.set.rounding", {}, {rounding});
 }
 
 } // namespace
@@ -273,18 +369,8 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
         builder.setDefaultConstrainedRounding(llvm::RoundingMode::Dynamic);
         builder.setDefaultConstrainedExcept(llvm::fp::ebIgnore);
 
-        // Save the original rounding mode.
-        //
-        // NOTE: on x86, there are two separate rounding modes: one for the x87 unit and one for SSE. llvm.get.rounding
-        // returns the x87 rounding mode, while llvm.set.rounding sets both. Thus, if the caller had set different x87
-        // and SSE rounding modes (which is possible only via non-standard means, e.g., the _mm_setcsr() intrinsic), on
-        // exit both rounding modes will be set to the caller's x87 rounding mode. Note that this is a corner case that
-        // cannot be hit via standard C/C++ code (where the FP env functions operate in the same way as the LLVM
-        // intrinsics), so we are fine with this behaviour.
-        orig_rounding = llvm_invoke_intrinsic(builder, "llvm.get.rounding", {}, {});
-
-        // Switch to rounding toward +inf.
-        llvm_invoke_intrinsic(builder, "llvm.set.rounding", {}, {builder.getInt32(2)});
+        // Set the rounding to +inf and save the original rounding mode.
+        orig_rounding = llvm_set_rounding_up(s, fp_t);
     }
 
     // Load the timestep.
@@ -494,7 +580,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Restore the original rounding mode, if necessary.
     if (impl == fex_check_impl::portable) {
         assert(orig_rounding != nullptr);
-        llvm_invoke_intrinsic(builder, "llvm.set.rounding", {}, {orig_rounding});
+        llvm_restore_rounding(s, orig_rounding, fp_t);
     }
 
     // Exit.

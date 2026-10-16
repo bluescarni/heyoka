@@ -19,6 +19,14 @@
 #include <type_traits>
 #include <vector>
 
+#include <boost/predef/architecture.h>
+
+#if BOOST_ARCH_X86_64
+
+#include <xmmintrin.h>
+
+#endif
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -33,6 +41,7 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -982,6 +991,87 @@ TEST_CASE("batch")
     });
 }
 
+#if BOOST_ARCH_X86_64
+
+// The types for which the fast exclusion check operates only on the MXCSR register (i.e., the types which are mapped to
+// the LLVM float/double types, see llvm_set_rounding_up()).
+template <typename T>
+constexpr bool uses_mxcsr = detail::is_ieee754_binary32<T> || detail::is_ieee754_binary64<T>;
+
+// Mask of the rounding control field (bits 13 and 14) in the MXCSR register.
+constexpr unsigned mxcsr_rc_mask = 0x6000;
+
+// Mask of all the bits of the MXCSR register except the rounding control field.
+constexpr unsigned mxcsr_non_rc_mask = 0xFFFF9FFF;
+
+// Values of the rounding control field for rounding up and down.
+constexpr unsigned mxcsr_rc_up = 0x4000;
+constexpr unsigned mxcsr_rc_down = 0x2000;
+
+#endif
+
+// Fetch the rounding mode for the floating-point type T in the same way as the fast exclusion check does (see
+// llvm_set_rounding_up()): on x86-64 with float/double, the rounding control field of the MXCSR register, otherwise the
+// value returned by std::fegetround().
+template <typename T>
+int get_rounding()
+{
+#if BOOST_ARCH_X86_64
+    if constexpr (uses_mxcsr<T>) {
+        return static_cast<int>(_mm_getcsr() & mxcsr_rc_mask);
+    } else {
+        return std::fegetround();
+    }
+#else
+    return std::fegetround();
+#endif
+}
+
+// Restore the rounding mode r returned by get_rounding() for the floating-point type T.
+template <typename T>
+void restore_rounding(int r)
+{
+#if BOOST_ARCH_X86_64
+    if constexpr (uses_mxcsr<T>) {
+        _mm_setcsr((_mm_getcsr() & mxcsr_non_rc_mask) | static_cast<unsigned>(r));
+    } else {
+        REQUIRE(std::fesetround(r) == 0);
+    }
+#else
+    REQUIRE(std::fesetround(r) == 0);
+#endif
+}
+
+// Set the rounding mode for the floating-point type T to rounding up, in the same way as get_rounding().
+template <typename T>
+void set_rounding_up()
+{
+#if BOOST_ARCH_X86_64
+    if constexpr (uses_mxcsr<T>) {
+        _mm_setcsr((_mm_getcsr() & mxcsr_non_rc_mask) | mxcsr_rc_up);
+    } else {
+        REQUIRE(std::fesetround(FE_UPWARD) == 0);
+    }
+#else
+    REQUIRE(std::fesetround(FE_UPWARD) == 0);
+#endif
+}
+
+// Set the rounding mode for the floating-point type T to rounding down, in the same way as get_rounding().
+template <typename T>
+void set_rounding_down()
+{
+#if BOOST_ARCH_X86_64
+    if constexpr (uses_mxcsr<T>) {
+        _mm_setcsr((_mm_getcsr() & mxcsr_non_rc_mask) | mxcsr_rc_down);
+    } else {
+        REQUIRE(std::fesetround(FE_DOWNWARD) == 0);
+    }
+#else
+    REQUIRE(std::fesetround(FE_DOWNWARD) == 0);
+#endif
+}
+
 TEST_CASE("caller rounding mode")
 {
     tuple_for_each(fp_types, [](auto x) {
@@ -1005,27 +1095,41 @@ TEST_CASE("caller rounding mode")
                     }
                 }
 
-                // Output with the caller's rounding mode set to round to nearest.
-                std::vector<fp_t> enc_nearest(2u * batch_size);
-                std::vector<std::uint32_t> out_nearest(batch_size);
-                fex_check(cf.data(), h.data(), out_nearest.data(), enc_nearest.data());
+                std::vector<fp_t> enc_orig(2u * batch_size), enc_up(2u * batch_size), enc_down(2u * batch_size);
+                std::vector<std::uint32_t> out_orig(batch_size), out_up(batch_size), out_down(batch_size);
 
-                for (const auto mode : {FE_UPWARD, FE_DOWNWARD, FE_TOWARDZERO}) {
-                    std::vector<fp_t> enc(2u * batch_size);
-                    std::vector<std::uint32_t> out(batch_size);
+                // Run the fast exclusion check with the caller's original rounding mode.
+                fex_check(cf.data(), h.data(), out_orig.data(), enc_orig.data());
 
-                    // NOTE: the test code does not perform any floating-point computation while the caller's rounding
-                    // mode is changed.
-                    REQUIRE(std::fesetround(mode) == 0);
-                    fex_check(cf.data(), h.data(), out.data(), enc.data());
-                    const auto mode_after = std::fegetround();
-                    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
+                // The caller's original rounding mode.
+                const auto orig_rounding = get_rounding<fp_t>();
 
-                    // The caller's rounding mode must be restored, and the output must not depend on it.
-                    REQUIRE(mode_after == mode);
-                    REQUIRE(enc == enc_nearest);
-                    REQUIRE(out == out_nearest);
-                }
+                // NOTE: the test code does not perform any floating-point computation while the caller's rounding mode
+                // is changed.
+
+                // Run the fast exclusion check with the caller's rounding mode set to rounding up.
+                set_rounding_up<fp_t>();
+                const auto rounding_up = get_rounding<fp_t>();
+                fex_check(cf.data(), h.data(), out_up.data(), enc_up.data());
+                const auto rounding_up_after = get_rounding<fp_t>();
+
+                // Run the fast exclusion check with the caller's rounding mode set to rounding down.
+                set_rounding_down<fp_t>();
+                const auto rounding_down = get_rounding<fp_t>();
+                fex_check(cf.data(), h.data(), out_down.data(), enc_down.data());
+                const auto rounding_down_after = get_rounding<fp_t>();
+
+                restore_rounding<fp_t>(orig_rounding);
+
+                // The caller's rounding mode must be restored.
+                REQUIRE(rounding_up_after == rounding_up);
+                REQUIRE(rounding_down_after == rounding_down);
+
+                // The output must not depend on the caller's rounding mode.
+                REQUIRE(enc_up == enc_orig);
+                REQUIRE(out_up == out_orig);
+                REQUIRE(enc_down == enc_orig);
+                REQUIRE(out_down == out_orig);
             }
         }
     });
