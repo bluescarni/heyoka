@@ -129,7 +129,7 @@ llvm::Value *avx512_binop_up(llvm_state &s, const std::string_view op, llvm::Val
 //
 // The return value is the original rounding mode (i.e., before the change), a platform-specific 32-bit int value that
 // can be passed to llvm_restore_rounding() to restore the original rounding mode.
-llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] llvm::Type *const fp_t)
+llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] const llvm::Type *const fp_t)
 {
     assert(!fp_t->isVectorTy());
 
