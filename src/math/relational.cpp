@@ -159,7 +159,7 @@ llvm::Value *rel_eval_impl(llvm_state &s, rel_op op, const std::vector<llvm::Val
             ret = llvm_fcmp_oeq(s, args[0], args[1]);
             break;
         case rel_op::neq:
-            ret = llvm_fcmp_one(s, args[0], args[1]);
+            ret = llvm_fcmp_une(s, args[0], args[1]);
             break;
         case rel_op::lt:
             ret = llvm_fcmp_olt(s, args[0], args[1]);

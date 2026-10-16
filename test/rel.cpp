@@ -10,10 +10,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -242,6 +244,58 @@ TEST_CASE("cfunc")
     }
 }
 
+// Relational operators with NaN operands: as in C++, only neq evaluates to true.
+TEST_CASE("cfunc nan")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, y] = make_vars("x", "y");
+
+        const auto nan = std::numeric_limits<fp_t>::quiet_NaN();
+        const auto one = fp_t(1);
+
+        // The values of (x, y), each with at least one NaN operand.
+        const std::vector<std::pair<fp_t, fp_t>> cases{{nan, one}, {one, nan}, {nan, nan}};
+
+        for (auto batch_size : {1u, 3u}) {
+            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
+            cfunc<fp_t> cf({eq(x, y), neq(x, y), lt(x, y), gt(x, y), lte(x, y), gte(x, y)}, {x, y},
+                           kw::batch_size = batch_size, kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+
+            std::vector<fp_t> outs(batch_size * 6u), ins(batch_size * 2u);
+
+            for (std::size_t start = 0; start < cases.size(); start += batch_size) {
+                for (std::size_t j = 0; j < batch_size; ++j) {
+                    ins[j] = cases[start + j].first;
+                    ins[batch_size + j] = cases[start + j].second;
+                }
+
+                cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 6u, batch_size),
+                   mdspan<const fp_t, dextents<std::size_t, 2>>(ins.data(), 2u, batch_size));
+
+                for (std::size_t j = 0; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == 0);
+                    REQUIRE(outs[batch_size + j] == 1);
+                    REQUIRE(outs[2u * batch_size + j] == 0);
+                    REQUIRE(outs[3u * batch_size + j] == 0);
+                    REQUIRE(outs[4u * batch_size + j] == 0);
+                    REQUIRE(outs[5u * batch_size + j] == 0);
+                }
+            }
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            tuple_for_each(fp_types, [&tester, opt_level, cm](auto x) { tester(x, opt_level, cm); });
+        }
+    }
+}
+
 #if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("cfunc_mp")
@@ -271,6 +325,40 @@ TEST_CASE("cfunc_mp")
             REQUIRE(outs[5] == (pars[0] >= .4));
             REQUIRE(outs[6] == true);
             REQUIRE(outs[7] == true);
+        }
+    }
+}
+
+// Relational operators with NaN operands: as in C++, only neq evaluates to true.
+TEST_CASE("cfunc_mp nan")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    const auto prec = 237u;
+
+    const mppp::real nan{mppp::real_kind::nan, prec}, one{1, prec};
+
+    // The values of (x, y), each with at least one NaN operand.
+    const std::vector<std::pair<mppp::real, mppp::real>> cases{{nan, one}, {one, nan}, {nan, nan}};
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            cfunc<mppp::real> cf({eq(x, y), neq(x, y), lt(x, y), gt(x, y), lte(x, y), gte(x, y)}, {x, y},
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
+
+            for (const auto &[a, b] : cases) {
+                const std::vector ins{a, b};
+                std::vector<mppp::real> outs(6u, mppp::real{0, prec});
+
+                cf(outs, ins);
+
+                REQUIRE(outs[0] == 0);
+                REQUIRE(outs[1] == 1);
+                REQUIRE(outs[2] == 0);
+                REQUIRE(outs[3] == 0);
+                REQUIRE(outs[4] == 0);
+                REQUIRE(outs[5] == 0);
+            }
         }
     }
 }

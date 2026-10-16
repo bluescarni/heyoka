@@ -446,9 +446,10 @@ namespace
 {
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR comparison primitive 'mpfr_name'.
+//
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N), the return type is bool. The name of the
-// function will be built from mpfr_name. The MPFR primitive must not require a rounding mode argument and it must
-// return an int.
+// function will be built from mpfr_name. The mpfr_name function is expected to return a nonzero int to indicate true,
+// zero int for false. The MPFR primitive must not require a rounding mode argument.
 llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &mpfr_name, unsigned nargs)
 {
     assert(nargs > 0u);
@@ -465,33 +466,36 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
 
     auto *f = md.getFunction(fname);
 
-    if (f == nullptr) {
-        auto *orig_bb = builder.GetInsertBlock();
-
-        // Create the function type and the function.
-        const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
-        auto *ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
-
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the mpfr views for the input arguments and add them as function arguments.
-        std::vector<llvm::Value *> mpfr_args;
-        mpfr_args.reserve(boost::numeric_cast<decltype(mpfr_args.size())>(nargs));
-        for (auto i = 0u; i < nargs; ++i) {
-            mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
-        }
-
-        // Invoke the MPFR primitive.
-        auto *cmp_ret = llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args,
-                                             get_mpfr_attr_list(context));
-
-        // Truncate the result to a boolean and return.
-        builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
-
-        builder.SetInsertPoint(orig_bb);
+    if (f != nullptr) {
+        return f;
     }
+
+    // Remember and restore the current insertion point.
+    const llvm::IRBuilderBase::InsertPointGuard ipg(builder);
+
+    // Create the function type and the function.
+    const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
+    auto *const ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Create the mpfr views for the input arguments and add them as function arguments.
+    std::vector<llvm::Value *> mpfr_args;
+    mpfr_args.reserve(nargs);
+    for (auto i = 0u; i < nargs; ++i) {
+        mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
+    }
+
+    // Invoke the MPFR primitive.
+    auto *const cmp_ret = llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args,
+                                               get_mpfr_attr_list(context));
+
+    // Convert the result to a boolean and return.
+    //
+    // NOTE: in order to properly convert an integral bool-like flag to the bool type, we need to run a comparison.
+    builder.CreateRet(builder.CreateICmpNE(cmp_ret, llvm::ConstantInt::get(cmp_ret->getType(), 0)));
 
     return f;
 }
@@ -615,7 +619,21 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateCall(f, {a, b});
 }
 
+// NOTE: fcmp ONE means that it must return true if neither operand is NaN and a != b.
 llvm::Value *llvm_real_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+
+    // NOTE: mpfr_lessgreater_p() returns true if a < b or a > b, false otherwise (i.e., if a and/or b is NaN, or if a
+    // == b).
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_lessgreater_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+llvm::Value *llvm_real_fcmp_une(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     // Compute a == b.
     auto *ret = llvm_real_fcmp_oeq(s, a, b);

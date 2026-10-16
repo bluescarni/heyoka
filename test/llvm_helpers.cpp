@@ -3223,6 +3223,67 @@ TEST_CASE("is_finite scalar mp")
     }
 }
 
+TEST_CASE("fcmp one une scalar mp")
+{
+    using detail::llvm_fcmp_one;
+    using detail::llvm_fcmp_une;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = detail::internal_llvm_type_like(s, mppp::real{0, prec});
+
+        // Add a function called name returning cmp(a, b), with a and b loaded from the two pointer arguments.
+        const auto add_cmp_func = [&](const char *name, auto cmp) {
+            auto *ft = llvm::FunctionType::get(
+                builder.getInt32Ty(), {llvm::PointerType::getUnqual(context), llvm::PointerType::getUnqual(context)},
+                false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            auto *a = detail::ext_load_vector_from_memory(s, real_t, f->args().begin(), 1u);
+            auto *b = detail::ext_load_vector_from_memory(s, real_t, f->args().begin() + 1, 1u);
+
+            builder.CreateRet(builder.CreateZExt(cmp(s, a, b), builder.getInt32Ty()));
+        };
+
+        add_cmp_func("fcmp_one", llvm_fcmp_one);
+        add_cmp_func("fcmp_une", llvm_fcmp_une);
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointers.
+        auto one_ptr = reinterpret_cast<std::uint32_t (*)(const fp_t *, const fp_t *)>(s.jit_lookup("fcmp_one"));
+        auto une_ptr = reinterpret_cast<std::uint32_t (*)(const fp_t *, const fp_t *)>(s.jit_lookup("fcmp_une"));
+
+        const mppp::real a{1.5, prec}, b{2, prec}, nan{mppp::real_kind::nan, prec};
+
+        // ONE: true if neither operand is NaN and the operands differ.
+        REQUIRE(one_ptr(&a, &b) == 1u);
+        REQUIRE(one_ptr(&a, &a) == 0u);
+        REQUIRE(one_ptr(&nan, &a) == 0u);
+        REQUIRE(one_ptr(&a, &nan) == 0u);
+        REQUIRE(one_ptr(&nan, &nan) == 0u);
+
+        // UNE: true if either operand is NaN or the operands differ.
+        REQUIRE(une_ptr(&a, &b) == 1u);
+        REQUIRE(une_ptr(&a, &a) == 0u);
+        REQUIRE(une_ptr(&nan, &a) == 1u);
+        REQUIRE(une_ptr(&a, &nan) == 1u);
+        REQUIRE(une_ptr(&nan, &nan) == 1u);
+    }
+}
+
 #endif
 
 // NOTE: is_natural() appears not to be working on ppc, giving the following error:
