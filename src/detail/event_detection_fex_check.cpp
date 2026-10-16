@@ -382,9 +382,11 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Helper to compute a < b.
     //
     // NOTE: LLVM cannot lower constrained comparisons of vectors of fp128 on some platforms (e.g., x86-64 and aarch64
-    // as of LLVM 23), thus for fp128 we compare element by element.
+    // as of LLVM 23), nor constrained comparisons of vectors of x86_fp80 on x86-64 with AVX-512 (LLVM 19-21). Thus, for
+    // these types we compare element by element. This has no runtime cost, as the backend operates on these vectors
+    // element by element anyway.
     const auto lt = [&s, &builder, fp_t](llvm::Value *const a, llvm::Value *const b) -> llvm::Value * {
-        if (fp_t->isFP128Ty()) {
+        if (fp_t->isFP128Ty() || fp_t->isX86_FP80Ty()) {
             const auto a_scalars = vector_to_scalars(builder, a);
             const auto b_scalars = vector_to_scalars(builder, b);
 
