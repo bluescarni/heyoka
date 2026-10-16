@@ -870,14 +870,17 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         //
         // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
         // functions.
+        //
+        // NOTE: this is the index in m_ev_jet where the Taylor coefficients for the event functions begin.
+        const auto ev_begin = m_dim * (m_order + 1u);
         const auto ed_finite = is_finite(h) && is_finite(g_eps)
-                               && std::ranges::all_of(edd.m_ev_jet.data() + m_dim * (m_order + 1u),
+                               && std::ranges::all_of(edd.m_ev_jet.data() + ev_begin,
                                                       edd.m_ev_jet.data() + edd.m_ev_jet.size(), is_finite);
 
         // NOTE: run event detection only if all its input data is finite.
         if (ed_finite) [[likely]] {
             // Do the event detection.
-            edd.detect_events(h, m_order, m_dim, g_eps);
+            edd.detect_events(h, m_order, m_dim);
 
             // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary
             // memory). From here until we start invoking the callbacks, everything is noexcept, so we don't risk
@@ -923,7 +926,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         }
 
         // Write unconditionally the tcs for the state.
-        std::ranges::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
+        std::ranges::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + ev_begin, m_tc.data());
 
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), &h);

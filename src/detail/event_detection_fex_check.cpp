@@ -246,7 +246,8 @@ void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_u
 // the correctness of the function, and it will at most slightly degrade the quality of its output.
 //
 // NOTE: this implementation of the exclusion check assumes that all input values (i.e., the polynomial coefficients and
-// the timestep h) are finite. Invoking it with non-finite values may produce incorrect results.
+// the timestep h) are finite. Invoking it with non-finite values may produce incorrect results. In batch mode, this
+// applies to each lane separately: non-finite values in a lane may produce incorrect results only in that lane.
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, llvm::Type *const fp_t,

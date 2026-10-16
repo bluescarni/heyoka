@@ -1495,20 +1495,11 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 //
 // NOTE: the list of detected events may contain duplicates which will have to be removed outside this function.
 template <typename T>
-void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std::uint32_t dim, const T &g_eps)
+void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std::uint32_t dim)
 {
     using std::isfinite;
 
     assert(isfinite(h));
-    assert(isfinite(g_eps));
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        assert(h.get_prec() == g_eps.get_prec());
-    }
-
-#endif
 
     // As a first step, the vectors of detected events must be cleared out.
     m_d_tes.clear();
@@ -1793,13 +1784,13 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
 {
     using std::isfinite;
 
+    assert(order >= 2u);
+
     // Clear the vectors of detected events.
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_tes[i].clear();
         m_d_ntes[i].clear();
     }
-
-    assert(order >= 2u);
 
     // The value that will be used to initialise the coefficients of newly-created polynomials in the caches.
     const T poly_init = 0;

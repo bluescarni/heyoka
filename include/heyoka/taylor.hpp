@@ -1229,7 +1229,8 @@ inline constexpr int taylor_adaptive_s11n_version = 9;
 // - 5: added parallel JIT compilation for compact mode.
 // - 6: replaced aligned_buffer with aligned_vector.
 // - 7: re-organised internal layout.
-// - 8: changed the prototype and implementation of the fast exclusion check for events.
+// - 8: changed the prototype and implementation of the fast exclusion check for events, as well as the internal layout
+//   of the event detection data.
 inline constexpr int taylor_adaptive_batch_s11n_version = 8;
 
 } // namespace detail
