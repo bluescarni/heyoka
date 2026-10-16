@@ -69,6 +69,8 @@ enum class fex_check_impl : std::uint8_t {
     multiprecision,
 };
 
+// LCOV_EXCL_START
+
 // Helper to compute 'a op b', rounded toward +inf, via the AVX512 intrinsics with static rounding. op must be one of
 // "add", "sub" or "mul". a and b must be of the same type, which must be either float/double or a 512-bit vector of
 // float/double (i.e., of size 16/8).
@@ -180,6 +182,8 @@ llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] const llvm::Ty
     return ret;
 }
 
+// LCOV_EXCL_STOP
+
 // Wrapper to restore the original rounding mode returned by llvm_set_rounding_up() for a scalar floating-point type
 // fp_t.
 void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_unused]] const llvm::Type *const fp_t)
@@ -272,6 +276,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Check if we can use avx512.
     const auto &target_features = get_target_features();
     if (target_features.avx512f) {
+        // LCOV_EXCL_START
         const auto fp_is_float = fp_t->isFloatTy();
         const auto fp_is_double = fp_t->isDoubleTy();
 
@@ -281,6 +286,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
             || (fp_is_double && (batch_size == 1u || batch_size == 8u))) {
             impl = fex_check_impl::avx512;
         }
+        // LCOV_EXCL_STOP
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -452,8 +458,10 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
                 static_cast<void>(fp_t);
 
                 switch (impl) {
+                    // LCOV_EXCL_START
                     case fex_check_impl::avx512:
                         return avx512_binop_up(s, name, a, b);
+                    // LCOV_EXCL_STOP
 #if defined(HEYOKA_HAVE_REAL)
                     case fex_check_impl::multiprecision:
                         // NOTE: explicit rounding mode passed to the MPFR primitive.
