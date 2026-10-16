@@ -182,7 +182,7 @@ llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] llvm::Type *co
 
 // Wrapper to restore the original rounding mode returned by llvm_set_rounding_up() for a scalar floating-point type
 // fp_t.
-void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_unused]] llvm::Type *const fp_t)
+void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_unused]] const llvm::Type *const fp_t)
 {
     assert(!fp_t->isVectorTy());
 
