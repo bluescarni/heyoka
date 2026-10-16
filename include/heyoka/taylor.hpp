@@ -1216,7 +1216,8 @@ namespace detail
 // - 6: added parallel JIT compilation for compact mode.
 // - 7: replaced aligned_buffer with aligned_vector.
 // - 8: re-organised internal layout.
-inline constexpr int taylor_adaptive_s11n_version = 8;
+// - 9: changed the prototype and implementation of the fast exclusion check for events.
+inline constexpr int taylor_adaptive_s11n_version = 9;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 //
@@ -1228,7 +1229,8 @@ inline constexpr int taylor_adaptive_s11n_version = 8;
 // - 5: added parallel JIT compilation for compact mode.
 // - 6: replaced aligned_buffer with aligned_vector.
 // - 7: re-organised internal layout.
-inline constexpr int taylor_adaptive_batch_s11n_version = 7;
+// - 8: changed the prototype and implementation of the fast exclusion check for events.
+inline constexpr int taylor_adaptive_batch_s11n_version = 8;
 
 } // namespace detail
 

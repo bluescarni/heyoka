@@ -568,20 +568,18 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 // h is the integration timestep (assumed finite and nonzero). ptr is a pointer to the Taylor polynomial for the event,
 // whose order is 'order'. It must point to a scalar polynomial with order + 1 contiguous coefficients. poly_cache is
 // the polynomial cache. rtscc and pt are, respectively, the sign changes counting and polynomial translation functions.
-// back_int is a flag that will be 1 if the integration is backwards in time, 0 otherwise (it must be consistent with
-// the sign of h). isol is the list of isolating intervals. wlist the working list. out is the output vector for the
-// detected events. ev_vec is the vector of events. ev_idx is the index of the event being detected in ev_vec.
-// te_cooldowns is the vector of cooldowns for terminal events, relevant only if Event is a terminal event type. tmp,
-// tmp1 and tmp2 are temporary polynomials used in the bisection loop. poly_init is the value that will be used to
-// initialise the coefficients of newly-created polynomials in the caches.
+// isol is the list of isolating intervals. wlist the working list. out is the output vector for the detected events.
+// ev_vec is the vector of events. ev_idx is the index of the event being detected in ev_vec. te_cooldowns is the vector
+// of cooldowns for terminal events, relevant only if Event is a terminal event type. tmp, tmp1 and tmp2 are temporary
+// polynomials used in the bisection loop. poly_init is the value that will be used to initialise the coefficients of
+// newly-created polynomials in the caches.
 //
 // This function will detect the trigger time(s) of the event at index ev_idx in ev_vec and append the detected events
 // (possibly including duplicates) to the output vector out.
 template <typename T, typename Event>
 void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32_t order,
-                               taylor_poly_cache<T> &poly_cache, auto *const rtscc, auto *const pt,
-                               const std::uint32_t back_int, auto &isol, auto &wlist, auto &out,
-                               const std::vector<Event> &ev_vec, const std::uint32_t ev_idx,
+                               taylor_poly_cache<T> &poly_cache, auto *const rtscc, auto *const pt, auto &isol,
+                               auto &wlist, auto &out, const std::vector<Event> &ev_vec, const std::uint32_t ev_idx,
                                [[maybe_unused]] const auto &te_cooldowns, taylor_pwrap<T> &tmp, taylor_pwrap<T> &tmp1,
                                taylor_pwrap<T> &tmp2, const T &poly_init)
 {
@@ -595,7 +593,6 @@ void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32
     assert(pt != nullptr);
     assert(isfinite(h));
     assert(h != 0);
-    assert((h < 0) == back_int);
     assert(ev_idx < ev_vec.size());
 
     // The minimum width (in the [0, 1) range of the timestep) of the intervals that can be bisected in the real-root
@@ -696,10 +693,10 @@ void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32
                 // NOTE: the cooldown values are finite with |first| < second, thus the numerators are finite and
                 // non-negative. In these two computations, the worst outcome is the generation of a positive infinity
                 // (via overflow), which is correctly handled below.
-                if (back_int == 0u) {
-                    return (te_cooldowns[ev_idx]->second - te_cooldowns[ev_idx]->first) / abs(h);
-                } else {
+                if (h < 0) {
                     return (te_cooldowns[ev_idx]->second + te_cooldowns[ev_idx]->first) / abs(h);
+                } else {
+                    return (te_cooldowns[ev_idx]->second - te_cooldowns[ev_idx]->first) / abs(h);
                 }
             }
         }
@@ -1416,7 +1413,7 @@ ed_data<T>::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_eve
     llvm_add_poly_rtscc(m_state, fp_t, order, 1);
 
     // Add the function for the fast exclusion check.
-    llvm_add_fex_check(m_state, fp_t, order, 1);
+    llvm_ed_add_fex_check(m_state, "fex_check", fp_t, order, 1);
 
     // Compile.
     m_state.compile();
@@ -1543,15 +1540,15 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
     taylor_pwrap<T> tmp1(m_poly_cache, order, poly_init), tmp2(m_poly_cache, order, poly_init),
         tmp(m_poly_cache, order, poly_init);
 
-    // Determine if we are integrating backwards in time.
-    //
-    // NOTE: this must be a uint32_t so that it can be fed into the JITted functions.
-    const std::uint32_t back_int = (h < 0);
-
     // Fetch the function pointers.
     auto *const m_fex_check = m_jit_data->m_fex_check;
     auto *const m_rtscc = m_jit_data->m_rtscc;
     auto *const m_pt = m_jit_data->m_pt;
+
+    // NOTE: array to store the polynomial enclosures computed by m_fex_check(). We re-use poly_init in order to make
+    // sure that the array is inited with the correct precision for mppp::real. The content does not matter. The
+    // enclosures are not needed here, and they are ignored.
+    T enc[] = {poly_init, poly_init};
 
     // Helper to run event detection on a vector of events (terminal or not). 'out' is the vector of detected events,
     // 'ev_vec' the input vector of events to detect.
@@ -1567,14 +1564,14 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
             // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
             // non-finite Taylor coefficients will be caught in the step() implementations anyway.
             std::uint32_t fex_check_result{};
-            m_fex_check(ptr, &h, &back_int, &fex_check_result);
+            m_fex_check(ptr, &h, &fex_check_result, enc);
             if (fex_check_result) {
                 continue;
             }
 
             // Run the event detection.
-            detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, back_int, m_isol, m_wlist,
-                                              out, ev_vec, i, m_te_cooldowns, tmp, tmp1, tmp2, poly_init);
+            detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, m_isol, m_wlist, out, ev_vec,
+                                              i, m_te_cooldowns, tmp, tmp1, tmp2, poly_init);
         }
     };
 
@@ -1609,8 +1606,9 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     : m_tes(std::move(tes)), m_ntes(std::move(ntes)),
       m_jit_data(std::make_shared<ed_jit_data<T>>(ed_jit_data<T>{.m_state = std::move(s)}))
 {
-    assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
-    assert(batch_size != 0u);                  // LCOV_EXCL_LINE
+    assert(order >= 2u);
+    assert(!m_tes.empty() || !m_ntes.empty());
+    assert(batch_size != 0u);
 
     auto &m_state = m_jit_data->m_state;
 
@@ -1658,11 +1656,15 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     // Prepare m_d_ntes.
     m_d_ntes.resize(boost::numeric_cast<decltype(m_d_ntes.size())>(batch_size));
 
-    // Prepare m_back_int.
-    m_back_int.resize(boost::numeric_cast<decltype(m_back_int.size())>(batch_size));
-
     // Prepare m_fex_check_res.
-    m_fex_check_res.resize(batch_size);
+    m_fex_check_res.resize(boost::numeric_cast<decltype(m_fex_check_res.size())>(batch_size));
+
+    // Prepare m_fex_check_enc.
+    //
+    // NOTE: batch_size * 2u is safe, we checked earlier that (order + 1u) * batch_size (with order guaranteed >= 2) is
+    // representable both by std::uint32_t and the size type of m_ev_jet, which has the same size type as
+    // m_fex_check_enc.
+    m_fex_check_enc.resize(batch_size * 2u);
 
     // Setup the JIT-compiled functions.
 
@@ -1674,7 +1676,7 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
-    llvm_add_fex_check(m_state, fp_t, order, batch_size);
+    llvm_ed_add_fex_check(m_state, "fex_check", fp_t, order, batch_size);
 
     // Compile.
     m_state.compile();
@@ -1688,8 +1690,8 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
 template <typename T>
 ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps),
-      m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data), m_back_int(o.m_back_int),
-      m_fex_check_res(o.m_fex_check_res), m_poly_cache(o.m_poly_cache)
+      m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res),
+      m_fex_check_enc(o.m_fex_check_enc), m_poly_cache(o.m_poly_cache)
 {
     // Fetch the batch size.
     const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
@@ -1724,8 +1726,8 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_g_eps;
     ar << m_te_cooldowns;
     ar << m_jit_data;
-    ar << m_back_int;
     ar << m_fex_check_res;
+    ar << m_fex_check_enc;
     ar << m_poly_cache;
 
     // Save the batch size.
@@ -1756,8 +1758,8 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_g_eps;
     ar >> m_te_cooldowns;
     ar >> m_jit_data;
-    ar >> m_back_int;
     ar >> m_fex_check_res;
+    ar >> m_fex_check_enc;
     ar >> m_poly_cache;
 
     // Recover the batch size.
@@ -1804,11 +1806,10 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
 {
     using std::isfinite;
 
-    // Clear the vectors of detected events, and determine if we are integrating backwards in time.
+    // Clear the vectors of detected events.
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_tes[i].clear();
         m_d_ntes[i].clear();
-        m_back_int[i] = h_ptr[i] < 0;
     }
 
     assert(order >= 2u);
@@ -1841,7 +1842,7 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
             // NOTE: in case of non-finite values in the Taylor coefficients of the event equation, the worst that can
             // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
             // non-finite Taylor coefficients will be caught in the step() implementations anyway.
-            m_fex_check(batch_ptr, h_ptr, m_back_int.data(), m_fex_check_res.data());
+            m_fex_check(batch_ptr, h_ptr, m_fex_check_res.data(), m_fex_check_enc.data());
 
             // Run event detection on all the batch elements.
             for (std::uint32_t j = 0; j < batch_size; ++j) {
@@ -1849,9 +1850,6 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                 if (m_fex_check_res[j]) {
                     continue;
                 }
-
-                // Fetch the backwards integration flag.
-                const auto back_int = m_back_int[j];
 
                 // Start by running the checks that are run at the very beginning of the scalar event detection
                 // function.
@@ -1889,8 +1887,8 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                 const auto *const ptr = std::as_const(scal_poly.v).data();
 
                 // Run the event detection.
-                detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, back_int, m_isol, m_wlist,
-                                                  out, ev_vec, i, m_te_cooldowns[j], tmp, tmp1, tmp2, poly_init);
+                detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, m_isol, m_wlist, out,
+                                                  ev_vec, i, m_te_cooldowns[j], tmp, tmp1, tmp2, poly_init);
             }
         }
     };
