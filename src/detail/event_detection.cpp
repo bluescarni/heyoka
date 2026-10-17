@@ -519,13 +519,9 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
 namespace
 {
 
-// Helper to automatically deduce the cooldown
-// for a terminal event. g_eps is the maximum
-// absolute error on the Taylor series of the event
-// equation (which depends on the integrator tolerance
-// and the infinity norm of the state vector/event equations),
-// abs_der is the absolute value of the time derivative of the
-// event equation at the zero.
+// Helper to automatically deduce the cooldown for a terminal event. g_eps is the maximum absolute error on the Taylor
+// series of the event equation (which depends on the integrator tolerance and the infinity norm of the state
+// vector/event equations), abs_der is the absolute value of the time derivative of the event equation at the zero.
 template <typename T>
 T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 {
@@ -539,10 +535,11 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     // LCOV_EXCL_STOP
 
     // NOTE: the * 10 is a safety factor composed of:
+    //
     // - 2 is the original factor from theoretical considerations,
     // - 2 factor to deal with very small values of the derivative,
-    // - 2 factor to deal with the common case of event equation
-    //   flipping around after the event (e.g., for collisions).
+    // - 2 factor to deal with the common case of event equation flipping around after the event (e.g., for collisions).
+    //
     // The rest is additional safety.
     //
     // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
@@ -550,15 +547,14 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     // NOLINTNEXTLINE(misc-const-correctness)
     auto ret = std::move(g_eps) / std::move(abs_der) * 10;
 
-    if (isfinite(ret)) {
+    if (isfinite(ret)) [[likely]] {
         return ret;
     } else {
         // LCOV_EXCL_START
-        get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
-                           "heuristic produced a non-finite value of {}",
-                           fp_to_string(ret));
 
+        // The heuristic produced a non-finite value, fall back to a cooldown of zero.
         return 0;
+
         // LCOV_EXCL_STOP
     }
 }
