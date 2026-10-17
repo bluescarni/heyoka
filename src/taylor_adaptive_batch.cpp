@@ -904,68 +904,67 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
-        // Make a copy of the current times before invoking the callbacks, so that:
-        //
-        // - we can notice if the callbacks change the time coordinate, and,
-        // - if they do, we will use the original time coordinate in the time update logic, rather than the (wrong) time
-        //   coordinate that a callback invocation might set.
-        //
-        // In other words, m_time_copy will end up containing the correctly-updated time coordinate, while m_time is
-        // subject to arbitrary changes via callbacks.
-        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
-        // Run the finiteness check on the state vector *before* executing the callbacks, as the execution of a callback
-        // on a batch index might alter the state variables of another batch index.
-        //
-        // NOTE: this can probably be vectorised, if necessary.
+        // Update the time, store the last timestep, and run the finiteness checks. If the finiteness checks pass, also
+        // update the cooldowns, otherwise set m_step_res to err_nf_state.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_nf_detected[i] = check_nf_batch(i);
-        }
+            // Fetch the timestep that was used for the current lane.
+            const auto cur_h = m_delta_ts[i];
 
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // Fetch the timestep.
-            const auto h = m_delta_ts[i];
-
-            // Compute the new time in double-length arithmetic.
-            //
-            // NOTE: take the time coordinate from m_time_copy (rather than m_time directly) as m_time might have been
-            // modified by incorrectly implemented callbacks.
-            const auto new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]) + h;
-            m_time_hi[i] = new_time.hi;
-            m_time_lo[i] = new_time.lo;
-
-            // Update also m_time_copy with the new time.
-            m_time_copy_hi[i] = new_time.hi;
-            m_time_copy_lo[i] = new_time.lo;
+            // Update the time.
+            const auto cur_new_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + cur_h;
+            m_time_hi[i] = cur_new_time.hi;
+            m_time_lo[i] = cur_new_time.lo;
 
             // Store the last timestep.
-            m_last_h[i] = h;
+            m_last_h[i] = cur_h;
 
-            // Check if the time or the state vector are non-finite at the end of the timestep, or if event detection
-            // could not be performed due to non-finite inputs.
-            if (edd.m_ed_finite[i] == 0 || !is_finite(new_time) || m_nf_detected[i] != 0) [[unlikely]] {
-                // Flag the current lane as err_nf_state and move to the next.
-                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+            // Finiteness checks.
+            //
+            // NOTE: m_nf_detected considers the finiteness of time/state plus the input data for event detection as
+            // well. That is, a lane for which m_nf_detected is true must end up with an err_nf_state outcome, just like
+            // in the scalar case.
+            const auto cur_nf_detected = (ed_finite[i] == 0 || !is_finite(cur_new_time) || check_nf_batch(i));
+            m_nf_detected[i] = cur_nf_detected;
 
-                continue;
-            }
+            if (cur_nf_detected) [[unlikely]] {
+                // Non-finite values detected, set the outcome to err_nf_state.
+                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, cur_h};
+            } else {
+                // Update the cooldowns.
+                for (auto &cd : edd.m_te_cooldowns[i]) {
+                    if (cd) {
+                        // Check if the timestep we just took brought this event outside the cooldown.
+                        const auto tmp = cd->first + cur_h;
 
-            // Update the cooldowns.
-            for (auto &cd : edd.m_te_cooldowns[i]) {
-                if (cd) {
-                    // Check if the timestep we just took brought this event outside the cooldown.
-                    const auto tmp = cd->first + h;
-
-                    if (abs(tmp) >= cd->second) {
-                        // We are now outside the cooldown period for this event, reset cd.
-                        cd.reset();
-                    } else {
-                        // Still in cooldown, update the time spent in cooldown.
-                        cd->first = tmp;
+                        if (abs(tmp) >= cd->second) {
+                            // We are now outside the cooldown period for this event, reset cd.
+                            cd.reset();
+                        } else {
+                            // Still in cooldown, update the time spent in cooldown.
+                            cd->first = tmp;
+                        }
                     }
                 }
             }
+        }
+
+        // Make a copy of the times before invoking the callbacks. The copy is used to compute the time coordinates
+        // passed to the callbacks (so that they are not affected by callbacks altering the time), and to detect if the
+        // callbacks (incorrectly) change the time.
+        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
+        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
+
+        // For the lanes which did *not* end up in err_nf_state, execute the event callbacks.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Check if the current lane was flagged in the finiteness checks.
+            if (m_nf_detected[i] != 0) [[unlikely]] {
+                // Move to the next lane, do not run the callbacks. m_step_res[i] was already set up correctly in the
+                // previous loop.
+                continue;
+            }
+
+            // Fetch the timestep.
+            const auto h = m_delta_ts[i];
 
             // If we don't have terminal events, we will invoke the callbacks of *all* the non-terminal events.
             // Otherwise, we need to figure out which non-terminal events do not happen because their time coordinate is
@@ -980,6 +979,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Flag to signal that the callback of a non-terminal event threw an exception.
             bool nt_cb_exception = false;
 
+            // Construct the current (updated) time for the batch element as a dfloat from m_time_copy_hi and
+            // m_time_copy_lo, so that modifications to m_time_hi/m_time_lo from event callbacks are ignored.
+            const auto cur_new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]);
+
             // Invoke the callbacks of the non-terminal events, which are guaranteed to happen before the first terminal
             // event.
             //
@@ -991,7 +994,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
                 assert(cb);
                 try {
-                    cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
+                    cb(*this, static_cast<T>(cur_new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
                 } catch (...) {
                     // NOTE: in case of exception, remember it, set nt_cb_exception to true and break out, so that we do
                     // not process additional events.
@@ -1026,16 +1029,16 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     // Deduce the cooldown automatically.
                     //
                     // NOTE: if m_g_eps[i] is not finite, we skipped event detection altogether for the current batch
-                    // lane and thus we never end up here. If the derivative of the event equation is not finite, the
-                    // event is also skipped.
+                    // lane via the finiteness checks and thus we never end up here. If the derivative of the event
+                    // equation is not finite, the event is also skipped.
                     edd.m_te_cooldowns[i][te_idx].emplace(
                         0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<3>(edd.m_d_tes[i][0])));
                 }
 
                 // Invoke the callback of the first terminal event, if it has one.
-                if (te.get_callback()) {
+                if (auto &te_cb = te.get_callback()) {
                     try {
-                        te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]), i);
+                        te_cb_ret = te_cb(*this, std::get<2>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
                         // NOTE: if an exception is raised, record it and then move on to the next batch element. This
                         // is intended to match the behaviour of the scalar integrator.

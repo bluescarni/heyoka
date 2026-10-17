@@ -14,6 +14,7 @@
 #include <functional>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <random>
 #include <ranges>
 #include <sstream>
@@ -2455,6 +2456,82 @@ TEST_CASE("busy flag")
             std::runtime_error,
             Message("Cannot copy-assign to an integrator while the integrator is stepping/propagating"));
         REQUIRE_NOTHROW(ta.propagate_until(20.));
+    }
+}
+
+// Test that, when the event callbacks of a batch element are invoked, the time, the last timestep and the cooldowns of
+// *all* batch elements have already been updated, and that the alteration of the time coordinate of any batch element
+// from within an event callback is detected.
+TEST_CASE("event callbacks lane consistency")
+{
+    using Catch::Matchers::Message;
+
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // Alteration of the time coordinate of the batch element 1 from within an event callback of the batch element 0.
+    {
+        // NOTE: in both batch elements, v starts from a small positive value and decreases. The event v - par[0]
+        // triggers early in the first step only in the batch element 0 (where par[0] is zero).
+        auto ta = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
+                       kw::pars = std::vector<double>{0., 10.},
+                       kw::nt_events = {ta_t::nt_event_t(v - par[0], [](ta_t &t, double, int, std::uint32_t) {
+                           // Alter only the time coordinate of the batch element 1.
+                           auto hi = t.get_dtime().first;
+                           const auto lo = t.get_dtime().second;
+                           hi[1] += 1.;
+                           t.set_dtime(hi, lo);
+                       })});
+
+        REQUIRE_THROWS_MATCHES(
+            ta.step(), std::runtime_error,
+            Message("The invocation of one or more event callbacks resulted in the alteration of the time coordinate "
+                    "of the integrator at the batch index 1 - this is not supported"));
+    }
+
+    // Copy of the integrator from within an event callback of the batch element 0.
+    {
+        // The copy of the integrator.
+        std::optional<ta_t> ta_copy;
+
+        // NOTE: in both batch elements, x starts from 0.05, and v starts from a small positive value and decreases. In
+        // the first step, the terminal event v triggers in both batch elements, setting a long cooldown. In the second
+        // step, both batch elements are in cooldown for the terminal event, and the non-terminal event x - par[0]
+        // triggers only in the batch element 0 (where par[0] is slightly less than 0.05), whose callback copies the
+        // integrator.
+        auto ta = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
+                       kw::pars = std::vector<double>{0.0499, 10.},
+                       kw::t_events = {ta_t::t_event_t(
+                           v, kw::callback = [](ta_t &, int, std::uint32_t) { return true; }, kw::cooldown = 100.)},
+                       kw::nt_events = {ta_t::nt_event_t(x - par[0], [&ta_copy](ta_t &t, double, int, std::uint32_t) {
+                           if (!ta_copy.has_value()) {
+                               ta_copy.emplace(t);
+                           }
+                       })});
+
+        // First step.
+        ta.step();
+        REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome{0});
+        REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome{0});
+        REQUIRE(!ta_copy.has_value());
+
+        // Second step.
+        ta.step();
+        REQUIRE(ta_copy.has_value());
+
+        // The cooldown of the terminal event in the batch element 1 was updated in the second step.
+        REQUIRE(ta.get_te_cooldowns()[1][0].has_value());
+        REQUIRE(ta.get_te_cooldowns()[1][0]->first > 0.);
+
+        // The copy, made from within the event callback of the batch element 0, contains the updated time, state,
+        // last timestep, Taylor coefficients and cooldowns of all batch elements.
+        REQUIRE(ta_copy->get_dtime().first == ta.get_dtime().first);
+        REQUIRE(ta_copy->get_dtime().second == ta.get_dtime().second);
+        REQUIRE(ta_copy->get_state() == ta.get_state());
+        REQUIRE(ta_copy->get_last_h() == ta.get_last_h());
+        REQUIRE(ta_copy->get_tc() == ta.get_tc());
+        REQUIRE(ta_copy->get_te_cooldowns() == ta.get_te_cooldowns());
     }
 }
 
