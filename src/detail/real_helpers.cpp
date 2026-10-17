@@ -65,6 +65,9 @@ namespace detail
 namespace
 {
 
+// The integral type corresponding to the mpfr_rnd_t enum.
+using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
+
 // Various static checks.
 static_assert(sizeof(mppp::real) == sizeof(mppp::mpfr_struct_t));
 static_assert(alignof(mppp::real) == alignof(mppp::mpfr_struct_t));
@@ -127,7 +130,7 @@ mpfr_prec_t llvm_is_real(llvm::Type *t)
 }
 
 // Negation.
-llvm::Value *llvm_real_fneg(llvm_state &s, llvm ::Value *x)
+llvm::Value *llvm_real_fneg(llvm_state &s, llvm::Value *x)
 {
     assert(x != nullptr);
     assert(llvm_is_real(x->getType()) != 0);
@@ -146,11 +149,11 @@ llvm::Value *llvm_real_fneg(llvm_state &s, llvm ::Value *x)
 namespace
 {
 
-// Small helper to codegen the MPFR_RNDN constant.
-llvm::Constant *llvm_mpfr_rndn(llvm_state &s)
+// Small helper to codegen MPFR rounding modes.
+llvm::Constant *llvm_mpfr_make_rnd(llvm_state &s, const mpfr_rnd_t rnd_mode)
 {
     return llvm::ConstantInt::getSigned(to_external_llvm_type<real_rnd_t>(s.context()),
-                                        boost::numeric_cast<std::int64_t>(static_cast<real_rnd_t>(MPFR_RNDN)));
+                                        boost::numeric_cast<std::int64_t>(static_cast<real_rnd_t>(rnd_mode)));
 }
 
 // Small helper to codegen an MPFR precision value
@@ -303,9 +306,12 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 } // namespace
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
-// The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
-// will be built from mpfr_name. The return type of the MPFR primitive is assumed to be int.
-llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &mpfr_name, unsigned nargs)
+//
+// The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function will be built from
+// mpfr_name. The return type of the MPFR primitive is assumed to be int. nargs is the number of input operands.
+// rnd_mode is the rounding mode to be used (defaults to MPFR_RNDN).
+llvm::Function *real_nary_op(llvm_state &s, llvm::Type *const fp_t, const std::string &mpfr_name, const unsigned nargs,
+                             const mpfr_rnd_t rnd_mode)
 {
     assert(nargs > 0u);
 
@@ -317,44 +323,47 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
 
     assert(real_prec > 0);
 
-    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, mpfr_name);
+    // NOTE: for the name mangling, we must make sure to include, in addition to the MPFR function name, the precision
+    // and the rounding mode too.
+    const auto fname = fmt::format("heyoka.real.{}.{}.{}", real_prec, mpfr_name, static_cast<real_rnd_t>(rnd_mode));
 
     auto *f = md.getFunction(fname);
 
-    if (f == nullptr) {
-        auto *orig_bb = builder.GetInsertBlock();
-
-        // Create the function type and the function.
-        const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
-        auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
-
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create an undef value for the result and add it as first function argument.
-        auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
-        std::vector<llvm::Value *> mpfr_args;
-        mpfr_args.push_back(real_res);
-
-        // Create the mpfr views for the input arguments and add them as function arguments.
-        for (auto i = 0u; i < nargs; ++i) {
-            mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
-        }
-
-        // Add the rounding mode.
-        mpfr_args.push_back(llvm_mpfr_rndn(s));
-
-        // Invoke the MPFR primitive.
-        llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
-
-        // Assemble the result.
-        auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
-
-        builder.CreateRet(res);
-
-        builder.SetInsertPoint(orig_bb);
+    if (f != nullptr) {
+        return f;
     }
+
+    // Remember and restore the current insertion point.
+    const llvm::IRBuilderBase::InsertPointGuard ipg(builder);
+
+    // Create the function type and the function.
+    const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
+    auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Create an undef value for the result and add it as first function argument.
+    auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+    std::vector<llvm::Value *> mpfr_args;
+    mpfr_args.push_back(real_res);
+
+    // Create the mpfr views for the input arguments and add them as function arguments.
+    for (auto i = 0u; i < nargs; ++i) {
+        mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
+    }
+
+    // Add the rounding mode.
+    mpfr_args.push_back(llvm_mpfr_make_rnd(s, rnd_mode));
+
+    // Invoke the MPFR primitive.
+    llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
+
+    // Assemble the result.
+    auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
+
+    builder.CreateRet(res);
 
     return f;
 }
@@ -409,7 +418,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin()).first);
 
         // Add the rounding mode.
-        mpfr_args.push_back(llvm_mpfr_rndn(s));
+        mpfr_args.push_back(llvm_mpfr_make_rnd(s, MPFR_RNDN));
 
         // Invoke the MPFR primitive.
         llvm_invoke_external(s, "mpfr_sin_cos", to_external_llvm_type<int>(context), mpfr_args,
@@ -437,9 +446,10 @@ namespace
 {
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR comparison primitive 'mpfr_name'.
+//
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N), the return type is bool. The name of the
-// function will be built from mpfr_name. The MPFR primitive must not require a rounding mode argument and it must
-// return an int.
+// function will be built from mpfr_name. The mpfr_name function is expected to return a nonzero int to indicate true,
+// zero int for false. The MPFR primitive must not require a rounding mode argument.
 llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &mpfr_name, unsigned nargs)
 {
     assert(nargs > 0u);
@@ -456,33 +466,36 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
 
     auto *f = md.getFunction(fname);
 
-    if (f == nullptr) {
-        auto *orig_bb = builder.GetInsertBlock();
-
-        // Create the function type and the function.
-        const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
-        auto *ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
-        f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
-        assert(f != nullptr);
-
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the mpfr views for the input arguments and add them as function arguments.
-        std::vector<llvm::Value *> mpfr_args;
-        mpfr_args.reserve(boost::numeric_cast<decltype(mpfr_args.size())>(nargs));
-        for (auto i = 0u; i < nargs; ++i) {
-            mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
-        }
-
-        // Invoke the MPFR primitive.
-        auto *cmp_ret = llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args,
-                                             get_mpfr_attr_list(context));
-
-        // Truncate the result to a boolean and return.
-        builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
-
-        builder.SetInsertPoint(orig_bb);
+    if (f != nullptr) {
+        return f;
     }
+
+    // Remember and restore the current insertion point.
+    const llvm::IRBuilderBase::InsertPointGuard ipg(builder);
+
+    // Create the function type and the function.
+    const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
+    auto *const ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
+    f = llvm::Function::Create(ft, llvm::Function::PrivateLinkage, fname, &md);
+    assert(f != nullptr);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Create the mpfr views for the input arguments and add them as function arguments.
+    std::vector<llvm::Value *> mpfr_args;
+    mpfr_args.reserve(nargs);
+    for (auto i = 0u; i < nargs; ++i) {
+        mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
+    }
+
+    // Invoke the MPFR primitive.
+    auto *const cmp_ret = llvm_invoke_external(s, mpfr_name, to_external_llvm_type<int>(context), mpfr_args,
+                                               get_mpfr_attr_list(context));
+
+    // Convert the result to a boolean and return.
+    //
+    // NOTE: in order to properly convert an integral bool-like flag to the bool type, we need to run a comparison.
+    builder.CreateRet(builder.CreateICmpNE(cmp_ret, llvm::ConstantInt::get(cmp_ret->getType(), 0)));
 
     return f;
 }
@@ -606,7 +619,21 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateCall(f, {a, b});
 }
 
+// NOTE: fcmp ONE means that it must return true if neither operand is NaN and a != b.
 llvm::Value *llvm_real_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+
+    // NOTE: mpfr_lessgreater_p() returns true if a < b or a > b, false otherwise (i.e., if a and/or b is NaN, or if a
+    // == b).
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_lessgreater_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+llvm::Value *llvm_real_fcmp_une(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     // Compute a == b.
     auto *ret = llvm_real_fcmp_oeq(s, a, b);
@@ -717,7 +744,7 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         }
 
         // Add the rounding mode.
-        mpfr_args.push_back(llvm_mpfr_rndn(s));
+        mpfr_args.push_back(llvm_mpfr_make_rnd(s, MPFR_RNDN));
 
         // Invoke the MPFR primitive.
         llvm_invoke_external(s, "mpfr_set_ui", to_external_llvm_type<int>(context), mpfr_args,

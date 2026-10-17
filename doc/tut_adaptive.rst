@@ -238,9 +238,9 @@ to propagate both forward and backward in time:
    State                   : [0.050000000000000044, 0.02499999999999999]
 
 Note also that the time-limited propagation functions will stop
-integrating if a non-finite value is detected in the state vector
-at the end of the timestep. In such case, the outcome of the
-integration will be ``taylor_outcome::err_nf_state``.
+integrating if non-finite values are detected in the internal state
+of the integrator (e.g., in the state vector at the end of the timestep).
+In such case, the outcome of the integration will be ``taylor_outcome::err_nf_state``.
 
 .. versionadded:: 0.7.0
 
@@ -259,6 +259,10 @@ can be invoked with additional optional keyword arguments:
   object as only argument. This is known as a *step callback*. If the callback
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
+
+  From within a step callback, invoking the stepping/propagation functions on the integrator,
+  copy-assigning another integrator to it or deserialising into it will raise an exception, while
+  moving into or from the integrator will result in undefined behaviour.
 
   .. versionadded:: 1.0.0
 
@@ -352,6 +356,10 @@ can be invoked with additional optional keyword arguments:
   object as only argument. This is known as a *step callback*. If the callback
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
+
+  From within a step callback, invoking the stepping/propagation functions on the integrator,
+  copy-assigning another integrator to it or deserialising into it will raise an exception, while
+  moving into or from the integrator will result in undefined behaviour.
 
   .. versionadded:: 1.0.0
 

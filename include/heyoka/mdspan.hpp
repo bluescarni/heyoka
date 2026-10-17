@@ -31,6 +31,12 @@
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wshadow"
 
+#if __GNUC__ >= 15
+
+#pragma GCC diagnostic ignored "-Wtrailing-whitespace="
+
+#endif
+
 #endif
 
 #include <heyoka/detail/mdspan/mdspan/mdspan.hpp>

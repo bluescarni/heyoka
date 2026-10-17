@@ -424,7 +424,8 @@ TEST_CASE("existing trigger")
     bld.CreateRetVoid();
 
     REQUIRE_THROWS_MATCHES(s.compile(), std::invalid_argument,
-                           Message("Unable to create an LLVM function with name 'heyoka.obj_trigger'"));
+                           Message("Unable to create an LLVM function with name 'heyoka.obj_trigger' - a global value "
+                                   "with the same name already exists in the module"));
 
     // Check that the second function was properly cleaned up.
     REQUIRE(std::distance(s.module().begin(), s.module().end()) == 1);

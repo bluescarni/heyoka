@@ -15,7 +15,6 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -23,36 +22,6 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
-
-namespace
-{
-
-// RAII helper to temporarily disable fast math flags in a builder.
-class fmf_disabler
-{
-    ir_builder *m_builder;
-    const llvm::FastMathFlags m_orig_fmf;
-
-public:
-    explicit fmf_disabler(ir_builder &b) : m_builder(&b), m_orig_fmf(m_builder->getFastMathFlags())
-    {
-        // Reset the fast math flags.
-        m_builder->setFastMathFlags(llvm::FastMathFlags{});
-    }
-    ~fmf_disabler()
-    {
-        // Restore the original fast math flags.
-        m_builder->setFastMathFlags(m_orig_fmf);
-    }
-
-    fmf_disabler(const fmf_disabler &) = delete;
-    fmf_disabler(fmf_disabler &&) = delete;
-
-    fmf_disabler &operator=(const fmf_disabler &) = delete;
-    fmf_disabler &operator=(fmf_disabler &&) = delete;
-};
-
-} // namespace
 
 // Addition.
 // NOTE: this is an LLVM port of the original code in NTL.
@@ -63,7 +32,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto *S = llvm_fadd(state, x_hi, y_hi);
     auto *T = llvm_fadd(state, x_lo, y_lo);
@@ -114,7 +84,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto *x = llvm_fmul(s, a, b);
     auto *y = llvm_fma(s, a, b, llvm_fneg(s, x));
@@ -133,7 +104,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto [c, cc] = llvm_eft_product(s, x_hi, y_hi);
 
@@ -162,7 +134,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s,
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto *c = llvm_fdiv(s, x_hi, y_hi);
 
@@ -198,7 +171,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
     auto *fp_t = x_hi->getType();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     // Floor x_hi.
     auto *fhi = llvm_floor(s, x_hi);
@@ -271,7 +245,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto [xoy_hi, xoy_lo] = llvm_dl_div(s, x_hi, x_lo, y_hi, y_lo);
     auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
@@ -287,7 +262,8 @@ llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto *cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
@@ -306,7 +282,8 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    const fmf_disabler fd(builder);
+    const llvm::IRBuilderBase::FastMathFlagGuard fmfg(builder);
+    builder.setFastMathFlags(llvm::FastMathFlags{});
 
     auto *cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);

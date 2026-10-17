@@ -121,11 +121,10 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
     // LCOV_EXCL_STOP
 }
 
-// Helper to clamp the floating-point value x to the range [lb, ub].
-// This is guaranteed to return NaN if x is NaN.
-// NOTE: perhaps a dedicated clamp() primitive could give better
-// performance for real? In such a case, we would need to take
-// care that NaN is handled correctly.
+// Helper to clamp the floating-point value x to the range [lb, ub]. This is guaranteed to return NaN if x is NaN.
+//
+// NOTE: perhaps a dedicated clamp() primitive could give better performance for real? In such a case, we would need to
+// take care that NaN is handled correctly.
 llvm::Value *llvm_clamp(llvm_state &s, llvm::Value *x, llvm::Value *lb, llvm::Value *ub)
 {
     // NOTE: if x is NaN, then ret will remain NaN after these comparisons.

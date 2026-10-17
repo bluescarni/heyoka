@@ -49,6 +49,11 @@ struct ta_jit_data;
 
 template <typename T>
 struct taylor_adaptive<T>::i_data {
+    // The busy flag.
+    //
+    // This is set to true whenever a public step()/propagate_*() function is invoked, and it is automatically reset to
+    // false when the function exits.
+    bool m_busy = false;
     // State vector.
     std::vector<T> m_state;
     // Time.
@@ -115,6 +120,11 @@ public:
 
 template <typename T>
 struct taylor_adaptive_batch<T>::i_data {
+    // The busy flag.
+    //
+    // This is set to true whenever a public step()/propagate_*() function is invoked, and it is automatically reset to
+    // false when the function exits.
+    bool m_busy = false;
     // The batch size.
     std::uint32_t m_batch_size{};
     // State vectors.

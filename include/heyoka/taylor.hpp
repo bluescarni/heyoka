@@ -24,6 +24,7 @@
 #include <ostream>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -133,6 +134,28 @@ void validate_ode_sys(const std::vector<std::pair<expression, expression>> &, co
                       const std::vector<NTEvent> &);
 void validate_ode_sys(const std::vector<std::pair<expression, expression>> &);
 
+// Small RAII class that sets a boolean to true on construction and resets it to false on destruction.
+class [[nodiscard]] busy_guard
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+    bool &m_flag;
+
+public:
+    explicit busy_guard(bool &flag) : m_flag(flag)
+    {
+        assert(!m_flag);
+        m_flag = true;
+    }
+    busy_guard(const busy_guard &) = delete;
+    busy_guard(busy_guard &&) noexcept = delete;
+    busy_guard &operator=(const busy_guard &) = delete;
+    busy_guard &operator=(busy_guard &&) noexcept = delete;
+    ~busy_guard()
+    {
+        m_flag = false;
+    }
+};
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
@@ -150,7 +173,7 @@ enum class taylor_outcome : std::int64_t {
     success = -4294967296ll - 1,      // Integration step was successful.
     step_limit = -4294967296ll - 2,   // Maximum number of steps reached.
     time_limit = -4294967296ll - 3,   // Time limit reached.
-    err_nf_state = -4294967296ll - 4, // Non-finite state detected at the end of the timestep.
+    err_nf_state = -4294967296ll - 4, // Non-finite values detected in the internal state of the integrator.
     cb_stop = -4294967296ll - 5,      // Propagation stopped by callback.
 };
 
@@ -462,6 +485,8 @@ private:
     using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
+    [[nodiscard]] detail::busy_guard make_busy_guard(std::string_view);
+
 public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
@@ -630,6 +655,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_until(T t, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_until");
+
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
@@ -642,6 +669,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_for(T delta_t, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_for");
+
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
@@ -654,6 +683,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_grid");
+
         auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
         return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), std::move(cb));
@@ -877,6 +908,8 @@ private:
     using tm_input_t = mdspan<const T, dextents<std::size_t, 1>>;
     const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
+    [[nodiscard]] detail::busy_guard make_busy_guard(std::string_view);
+
 public:
     // kwargs configuration for the constructors.
     static constexpr auto ctor_kw_cfg = finalise_ctor_kw_cfg | llvm_state::kw_cfg;
@@ -1058,6 +1091,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_until");
+
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
@@ -1069,6 +1104,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_until(T t, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_until");
+
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
@@ -1080,6 +1117,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_for");
+
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
@@ -1091,6 +1130,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     propagate_for(T delta_t, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_for");
+
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
@@ -1103,6 +1144,8 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward,performance-unnecessary-value-param)
     std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
+        const auto bg = make_busy_guard("propagate_grid");
+
         auto [max_steps, max_delta_ts, cb]
             = detail::taylor_propagate_common_ops_batch<T, true, false>(get_batch_size(), kw_args...);
 
@@ -1216,7 +1259,8 @@ namespace detail
 // - 6: added parallel JIT compilation for compact mode.
 // - 7: replaced aligned_buffer with aligned_vector.
 // - 8: re-organised internal layout.
-inline constexpr int taylor_adaptive_s11n_version = 8;
+// - 9: several changes in the internal data layout and in the prototypes of jit-compiled functions.
+inline constexpr int taylor_adaptive_s11n_version = 9;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 //
@@ -1228,7 +1272,8 @@ inline constexpr int taylor_adaptive_s11n_version = 8;
 // - 5: added parallel JIT compilation for compact mode.
 // - 6: replaced aligned_buffer with aligned_vector.
 // - 7: re-organised internal layout.
-inline constexpr int taylor_adaptive_batch_s11n_version = 7;
+// - 8: several changes in the internal data layout and in the prototypes of jit-compiled functions.
+inline constexpr int taylor_adaptive_batch_s11n_version = 8;
 
 } // namespace detail
 

@@ -130,6 +130,8 @@ void init_cm_tape(IData &idata)
 template <typename T>
 void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
+    // NOTE: the m_busy flag is not saved to the archive, otherwise an integrator which is saved while propagating would
+    // be eternally stuck in busy status.
     ar << m_state;
     ar << m_time;
     ar << m_ta_jit_data;
@@ -153,6 +155,8 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
 template <typename T>
 void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsigned)
 {
+    // NOTE: we disallow loading into an integrator if it is busy (see the check in the integrator's load_impl()).
+    assert(!m_busy);
     ar >> m_state;
     ar >> m_time;
     ar >> m_ta_jit_data;
@@ -192,7 +196,9 @@ taylor_adaptive<T>::i_data::i_data(llvm_state s)
 
 template <typename T>
 taylor_adaptive<T>::i_data::i_data(const i_data &other)
-    : m_state(other.m_state), m_time(other.m_time),
+    : // NOTE: the busy flag is not copied, otherwise an integrator which is copied while propagating would be eternally
+      // stuck in busy status.
+      m_state(other.m_state), m_time(other.m_time),
       // NOTE: this will produce a correct shallow copy, no need to re-assign the pointers.
       m_ta_jit_data(other.m_ta_jit_data), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
@@ -235,6 +241,8 @@ HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real)
 template <typename T>
 void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
+    // NOTE: the m_busy flag is not saved to the archive, otherwise an integrator which is saved while propagating would
+    // be eternally stuck in busy status.
     ar << m_batch_size;
     ar << m_state;
     ar << m_time_hi;
@@ -276,6 +284,8 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
 template <typename T>
 void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar, unsigned)
 {
+    // NOTE: we disallow loading into an integrator if it is busy (see the check in the integrator's load_impl()).
+    assert(!m_busy);
     ar >> m_batch_size;
     ar >> m_state;
     ar >> m_time_hi;
@@ -333,7 +343,9 @@ taylor_adaptive_batch<T>::i_data::i_data(llvm_state s)
 
 template <typename T>
 taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
-    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
+    : // NOTE: the busy flag is not copied, otherwise an integrator which is copied while propagating would be eternally
+      // stuck in busy status.
+      m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
       // NOTE: this will produce a correct shallow copy, no need to re-assign the pointers.
       m_ta_jit_data(other.m_ta_jit_data), m_tplt_state(other.m_tplt_state), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),

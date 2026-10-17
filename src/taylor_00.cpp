@@ -68,15 +68,19 @@ namespace
 {
 
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
+//
+// NOTE: make sure that NaNs are propagated and not silently ignored in the computation of the timestep.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return llvm_max(s, x_v, llvm_abs(s, y_v));
+    return llvm_max_nan(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
+//
+// NOTE: make sure that NaNs are propagated and not silently ignored in the computation of the timestep.
 llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return llvm_min(s, x_v, llvm_abs(s, y_v));
+    return llvm_min_nan(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute the scaling + safety factor
@@ -220,7 +224,10 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         }
 
         // Find the maxima via pairwise reduction.
-        const auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_max(s, a, b); };
+        const auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * {
+            // NOTE: make sure that NaNs are not silently ignored.
+            return llvm_max_nan(s, a, b);
+        };
         max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
         max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
@@ -232,6 +239,9 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
+    //
+    // NOTE: the comparison is ordered, thus a NaN max_abs_state results in false abs_or_rel. This ensures that the NaN
+    // is propagated to num_rho and then to the step size.
     auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
@@ -252,7 +262,9 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
             batch_size));
 
     // Take the minimum.
-    auto *rho_m = llvm_min(s, rho_o, rho_om1);
+    //
+    // NOTE: make sure that NaNs are not silently ignored.
+    auto *rho_m = llvm_min_nan(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
     const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
@@ -265,6 +277,8 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
+    //
+    // NOTE: max_h_vec is guaranteed to contain only non-NaN values, so no concerns with NaN propagation here.
     auto *backward = llvm_fcmp_olt(s, max_h_vec, llvm_constantfp(s, vec_t, 0.));
     auto *h_fac = builder.CreateSelect(backward, llvm_constantfp(s, vec_t, -1.), llvm_constantfp(s, vec_t, 1.));
     h = llvm_fmul(s, h_fac, h);

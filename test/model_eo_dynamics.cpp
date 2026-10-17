@@ -133,7 +133,7 @@ TEST_CASE("J2 nodal precession")
 
 // Under J2-only geopotential, the argument of perigee precesses at the secular rate
 //
-//     dω/dt = (3/4) n J2 (R_⊕/p)^2 (5 cos²i − 1)
+//     dω/dt = (3/4) n J2 (R_⊕/p)^2 (5 cos²i - 1)
 //
 // We integrate elliptical LEOs at several inclinations for a couple of days and check the numerical drift against this
 // formula, covering:
@@ -180,7 +180,7 @@ TEST_CASE("J2 perigee precession")
         const double hz = (s[0] * s[4]) - (s[1] * s[3]);
         const double h_mag = std::sqrt((hx * hx) + (hy * hy) + (hz * hz));
 
-        // e_vec = (v × h)/μ − r/|r|.
+        // e_vec = (v × h)/μ - r/|r|.
         const double r_mag = std::sqrt((s[0] * s[0]) + (s[1] * s[1]) + (s[2] * s[2]));
         const double vxh_x = (s[4] * hz) - (s[5] * hy);
         const double vxh_y = (s[5] * hx) - (s[3] * hz);
@@ -274,7 +274,7 @@ TEST_CASE("drag pointwise check")
 }
 
 // Drag end-to-end dissipation: propagate a LEO circular orbit with drag and verify that the specific orbital energy E =
-// ½|v|² − μ/r strictly decreases over the propagation.
+// ½|v|² - μ/r strictly decreases over the propagation.
 TEST_CASE("drag dissipates orbital energy")
 {
     detail::edb_disabler ed;

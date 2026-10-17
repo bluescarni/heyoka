@@ -11,12 +11,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <random>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -2188,6 +2191,398 @@ TEST_CASE("bug prop_cb time")
         std::runtime_error,
         Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
                 "time coordinate of the integrator - this is not supported"));
+}
+
+// Test that non-finite values in the Taylor coefficients of the event equations of a batch element result in
+// err_nf_state for that batch element only, without any event callback being invoked for it, while the other batch
+// element is integrated (and detects events) exactly as in an integrator without non-finite values.
+TEST_CASE("event nf inputs")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // Number of invocations of the event callbacks, for each batch element.
+    std::vector<unsigned> n_cb(2u);
+
+    // Factories of integrators with a non-terminal or a terminal event v + par[0], where pars contains the values of
+    // par[0] for each batch element.
+    //
+    // NOTE: in both batch elements, v starts from a small positive value and decreases, thus, if par[0] is zero, the
+    // event triggers early in the first step. The Taylor coefficients of order > 0 of the events are those of v, thus
+    // only the order-0 coefficient is affected by the value of par[0].
+    const auto make_nt_ta = [&](std::vector<double> pars) {
+        return ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u, kw::pars = std::move(pars),
+                    kw::nt_events
+                    = {ta_t::nt_event_t(v + par[0], [&n_cb](ta_t &, double, int, std::uint32_t i) { ++n_cb[i]; })});
+    };
+    const auto make_t_ta = [&](std::vector<double> pars) {
+        return ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u, kw::pars = std::move(pars),
+                    kw::t_events = {ta_t::t_event_t(
+                        v + par[0], kw::callback = [&n_cb](ta_t &, int, std::uint32_t i) {
+                            ++n_cb[i];
+                            return true;
+                        })});
+    };
+
+    // Run the checks on the integrators created by make_ta, with par[0] set to p in the batch element bad_idx and to
+    // zero in the other batch element.
+    const auto check = [&n_cb](const auto &make_ta, double p, std::uint32_t bad_idx) {
+        const auto good_idx = 1u - bad_idx;
+
+        std::vector<double> pars(2u, 0.);
+        pars[bad_idx] = p;
+
+        // Reference integrator, with par[0] set to zero in both batch elements.
+        auto ta_ref = make_ta(std::vector<double>(2u, 0.));
+        ta_ref.step({10., 10.});
+
+        // Single step.
+        std::ranges::fill(n_cb, 0u);
+        auto ta = make_ta(pars);
+        ta.step({10., 10.});
+
+        const auto [oc, h] = ta.get_step_res()[bad_idx];
+        REQUIRE(oc == taylor_outcome::err_nf_state);
+        REQUIRE(n_cb[bad_idx] == 0u);
+
+        if (std::isnan(p)) {
+            // A NaN in the Taylor coefficients of the events propagates to the timestep.
+            REQUIRE(std::isnan(h));
+        } else {
+            // An infinite order-0 Taylor coefficient of the events makes the deduced timestep equal to max_delta_t.
+            // The time and the last timestep are updated nevertheless.
+            REQUIRE(h == 10.);
+            REQUIRE(ta.get_time()[bad_idx] == 10.);
+            REQUIRE(ta.get_last_h()[bad_idx] == 10.);
+        }
+
+        // The other batch element behaves as in the reference integrator.
+        REQUIRE(n_cb[good_idx] == 1u);
+        REQUIRE(ta.get_step_res()[good_idx] == ta_ref.get_step_res()[good_idx]);
+        REQUIRE(ta.get_time()[good_idx] == ta_ref.get_time()[good_idx]);
+        REQUIRE(ta.get_state()[good_idx] == ta_ref.get_state()[good_idx]);
+        REQUIRE(ta.get_state()[2u + good_idx] == ta_ref.get_state()[2u + good_idx]);
+
+        // propagate_until().
+        std::ranges::fill(n_cb, 0u);
+        ta = make_ta(pars);
+        ta.propagate_until(10.);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[bad_idx]) == taylor_outcome::err_nf_state);
+        REQUIRE(n_cb[bad_idx] == 0u);
+    };
+
+    for (const auto p : {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        for (const std::uint32_t bad_idx : {0u, 1u}) {
+            check(make_nt_ta, p, bad_idx);
+            check(make_t_ta, p, bad_idx);
+        }
+    }
+}
+
+// Step callback whose pre_hook() invokes step() on the integrator.
+struct pre_hook_step_cb {
+    bool operator()(taylor_adaptive_batch<double> &) const
+    {
+        return true;
+    }
+    void pre_hook(taylor_adaptive_batch<double> &ta) const
+    {
+        ta.step();
+    }
+};
+
+// Test that invoking the step()/propagate_*() functions on an integrator from within one of its own callbacks throws,
+// that the integrator is usable after the exception, and that copy-assigning or deserialising into an integrator from
+// within one of its own callbacks throws.
+TEST_CASE("busy flag")
+{
+    using Catch::Matchers::Message;
+
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // The error message produced by the invocation of the function fname() on a busy integrator.
+    const auto busy_msg = [](const std::string &fname) {
+        return Message("Cannot invoke the function '" + fname + "()' while the integrator is stepping/propagating");
+    };
+
+    // Invocations of the step()/propagate_*() functions, together with the names of the functions.
+    const std::vector<std::pair<std::string, std::function<void(ta_t &)>>> nested_calls
+        = {{"step", [](ta_t &t) { t.step(); }},
+           {"step", [](ta_t &t) { t.step({1., 1.}); }},
+           {"step_backward", [](ta_t &t) { t.step_backward(); }},
+           {"propagate_until", [](ta_t &t) { t.propagate_until(1.); }},
+           {"propagate_for", [](ta_t &t) { t.propagate_for(1.); }},
+           {"propagate_grid", [](ta_t &t) { t.propagate_grid({0., 0., 1., 1.}); }}};
+
+    // Event callbacks.
+    {
+        // The action performed by the event callback. It is performed at most once, and then it is reset.
+        std::function<void(ta_t &)> ev_action;
+
+        // NOTE: in both batch elements, v starts from a small positive value and decreases. The event v - par[0]
+        // triggers early in the first step only in the batch element 0 (where par[0] is zero), so that a single
+        // exception is raised.
+        const auto make_ta = [&] {
+            return ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
+                        kw::pars = std::vector<double>{0., 10.},
+                        kw::nt_events
+                        = {ta_t::nt_event_t(v - par[0], [&ev_action](ta_t &t, double, int, std::uint32_t) {
+                              if (ev_action) {
+                                  auto action = std::move(ev_action);
+                                  ev_action = nullptr;
+                                  action(t);
+                              }
+                          })});
+        };
+
+        for (const auto &[fname, call] : nested_calls) {
+            auto ta = make_ta();
+            ev_action = call;
+            REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error, busy_msg(fname));
+
+            // The exception was rethrown after the step was completed for all batch elements.
+            REQUIRE(ta.get_time()[0] > 0.);
+            REQUIRE(ta.get_time()[1] > 0.);
+
+            // The integrator is not busy any more.
+            REQUIRE_NOTHROW(ta.step());
+        }
+
+        // An event callback invoked during a propagation.
+        auto ta = make_ta();
+        ev_action = [](ta_t &t) { t.step(); };
+        REQUIRE_THROWS_MATCHES(ta.propagate_until(10.), std::runtime_error, busy_msg("step"));
+        REQUIRE_NOTHROW(ta.propagate_until(20.));
+    }
+
+    // Step callbacks.
+    {
+        const auto make_ta = [&] { return ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.051, 0.025, 0.026}, 2u); };
+
+        for (const auto &[fname, call] : nested_calls) {
+            auto ta = make_ta();
+            REQUIRE_THROWS_MATCHES(ta.propagate_until(
+                                       10., kw::callback =
+                                                [&call](ta_t &t) {
+                                                    call(t);
+                                                    return true;
+                                                }),
+                                   std::runtime_error, busy_msg(fname));
+
+            // The integrator is not busy any more.
+            REQUIRE_NOTHROW(ta.propagate_until(20.));
+        }
+
+        // The step callback in propagate_for() and propagate_grid().
+        auto ta = make_ta();
+        REQUIRE_THROWS_MATCHES(ta.propagate_for(
+                                   10., kw::callback =
+                                            [](ta_t &t) {
+                                                t.step();
+                                                return true;
+                                            }),
+                               std::runtime_error, busy_msg("step"));
+
+        ta = make_ta();
+        REQUIRE_THROWS_MATCHES(ta.propagate_grid(
+                                   {0., 0., 10., 10.}, kw::callback =
+                                                           [](ta_t &t) {
+                                                               t.step();
+                                                               return true;
+                                                           }),
+                               std::runtime_error, busy_msg("step"));
+
+        // The pre_hook() of a step callback.
+        ta = make_ta();
+        REQUIRE_THROWS_MATCHES(ta.propagate_until(10., kw::callback = pre_hook_step_cb{}), std::runtime_error,
+                               busy_msg("step"));
+        REQUIRE_NOTHROW(ta.propagate_until(20.));
+
+        // Copying and saving an integrator from within one of its own callbacks is allowed, and the copies are not
+        // busy.
+        ta = make_ta();
+        REQUIRE_NOTHROW(ta.propagate_until(
+            10., kw::callback = [](ta_t &t) {
+                auto t_copy = t;
+                t_copy.step();
+
+                std::stringstream ss;
+                {
+                    boost::archive::binary_oarchive oa(ss);
+                    oa << t;
+                }
+                ta_t t_load;
+                {
+                    boost::archive::binary_iarchive ia(ss);
+                    ia >> t_load;
+                }
+                t_load.step();
+
+                return false;
+            }));
+
+        // Deserialising into an integrator from within one of its own callbacks throws.
+        ta = make_ta();
+        std::stringstream ss;
+        {
+            boost::archive::binary_oarchive oa(ss);
+            oa << ta;
+        }
+        REQUIRE_THROWS_MATCHES(
+            ta.propagate_until(
+                10., kw::callback =
+                         [&ss](ta_t &t) {
+                             boost::archive::binary_iarchive ia(ss);
+                             ia >> t;
+                             return true;
+                         }),
+            std::runtime_error,
+            Message("Cannot deserialise into an integrator while the integrator is stepping/propagating"));
+        REQUIRE_NOTHROW(ta.propagate_until(20.));
+
+        // Copy-assigning to an integrator from within one of its own callbacks throws.
+        ta = make_ta();
+        const auto other = make_ta();
+        REQUIRE_THROWS_MATCHES(
+            ta.propagate_until(
+                10., kw::callback =
+                         [&other](ta_t &t) {
+                             t = other;
+                             return true;
+                         }),
+            std::runtime_error,
+            Message("Cannot copy-assign to an integrator while the integrator is stepping/propagating"));
+        REQUIRE_NOTHROW(ta.propagate_until(20.));
+    }
+}
+
+// Test the operations allowed on a moved-from integrator: copy/move assignment, deserialisation and destruction.
+TEST_CASE("moved-from")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    const auto other = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.051, 0.025, 0.026}, 2u);
+
+    std::stringstream ss;
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << other;
+    }
+
+    // Copy assignment.
+    auto ta = other;
+    const auto ta2 = std::move(ta);
+    ta = other;
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Deserialisation.
+    const auto ta3 = std::move(ta);
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> ta;
+    }
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Move assignment.
+    const auto ta4 = std::move(ta);
+    ta = ta_t(other);
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Leave ta in the moved-from state, so that it is destroyed in that state.
+    const auto ta5 = std::move(ta);
+}
+
+// Test that, when the event callbacks of a batch element are invoked, the time, the last timestep and the cooldowns of
+// *all* batch elements have already been updated, and that the alteration of the time coordinate of any batch element
+// from within an event callback is detected.
+TEST_CASE("event callbacks lane consistency")
+{
+    using Catch::Matchers::Message;
+
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // Alteration of the time coordinate of the batch element 1 from within an event callback of the batch element 0.
+    {
+        // NOTE: in both batch elements, v starts from a small positive value and decreases. The event v - par[0]
+        // triggers early in the first step only in the batch element 0 (where par[0] is zero).
+        auto ta = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
+                       kw::pars = std::vector<double>{0., 10.},
+                       kw::nt_events = {ta_t::nt_event_t(v - par[0], [](ta_t &t, double, int, std::uint32_t) {
+                           // Alter only the time coordinate of the batch element 1.
+                           auto hi = t.get_dtime().first;
+                           const auto lo = t.get_dtime().second;
+                           hi[1] += 1.;
+                           t.set_dtime(hi, lo);
+                       })});
+
+        REQUIRE_THROWS_MATCHES(
+            ta.step(), std::runtime_error,
+            Message("The invocation of one or more event callbacks resulted in the alteration of the time coordinate "
+                    "of the integrator at the batch index 1 - this is not supported"));
+    }
+
+    // Copy of the integrator from within an event callback of the batch element 0.
+    {
+        // The copy of the integrator.
+        std::optional<ta_t> ta_copy;
+
+        // NOTE: in both batch elements, x starts from 0.05, and v starts from a small positive value and decreases. In
+        // the first step, the terminal event v triggers in both batch elements, setting a long cooldown. In the second
+        // step, both batch elements are in cooldown for the terminal event, and the non-terminal event x - par[0]
+        // triggers only in the batch element 0 (where par[0] is slightly less than 0.05), whose callback copies the
+        // integrator.
+        auto ta = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
+                       kw::pars = std::vector<double>{0.0499, 10.},
+                       kw::t_events = {ta_t::t_event_t(
+                           v, kw::callback = [](ta_t &, int, std::uint32_t) { return true; }, kw::cooldown = 100.)},
+                       kw::nt_events = {ta_t::nt_event_t(x - par[0], [&ta_copy](ta_t &t, double, int, std::uint32_t) {
+                           if (!ta_copy.has_value()) {
+                               ta_copy.emplace(t);
+                           }
+                       })});
+
+        // First step.
+        ta.step();
+        REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome{0});
+        REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome{0});
+        REQUIRE(!ta_copy.has_value());
+
+        // Second step.
+        ta.step();
+        REQUIRE(ta_copy.has_value());
+
+        // The cooldown of the terminal event in the batch element 1 was updated in the second step.
+        REQUIRE(ta.get_te_cooldowns()[1][0].has_value());
+        REQUIRE(ta.get_te_cooldowns()[1][0]->first > 0.);
+
+        // The copy, made from within the event callback of the batch element 0, contains the updated time, state,
+        // last timestep, Taylor coefficients and cooldowns of all batch elements.
+        REQUIRE(ta_copy->get_dtime().first == ta.get_dtime().first);
+        REQUIRE(ta_copy->get_dtime().second == ta.get_dtime().second);
+        REQUIRE(ta_copy->get_state() == ta.get_state());
+        REQUIRE(ta_copy->get_last_h() == ta.get_last_h());
+        REQUIRE(ta_copy->get_tc() == ta.get_tc());
+        REQUIRE(ta_copy->get_te_cooldowns() == ta.get_te_cooldowns());
+    }
 }
 
 // Handling of the state_vars and rhs members

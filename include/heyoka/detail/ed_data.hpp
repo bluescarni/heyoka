@@ -16,6 +16,7 @@
 #endif
 
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -52,7 +53,7 @@ struct ed_jit_data {
     // rtscc function type.
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
     // fex_check function type.
-    using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
+    using fex_check_t = void (*)(const T *, const T *, std::uint32_t *, T *) noexcept;
 
     // The LLVM state.
     llvm_state m_state;
@@ -119,7 +120,7 @@ struct ed_data {
     ed_data &operator=(ed_data &&) = delete;
 
     // The event detection function.
-    void detect_events(const T &, std::uint32_t, std::uint32_t, const T &);
+    void detect_events(const T &, std::uint32_t, std::uint32_t);
 
 private:
     // Serialisation.
@@ -150,6 +151,11 @@ struct ed_data_batch {
     // The jet of derivatives for the state variables
     // and the events.
     std::vector<T> m_ev_jet;
+    // Vector of boolean flags signalling, for each batch lane, whether all input data for event detection is finite or
+    // not.
+    //
+    // NOTE: we use int instead of bool in order to avoid the usual std::vector<bool> pitfalls.
+    std::vector<int> m_ed_finite;
     // The vector to store the norm infinity of the state
     // vector when using the stepper with events.
     std::vector<T> m_max_abs_state;
@@ -168,10 +174,11 @@ struct ed_data_batch {
     std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
     // The JIT data.
     std::shared_ptr<ed_jit_data<T>> m_jit_data;
-    // Flags to signal if we are integrating backwards in time.
-    std::vector<std::uint32_t> m_back_int;
-    // Output of the fast exclusion check.
+    // Outputs of the fast exclusion check.
     std::vector<std::uint32_t> m_fex_check_res;
+    std::vector<T> m_fex_check_enc;
+    // Vector in which exceptions raised by the event callbacks will be temporarily stored.
+    std::vector<std::pair<std::uint32_t, std::exception_ptr>> m_cb_eptrs;
     // The polynomial cache.
     // NOTE: it is *really* important that this is declared
     // *before* m_wlist, because m_wlist will contain references

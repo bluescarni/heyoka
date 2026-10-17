@@ -20,6 +20,15 @@ New
 Changes
 ~~~~~~~
 
+- Invoking the stepping/propagation functions of an integrator, copy-assigning to it or deserialising into it
+  from within one of its own event or step callbacks now raises an exception
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
+- The integrators now return the ``err_nf_state`` outcome if non-finite values are detected in the input data
+  of event detection (e.g., in the Taylor coefficients of the event equations)
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
+- In the batch integrator, the event callbacks are now invoked after the time coordinates, the last timesteps
+  and the cooldowns of all batch elements have been updated
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - Events triggering at exactly the same time are now guaranteed to be processed in increasing order
   of their index
   (`#559 <https://github.com/bluescarni/heyoka/pull/559>`__).
@@ -32,6 +41,15 @@ Changes
 Fix
 ~~~
 
+- Fix the relational ``neq()`` operator evaluating to false when one or both operands are NaN
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
+- Fix NaN values in the Taylor coefficients being silently ignored in the computation of the adaptive timestep
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
+- Fix the batch integrator not detecting, in some cases, the alteration of the time coordinate from within
+  an event callback
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
+- Fix compilation warnings with GCC 15 in the bundled copy of mdspan
+  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - Fix link-time errors when mixing code compiled with GCC and Clang
   (`#556 <https://github.com/bluescarni/heyoka/pull/556>`__).
 - Fix a number of inconsistencies and corner-case issues in the time-limited propagation functions

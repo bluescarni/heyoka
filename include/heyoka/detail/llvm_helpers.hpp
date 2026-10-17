@@ -81,6 +81,8 @@ HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::
                                                        const std::vector<llvm::Value *> &);
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
                                                        const std::vector<llvm::Value *> &, const llvm::AttributeList &);
+llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &, const std::vector<llvm::Type *> &,
+                                      const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
 
@@ -122,6 +124,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_olt(llvm_state &, llvm::Value *, llvm::
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_one(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_une(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ord(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fnz(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
@@ -195,11 +198,6 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &, llvm::Type *, std::uint32_t);
 
 // Event-detection helpers.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &, llvm::Type *, llvm::Value *,
-                                                                             std::uint32_t, llvm::Value *,
-                                                                             llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
 // Algorithms.
