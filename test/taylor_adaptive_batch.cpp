@@ -2459,6 +2459,56 @@ TEST_CASE("busy flag")
     }
 }
 
+// Test the operations allowed on a moved-from integrator: copy/move assignment, deserialisation and destruction.
+TEST_CASE("moved-from")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    const auto other = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.051, 0.025, 0.026}, 2u);
+
+    std::stringstream ss;
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << other;
+    }
+
+    // Copy assignment.
+    auto ta = other;
+    const auto ta2 = std::move(ta);
+    ta = other;
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Deserialisation.
+    const auto ta3 = std::move(ta);
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> ta;
+    }
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Move assignment.
+    const auto ta4 = std::move(ta);
+    ta = ta_t(other);
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    ta.step();
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    // Leave ta in the moved-from state, so that it is destroyed in that state.
+    const auto ta5 = std::move(ta);
+}
+
 // Test that, when the event callbacks of a batch element are invoked, the time, the last timestep and the cooldowns of
 // *all* batch elements have already been updated, and that the alteration of the time coordinate of any batch element
 // from within an event callback is detected.

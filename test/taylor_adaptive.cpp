@@ -2560,6 +2560,50 @@ TEST_CASE("busy flag")
     }
 }
 
+// Test the operations allowed on a moved-from integrator: copy/move assignment, deserialisation and destruction.
+TEST_CASE("moved-from")
+{
+    using ta_t = taylor_adaptive<double>;
+
+    auto [x, v] = make_vars("x", "v");
+
+    const auto other = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.025});
+
+    std::stringstream ss;
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << other;
+    }
+
+    // Copy assignment.
+    auto ta = other;
+    const auto ta2 = std::move(ta);
+    ta = other;
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
+
+    // Deserialisation.
+    const auto ta3 = std::move(ta);
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> ta;
+    }
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
+
+    // Move assignment.
+    const auto ta4 = std::move(ta);
+    ta = ta_t(other);
+    REQUIRE(ta.get_state() == other.get_state());
+    REQUIRE(ta.get_time() == other.get_time());
+    REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
+
+    // Leave ta in the moved-from state, so that it is destroyed in that state.
+    const auto ta5 = std::move(ta);
+}
+
 // Test case for a propagate callback changing the time coordinate
 // in invalid ways.
 TEST_CASE("bug prop_cb time")
