@@ -1046,8 +1046,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
 
             // Invoke the callback of the first terminal event, if it has one.
-            if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[0]));
+            if (auto &te_cb = te.get_callback()) {
+                te_cb_ret = te_cb(*this, std::get<2>(edd.m_d_tes[0]));
             }
         }
 
