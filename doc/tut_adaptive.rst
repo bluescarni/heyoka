@@ -260,6 +260,10 @@ can be invoked with additional optional keyword arguments:
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
 
+  From within a step callback, invoking the stepping/propagation functions on the integrator,
+  copy-assigning another integrator to it or deserialising into it will raise an exception, while
+  moving into or from the integrator will result in undefined behaviour.
+
   .. versionadded:: 1.0.0
 
   Optionally, a step callback can implement a ``pre_hook()`` member
@@ -352,6 +356,10 @@ can be invoked with additional optional keyword arguments:
   object as only argument. This is known as a *step callback*. If the callback
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
+
+  From within a step callback, invoking the stepping/propagation functions on the integrator,
+  copy-assigning another integrator to it or deserialising into it will raise an exception, while
+  moving into or from the integrator will result in undefined behaviour.
 
   .. versionadded:: 1.0.0
 

@@ -20,6 +20,7 @@
 #include <optional>
 #include <ranges>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -617,7 +618,12 @@ taylor_adaptive<T>::taylor_adaptive(taylor_adaptive &&) noexcept = default;
 template <typename T>
 taylor_adaptive<T> &taylor_adaptive<T>::operator=(const taylor_adaptive &other)
 {
-    if (this != &other) {
+    if (this != &other) [[likely]] {
+        if (m_i_data && m_i_data->m_busy) [[unlikely]] {
+            throw std::runtime_error(
+                "Cannot copy-assign to an integrator while the integrator is stepping/propagating");
+        }
+
         *this = taylor_adaptive(other);
     }
 
@@ -657,12 +663,17 @@ template <typename Archive>
 void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
-    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive<T>>::type::value)) {
+    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive<T>>::type::value)) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive integrator: "
                                                 "the archive version ({}) is too old",
                                                 version));
     }
     // LCOV_EXCL_STOP
+
+    // Check the busy flag.
+    if (m_i_data && m_i_data->m_busy) [[unlikely]] {
+        throw std::runtime_error("Cannot deserialise into an integrator while the integrator is stepping/propagating");
+    }
 
     try {
         ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
@@ -699,6 +710,18 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
     load_impl(ar, v);
 }
 
+template <typename T>
+detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view name)
+{
+    assert(m_i_data);
+    if (m_i_data->m_busy) [[unlikely]] {
+        throw std::runtime_error(
+            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
+    }
+
+    return detail::busy_guard(m_i_data->m_busy);
+}
+
 // Implementation detail to make a single integration timestep.
 //
 // The magnitude of the timestep is automatically deduced, but it will always be not greater than abs(max_delta_t). The
@@ -732,16 +755,14 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     using std::abs;
     using std::isfinite;
 
-    // Small helper to reduce typing below.
-    constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
-
 #if !defined(NDEBUG)
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
     assert(!isnan(max_delta_t));
+#endif
 
     assert(m_i_data);
-#endif
+    assert(m_i_data->m_busy);
 
 #if defined(HEYOKA_HAVE_REAL)
 
@@ -753,6 +774,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     }
 
 #endif
+
+    // Small helper to reduce typing below.
+    constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
@@ -1053,6 +1077,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
+    const auto bg = make_busy_guard("step");
+
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
 #if defined(HEYOKA_HAVE_REAL)
@@ -1069,6 +1095,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
+    const auto bg = make_busy_guard("step_backward");
+
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return step_impl(mppp::real{mppp::real_kind::inf, -1, this->get_prec()}, wtc);
@@ -1084,6 +1112,8 @@ template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 {
     using std::isnan;
+
+    const auto bg = make_busy_guard("step");
 
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
@@ -1132,6 +1162,8 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
     using std::abs;
     using std::isfinite;
     using std::isnan;
+
+    assert(m_i_data->m_busy);
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
@@ -1425,6 +1457,8 @@ std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>
 taylor_adaptive<T>::propagate_for_impl(T delta_t, std::size_t max_steps, T max_delta_t, step_callback<T> cb, bool wtc,
                                        bool with_c_out)
 {
+    assert(m_i_data->m_busy);
+
     return propagate_until_impl(m_i_data->m_time + std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb),
                                 wtc, with_c_out);
 }
@@ -1452,6 +1486,8 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     using std::abs;
     using std::isfinite;
     using std::isnan;
+
+    assert(m_i_data->m_busy);
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
@@ -1572,8 +1608,11 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     // resulting in no event detection being performed.
     //
     // NOTE: use the same max_steps for the initial propagation, and don't pass the callback.
+    //
+    // NOTE: we use propagate_until_impl() here, rather than propagate_until(), because the public propagate_grid()
+    // function has already set the busy flag, and the busy check in propagate_until() would thus fail.
     const auto oc_until
-        = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
+        = std::get<0>(propagate_until_impl(detail::dfloat<T>(grid[0]), max_steps, max_delta_t, {}, false, false));
 
     if (oc_until != taylor_outcome::time_limit) [[unlikely]] {
         // The outcome is not time_limit, exit now.

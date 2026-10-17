@@ -24,6 +24,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -445,7 +446,12 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(taylor_adaptive_batch &&) noexce
 template <typename T>
 taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(const taylor_adaptive_batch &other)
 {
-    if (this != &other) {
+    if (this != &other) [[likely]] {
+        if (m_i_data && m_i_data->m_busy) [[unlikely]] {
+            throw std::runtime_error(
+                "Cannot copy-assign to an integrator while the integrator is stepping/propagating");
+        }
+
         *this = taylor_adaptive_batch(other);
     }
 
@@ -484,12 +490,18 @@ template <typename Archive>
 void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
-    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_batch<T>>::type::value)) {
+    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_batch<T>>::type::value))
+        [[unlikely]] {
         throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive_batch integrator: "
                                                 "the archive version ({}) is too old",
                                                 version));
     }
     // LCOV_EXCL_STOP
+
+    // Check the busy flag.
+    if (m_i_data && m_i_data->m_busy) [[unlikely]] {
+        throw std::runtime_error("Cannot deserialise into an integrator while the integrator is stepping/propagating");
+    }
 
     try {
         ar >> m_i_data;
@@ -523,6 +535,18 @@ template <typename T>
 void taylor_adaptive_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
+}
+
+template <typename T>
+detail::busy_guard taylor_adaptive_batch<T>::make_busy_guard(const std::string_view name)
+{
+    assert(m_i_data);
+    if (m_i_data->m_busy) [[unlikely]] {
+        throw std::runtime_error(
+            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
+    }
+
+    return detail::busy_guard(m_i_data->m_busy);
 }
 
 template <typename T>
@@ -650,6 +674,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     using std::abs;
     using std::isfinite;
 
+    assert(m_i_data->m_busy);
+
     // Small helper to reduce typing below.
     constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
@@ -749,7 +775,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
         // NOTE: this vector is always empty at this point: it is empty after construction/deserialisation, it is filled
         // in only within step_impl(), and the scope guard below clears it on exit. This relies on step_impl() never
-        // being re-entered.
+        // being re-entered, which is guaranteed by the busy flag (see make_busy_guard()).
         assert(cb_eptrs.empty());
 
         // Create the scope guard to automatically clear cb_eptrs on exit.
@@ -1095,6 +1121,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch<T>::step(bool wtc)
 {
+    const auto bg = make_busy_guard("step");
+
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
 
     step_impl(m_pinf, wtc);
@@ -1103,6 +1131,8 @@ void taylor_adaptive_batch<T>::step(bool wtc)
 template <typename T>
 void taylor_adaptive_batch<T>::step_backward(bool wtc)
 {
+    const auto bg = make_busy_guard("step_backward");
+
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_minf);
 
     step_impl(m_minf, wtc);
@@ -1111,6 +1141,8 @@ void taylor_adaptive_batch<T>::step_backward(bool wtc)
 template <typename T>
 void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    const auto bg = make_busy_guard("step");
+
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
 
     // Check the dimensionality of max_delta_ts.
@@ -1122,7 +1154,7 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc
     }
 
     // Make sure no values in max_delta_ts are nan.
-    if (std::any_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
+    if (std::ranges::any_of(max_delta_ts, [](const auto &x) {
             using std::isnan;
             return isnan(x);
         })) {
@@ -1140,6 +1172,8 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
                                              const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
                                              bool with_c_out)
 {
+    assert(m_i_data->m_busy);
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
@@ -1198,6 +1232,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
     using std::isnan;
 
     using safe_size_t = boost::safe_numerics::safe<std::size_t>;
+
+    assert(m_i_data->m_busy);
 
     // Small helper to reduce typing below.
     constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
@@ -1655,6 +1691,8 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
 
     using safe_size_t = boost::safe_numerics::safe<std::size_t>;
 
+    assert(m_i_data->m_busy);
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -1826,8 +1864,16 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
     // zero timestep, resulting in no event detection being performed.
     //
     // NOTE: use the same max_steps for the initial propagation, and don't pass the callback.
+    //
+    // NOTE: we use propagate_until_impl() here, rather than propagate_until(), because the public propagate_grid()
+    // function has already set the busy flag, and the busy check in propagate_until() would thus fail.
+    //
+    // NOTE: aliasing-wise, we are ok here. pgrid_tmp is a local vector that by definition cannot alias any other data,
+    // max_delta_ts is a reference either to a vector which was newly-created in taylor_propagate_common_ops_batch(), or
+    // to the internal m_pinf vector (which can never alias any user-provided data, as the user does not have access to
+    // it).
     std::ranges::copy(grid_row(0), pgrid_tmp.begin());
-    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
+    propagate_until_impl(pgrid_tmp, max_steps, max_delta_ts, {}, false, false);
 
     // Check the result of the integration.
     if (std::ranges::any_of(m_prop_res, [](const auto &t) { return std::get<0>(t) != taylor_outcome::time_limit; }))
