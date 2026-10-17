@@ -1616,6 +1616,9 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     // LCOV_EXCL_STOP
     m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u) * batch_size);
 
+    // Prepare m_ed_finite.
+    m_ed_finite.resize(boost::numeric_cast<decltype(m_ed_finite.size())>(batch_size));
+
     // Prepare m_max_abs_state.
     m_max_abs_state.resize(batch_size);
 
@@ -1667,9 +1670,10 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
 
 template <typename T>
 ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
-    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps),
-      m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res),
-      m_fex_check_enc(o.m_fex_check_enc), m_poly_cache(o.m_poly_cache)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_ed_finite(o.m_ed_finite),
+      m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps), m_te_cooldowns(o.m_te_cooldowns),
+      m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res), m_fex_check_enc(o.m_fex_check_enc),
+      m_poly_cache(o.m_poly_cache)
 {
     // Fetch the batch size.
     const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
@@ -1700,6 +1704,7 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_tes;
     ar << m_ntes;
     ar << m_ev_jet;
+    ar << m_ed_finite;
     ar << m_max_abs_state;
     ar << m_g_eps;
     ar << m_te_cooldowns;
@@ -1732,6 +1737,7 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_tes;
     ar >> m_ntes;
     ar >> m_ev_jet;
+    ar >> m_ed_finite;
     ar >> m_max_abs_state;
     ar >> m_g_eps;
     ar >> m_te_cooldowns;
@@ -1778,6 +1784,9 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 // Implementation of event detection.
 //
 // NOTE: the list of detected events may contain duplicates which will have to be removed outside this function.
+//
+// NOTE: batch lanes whose flag in m_ed_finite is zero are skipped. The flags must be set by the caller before invoking
+// this function.
 template <typename T>
 void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t order, const std::uint32_t dim,
                                      const std::uint32_t batch_size)
@@ -1817,38 +1826,27 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
 
             // Run the fast exclusion check.
             //
-            // NOTE: in case of non-finite values in the Taylor coefficients of the event equation, the worst that can
-            // happen here is that we end up skipping event detection altogether without a warning. This is ok, and
-            // non-finite Taylor coefficients will be caught in the step() implementations anyway.
+            // NOTE: in lanes with non-finite values in h or in the Taylor coefficients of the event function, the
+            // results of the check are meaningless. This is ok, because event detection is skipped for these lanes
+            // below without looking at the output of m_fex_check(), and the check operates independently on each lane,
+            // so that non-finite values in one lane do not affect the results in the other lanes.
             m_fex_check(batch_ptr, h_ptr, m_fex_check_res.data(), m_fex_check_enc.data());
 
             // Run event detection on all the batch elements.
             for (std::uint32_t j = 0; j < batch_size; ++j) {
+                // Check if we are in a lane which contains non-finite data.
+                if (m_ed_finite[j] == 0) [[unlikely]] {
+                    continue;
+                }
+
                 // See if the fast exclusion check was positive for the current batch element.
                 if (m_fex_check_res[j]) {
                     continue;
                 }
 
-                // Start by running the checks that are run at the very beginning of the scalar event detection
-                // function.
+                // Load the timestep value.
                 const auto h = h_ptr[j];
-                const auto g_eps = m_g_eps[j];
-
-                // LCOV_EXCL_START
-                if (!isfinite(h)) [[unlikely]] {
-                    get_logger()->warn(
-                        "event detection skipped due to an invalid timestep value of {} at the batch index {}",
-                        fp_to_string(h), j);
-                    continue;
-                }
-                if (!isfinite(g_eps)) [[unlikely]] {
-                    get_logger()->warn(
-                        "event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
-                        "series of the event equations at the batch index {}",
-                        fp_to_string(g_eps), j);
-                    continue;
-                }
-                // LCOV_EXCL_STOP
+                assert(isfinite(h));
 
                 if (h == 0) {
                     // If the timestep is zero, skip event detection.

@@ -609,33 +609,48 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 }
 
 // Implementation detail to make a single integration timestep.
-// The magnitude of the timestep is automatically deduced for each
-// state vector, but it will always be not greater than
-// the absolute value of the corresponding element in max_delta_ts.
-// For each state vector, the propagation
-// is done forward in time if max_delta_t >= 0, backwards in
-// time otherwise.
 //
-// The function will write to res a pair for each state
-// vector, containing a flag describing the outcome of the integration
-// and the integration timestep that was used.
+// For each batch element i, the magnitude of the timestep is automatically deduced, but it will always be not greater
+// than abs(max_delta_ts[i]). The propagation is done forward in time if max_delta_ts[i] >= 0, backwards in time
+// otherwise.
+//
+// The function will write into m_step_res, for each batch element, a tuple containing a flag describing the outcome of
+// the integration and the integration timestep that was used.
 //
 // NOTE: for the docs:
-// - document exception rethrowing behaviour when an event
-//   callback throws;
+//
 // - outcome for each batch element:
-//   - if nf state is detected, err_nf_state, else
-//   - if terminal events trigger, return the index
-//     of the first event triggering, else
-//   - either time_limit or success, depending on whether
-//     max_delta_t was used as a timestep or not;
-// - the docs for the scalar step function are applicable to
-//   the batch version too.
+//   - if non-finite values are detected in the internal state of the integrator for that batch element, err_nf_state.
+//     This happens if the time or the state vector of the batch element are non-finite at the end of the timestep or,
+//     in the presence of events, if any of the inputs of event detection for the batch element (the timestep, the
+//     maximum error on the Taylor series of the event equations and the Taylor coefficients of the event equations) is
+//     non-finite. In this case, the state vector, the time and the last timestep of the batch element are updated
+//     nevertheless, and no event callback is invoked for the batch element; else
+//   - if terminal events trigger, the index ev_idx of the first terminal event triggering, encoded as ev_idx if the
+//     integration should continue (i.e., the event has a callback which returned true), and as -ev_idx - 1 otherwise;
+//     else
+//   - either time_limit or success, depending on whether max_delta_ts[i] was used as a timestep or not;
+// - if an event callback throws, no further callbacks are invoked for that batch element, its outcome is not written,
+//   and the processing moves on to the next batch element. After all batch elements have been processed, a single
+//   exception is rethrown as is, while two or more exceptions are combined into a std::runtime_error reporting the
+//   batch index, the type and the message of each exception;
+// - event detection happens in the [0, h) half-open range, where h is the timestep of the batch element (that is, all
+//   detected events are guaranteed to trigger within the [0, h) range). Thus, if the timestep ends up being zero
+//   (either because max_delta_ts[i] == 0 or the inferred timestep is zero), then event detection is skipped altogether
+//   for the batch element;
+// - for each batch element, the execution of the events' callbacks is guaranteed to proceed in chronological order. The
+//   batch elements are processed in increasing order of index;
+// - a timestep h == 0 will still result in the last timestep of the batch element being updated (to zero) and the
+//   Taylor coefficients being recorded in the internal array (if wtc == true, or always in the presence of events).
+//   That is, h == 0 is not treated in any special way.
 template <typename T>
 void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
     using std::abs;
     using std::isfinite;
+
+    // Small helper to reduce typing below.
+    constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
@@ -659,27 +674,24 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     auto &m_step_f = m_ta_jit_data->m_step_f;
     auto &m_d_out_f = m_ta_jit_data->m_d_out_f;
 
-    // LCOV_EXCL_START
     // Check preconditions.
     assert(max_delta_ts.size() == m_batch_size);
-    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
+    assert(std::ranges::none_of(max_delta_ts, [](const auto &x) {
         using std::isnan;
         return isnan(x);
     }));
 
     // Sanity check.
     assert(m_step_res.size() == m_batch_size);
-    // LCOV_EXCL_STOP
 
     // Copy max_delta_ts to the tmp buffer, twice.
-    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.data());
-    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.data() + m_batch_size);
+    std::ranges::copy(max_delta_ts, m_delta_ts.data());
+    std::ranges::copy(max_delta_ts, m_delta_ts.data() + m_batch_size);
 
-    // Helper to check if the state vector of a batch element
-    // contains a non-finite value.
-    const auto check_nf_batch = [&](std::uint32_t batch_idx) {
+    // Helper to check if the state vector of a batch element contains a non-finite value.
+    const auto check_nf_batch = [m_dim, &m_state, m_batch_size, is_finite](const std::uint32_t batch_idx) {
         for (std::uint32_t i = 0; i < m_dim; ++i) {
-            if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
+            if (!is_finite(m_state[i * m_batch_size + batch_idx])) [[unlikely]] {
                 return true;
             }
         }
@@ -687,7 +699,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     };
 
     if (m_step_f.index() == 0u || m_step_f.index() == 2u) {
-        assert(!m_ed_data); // LCOV_EXCL_LINE
+        assert(!m_ed_data);
 
         // Invoke the vanilla stepper.
         if (m_step_f.index() == 0u) {
@@ -703,8 +715,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
         // Update the times and the last timesteps, and write out the result.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // The timestep that was actually used for
-            // this batch element.
+            // The timestep that was actually used for this batch element.
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
@@ -715,28 +726,25 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Update the size of the last timestep.
             m_last_h[i] = h;
 
-            if (!isfinite(new_time) || check_nf_batch(i)) {
-                // Either the new time or state contain non-finite values,
-                // return an error condition.
+            if (!is_finite(new_time) || check_nf_batch(i)) [[unlikely]] {
+                // Either the new time or state contain non-finite values, return an error condition.
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
             } else {
                 m_step_res[i] = std::tuple{
-                    // NOTE: use here the original value of
-                    // max_delta_ts, stored at the end of m_delta_ts,
-                    // in case max_delta_ts aliases integrator data
-                    // which was modified during the step.
+                    // NOTE: use here the original value of max_delta_ts, stored at the end of m_delta_ts, in case
+                    // max_delta_ts aliases integrator data which was modified during the step.
                     h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success,
                     h,
                 };
             }
         }
     } else {
-        assert(m_ed_data); // LCOV_EXCL_LINE
+        assert(m_ed_data);
 
         auto &edd = *m_ed_data;
 
-        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
-        // event equations at the beginning of the timestep for later use.
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector + event equations
+        // at the beginning of the timestep for later use.
         if (m_step_f.index() == 1u) {
             std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
                                   m_delta_ts.data(), edd.m_max_abs_state.data());
@@ -749,27 +757,30 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         }
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
-        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in edd.detect_events() we skip event detection altogether.
+        // automatic cooldown deduction. If max_abs_state is not finite, set g_eps to infinity so that event detection
+        // will be skipped for that lane, which will end the step with err_nf_state.
+        //
+        // NOTE: a +inf g_eps can also be generated via overflow in the calculation. In that case, event detection will
+        // also be skipped and the lane outcome will be err_nf_state.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             const auto max_abs_state = edd.m_max_abs_state[i];
 
-            if (isfinite(max_abs_state)) {
+            if (is_finite(max_abs_state)) {
                 // Are we in absolute or relative error control mode?
-                const auto abs_or_rel = max_abs_state < 1;
+                const auto abs_or_rel = max_abs_state <= 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
+                // Estimate the size of the largest remainder in the Taylor series of both the dynamical equations and
+                // the events.
                 const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-                // integration error cannot be too small due to floating-point truncation.
-                // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real integration error cannot be
+                // too small due to floating-point truncation. This is the case for instance if we use sub-epsilon
+                // integration tolerances to achieve Brouwer's law. In such a case, we cap the value of g_eps, using eps
+                // * max_abs_state as an estimation of the smallest number that can be resolved with the current
+                // floating-point type.
+                //
+                // NOTE: the if condition in the next line is equivalent, in relative error control mode, to:
+                //
                 // if (m_tol < std::numeric_limits<T>::epsilon())
                 if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
                     edd.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
@@ -781,8 +792,28 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             }
         }
 
-        // Write unconditionally the tcs.
-        std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size, m_tc.data());
+        // Next, we compute the flags to signal that all the input data for event detection is finite.
+        //
+        // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
+        // functions.
+        //
+        // NOTE: this is the index in m_ev_jet where the Taylor coefficients for the event functions begin.
+        const auto ev_begin = m_dim * (m_order + 1u) * m_batch_size;
+
+        // The total number of batches of Taylor coefficients for the event functions.
+        const auto n_ev_tcs = (edd.m_ev_jet.size() - ev_begin) / m_batch_size;
+        assert((edd.m_ev_jet.size() - ev_begin) % m_batch_size == 0u);
+
+        auto &ed_finite = edd.m_ed_finite;
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            bool flag = is_finite(m_delta_ts[i]) && is_finite(edd.m_g_eps[i]);
+
+            for (decltype(edd.m_ev_jet.size()) k = 0; flag && k < n_ev_tcs; ++k) {
+                flag = is_finite(edd.m_ev_jet[ev_begin + k * m_batch_size + i]);
+            }
+
+            ed_finite[i] = flag;
+        }
 
         // Do the event detection.
         edd.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
@@ -792,6 +823,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // integrator in a half-baked state.
 
         // We now have to post-process the list of detected events, which are unordered and may contain duplicates.
+        //
+        // NOTE: contrary to the scalar case, this block always runs because detect_events() also always runs: it takes
+        // care internally of clearing out the vectors of detected events (for all lanes), and of skipping event
+        // detection for a batch lane when any input data for event detection in that lane is not finite.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // For terminal events, we are interested only in the first event triggering in chronological order. It will
             // be placed at the first position of edd.m_d_tes[i]. Duplicates are irrelevant here, as only the first
@@ -821,11 +856,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             }
         }
 
+        // Write unconditionally the tcs for the state.
+        std::ranges::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + ev_begin, m_tc.data());
+
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
-
-        // We will use this to capture exceptions thrown while executing callbacks.
-        std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
 
         // Make a copy of the current times before invoking the callbacks, so that:
         //
@@ -838,22 +873,25 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
         std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
 
-        // Run the finiteness check on the state vector
-        // *before* executing the callbacks, as the execution of
-        // a callback on a batch index might alter the state
-        // variables of another batch index.
+        // Run the finiteness check on the state vector *before* executing the callbacks, as the execution of a callback
+        // on a batch index might alter the state variables of another batch index.
+        //
         // NOTE: this can probably be vectorised, if necessary.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_nf_detected[i] = check_nf_batch(i);
         }
 
+        // We will use this to capture exceptions thrown while executing callbacks.
+        std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
+
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Fetch the timestep.
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
-            // NOTE: take the time coordinate from m_time_copy (rather than
-            // m_time directly) as m_time might have been modified by incorrectly
-            // implemented callbacks.
+            //
+            // NOTE: take the time coordinate from m_time_copy (rather than m_time directly) as m_time might have been
+            // modified by incorrectly implemented callbacks.
             const auto new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]) + h;
             m_time_hi[i] = new_time.hi;
             m_time_lo[i] = new_time.lo;
@@ -865,29 +903,26 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Store the last timestep.
             m_last_h[i] = h;
 
-            // Check if the time or the state vector are non-finite at the
-            // end of the timestep.
-            if (!isfinite(new_time) || m_nf_detected[i] != 0) {
+            // Check if the time or the state vector are non-finite at the end of the timestep, or if event detection
+            // could not be performed due to non-finite inputs.
+            if (edd.m_ed_finite[i] == 0 || !is_finite(new_time) || m_nf_detected[i] != 0) [[unlikely]] {
+                // Flag the current lane as err_nf_state and move to the next.
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
 
-                // Move to the next batch element.
                 continue;
             }
 
             // Update the cooldowns.
             for (auto &cd : edd.m_te_cooldowns[i]) {
                 if (cd) {
-                    // Check if the timestep we just took
-                    // brought this event outside the cooldown.
+                    // Check if the timestep we just took brought this event outside the cooldown.
                     const auto tmp = cd->first + h;
 
                     if (abs(tmp) >= cd->second) {
-                        // We are now outside the cooldown period
-                        // for this event, reset cd.
+                        // We are now outside the cooldown period for this event, reset cd.
                         cd.reset();
                     } else {
-                        // Still in cooldown, update the
-                        // time spent in cooldown.
+                        // Still in cooldown, update the time spent in cooldown.
                         cd->first = tmp;
                     }
                 }
@@ -903,48 +938,44 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                                                                 return detail::cmp_abs(std::get<1>(ev), t) < 0;
                                                             });
 
-            // Flag to signal that the callback of a non-terminal event threw
-            // an exception.
+            // Flag to signal that the callback of a non-terminal event threw an exception.
             bool nt_cb_exception = false;
 
-            // Invoke the callbacks of the non-terminal events, which are guaranteed
-            // to happen before the first terminal event.
-            // NOTE: the loop will be exited as soon as an exception is raised
-            // by a callback. This is intended to match the behaviour of the
-            // scalar integrator (i.e., do not process any more events for the current
-            // batch element and move to the next batch element instead).
+            // Invoke the callbacks of the non-terminal events, which are guaranteed to happen before the first terminal
+            // event.
+            //
+            // NOTE: the loop will be exited as soon as an exception is raised by a callback. This is intended to match
+            // the behaviour of the scalar integrator (i.e., do not process any more events for the current batch
+            // element and move to the next batch element instead).
             for (auto it = edd.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
                 auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
-                assert(cb); // LCOV_EXCL_LINE
+                assert(cb);
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
                 } catch (...) {
-                    // NOTE: in case of exception, remember it, set nt_cb_exception
-                    // to true and break out, so that we do not process additional events.
+                    // NOTE: in case of exception, remember it, set nt_cb_exception to true and break out, so that we do
+                    // not process additional events.
                     cb_eptrs.emplace_back(i, std::current_exception());
                     nt_cb_exception = true;
                     break;
                 }
             }
 
-            // Don't proceed to the terminal events if a non-terminal
-            // callback threw, just move to the next batch element. This
-            // is intended to match the behaviour of the
-            // scalar integrator.
-            if (nt_cb_exception) {
+            // Don't proceed to the terminal events if a non-terminal callback threw, just move to the next batch
+            // element. This is intended to match the behaviour of the scalar integrator.
+            if (nt_cb_exception) [[unlikely]] {
                 continue;
             }
 
-            // The return value of the first
-            // terminal event's callback. It will be
-            // unused if there are no terminal events.
+            // The return value of the first terminal event's callback. It will be unused if there are no terminal
+            // events.
             bool te_cb_ret = false;
 
             if (!edd.m_d_tes[i].empty()) {
                 // Fetch the first terminal event.
                 const auto te_idx = std::get<0>(edd.m_d_tes[i][0]);
-                assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
+                assert(te_idx < edd.m_tes.size());
                 auto &te = edd.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
@@ -953,9 +984,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     edd.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
                 } else {
                     // Deduce the cooldown automatically.
-                    // NOTE: if m_g_eps[i] is not finite, we skipped event detection
-                    // altogether and thus we never end up here. If the derivative
-                    // of the event equation is not finite, the event is also skipped.
+                    //
+                    // NOTE: if m_g_eps[i] is not finite, we skipped event detection altogether for the current batch
+                    // lane and thus we never end up here. If the derivative of the event equation is not finite, the
+                    // event is also skipped.
                     edd.m_te_cooldowns[i][te_idx].emplace(
                         0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<3>(edd.m_d_tes[i][0])));
                 }
@@ -965,10 +997,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     try {
                         te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
-                        // NOTE: if an exception is raised, record it
-                        // and then move on to the next batch element.
-                        // This is intended to match the behaviour of
-                        // the scalar integrator.
+                        // NOTE: if an exception is raised, record it and then move on to the next batch element. This
+                        // is intended to match the behaviour of the scalar integrator.
                         cb_eptrs.emplace_back(i, std::current_exception());
                         continue;
                     }
@@ -978,10 +1008,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             if (edd.m_d_tes[i].empty()) {
                 // No terminal events detected, return success or time limit.
                 m_step_res[i] = std::tuple{
-                    // NOTE: use here the original value of
-                    // max_delta_ts, stored at the end of m_delta_ts,
-                    // in case max_delta_ts aliases integrator data
-                    // which was modified during the step.
+                    // NOTE: use here the original value of max_delta_ts, stored at the end of m_delta_ts, in case
+                    // max_delta_ts aliases integrator data which was modified during the step.
                     h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success,
                     h,
                 };
@@ -989,24 +1017,21 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 // Terminal event detected. Fetch its index.
                 const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[i][0]));
 
-                // NOTE: if te_cb_ret is true, it means that the terminal event has
-                // a callback and its invocation returned true (meaning that the
-                // integration should continue). Otherwise, either the terminal event
-                // has no callback or its callback returned false, meaning that the
-                // integration must stop.
+                // NOTE: if te_cb_ret is true, it means that the terminal event has a callback and its invocation
+                // returned true (meaning that the integration should continue). Otherwise, either the terminal event
+                // has no callback or its callback returned false, meaning that the integration must stop.
                 m_step_res[i] = std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
             }
         }
 
         // Check if any callback threw an exception.
-        if (!cb_eptrs.empty()) {
+        if (!cb_eptrs.empty()) [[unlikely]] {
             // If there's only 1 exception just rethrow it.
             if (cb_eptrs.size() == 1u) {
                 std::rethrow_exception(cb_eptrs[0].second);
             }
 
-            // Otherwise, we will assemble and throw a new exception
-            // containing the messages of all thrown exceptions.
+            // Otherwise, we will assemble and throw a new exception containing the messages of all thrown exceptions.
             std::string exc_msg = "Two or more exceptions were raised during the execution of event callbacks in a "
                                   "batch integrator:\n\n";
 
@@ -1031,16 +1056,16 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             throw std::runtime_error(exc_msg);
         }
 
-        // NOTE: event callbacks - terminal or not - cannot modify the time
-        // variable, as this is going to mess up the internal time keeping logic
-        // in the propagate_*() functions.
-        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
-        // This is necessary in case something goes wrong in the integration step
-        // and the time coordinate goes NaN - in such a case, the standard equality operator
-        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
+        // NOTE: event callbacks - terminal or not - cannot modify the time variable, as this is going to mess up the
+        // internal time keeping logic in the propagate_*() functions.
+        //
+        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates. This is necessary in case
+        // something goes wrong in the integration step and the time coordinate goes NaN - in such a case, the standard
+        // equality operator would trigger (because NaN != NaN) even if the time coordinate was not changed by the
+        // callback.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             if (!detail::cmp_nan_eq(m_time_hi[i], m_time_copy_hi[i])
-                || !detail::cmp_nan_eq(m_time_lo[i], m_time_copy_lo[i])) {
+                || !detail::cmp_nan_eq(m_time_lo[i], m_time_copy_lo[i])) [[unlikely]] {
                 throw std::runtime_error(
                     fmt::format("The invocation of one or more event callbacks resulted in the alteration of the "
                                 "time coordinate of the integrator at the batch index {} - this is not supported",

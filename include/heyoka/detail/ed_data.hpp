@@ -150,6 +150,11 @@ struct ed_data_batch {
     // The jet of derivatives for the state variables
     // and the events.
     std::vector<T> m_ev_jet;
+    // Vector of boolean flags signalling, for each batch lane, whether all input data for event detection is finite or
+    // not.
+    //
+    // NOTE: we use int instead of bool in order to avoid the usual std::vector<bool> pitfalls.
+    std::vector<int> m_ed_finite;
     // The vector to store the norm infinity of the state
     // vector when using the stepper with events.
     std::vector<T> m_max_abs_state;
