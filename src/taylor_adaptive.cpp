@@ -1003,23 +1003,24 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb);
 
+            // Compute the time coordinate to pass to the callback.
+            //
             // NOTE: use new_time, instead of m_time, in order to prevent passing the wrong time coordinate to the
             // callback if an earlier callback changed it.
+            //
+            // NOLINTNEXTLINE(misc-const-correctness)
+            auto cb_tm = static_cast<T>(new_time - m_last_h + std::get<1>(t));
 
 #if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
+            if constexpr (std::same_as<T, mppp::real>) {
                 // NOTE: for mppp::real, we must ensure that the time coordinate of the event is computed with the
                 // correct precision (we are getting the time coordinate from the event detection machinery, which does
                 // not enforce preservation of the correct precision).
-                auto tc = static_cast<T>((new_time - m_last_h + std::get<1>(t)));
-                tc.prec_round(this->get_prec());
-                cb(*this, tc, std::get<2>(t));
-            } else {
-#endif
-                cb(*this, static_cast<T>(new_time - m_last_h + std::get<1>(t)), std::get<2>(t));
-#if defined(HEYOKA_HAVE_REAL)
+                cb_tm.prec_round(this->get_prec());
             }
 #endif
+
+            cb(*this, std::move(cb_tm), std::get<2>(t));
         }
 
         // The return value of the first terminal event's callback. It will be unused if there are no terminal events.
