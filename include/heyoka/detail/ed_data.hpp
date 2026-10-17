@@ -16,6 +16,7 @@
 #endif
 
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -176,6 +177,8 @@ struct ed_data_batch {
     // Outputs of the fast exclusion check.
     std::vector<std::uint32_t> m_fex_check_res;
     std::vector<T> m_fex_check_enc;
+    // Vector in which exceptions raised by the event callbacks will be temporarily stored.
+    std::vector<std::pair<std::uint32_t, std::exception_ptr>> m_cb_eptrs;
     // The polynomial cache.
     // NOTE: it is *really* important that this is declared
     // *before* m_wlist, because m_wlist will contain references

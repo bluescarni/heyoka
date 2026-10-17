@@ -33,6 +33,7 @@
 #include <boost/container/vector.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/scope/scope_exit.hpp>
 
 #include <fmt/core.h>
 
@@ -743,6 +744,17 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
         auto &edd = *m_ed_data;
 
+        // Fetch the vector to store the callback exceptions.
+        auto &cb_eptrs = edd.m_cb_eptrs;
+
+        // NOTE: this vector is always empty at this point: it is empty after construction/deserialisation, it is filled
+        // in only within step_impl(), and the scope guard below clears it on exit. This relies on step_impl() never
+        // being re-entered.
+        assert(cb_eptrs.empty());
+
+        // Create the scope guard to automatically clear cb_eptrs on exit.
+        const boost::scope::scope_exit cb_eptrs_clear_guard([&cb_eptrs] noexcept { cb_eptrs.clear(); });
+
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector + event equations
         // at the beginning of the timestep for later use.
         if (m_step_f.index() == 1u) {
@@ -821,6 +833,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary memory).
         // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
         // integrator in a half-baked state.
+        //
+        // NOTE: the noexcept guarantee relies on cb_eptrs having enough reserved storage for all exceptions that may be
+        // thrown by the callbacks, so that adding items to it never requires allocation. We make sure of this when
+        // setting up cb_eptrs in the constructors and during deserialisation.
 
         // We now have to post-process the list of detected events, which are unordered and may contain duplicates.
         //
@@ -880,9 +896,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_nf_detected[i] = check_nf_batch(i);
         }
-
-        // We will use this to capture exceptions thrown while executing callbacks.
-        std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
 
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // Fetch the timestep.
@@ -956,6 +969,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 } catch (...) {
                     // NOTE: in case of exception, remember it, set nt_cb_exception to true and break out, so that we do
                     // not process additional events.
+                    assert(cb_eptrs.size() < m_batch_size);
                     cb_eptrs.emplace_back(i, std::current_exception());
                     nt_cb_exception = true;
                     break;
@@ -999,6 +1013,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     } catch (...) {
                         // NOTE: if an exception is raised, record it and then move on to the next batch element. This
                         // is intended to match the behaviour of the scalar integrator.
+                        assert(cb_eptrs.size() < m_batch_size);
                         cb_eptrs.emplace_back(i, std::current_exception());
                         continue;
                     }
@@ -1026,6 +1041,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
         // Check if any callback threw an exception.
         if (!cb_eptrs.empty()) [[unlikely]] {
+            assert(cb_eptrs.size() <= m_batch_size);
+
             // If there's only 1 exception just rethrow it.
             if (cb_eptrs.size() == 1u) {
                 std::rethrow_exception(cb_eptrs[0].second);

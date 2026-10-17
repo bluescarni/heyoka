@@ -1647,6 +1647,13 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     // m_fex_check_enc.
     m_fex_check_enc.resize(batch_size * 2u);
 
+    // Prepare m_cb_eptrs.
+    //
+    // NOTE: this vector is normally kept empty. During the execution of step_impl(), it will end up containing at most
+    // batch_size elements, and it is guaranteed to be cleared out when step_impl() returns. Because we reserve its
+    // maximum possible size, it is guaranteed that no exceptions will be thrown when pushing back.
+    m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
+
     // Setup the JIT-compiled functions.
 
     // Add the rtscc function. This will also indirectly
@@ -1693,6 +1700,9 @@ ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     // Reserve space in m_wlist and m_isol.
     m_wlist.reserve(o.m_wlist.capacity());
     m_isol.reserve(o.m_isol.capacity());
+
+    // Reserve space in m_cb_eptrs.
+    m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
 }
 
 template <typename T>
@@ -1779,6 +1789,8 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     m_wlist.reserve(wlist_cap);
     m_isol.clear();
     m_isol.reserve(isol_cap);
+    m_cb_eptrs.clear();
+    m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
 }
 
 // Implementation of event detection.
