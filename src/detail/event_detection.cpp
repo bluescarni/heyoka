@@ -686,7 +686,7 @@ void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32
                 // NOTE: the division by abs(h) will ensure that, in case of mppp::real, the result is computed
                 // in a precision no less than h's.
                 //
-                // NOTE: the cooldown values are finite with |first| < second, thus the numerators are finite and
+                // NOTE: the cooldown values are finite with |first| <= second, thus the numerators are finite and
                 // non-negative. In these two computations, the worst outcome is the generation of a positive infinity
                 // (via overflow), which is correctly handled below.
                 if (h < 0) {
