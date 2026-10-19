@@ -205,7 +205,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 }
 
 // Helper to determine the vector size of a type. If the type is not llvm::FixedVectorType, 1 will be returned.
-std::uint32_t get_vector_size(llvm::Type *const tp)
+std::uint32_t get_vector_size(const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 

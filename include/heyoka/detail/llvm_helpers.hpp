@@ -39,7 +39,7 @@ HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(const llvm::Value *);
-HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Type *);
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(const llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(const llvm::Module &, llvm::Type *);
 std::uint32_t gl_arr_size(llvm::Value *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_size(const llvm::Module &, llvm::Type *);
