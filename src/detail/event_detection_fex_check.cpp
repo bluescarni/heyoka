@@ -124,6 +124,15 @@ llvm::Value *avx512_binop_up(llvm_state &s, const std::string_view op, llvm::Val
     return builder.CreateExtractElement(res_vec, static_cast<std::uint64_t>(0));
 }
 
+// LCOV_EXCL_STOP
+
+#if BOOST_ARCH_X86_64
+
+// Mask of all the bits of the MXCSR register except the rounding control field (bits 13 and 14).
+constexpr std::uint32_t mxcsr_non_rc_mask = 0xFFFF9FFF;
+
+#endif
+
 // Wrapper to set the rounding mode to UP for a scalar floating-point type fp_t.
 //
 // Normally, we use llvm.get/set.rounding() to manipulate the rounding mode, but on some platforms this leads to
@@ -149,9 +158,6 @@ llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] const llvm::Ty
     if (fp_t->isDoubleTy() || fp_t->isFloatTy()) {
         // Mask of the rounding control field (bits 13 and 14) in the MXCSR register.
         constexpr std::uint32_t mxcsr_rc_mask = 0x6000;
-
-        // Mask of all the bits of the MXCSR register except the rounding control field.
-        constexpr std::uint32_t mxcsr_non_rc_mask = 0xFFFF9FFF;
 
         // Value of the rounding control field for rounding up.
         constexpr std::uint32_t mxcsr_rc_up = 0x4000;
@@ -182,8 +188,6 @@ llvm::Value *llvm_set_rounding_up(llvm_state &s, [[maybe_unused]] const llvm::Ty
     return ret;
 }
 
-// LCOV_EXCL_STOP
-
 // Wrapper to restore the original rounding mode returned by llvm_set_rounding_up() for a scalar floating-point type
 // fp_t.
 void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_unused]] const llvm::Type *const fp_t)
@@ -198,9 +202,6 @@ void llvm_restore_rounding(llvm_state &s, llvm::Value *const rounding, [[maybe_u
 #if BOOST_ARCH_X86_64
 
     if (fp_t->isDoubleTy() || fp_t->isFloatTy()) {
-        // Mask of all the bits of the MXCSR register except the rounding control field (bits 13 and 14).
-        constexpr std::uint32_t mxcsr_non_rc_mask = 0xFFFF9FFF;
-
         // Load the current value of the MXCSR register via a stack slot.
         auto *const mxcsr_ptr = builder.CreateAlloca(builder.getInt32Ty());
         llvm_invoke_intrinsic(builder, "llvm.x86.sse.stmxcsr", {}, {mxcsr_ptr});
