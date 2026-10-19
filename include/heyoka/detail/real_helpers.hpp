@@ -24,7 +24,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-mpfr_prec_t llvm_is_real(llvm::Type *);
+mpfr_prec_t llvm_is_real(const llvm::Type *);
 
 llvm::Value *llvm_real_fneg(llvm_state &, llvm::Value *);
 llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, unsigned, mpfr_rnd_t = MPFR_RNDN);
