@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <source_location>
 #include <string>
 #include <typeinfo>
@@ -85,6 +86,8 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &, const s
                                       const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_entry_alloca(llvm_state &, llvm::Type *);
 
 void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
 
@@ -178,6 +181,49 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_s
                                                                           llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
+// RAII guard for interval arithmetic functions.
+//
+// Due to the way LLVM's constrained floating-point intrinsics work, algorithms employing interval arithmetic must be
+// implemented in separate functions with a specific setup for the function attributes and the floating-point
+// environment. This class encapsulates the details of such setup, and offers a set of functions implementing basic
+// interval arithmetic building blocks.
+//
+// A guard must be created before adding any code to the function, right after the creation of the entry block. The
+// finalise() method must be called before *every* return statement. The guard itself must be destroyed immediately
+// after code generation for the function has finished, and no code for other functions may be generated while the guard
+// is alive (i.e., any function invoked from f must be created before the guard). There are exceptions to this rule,
+// e.g., the wrapper functions generated internally by the mppp::real helpers, which contain no floating-point
+// instructions and are thus unaffected by the guard's settings. In general, all floating-point operations in an
+// interval arithmetic function (including the non-rounding ones, such as comparisons, negation and absolute value)
+// should be performed via the member functions of this class, in order to minimise the risk that the guard's settings
+// leak into non-interval functions.
+//
+// All operands passed to the member functions must be of the type passed to the constructor. Only rounding-up
+// arithmetic operations are provided: rounding down can be computed as down(x) = -up(-x).
+class HEYOKA_DLL_PUBLIC [[nodiscard]] llvm_ival_guard
+{
+    struct impl;
+    std::unique_ptr<impl> m_impl;
+
+public:
+    explicit llvm_ival_guard(llvm_state &, llvm::Function *, llvm::Type *);
+    llvm_ival_guard(const llvm_ival_guard &) = delete;
+    llvm_ival_guard(llvm_ival_guard &&) noexcept = delete;
+    llvm_ival_guard &operator=(const llvm_ival_guard &) = delete;
+    llvm_ival_guard &operator=(llvm_ival_guard &&) noexcept = delete;
+    ~llvm_ival_guard();
+
+    void finalise() const;
+
+    llvm::Value *lt(llvm::Value *, llvm::Value *) const;
+    llvm::Value *max(llvm::Value *, llvm::Value *) const;
+    llvm::Value *add_up(llvm::Value *, llvm::Value *) const;
+    llvm::Value *sub_up(llvm::Value *, llvm::Value *) const;
+    llvm::Value *mul_up(llvm::Value *, llvm::Value *) const;
+    llvm::Value *neg(llvm::Value *) const;
+    llvm::Value *abs(llvm::Value *) const;
+};
 
 // Flow control.
 HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,

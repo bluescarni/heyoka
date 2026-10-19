@@ -1636,6 +1636,25 @@ ip_restorer::~ip_restorer()
     m_bld.SetInsertPoint(m_orig_bb);
 }
 
+// Create an alloca for a value of type tp at the beginning of the entry block of the function currently being built.
+//
+// NOTE: LLVM treats allocas outside the entry block as dynamic stack allocations, which are not promoted to registers
+// and force a frame pointer and runtime stack adjustments.
+llvm::Value *llvm_entry_alloca(llvm_state &s, llvm::Type *const tp)
+{
+    assert(tp != nullptr);
+
+    auto &builder = s.builder();
+    assert(builder.GetInsertBlock() != nullptr);
+
+    auto &entry = builder.GetInsertBlock()->getParent()->getEntryBlock();
+
+    const llvm::IRBuilderBase::InsertPointGuard ipg(builder);
+    builder.SetInsertPoint(&entry, entry.begin());
+
+    return builder.CreateAlloca(tp);
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
