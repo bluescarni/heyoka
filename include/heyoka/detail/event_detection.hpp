@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -68,6 +69,10 @@ mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
 // Helper to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,
                                                         std::uint32_t);
+
+// Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ed_ival_poly_shift_1(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
