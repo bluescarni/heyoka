@@ -122,7 +122,7 @@ namespace
 // Small helper to compute sqrt(pi) / 2 at the precision of the floating-point type tp.
 //
 // NOTE: this is a repetition of number_like(), perhaps we can abstract this?
-number sqrt_pi_2_like(llvm_state &s, llvm::Type *tp)
+number sqrt_pi_2_like(llvm_state &s, const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 

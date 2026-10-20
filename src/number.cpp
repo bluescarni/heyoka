@@ -642,7 +642,7 @@ namespace detail
 
 // A small helper to create a number instance containing the value val
 // cast to the C++ type corresponding to the LLVM type tp.
-number number_like(llvm_state &s, llvm::Type *tp, double val)
+number number_like(llvm_state &s, const llvm::Type *const tp, double val)
 {
     assert(tp != nullptr);
 
@@ -743,7 +743,7 @@ const auto dl_twopi_dict = make_dl_twopi_dict();
 
 // Helper to create a pair of number instances containing the double-length approximation
 // of 2pi for an input LLVM floating-point scalar type.
-std::pair<number, number> dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
+std::pair<number, number> dl_twopi_like(llvm_state &s, const llvm::Type *const fp_t)
 {
     if (llvm_is_ieee_like_fp(fp_t)) {
 #if !defined(NDEBUG)

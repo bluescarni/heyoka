@@ -147,7 +147,7 @@ llvm::Value *llvm_fneg(llvm_state &s, llvm::Value *a)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFNeg(a);

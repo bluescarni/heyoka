@@ -447,7 +447,7 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
     // Construct the scalar type first, then we will convert
     // to a vector if needed.
-    auto *tp_scal = tp->getScalarType();
+    const auto *const tp_scal = tp->getScalarType();
     llvm::Type *ret_scal_t = nullptr;
 
 #define HEYOKA_LLVM_CLONE_TYPE_IMPL(tid)                                                                               \
