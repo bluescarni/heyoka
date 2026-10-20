@@ -360,6 +360,16 @@ llvm_ival_guard::llvm_ival_guard(llvm_state &s, llvm::Function *const f, llvm::T
 // NOTE: the dtor of m_impl->m_fmfg will ensure that the FP flags are restored to their original values.
 llvm_ival_guard::~llvm_ival_guard() = default;
 
+llvm::Type *llvm_ival_guard::get_val_t() const
+{
+    return m_impl->m_val_t;
+}
+
+llvm_state &llvm_ival_guard::get_state() const
+{
+    return m_impl->m_state;
+}
+
 // NOTE: finalise() must be called immediately before every return statement in the function.
 void llvm_ival_guard::finalise() const
 {

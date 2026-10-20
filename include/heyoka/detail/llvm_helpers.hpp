@@ -214,15 +214,18 @@ public:
     llvm_ival_guard &operator=(llvm_ival_guard &&) noexcept = delete;
     ~llvm_ival_guard();
 
+    [[nodiscard]] llvm::Type *get_val_t() const;
+    [[nodiscard]] llvm_state &get_state() const;
+
     void finalise() const;
 
-    llvm::Value *lt(llvm::Value *, llvm::Value *) const;
-    llvm::Value *max(llvm::Value *, llvm::Value *) const;
-    llvm::Value *add_up(llvm::Value *, llvm::Value *) const;
-    llvm::Value *sub_up(llvm::Value *, llvm::Value *) const;
-    llvm::Value *mul_up(llvm::Value *, llvm::Value *) const;
-    llvm::Value *neg(llvm::Value *) const;
-    llvm::Value *abs(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *lt(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *max(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *add_up(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *sub_up(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *mul_up(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *neg(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *abs(llvm::Value *) const;
 };
 
 // Flow control.
