@@ -213,8 +213,8 @@ ival_mode llvm_get_ival_mode(const llvm::Type *const val_t)
 // LCOV_EXCL_START
 
 // Helper to compute 'a op b', rounded toward +inf, via the AVX512 intrinsics with static rounding. op must be one of
-// "add", "sub" or "mul". a and b must be of the same type, which must be either float/double or a 512-bit vector of
-// float/double (i.e., of size 16/8).
+// "add", "sub", "mul" or "div". a and b must be of the same type, which must be either float/double or a 512-bit vector
+// of float/double (i.e., of size 16/8).
 //
 // NOTE: static rounding is available only for scalar operations and for 512-bit vectors. The scalar intrinsics operate
 // on the first element of 128-bit vectors, thus scalar operands are inserted into (and the result is extracted from)
@@ -224,7 +224,7 @@ llvm::Value *avx512_binop_up(llvm_state &s, const std::string_view op, llvm::Val
     assert(a != nullptr);
     assert(b != nullptr);
     assert(a->getType() == b->getType());
-    assert(op == "add" || op == "sub" || op == "mul");
+    assert(op == "add" || op == "sub" || op == "mul" || op == "div");
 
     auto &builder = s.builder();
 
@@ -316,15 +316,16 @@ struct llvm_ival_guard::impl {
 
     // Common helper to compute 'a name b' rounded toward +inf.
     //
-    // 'name' is the name of the operation ("add", "sub" or "mul"), used to select the AVX512 intrinsic and the MPFR
-    // primitive. portable_op is the function implementing the operation in the portable implementation.
-    llvm::Value *arith_op_up(const char *name, auto *const portable_op, llvm::Value *const a,
+    // 'name' is the name of the operation ("add", "sub", "mul" or "div"), used to select the AVX512 intrinsic and the
+    // MPFR primitive. portable_op is the function implementing the operation in the portable implementation.
+    llvm::Value *arith_op_up(const std::string_view name, auto *const portable_op, llvm::Value *const a,
                              llvm::Value *const b) const
     {
         assert(a != nullptr);
         assert(b != nullptr);
         assert(a->getType() == b->getType());
         assert(a->getType() == m_val_t);
+        assert(name == "add" || name == "sub" || name == "mul" || name == "div");
 
         switch (m_mode) {
             // LCOV_EXCL_START
@@ -462,6 +463,11 @@ llvm::Value *llvm_ival_guard::sub_up(llvm::Value *const a, llvm::Value *const b)
 llvm::Value *llvm_ival_guard::mul_up(llvm::Value *const a, llvm::Value *const b) const
 {
     return m_impl->arith_op_up("mul", llvm_fmul, a, b);
+}
+
+llvm::Value *llvm_ival_guard::div_up(llvm::Value *const a, llvm::Value *const b) const
+{
+    return m_impl->arith_op_up("div", llvm_fdiv, a, b);
 }
 
 // Helper to compute -a.

@@ -224,6 +224,7 @@ public:
     [[nodiscard]] llvm::Value *add_up(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *sub_up(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *mul_up(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *div_up(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *neg(llvm::Value *) const;
     [[nodiscard]] llvm::Value *abs(llvm::Value *) const;
 };
