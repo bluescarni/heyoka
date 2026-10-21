@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -83,6 +84,9 @@ HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type
 // - counts the sign changes in the coefficients
 //   of the resulting polynomial.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
+
+template <typename T>
+std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
 
 } // namespace detail
 
