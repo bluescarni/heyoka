@@ -15,6 +15,7 @@
 #include <fmt/core.h>
 
 #include <boost/predef/architecture.h>
+#include <boost/scope/scope_exit.hpp>
 
 #include <llvm/ADT/FloatingPointMode.h>
 #include <llvm/Config/llvm-config.h>
@@ -386,6 +387,15 @@ void llvm_ival_guard::finalise() const
 // LLVM 23), nor constrained comparisons of vectors of x86_fp80 on x86-64 with AVX-512 (LLVM 19-21). Thus, for these
 // types we compare element by element. This has no runtime cost, as the backend operates on these vectors element by
 // element anyway.
+//
+// NOTE: here we are adopting a performance workaround for scalar float and double computations in portable mode on
+// x86-64, where we force the usage of a plain (i.e., non-constrained) comparison. On x86-64, a select on the result of
+// a constrained float/double scalar comparison becomes a conditional branch (because the comparison sets the flags
+// register), whereas with a plain comparison it becomes a compare + blend instruction sequence: in a benchmark, this
+// made the rescaling of a polynomial of degree 20 about 4 times faster with coefficients of random signs. This
+// technically breaks the LLVM rule that "if any FP operation in a function is constrained then they all must be
+// constrained" (like the use of maximumnum() in max()), but it should be OK in practice since comparisons are not
+// affected by the active rounding mode. If this ever becomes an issue, we can just remove the workaround code block.
 llvm::Value *llvm_ival_guard::lt(llvm::Value *const a, llvm::Value *const b) const
 {
     assert(a != nullptr);
@@ -395,9 +405,25 @@ llvm::Value *llvm_ival_guard::lt(llvm::Value *const a, llvm::Value *const b) con
 
     auto &s = m_impl->m_state;
     auto &builder = s.builder();
+    auto *const val_t = get_val_t();
+
+#if BOOST_ARCH_X86_64
+
+    if (m_impl->m_mode == ival_mode::portable && (val_t->isFloatTy() || val_t->isDoubleTy())) {
+        // Temporarily disable the constrained flag and make sure it is restored on function exit.
+        const boost::scope::scope_exit constrained_guard(
+            [&builder, orig_constr = builder.getIsFPConstrained()] noexcept {
+                builder.setIsFPConstrained(orig_constr);
+            });
+        builder.setIsFPConstrained(false);
+
+        return llvm_fcmp_olt(s, a, b);
+    }
+
+#endif
 
     // Fetch the scalar type.
-    const auto *const fp_t = m_impl->m_val_t->getScalarType();
+    const auto *const fp_t = val_t->getScalarType();
 
     if (fp_t->isFP128Ty() || fp_t->isX86_FP80Ty()) {
         const auto a_scalars = vector_to_scalars(builder, a);
