@@ -75,6 +75,10 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std:
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
 llvm_ed_ival_poly_shift_1(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
+// Helper implementing polynomial rescaling in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ed_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
 // Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
 // inputs.
 template <typename T>
