@@ -40,6 +40,10 @@ namespace detail
 // ivg.get_val_t(). cfs must not be empty and its size must be an even number. The IR is emitted at the current
 // insertion point, which must be within the function guarded by ivg.
 //
+// The input intervals are assumed to have no NaN bounds. Infinite bounds may be present, but never in the invalid forms
+// [-inf, -inf] and [+inf, +inf]. Similarly, the output intervals have no NaN bounds and are never in the invalid forms
+// [-inf, -inf] and [+inf, +inf].
+//
 // We use the "Optimized Algorithm for Horner Polynomial Taylor shift with real coefficients" algorithm from here
 //
 // https://www.researchgate.net/publication/368987410_Polynomial_Taylor_Shifting
@@ -49,7 +53,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1(const llvm_ival_guard &ivg,
 {
     assert(!cfs.empty());
     assert(cfs.size() % 2u == 0u);
-    assert(std::ranges::all_of(cfs, [&ivg](auto *x) { return x->getType() == ivg.get_val_t(); }));
+    assert(std::ranges::all_of(cfs, [&ivg](auto *const x) { return x != nullptr && x->getType() == ivg.get_val_t(); }));
 
     // Make sure we can use 32-bit ints for all indexing.
     const auto cfs_size = boost::numeric_cast<std::uint32_t>(cfs.size());

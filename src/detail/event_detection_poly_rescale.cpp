@@ -39,8 +39,9 @@ namespace detail
 // current insertion point, which must be within the function guarded by ivg.
 //
 // cfs is assumed non-empty. h and all elements of cfs are assumed to have the same type as the input guard ivg. All
-// input values are assumed to be finite. The output components are valid bounds, which may be +inf in case of overflow
-// but never NaN.
+// input values are assumed to be finite. The output intervals enclose the exact coefficients, and they have no NaN
+// bounds. Infinite bounds may be returned in case of overflow, but never in the invalid forms [-inf, -inf] and [+inf,
+// +inf].
 std::vector<llvm::Value *> llvm_ed_ival_poly_rescale(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
                                                      llvm::Value *const h)
 {
