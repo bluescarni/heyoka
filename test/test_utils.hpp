@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/containers/xfixed.hpp>
@@ -298,6 +299,22 @@ bool ir_contains(const auto &ta, const char *str)
         return boost::contains(std::get<0>(ta.get_llvm_state()).get_ir(), str);
     }
 }
+
+// Convert the finite value x of type T exactly to a rational.
+template <typename T>
+boost::multiprecision::cpp_rational to_rat(T);
+
+// Check whether addition in the type T honours the rounding mode set via std::fesetround().
+template <typename T>
+bool add_honours_rounding();
+
+// Check whether multiplication in the type T honours the rounding mode set via std::fesetround().
+template <typename T>
+bool mul_honours_rounding();
+
+// Generate a random value of type T approximately uniformly distributed in [lo, hi].
+template <typename T>
+T rand_uniform(std::mt19937 &, double, double);
 
 } // namespace heyoka_test
 

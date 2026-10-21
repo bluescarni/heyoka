@@ -69,25 +69,6 @@ const auto fp_types = std::tuple<float, double
 // The largest n tested.
 constexpr std::uint32_t n_max = 140;
 
-// Convert the finite value x of type T exactly to a rational.
-//
-// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
-// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
-// range of double.
-template <typename T>
-rat to_rat(T x)
-{
-    rat ret = 0;
-
-    while (x != 0) {
-        const auto d = static_cast<double>(x);
-        ret += rat(d);
-        x -= static_cast<T>(d);
-    }
-
-    return ret;
-}
-
 // The rows 0, 1, ..., n_max of Pascal's triangle: the element k of the row n is C(n, k).
 std::vector<std::vector<cpp_int>> pascal_triangle()
 {

@@ -8,7 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <cfenv>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
@@ -77,25 +76,6 @@ const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
 struct rat_ival {
     rat lo, hi;
 };
-
-// Convert the finite value x of type T exactly to a rational.
-//
-// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
-// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
-// range of double.
-template <typename T>
-rat to_rat(T x)
-{
-    rat ret = 0;
-
-    while (x != 0) {
-        const auto d = static_cast<double>(x);
-        ret += rat(d);
-        x -= static_cast<T>(d);
-    }
-
-    return ret;
-}
 
 // The binomial coefficient C(m, k), with k <= m.
 cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
@@ -197,42 +177,6 @@ shift_t<T> add_shift(llvm_state &s, std::uint32_t n)
     return add_shift<T>(s, detail::to_external_llvm_type<T>(s.context()), n);
 }
 
-// Add a and b.
-template <typename T>
-T test_add(T a, T b)
-{
-    return a + b;
-}
-
-// Check whether addition in the type T honours the rounding mode set via std::fesetround(). Software-emulated
-// quadruple-precision arithmetic may not honour it.
-template <typename T>
-bool add_honours_rounding()
-{
-    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the addition at compile
-    // time nor move it across the changes of rounding mode.
-    T (*volatile f)(T, T) = &test_add<T>;
-
-    const T eps = std::numeric_limits<T>::epsilon();
-
-    REQUIRE(std::fesetround(FE_UPWARD) == 0);
-    const T res = f(T(1), eps / 4);
-    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
-
-    // The exact sum is 1 + eps / 4: rounding up gives 1 + eps, rounding to nearest 1.
-    return res > 1;
-}
-
-// Generate a random value of type T of magnitude up to about 10.
-template <typename T>
-T rand_val(std::mt19937 &rng)
-{
-    std::uniform_real_distribution<double> dist(-10., 10.);
-
-    // NOTE: combine two doubles in order to fill the significands of the types wider than double.
-    return static_cast<T>(dist(rng)) + static_cast<T>(dist(rng)) * static_cast<T>(0x1p-53);
-}
-
 std::mt19937 rng(42);
 
 TEST_CASE("random")
@@ -259,8 +203,8 @@ TEST_CASE("random")
                     std::vector<fp_t> in(2u * (n + 1u));
                     std::vector<rat_ival> in_rat;
                     for (std::uint32_t i = 0; i <= n; ++i) {
-                        const auto lo = rand_val<fp_t>(rng);
-                        const auto w = rand_val<fp_t>(rng);
+                        const auto lo = rand_uniform<fp_t>(rng, -10., 10.);
+                        const auto w = rand_uniform<fp_t>(rng, -10., 10.);
                         const auto hi = (i % 3u == 0u) ? lo : lo + (w < 0 ? -w : w);
 
                         in[i] = -lo;
@@ -332,7 +276,8 @@ TEST_CASE("real")
             const auto a = dist(rng);
             const auto b = dist(rng);
 
-            // NOTE: combine two doubles in order to fill the significands of the precisions higher than double's.
+            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
+            // higher than double's.
             return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
         };
 

@@ -8,7 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <cfenv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -52,8 +51,8 @@
 // Tests for llvm_ed_ival_poly_rescale().
 //
 // llvm_ed_ival_poly_rescale() computes intervals enclosing the coefficients c_i * h**i of p(h*x), where p(x) is a
-// polynomial with coefficients c_i. The tests check that the computed intervals contain the exact coefficients, computed
-// with rationals, and that the output components are never NaN or -inf, and +inf only in case of overflow.
+// polynomial with coefficients c_i. The tests check that the computed intervals contain the exact coefficients,
+// computed with rationals, and that the output components are never NaN or -inf, and +inf only in case of overflow.
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -75,25 +74,6 @@ const auto fp_types = std::tuple<float, double
 
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
-
-// Convert the finite value x of type T exactly to a rational.
-//
-// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
-// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
-// range of double.
-template <typename T>
-rat to_rat(T x)
-{
-    rat ret = 0;
-
-    while (x != 0) {
-        const auto d = static_cast<double>(x);
-        ret += rat(d);
-        x -= static_cast<T>(d);
-    }
-
-    return ret;
-}
 
 // The largest finite value of the type T, as a rational.
 //
@@ -261,44 +241,6 @@ void check_rounding_direction(rescale_t<T> rescale, const T &one, const T &eps)
                               one + 5 * eps});
 }
 
-// Multiply a and b.
-template <typename T>
-T test_mul(T a, T b)
-{
-    return a * b;
-}
-
-// Check whether multiplication in the type T honours the rounding mode set via std::fesetround(). This is not the case
-// for the software-emulated quadruple precision of LLVM's compiler-rt (used, e.g., on FreeBSD), whose multiplication
-// always rounds to nearest.
-template <typename T>
-bool mul_honours_rounding()
-{
-    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the multiplication at
-    // compile time nor move it across the changes of rounding mode.
-    T (*volatile f)(T, T) = &test_mul<T>;
-
-    const T eps = std::numeric_limits<T>::epsilon();
-    const T x = 1 + eps;
-
-    REQUIRE(std::fesetround(FE_UPWARD) == 0);
-    const T res = f(x, x);
-    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
-
-    // The exact product is 1 + 2 * eps + eps * eps: rounding up gives 1 + 3 * eps, rounding to nearest 1 + 2 * eps.
-    return res > 1 + 2 * eps;
-}
-
-// Generate a random value of type T of magnitude up to about 10.
-template <typename T>
-T rand_val(std::mt19937 &rng)
-{
-    std::uniform_real_distribution<double> dist(-10., 10.);
-
-    // NOTE: combine two doubles in order to fill the significands of the types wider than double.
-    return static_cast<T>(dist(rng)) + static_cast<T>(dist(rng)) * static_cast<T>(0x1p-53);
-}
-
 // Generate a random value of type T of magnitude between about 0.1 and 10, with random sign.
 template <typename T>
 T rand_h(std::mt19937 &rng)
@@ -306,7 +248,8 @@ T rand_h(std::mt19937 &rng)
     std::uniform_real_distribution<double> dist(0.1, 10.);
     std::bernoulli_distribution sign;
 
-    // NOTE: combine two doubles in order to fill the significands of the types wider than double.
+    // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the types wider than
+    // double.
     const auto ret = static_cast<T>(dist(rng)) + static_cast<T>(dist(rng)) * static_cast<T>(0x1p-53);
 
     return sign(rng) ? -ret : ret;
@@ -339,7 +282,7 @@ TEST_CASE("random")
                     // NOTE: every third coefficient is zero.
                     std::vector<fp_t> cfs(n + 1u);
                     for (std::uint32_t i = 0; i <= n; ++i) {
-                        cfs[i] = (i % 3u == 2u) ? fp_t(0) : rand_val<fp_t>(rng);
+                        cfs[i] = (i % 3u == 2u) ? fp_t(0) : rand_uniform<fp_t>(rng, -10., 10.);
                     }
 
                     // Generate h. The first two trials use h = 0 and h = -0.
@@ -373,7 +316,7 @@ TEST_CASE("exact")
                     // NOTE: every third coefficient is zero.
                     std::vector<fp_t> cfs(n + 1u);
                     for (std::uint32_t i = 0; i <= n; ++i) {
-                        cfs[i] = (i % 3u == 2u) ? fp_t(0) : rand_val<fp_t>(rng);
+                        cfs[i] = (i % 3u == 2u) ? fp_t(0) : rand_uniform<fp_t>(rng, -10., 10.);
                     }
 
                     std::vector<fp_t> out(2u * (n + 1u));
@@ -449,15 +392,15 @@ TEST_CASE("overflow")
             const auto h = abs_h;
             rescale(out.data(), cfs.data(), &h);
             REQUIRE(out
-                    == std::vector<fp_t>{fp_t(-1), -abs_h, fp_t(0), -max_val, inf, fp_t(0), fp_t(1), abs_h, fp_t(0), inf,
-                                         -max_val, fp_t(0)});
+                    == std::vector<fp_t>{fp_t(-1), -abs_h, fp_t(0), -max_val, inf, fp_t(0), fp_t(1), abs_h, fp_t(0),
+                                         inf, -max_val, fp_t(0)});
 
             // For negative h, the odd-degree coefficients are negated.
             const auto mh = -abs_h;
             rescale(out.data(), cfs.data(), &mh);
             REQUIRE(out
-                    == std::vector<fp_t>{fp_t(-1), abs_h, fp_t(0), inf, inf, fp_t(0), fp_t(1), -abs_h, fp_t(0), -max_val,
-                                         -max_val, fp_t(0)});
+                    == std::vector<fp_t>{fp_t(-1), abs_h, fp_t(0), inf, inf, fp_t(0), fp_t(1), -abs_h, fp_t(0),
+                                         -max_val, -max_val, fp_t(0)});
         }
     });
 }
@@ -479,7 +422,8 @@ TEST_CASE("real")
             const auto a = dist(rng);
             const auto b = dist(rng);
 
-            // NOTE: combine two doubles in order to fill the significands of the precisions higher than double's.
+            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
+            // higher than double's.
             return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
         };
 
@@ -491,7 +435,8 @@ TEST_CASE("real")
             const auto a = dist(rng);
             const auto b = dist(rng);
 
-            // NOTE: combine two doubles in order to fill the significands of the precisions higher than double's.
+            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
+            // higher than double's.
             const auto ret = fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
 
             return sign(rng) ? -ret : ret;
