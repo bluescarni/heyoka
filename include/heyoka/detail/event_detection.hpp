@@ -75,6 +75,11 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std:
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
 llvm_ed_ival_poly_shift_1(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
+// Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
+// inputs.
+template <typename T>
+std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
+
 HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
 // Machinery to add a function that, given an input polynomial of order n represented
@@ -84,9 +89,6 @@ HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type
 // - counts the sign changes in the coefficients
 //   of the resulting polynomial.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
-
-template <typename T>
-std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
 
 } // namespace detail
 
