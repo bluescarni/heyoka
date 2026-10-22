@@ -405,11 +405,13 @@ llvm::Value *llvm_ival_guard::lt(llvm::Value *const a, llvm::Value *const b) con
 
     auto &s = m_impl->m_state;
     auto &builder = s.builder();
-    auto *const val_t = get_val_t();
+    const auto *const val_t = get_val_t();
 
 #if BOOST_ARCH_X86_64
 
     if (m_impl->m_mode == ival_mode::portable && (val_t->isFloatTy() || val_t->isDoubleTy())) {
+        // LCOV_EXCL_START
+
         // Temporarily disable the constrained flag and make sure it is restored on function exit.
         const boost::scope::scope_exit constrained_guard(
             [&builder, orig_constr = builder.getIsFPConstrained()] noexcept {
@@ -418,6 +420,8 @@ llvm::Value *llvm_ival_guard::lt(llvm::Value *const a, llvm::Value *const b) con
         builder.setIsFPConstrained(false);
 
         return llvm_fcmp_olt(s, a, b);
+
+        // LCOV_EXCL_STOP
     }
 
 #endif
