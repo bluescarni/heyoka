@@ -109,6 +109,9 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_bernstein(const llvm_ival_guard &iv
     // NOTE: this final division step involves only divisions by finite divisors >= 1. Thus, +inf bounds stay +inf,
     // finite bounds stay finite and no NaNs are generated. Since the invalid forms [-inf, -inf] and [+inf, +inf] are
     // guaranteed not to arise in the previous steps of this algorithm, they cannot arise in the result either.
+    //
+    // NOTE: here there could be a potential benefit in implementing the scalar divisions as a single SIMD vector
+    // division. Keep this in mind for future potential performance improvements.
     const auto op1 = cfs.size();
     const auto n = boost::numeric_cast<std::uint32_t>(op1 - 1u);
 
