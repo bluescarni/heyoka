@@ -316,6 +316,10 @@ bool mul_honours_rounding();
 template <typename T>
 T rand_uniform(std::mt19937 &, double, double);
 
+// The largest finite value of the type T, as a rational.
+template <typename T>
+boost::multiprecision::cpp_rational max_rat();
+
 } // namespace heyoka_test
 
 #endif

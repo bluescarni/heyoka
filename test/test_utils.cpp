@@ -338,4 +338,29 @@ template mppp::real128 rand_uniform<mppp::real128>(std::mt19937 &, double, doubl
 
 #endif
 
+// The largest finite value of the type T, as a rational.
+//
+// NOTE: the largest finite value is (2**p - 1) * 2**(e - p), where p is the number of significand bits and e is the
+// maximum exponent, as defined by std::numeric_limits.
+template <typename T>
+boost::multiprecision::cpp_rational max_rat()
+{
+    using boost::multiprecision::cpp_int;
+
+    constexpr auto p = static_cast<unsigned>(std::numeric_limits<T>::digits);
+    constexpr auto e = static_cast<unsigned>(std::numeric_limits<T>::max_exponent);
+
+    return boost::multiprecision::cpp_rational(((cpp_int(1) << p) - 1) << (e - p));
+}
+
+template boost::multiprecision::cpp_rational max_rat<float>();
+template boost::multiprecision::cpp_rational max_rat<double>();
+template boost::multiprecision::cpp_rational max_rat<long double>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template boost::multiprecision::cpp_rational max_rat<mppp::real128>();
+
+#endif
+
 } // namespace heyoka_test

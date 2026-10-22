@@ -58,7 +58,6 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 using rat = boost::multiprecision::cpp_rational;
-using boost::multiprecision::cpp_int;
 
 // The floating-point types tested.
 const auto fp_types = std::tuple<float, double
@@ -74,19 +73,6 @@ const auto fp_types = std::tuple<float, double
 
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
-
-// The largest finite value of the type T, as a rational.
-//
-// NOTE: the largest finite value is (2**p - 1) * 2**(e - p), where p is the number of significand bits and e is the
-// maximum exponent, as defined by std::numeric_limits.
-template <typename T>
-rat max_rat()
-{
-    constexpr auto p = static_cast<unsigned>(std::numeric_limits<T>::digits);
-    constexpr auto e = static_cast<unsigned>(std::numeric_limits<T>::max_exponent);
-
-    return rat(((cpp_int(1) << p) - 1) << (e - p));
-}
 
 // Pointer to a function computing the rescaling of a polynomial of degree n. The first argument is the output array,
 // which has size 2 * (n + 1) and uses the split (-lo, hi) layout. The second argument is the array of the n + 1 input
