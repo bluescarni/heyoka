@@ -15,8 +15,10 @@
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 
+#include <boost/core/demangle.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/predef/architecture.h>
 
@@ -66,7 +68,8 @@ boost::multiprecision::cpp_int cpp_int_choose(const std::uint32_t n, const std::
 // Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
 // inputs n and k. The x argument is used only for mppp::real in order to infer the desired precision.
 //
-// The output is guaranteed to be finite (an exception will be thrown in case of overflow).
+// The output is guaranteed to be finite (an exception will be thrown in case of overflow). The function will throw if T
+// is a builtin floating-point type whose radix is not 2 or which is not an IEC 559/IEEE 754 floating-point type.
 template <typename T>
 std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::uint32_t k, [[maybe_unused]] const T &x)
 {
@@ -92,8 +95,24 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
         static_cast<void>(x);
 
         if constexpr (has_num_limits) {
-            static_assert(std::numeric_limits<T>::radix == 2);
-            static_assert(std::numeric_limits<T>::is_iec559);
+            // LCOV_EXCL_START
+            if constexpr (std::numeric_limits<T>::radix != 2 || !std::numeric_limits<T>::is_iec559) {
+                throw std::invalid_argument(fmt::format(
+                    "Cannot construct a rigorous enclosure for a binomial coefficient using the floating-point type "
+                    "'{}': the radix of the type is not 2 or the type is not an IEC 559/IEEE 754 floating-point type",
+                    boost::core::demangle(typeid(T).name())));
+            }
+            // NOTE: some standard libraries (e.g., libstdc++) consider the double-double long double type available on
+            // PPC as an IEC 559/IEEE 754 floating-point type, even though it is not. Thus, we add special casing for
+            // such situations.
+#if BOOST_ARCH_PPC && __LONG_DOUBLE_IBM128__
+            if constexpr (std::same_as<T, long double>) {
+                throw std::invalid_argument("Cannot construct a rigorous enclosure for a binomial coefficient using "
+                                            "the IBM double-double long double type");
+            }
+#endif
+            // LCOV_EXCL_STOP
+
             return safe_uint32_t(std::numeric_limits<T>::digits);
 #if defined(HEYOKA_HAVE_REAL)
         } else if constexpr (std::same_as<T, mppp::real>) {
@@ -170,11 +189,7 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
 HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(float);
 HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(double);
 
-#if !BOOST_ARCH_PPC
-
 HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(long double);
-
-#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
