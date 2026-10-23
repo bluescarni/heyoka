@@ -61,7 +61,7 @@ namespace
 // Small helper to compute pi at the precision of the floating-point type tp.
 // Used only for debugging purposes.
 // NOTE: this is a repetition of number_like(), perhaps we can abstract this?
-number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
+number inv_kep_E_pi_like(llvm_state &s, const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 
@@ -93,7 +93,7 @@ number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
 
 // Small helper to return the epsilon of the floating-point type tp as a number.
 // NOTE: this is a repetition of number_like(), perhaps we can abstract this?
-number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
+number inv_kep_E_eps_like(llvm_state &s, const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 
@@ -142,7 +142,7 @@ llvm::Value *llvm_trig_arg_reduce(llvm_state &s, llvm::Value *x)
     auto *tp = x->getType();
 
     // The scalar type of x.
-    auto *fp_t = tp->getScalarType();
+    const auto *const fp_t = tp->getScalarType();
 
     // NOTE: the current implementation employs double-length arithmetic
     // to ameliorate catastrophic cancellation. A more rigorous approach

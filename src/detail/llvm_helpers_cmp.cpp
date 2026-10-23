@@ -44,7 +44,7 @@ llvm::Value *llvm_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpULT(a, b);
@@ -69,7 +69,7 @@ llvm::Value *llvm_fcmp_uge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUGE(a, b);
@@ -94,7 +94,7 @@ llvm::Value *llvm_fcmp_ule(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpULE(a, b);
@@ -119,7 +119,7 @@ llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOGE(a, b);
@@ -144,7 +144,7 @@ llvm::Value *llvm_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOLE(a, b);
@@ -169,7 +169,7 @@ llvm::Value *llvm_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOLT(a, b);
@@ -194,7 +194,7 @@ llvm::Value *llvm_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOGT(a, b);
@@ -219,7 +219,7 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOEQ(a, b);
@@ -244,7 +244,7 @@ llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpONE(a, b);
@@ -269,7 +269,7 @@ llvm::Value *llvm_fcmp_une(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUNE(a, b);
@@ -294,7 +294,7 @@ llvm::Value *llvm_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     auto &builder = s.builder();
 
-    auto *fp_t = a->getType();
+    const auto *const fp_t = a->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpORD(a, b);
@@ -319,7 +319,7 @@ llvm::Value *llvm_fnz(llvm_state &s, llvm::Value *x)
 
     auto &builder = s.builder();
 
-    auto *fp_t = x->getType();
+    const auto *const fp_t = x->getType();
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUNE(x, llvm::ConstantFP::get(x->getType(), 0.));

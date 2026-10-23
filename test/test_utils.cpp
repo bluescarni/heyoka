@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cfenv>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <utility>
 #include <vector>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -204,6 +208,158 @@ template void compare_batch_scalar<long double>(const std::vector<std::pair<heyo
 template void
 compare_batch_scalar<mppp::real128>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned,
                                     bool, bool, std::mt19937 &, float, float, mppp::real128);
+
+#endif
+
+// Convert the finite value x of type T exactly to a rational.
+//
+// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
+// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
+// range of double.
+template <typename T>
+boost::multiprecision::cpp_rational to_rat(T x)
+{
+    using rat = boost::multiprecision::cpp_rational;
+
+    rat ret = 0;
+
+    while (x != 0) {
+        const auto d = static_cast<double>(x);
+        ret += rat(d);
+        x -= static_cast<T>(d);
+    }
+
+    return ret;
+}
+
+template boost::multiprecision::cpp_rational to_rat<float>(float x);
+template boost::multiprecision::cpp_rational to_rat<double>(double x);
+template boost::multiprecision::cpp_rational to_rat<long double>(long double x);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template boost::multiprecision::cpp_rational to_rat<mppp::real128>(mppp::real128 x);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template boost::multiprecision::cpp_rational to_rat<mppp::real>(mppp::real x);
+
+#endif
+
+namespace
+{
+
+// Add a and b.
+template <typename T>
+T test_add(T a, T b)
+{
+    return a + b;
+}
+
+// Multiply a and b.
+template <typename T>
+T test_mul(T a, T b)
+{
+    return a * b;
+}
+
+} // namespace
+
+// Check whether addition in the type T honours the rounding mode set via std::fesetround(). Software-emulated
+// quadruple-precision arithmetic may not honour it.
+template <typename T>
+bool add_honours_rounding()
+{
+    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the addition at compile
+    // time nor move it across the changes of rounding mode.
+    T (*volatile f)(T, T) = &test_add<T>;
+
+    const T eps = std::numeric_limits<T>::epsilon();
+
+    REQUIRE(std::fesetround(FE_UPWARD) == 0);
+    const T res = f(T(1), eps / 4);
+    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
+
+    // The exact sum is 1 + eps / 4: rounding up gives 1 + eps, rounding to nearest 1.
+    return res > 1;
+}
+
+// Check whether multiplication in the type T honours the rounding mode set via std::fesetround(). This is not the case
+// for the software-emulated quadruple precision of LLVM's compiler-rt (used, e.g., on FreeBSD), whose multiplication
+// always rounds to nearest.
+template <typename T>
+bool mul_honours_rounding()
+{
+    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the multiplication at
+    // compile time nor move it across the changes of rounding mode.
+    T (*volatile f)(T, T) = &test_mul<T>;
+
+    const T eps = std::numeric_limits<T>::epsilon();
+    const T x = 1 + eps;
+
+    REQUIRE(std::fesetround(FE_UPWARD) == 0);
+    const T res = f(x, x);
+    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
+
+    // The exact product is 1 + 2 * eps + eps * eps: rounding up gives 1 + 3 * eps, rounding to nearest 1 + 2 * eps.
+    return res > 1 + 2 * eps;
+}
+
+// Generate a random value of type T approximately uniformly distributed in [lo, hi]. The value is the sum of two
+// doubles, thus for the types wider than double it can have up to about 106 significant bits.
+template <typename T>
+T rand_uniform(std::mt19937 &rng, double lo, double hi)
+{
+    std::uniform_real_distribution<double> dist(lo, hi);
+
+    // NOTE: the second double is scaled by 2**-53, so that its bits extend those of the first one.
+    return static_cast<T>(dist(rng)) + static_cast<T>(dist(rng)) * static_cast<T>(0x1p-53);
+}
+
+template bool add_honours_rounding<float>();
+template bool add_honours_rounding<double>();
+template bool add_honours_rounding<long double>();
+
+template bool mul_honours_rounding<float>();
+template bool mul_honours_rounding<double>();
+template bool mul_honours_rounding<long double>();
+
+template float rand_uniform<float>(std::mt19937 &, double, double);
+template double rand_uniform<double>(std::mt19937 &, double, double);
+template long double rand_uniform<long double>(std::mt19937 &, double, double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template bool add_honours_rounding<mppp::real128>();
+template bool mul_honours_rounding<mppp::real128>();
+template mppp::real128 rand_uniform<mppp::real128>(std::mt19937 &, double, double);
+
+#endif
+
+// The largest finite value of the type T, as a rational.
+//
+// NOTE: the largest finite value is (2**p - 1) * 2**(e - p), where p is the number of significand bits and e is the
+// maximum exponent, as defined by std::numeric_limits.
+template <typename T>
+boost::multiprecision::cpp_rational max_rat()
+{
+    using boost::multiprecision::cpp_int;
+
+    constexpr auto p = static_cast<unsigned>(std::numeric_limits<T>::digits);
+    constexpr auto e = static_cast<unsigned>(std::numeric_limits<T>::max_exponent);
+
+    return boost::multiprecision::cpp_rational(((cpp_int(1) << p) - 1) << (e - p));
+}
+
+template boost::multiprecision::cpp_rational max_rat<float>();
+template boost::multiprecision::cpp_rational max_rat<double>();
+template boost::multiprecision::cpp_rational max_rat<long double>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template boost::multiprecision::cpp_rational max_rat<mppp::real128>();
 
 #endif
 

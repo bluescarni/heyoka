@@ -13,6 +13,8 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -68,6 +70,24 @@ mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
 // Helper to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,
                                                         std::uint32_t);
+
+// Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ed_ival_poly_shift_1(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
+
+// Helper implementing polynomial rescaling in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ed_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
+// Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
+// inputs.
+template <typename T>
+[[nodiscard]] std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
+
+// Helper to convert an input polynomial from the monomial basis into the interval Bernstein form required by event
+// detection.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ed_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <source_location>
 #include <string>
 #include <typeinfo>
@@ -39,7 +40,7 @@ HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_clone_type(llvm_state &, llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(const llvm::Value *);
-HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Type *);
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(const llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(const llvm::Module &, llvm::Type *);
 std::uint32_t gl_arr_size(llvm::Value *);
 HEYOKA_DLL_PUBLIC std::uint64_t get_size(const llvm::Module &, llvm::Type *);
@@ -85,6 +86,8 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &, const s
                                       const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC void llvm_assert(llvm_state &, llvm::Value *, std::source_location = std::source_location::current());
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_entry_alloca(llvm_state &, llvm::Type *);
 
 void llvm_add_no_capture_argattr(llvm_state &, llvm::Argument *);
 
@@ -178,6 +181,70 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_s
                                                                           llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
+// RAII guard for interval arithmetic functions.
+//
+// Interval arithmetic requires using non-default rounding modes for floating-point operations. In LLVM this can be
+// achieved portably for builtin floating-point types via constrained floating-point intrinsics combined with rounding
+// mode switching at runtime. See:
+//
+// https://llvm.org/docs/LangRef.html#constrainedfp
+//
+// Due to the way LLVM's constrained floating-point intrinsics work, algorithms employing interval arithmetic must be
+// implemented in separate functions with a specific setup for the function attributes and the floating-point
+// environment. This class encapsulates the details of such setup, and offers a set of functions implementing basic
+// building blocks for interval arithmetic.
+//
+// A guard must be created before adding any code to the function, right after the creation of the entry block. The
+// constructor takes care of setting up the function attributes, the IR builder's floating-point settings and the
+// rounding mode. The finalise() function takes care of restoring the original rounding mode at function exit and it
+// must thus be called before *every* return statement. The guard itself must be destroyed immediately after code
+// generation for the function has finished, with the destructor taking care of restoring the IR builder's original
+// floating-point settings. No code for other functions may be generated while the guard is alive (i.e., any function
+// invoked from the function must be created before the guard). There are exceptions to this rule, e.g., the wrapper
+// functions generated internally by the mppp::real helpers, which contain no floating-point instructions and are thus
+// unaffected by the guard's settings. In general, all floating-point operations in an interval arithmetic function
+// (including the non-rounding ones, such as comparisons, negation and absolute value) should be performed via the
+// member functions of this class, in order to minimise the risk that the guard's settings leak into non-interval
+// functions.
+class HEYOKA_DLL_PUBLIC [[nodiscard]] llvm_ival_guard
+{
+    struct impl;
+    std::unique_ptr<impl> m_impl;
+
+public:
+    explicit llvm_ival_guard(llvm_state &, llvm::Function *, llvm::Type *);
+    llvm_ival_guard(const llvm_ival_guard &) = delete;
+    llvm_ival_guard(llvm_ival_guard &&) noexcept = delete;
+    llvm_ival_guard &operator=(const llvm_ival_guard &) = delete;
+    llvm_ival_guard &operator=(llvm_ival_guard &&) noexcept = delete;
+    ~llvm_ival_guard();
+
+    [[nodiscard]] llvm::Type *get_val_t() const;
+    [[nodiscard]] llvm::Type *get_ival_t() const;
+    [[nodiscard]] llvm_state &get_state() const;
+
+    void finalise() const;
+
+    // NOTE: the following functions assume that input interval arguments are always valid intervals, that is, no NaN
+    // bounds, not [-inf, -inf] or [+inf, +inf], and with the lower bound not greater than the upper bound. The interval
+    // return values are also guaranteed to be valid, provided that the preconditions of the functions are satisfied.
+    [[nodiscard]] llvm::Value *ival_construct(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] std::pair<llvm::Value *, llvm::Value *> ival_extract(llvm::Value *) const;
+
+    [[nodiscard]] llvm::Value *val_neg(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *val_abs(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_add(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_add_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_zlb(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_nn_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *val_mul_nn_ival(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_div_pos_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_div_pos_ival(llvm::Value *, llvm::Value *) const;
+
+    [[nodiscard]] llvm::Value *val_lt(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_nz(llvm::Value *) const;
+};
 
 // Flow control.
 HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
