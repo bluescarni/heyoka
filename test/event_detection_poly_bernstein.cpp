@@ -132,17 +132,19 @@ std::vector<rat> exact_bernstein(const std::vector<T> &cfs, const T &h)
     return b;
 }
 
-// Pointer to a function computing the Bernstein form of a polynomial of degree n. The first argument is the output
-// array, which has size 2 * (n + 1) and uses the split (-lo, hi) layout. The second argument is the array of the n + 1
-// input coefficients, the third argument a pointer to h.
+// Pointer to a function computing the Bernstein forms of batch_size polynomials of degree n. The first argument is the
+// output array, of size 2 * (n + 1) * batch_size, the second argument the array of the (n + 1) * batch_size input
+// coefficients, the third argument the array of the batch_size values of h. For the j-th polynomial, the i-th input
+// coefficient is at index i * batch_size + j, and the k-th output interval uses the split (-lo, hi) layout, with -lo at
+// index k * batch_size + j and hi at index (n + 1 + k) * batch_size + j.
 template <typename T>
 using bernstein_t = void (*)(T *, const T *, const T *);
 
-// Add to s a function computing the Bernstein form of a polynomial of degree n via llvm_ed_ival_poly_bernstein(),
-// compile s and return a pointer to the function. fp_t is the scalar LLVM type used in the computation, and T is the
-// corresponding C++ type.
+// Add to s a function computing the Bernstein forms of batch_size polynomials of degree n via
+// llvm_ed_ival_poly_bernstein(), compile s and return a pointer to the function. fp_t is the scalar LLVM type used in
+// the computation, and T is the corresponding C++ type.
 template <typename T>
-bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
+bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size = 1)
 {
     auto &builder = s.builder();
     auto &context = s.context();
@@ -159,21 +161,26 @@ bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
     {
-        const auto ivg = detail::llvm_ival_guard(s, f, fp_t);
+        const auto ivg = detail::llvm_ival_guard(s, f, detail::make_vector_type(fp_t, batch_size));
 
         std::vector<llvm::Value *> cfs;
         for (std::uint32_t i = 0; i <= n; ++i) {
-            auto *const ptr = builder.CreateInBoundsGEP(ext_fp_t, cfs_ptr, builder.getInt32(i));
-            cfs.push_back(detail::ext_load_vector_from_memory(s, fp_t, ptr, 1));
+            auto *const ptr = builder.CreateInBoundsGEP(ext_fp_t, cfs_ptr, builder.getInt32(i * batch_size));
+            cfs.push_back(detail::ext_load_vector_from_memory(s, fp_t, ptr, batch_size));
         }
 
-        auto *const h = detail::ext_load_vector_from_memory(s, fp_t, h_ptr, 1);
+        auto *const h = detail::ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
 
         const auto ret = detail::llvm_ed_ival_poly_bernstein(ivg, cfs, h);
 
-        for (std::uint32_t i = 0; i < 2u * (n + 1u); ++i) {
-            auto *const ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(i));
-            detail::ext_store_vector_to_memory(s, ptr, ret[i]);
+        // Store the output intervals in the split layout.
+        for (std::uint32_t i = 0; i <= n; ++i) {
+            const auto [mlo, hi] = ivg.ival_extract(ret[i]);
+            auto *const mlo_ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(i * batch_size));
+            auto *const hi_ptr
+                = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32((n + 1u + i) * batch_size));
+            detail::ext_store_vector_to_memory(s, mlo_ptr, mlo);
+            detail::ext_store_vector_to_memory(s, hi_ptr, hi);
         }
 
         ivg.finalise();
@@ -187,9 +194,9 @@ bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 
 // Overload of add_bernstein() in which the scalar LLVM type is deduced from T.
 template <typename T>
-bernstein_t<T> add_bernstein(llvm_state &s, std::uint32_t n)
+bernstein_t<T> add_bernstein(llvm_state &s, std::uint32_t n, std::uint32_t batch_size = 1)
 {
-    return add_bernstein<T>(s, detail::to_external_llvm_type<T>(s.context()), n);
+    return add_bernstein<T>(s, detail::to_external_llvm_type<T>(s.context()), n, batch_size);
 }
 
 // Check the output out of the conversion to the Bernstein form of the polynomial with coefficients cfs rescaled by h.
@@ -391,6 +398,61 @@ TEST_CASE("exact")
                         REQUIRE(out[k] == -static_cast<double>(b[k]));
                         REQUIRE(out[n + 1u + k] == static_cast<double>(b[k]));
                     }
+                }
+            }
+        }
+    }
+}
+
+// Test the batch mode in double precision.
+TEST_CASE("batch")
+{
+    const std::uint32_t batch_size = 4;
+
+    std::bernoulli_distribution sign;
+
+    for (const auto n : degrees) {
+        for (const auto opt_level : {0u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+            const auto bernstein = add_bernstein<double>(s, n, batch_size);
+
+            for (auto trial = 0; trial < 10; ++trial) {
+                // Generate the input polynomials as in the "random" test case.
+                std::vector<double> cfs((n + 1u) * batch_size);
+                for (std::uint32_t i = 0; i <= n; ++i) {
+                    for (std::uint32_t j = 0; j < batch_size; ++j) {
+                        cfs[i * batch_size + j] = (i % 3u == 2u) ? 0. : rand_uniform<double>(rng, -10., 10.);
+                    }
+                }
+
+                // Generate the values of h as in the "random" test case. The first trial uses h = 0 and h = -0 for the
+                // first two polynomials.
+                std::vector<double> h(batch_size);
+                for (auto &h_j : h) {
+                    h_j = rand_uniform<double>(rng, 0.1, 10.);
+                    if (sign(rng)) {
+                        h_j = -h_j;
+                    }
+                }
+                if (trial == 0) {
+                    h[0] = 0.;
+                    h[1] = -0.;
+                }
+
+                std::vector<double> out(2u * (n + 1u) * batch_size);
+                bernstein(out.data(), cfs.data(), h.data());
+
+                // Check the output for each polynomial.
+                for (std::uint32_t j = 0; j < batch_size; ++j) {
+                    std::vector<double> cfs_j(n + 1u), out_j(2u * (n + 1u));
+                    for (std::uint32_t i = 0; i <= n; ++i) {
+                        cfs_j[i] = cfs[i * batch_size + j];
+                    }
+                    for (std::uint32_t k = 0; k < 2u * (n + 1u); ++k) {
+                        out_j[k] = out[k * batch_size + j];
+                    }
+
+                    check_bernstein(out_j, cfs_j, h[j], true);
                 }
             }
         }

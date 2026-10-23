@@ -184,23 +184,29 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Val
 
 // RAII guard for interval arithmetic functions.
 //
+// Interval arithmetic requires using non-default rounding modes for floating-point operations. In LLVM this can be
+// achieved portably for builtin floating-point types via constrained floating-point intrinsics combined with rounding
+// mode switching at runtime. See:
+//
+// https://llvm.org/docs/LangRef.html#constrainedfp
+//
 // Due to the way LLVM's constrained floating-point intrinsics work, algorithms employing interval arithmetic must be
 // implemented in separate functions with a specific setup for the function attributes and the floating-point
 // environment. This class encapsulates the details of such setup, and offers a set of functions implementing basic
-// interval arithmetic building blocks.
+// building blocks for interval arithmetic.
 //
 // A guard must be created before adding any code to the function, right after the creation of the entry block. The
-// finalise() method must be called before *every* return statement. The guard itself must be destroyed immediately
-// after code generation for the function has finished, and no code for other functions may be generated while the guard
-// is alive (i.e., any function invoked from f must be created before the guard). There are exceptions to this rule,
-// e.g., the wrapper functions generated internally by the mppp::real helpers, which contain no floating-point
-// instructions and are thus unaffected by the guard's settings. In general, all floating-point operations in an
-// interval arithmetic function (including the non-rounding ones, such as comparisons, negation and absolute value)
-// should be performed via the member functions of this class, in order to minimise the risk that the guard's settings
-// leak into non-interval functions.
-//
-// All operands passed to the member functions must be of the type passed to the constructor. Only rounding-up
-// arithmetic operations are provided: rounding down can be computed as down(x) = -up(-x).
+// constructor takes care of setting up the function attributes, the IR builder's floating-point settings and the
+// rounding mode. The finalise() function takes care of restoring the original rounding mode at function exit and it
+// must thus be called before *every* return statement. The guard itself must be destroyed immediately after code
+// generation for the function has finished, with the destructor taking care of restoring the IR builder's original
+// floating-point settings. No code for other functions may be generated while the guard is alive (i.e., any function
+// invoked from the function must be created before the guard). There are exceptions to this rule, e.g., the wrapper
+// functions generated internally by the mppp::real helpers, which contain no floating-point instructions and are thus
+// unaffected by the guard's settings. In general, all floating-point operations in an interval arithmetic function
+// (including the non-rounding ones, such as comparisons, negation and absolute value) should be performed via the
+// member functions of this class, in order to minimise the risk that the guard's settings leak into non-interval
+// functions.
 class HEYOKA_DLL_PUBLIC [[nodiscard]] llvm_ival_guard
 {
     struct impl;
@@ -215,18 +221,29 @@ public:
     ~llvm_ival_guard();
 
     [[nodiscard]] llvm::Type *get_val_t() const;
+    [[nodiscard]] llvm::Type *get_ival_t() const;
     [[nodiscard]] llvm_state &get_state() const;
 
     void finalise() const;
 
-    [[nodiscard]] llvm::Value *lt(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *max(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *add_up(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *sub_up(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *mul_up(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *div_up(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *neg(llvm::Value *) const;
-    [[nodiscard]] llvm::Value *abs(llvm::Value *) const;
+    // NOTE: the following functions assume that input interval arguments are always valid intervals, that is, no NaN
+    // bounds, not [-inf, -inf] or [+inf, +inf], and with the lower bound not greater than the upper bound. The interval
+    // return values are also guaranteed to be valid, provided that the preconditions of the functions are satisfied.
+    [[nodiscard]] llvm::Value *ival_construct(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] std::pair<llvm::Value *, llvm::Value *> ival_extract(llvm::Value *) const;
+
+    [[nodiscard]] llvm::Value *val_neg(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *val_abs(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_add(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_add_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_zlb(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_nn_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *val_mul_nn_ival(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_div_pos_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_div_pos_ival(llvm::Value *, llvm::Value *) const;
+
+    [[nodiscard]] llvm::Value *val_lt(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_nz(llvm::Value *) const;
 };
 
 // Flow control.

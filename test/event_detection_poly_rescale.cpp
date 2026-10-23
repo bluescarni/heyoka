@@ -113,9 +113,13 @@ rescale_t<T> add_rescale(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 
         const auto ret = detail::llvm_ed_ival_poly_rescale(ivg, cfs, h);
 
-        for (std::uint32_t i = 0; i < 2u * (n + 1u); ++i) {
-            auto *const ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(i));
-            detail::ext_store_vector_to_memory(s, ptr, ret[i]);
+        // Store the output intervals in the split layout.
+        for (std::uint32_t i = 0; i <= n; ++i) {
+            const auto [mlo, hi] = ivg.ival_extract(ret[i]);
+            auto *const mlo_ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(i));
+            auto *const hi_ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.getInt32(n + 1u + i));
+            detail::ext_store_vector_to_memory(s, mlo_ptr, mlo);
+            detail::ext_store_vector_to_memory(s, hi_ptr, hi);
         }
 
         ivg.finalise();

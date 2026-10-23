@@ -33,26 +33,25 @@ namespace
 // Loop version of llvm_ed_ival_poly_shift_1().
 std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard &ivg,
                                                           const std::vector<llvm::Value *> &cfs,
-                                                          llvm::Type *const val_t, const std::uint32_t cfs_size)
+                                                          const std::uint32_t op1)
 {
-    // Fetch the poly degree + 1.
-    const auto op1 = cfs_size / 2u;
-
     // Get the state and builder from ivg.
     auto &s = ivg.get_state();
     auto &bld = s.builder();
 
     // Codegen a few constants.
-    auto *val_0 = bld.getInt32(0);
-    auto *val_1 = bld.getInt32(1);
-    auto *val_op1 = bld.getInt32(op1);
+    auto *const val_0 = bld.getInt32(0);
+    auto *const val_1 = bld.getInt32(1);
+    auto *const val_op1 = bld.getInt32(op1);
 
     // NOTE: the loops below index the coefficients at runtime, thus the coefficients must be stored in memory. Since
     // the algorithm operates in-place, a single alloca array suffices.
-    auto *array_t = llvm::ArrayType::get(val_t, cfs_size);
-    auto *cfs_arr_alloca = llvm_entry_alloca(s, array_t);
-    for (std::uint32_t idx = 0; idx < cfs_size; ++idx) {
-        auto *ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
+    auto *const ival_t = ivg.get_ival_t();
+    auto *const array_t = llvm::ArrayType::get(ival_t, op1);
+    auto *const cfs_arr_alloca = llvm_entry_alloca(s, array_t);
+    // Copy the original coefficients into the alloca.
+    for (std::uint32_t idx = 0; idx < op1; ++idx) {
+        auto *const ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
         bld.CreateStore(cfs[idx], ptr);
     }
 
@@ -72,28 +71,19 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
             // ai_idx = op1 - 1 - i.
             auto *ai_idx = bld.CreateSub(val_op1, val_1);
             ai_idx = bld.CreateSub(ai_idx, i);
-            auto *ai_mlo_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, ai_idx});
-            auto *ai_hi_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.CreateAdd(ai_idx, val_op1)});
+            auto *const ai_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, ai_idx});
 
             // aim1_idx = op1 - i.
-            auto *aim1_idx = bld.CreateSub(val_op1, i);
-            auto *aim1_mlo_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, aim1_idx});
-            auto *aim1_hi_ptr
-                = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.CreateAdd(aim1_idx, val_op1)});
+            auto *const aim1_idx = bld.CreateSub(val_op1, i);
+            auto *const aim1_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, aim1_idx});
 
-            // Compute the negated lo part of the result.
-            auto *ai_mlo = bld.CreateLoad(val_t, ai_mlo_ptr);
-            auto *aim1_mlo = bld.CreateLoad(val_t, aim1_mlo_ptr);
-            auto *ret_mlo = ivg.add_up(ai_mlo, aim1_mlo);
+            // Compute the result: a[i] + a[i-1].
+            auto *const ai = bld.CreateLoad(ival_t, ai_ptr);
+            auto *const aim1 = bld.CreateLoad(ival_t, aim1_ptr);
+            auto *const ret = ivg.ival_add(ai, aim1);
 
-            // Compute the hi part of the result.
-            auto *ai_hi = bld.CreateLoad(val_t, ai_hi_ptr);
-            auto *aim1_hi = bld.CreateLoad(val_t, aim1_hi_ptr);
-            auto *ret_hi = ivg.add_up(ai_hi, aim1_hi);
-
-            // Update the a[i] values in cfs_arr_alloca.
-            bld.CreateStore(ret_mlo, ai_mlo_ptr);
-            bld.CreateStore(ret_hi, ai_hi_ptr);
+            // Update the a[i] value in cfs_arr_alloca.
+            bld.CreateStore(ret, ai_ptr);
         });
     });
 
@@ -102,9 +92,9 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
     ret.reserve(cfs.size());
 
     // Load the values from cfs_arr_alloca to fill in the return value.
-    for (std::uint32_t idx = 0; idx < cfs_size; ++idx) {
-        auto *ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
-        ret.push_back(bld.CreateLoad(val_t, ptr));
+    for (std::uint32_t idx = 0; idx < op1; ++idx) {
+        auto *const ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
+        ret.push_back(bld.CreateLoad(ival_t, ptr));
     }
 
     return ret;
@@ -113,11 +103,8 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
 // Manually-unrolled version of llvm_ed_ival_poly_shift_1().
 std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_guard &ivg,
                                                               const std::vector<llvm::Value *> &cfs,
-                                                              const std::uint32_t cfs_size)
+                                                              const std::uint32_t op1)
 {
-    // Fetch the poly degree + 1.
-    const auto op1 = cfs_size / 2u;
-
     // Init the return value from cfs.
     auto ret = cfs;
 
@@ -130,22 +117,15 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_gu
             const auto ai_idx = op1 - 1u - i;
             const auto aim1_idx = op1 - i;
 
-            // Fetch a[i].
-            auto *const ai_mlo = ret[ai_idx];
-            auto *const ai_hi = ret[ai_idx + op1];
+            // Fetch a[i] and a[i-1].
+            auto *const ai = ret[ai_idx];
+            auto *const aim1 = ret[aim1_idx];
 
-            // Fetch a[i-1].
-            auto *const aim1_mlo = ret[aim1_idx];
-            auto *const aim1_hi = ret[aim1_idx + op1];
+            // Compute the result: a[i] + a[i-1].
+            auto *const res = ivg.ival_add(ai, aim1);
 
-            // Compute the negated lo part of the result.
-            auto *const ret_mlo = ivg.add_up(ai_mlo, aim1_mlo);
-            // Compute the hi part of the result.
-            auto *const ret_hi = ivg.add_up(ai_hi, aim1_hi);
-
-            // Update the a[i] values in ret.
-            ret[ai_idx] = ret_mlo;
-            ret[ai_idx + op1] = ret_hi;
+            // Update the a[i] value in ret.
+            ret[ai_idx] = res;
         }
     }
 
@@ -158,14 +138,14 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_gu
 //
 // cfs is an input polynomial p(x) = c0 + c1*x + c2*x**2 + ... with the coefficients represented as intervals [lo, hi]
 // in the (-lo, hi) format (that is, the lower bound of the interval is carried around negated). The coefficients are
-// stored in the cfs vector in ascending order in split format, that is:
+// stored in the cfs vector in ascending order, that is:
 //
-// [-c0_lo, -c1_lo, -c2_lo, ..., c0_hi, c1_hi, c2_hi, ...]
+// [(-c0_lo, c0_hi), (-c1_lo, c1_hi), (-c2_lo, c2_hi), ...]
 //
 // This function will compute and return in the same format intervals enclosing the coefficients of the polynomial
 // p(x+1), using the arithmetic primitives from the input guard ivg. It is assumed that all values in cfs are of type
-// ivg.get_val_t(). cfs must not be empty and its size must be an even number. The IR is emitted at the current
-// insertion point, which must be within the function guarded by ivg.
+// ivg.get_ival_t(). cfs must not be empty. The IR is emitted at the current insertion point, which must be within the
+// function guarded by ivg.
 //
 // The input intervals are assumed to have no NaN bounds. Infinite bounds may be present, but never in the invalid forms
 // [-inf, -inf] and [+inf, +inf]. Similarly, the output intervals have no NaN bounds and are never in the invalid forms
@@ -179,26 +159,22 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_gu
 std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs)
 {
     assert(!cfs.empty());
-    assert(cfs.size() % 2u == 0u);
-    assert(std::ranges::all_of(cfs, [&ivg](auto *const x) { return x != nullptr && x->getType() == ivg.get_val_t(); }));
+    assert(
+        std::ranges::all_of(cfs, [&ivg](auto *const x) { return x != nullptr && x->getType() == ivg.get_ival_t(); }));
 
     // Make sure we can use 32-bit ints for all indexing.
-    const auto cfs_size = boost::numeric_cast<std::uint32_t>(cfs.size());
+    const auto op1 = boost::numeric_cast<std::uint32_t>(cfs.size());
 
-    // Fetch the poly degree + 1.
-    const auto op1 = cfs_size / 2u;
-
-    // Fetch the val_t from ivg.
-    auto *const val_t = ivg.get_val_t();
-    auto *const scal_t = val_t->getScalarType();
+    // Fetch the scalar type of the interval bounds from ivg.
+    const auto *const scal_t = ivg.get_val_t()->getScalarType();
 
     // NOTE: if we are working with float/double scalars/vectors and the poly degree is small enough, we want to
     // manually unroll the computation in order to improve performance. For the other floating-point types, we expect
     // the unrolling not to improve performance.
     if ((scal_t->isFloatTy() || scal_t->isDoubleTy()) && op1 < 25u) {
-        return llvm_ed_ival_poly_shift_1_unrolled(ivg, cfs, cfs_size);
+        return llvm_ed_ival_poly_shift_1_unrolled(ivg, cfs, op1);
     } else {
-        return llvm_ed_ival_poly_shift_1_loop(ivg, cfs, val_t, cfs_size);
+        return llvm_ed_ival_poly_shift_1_loop(ivg, cfs, op1);
     }
 }
 
