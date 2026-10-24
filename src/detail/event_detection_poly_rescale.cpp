@@ -33,7 +33,7 @@ namespace
 // -0.
 //
 // x and y must be scalar float or double values of the same type.
-llvm::Value *xor_signbit(llvm_state &s, llvm::Value *const x, llvm::Value *const y)
+llvm::Value *llvm_ed_ival_poly_rescale_xor_signbit(llvm_state &s, llvm::Value *const x, llvm::Value *const y)
 {
     assert(x != nullptr);
     assert(y != nullptr);
@@ -114,7 +114,8 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_rescale(const llvm_ival_guard &ivg,
         // register spilling. Thus, in this case we XOR the sign bit of h into cf instead. This also negates cf when h
         // is -0, which is harmless since cf * |h|**i is zero in this case.
         if (i % 2u != 0u) {
-            cf = use_signbit ? xor_signbit(s, cf, h) : bld.CreateSelect(h_neg, ivg.val_neg(cf), cf);
+            cf = use_signbit ? llvm_ed_ival_poly_rescale_xor_signbit(s, cf, h)
+                             : bld.CreateSelect(h_neg, ivg.val_neg(cf), cf);
         }
 
         // Compute the rescaled coefficient.
