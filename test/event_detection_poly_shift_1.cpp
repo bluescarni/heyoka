@@ -72,11 +72,6 @@ const auto fp_types = std::tuple<float, double
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
 
-// An interval with rational endpoints.
-struct rat_ival {
-    rat lo, hi;
-};
-
 // The binomial coefficient C(m, k), with k <= m.
 cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
 {
@@ -88,16 +83,6 @@ cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
     }
 
     return ret;
-}
-
-// The product of the rational c and the interval x.
-rat_ival ival_scale(const rat &c, const rat_ival &x)
-{
-    if (c >= 0) {
-        return {c * x.lo, c * x.hi};
-    } else {
-        return {c * x.hi, c * x.lo};
-    }
 }
 
 // The exact shift by 1 of the interval polynomial with coefficients cfs (in ascending order), computed via the binomial

@@ -363,4 +363,20 @@ template boost::multiprecision::cpp_rational max_rat<mppp::real128>();
 
 #endif
 
+// The product of the rational c and the interval x.
+rat_ival ival_scale(const boost::multiprecision::cpp_rational &c, const rat_ival &x)
+{
+    if (c >= 0) {
+        return {c * x.lo, c * x.hi};
+    } else {
+        return {c * x.hi, c * x.lo};
+    }
+}
+
+// The sum of the intervals x and y.
+rat_ival ival_add(const rat_ival &x, const rat_ival &y)
+{
+    return {x.lo + y.lo, x.hi + y.hi};
+}
+
 } // namespace heyoka_test

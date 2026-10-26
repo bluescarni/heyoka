@@ -94,6 +94,10 @@ llvm_ed_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Val
 template <typename T>
 [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(std::span<const T>);
 
+// Helper to split the input Bernstein polynomial at the midpoint of its interval.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
+llvm_ed_ival_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
+
 HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
 // Machinery to add a function that, given an input polynomial of order n represented

@@ -191,6 +191,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_binomial_cf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_poly_bernstein.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_count_sign_changes_ival.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_de_casteljau_half.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_arith.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_cmp.cpp"

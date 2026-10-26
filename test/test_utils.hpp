@@ -320,6 +320,17 @@ T rand_uniform(std::mt19937 &, double, double);
 template <typename T>
 boost::multiprecision::cpp_rational max_rat();
 
+// An interval with rational bounds.
+struct rat_ival {
+    boost::multiprecision::cpp_rational lo, hi;
+};
+
+// The product of the rational c and the interval x.
+rat_ival ival_scale(const boost::multiprecision::cpp_rational &, const rat_ival &);
+
+// The sum of the intervals x and y.
+rat_ival ival_add(const rat_ival &, const rat_ival &);
+
 } // namespace heyoka_test
 
 #endif
