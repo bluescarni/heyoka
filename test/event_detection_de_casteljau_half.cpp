@@ -299,8 +299,8 @@ TEST_CASE("exact")
 {
     std::uniform_int_distribution<int> b_dist(-10, 10);
 
-    tuple_for_each(fp_types, [&b_dist](auto x) {
-        using fp_t = decltype(x);
+    tuple_for_each(fp_types, [&b_dist](auto x_) {
+        using fp_t = decltype(x_);
 
         if (!ival_arith_supported<fp_t>()) {
             WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
