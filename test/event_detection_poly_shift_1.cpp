@@ -38,7 +38,6 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -55,7 +54,6 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 using rat = boost::multiprecision::cpp_rational;
-using boost::multiprecision::cpp_int;
 
 // The floating-point types tested.
 const auto fp_types = std::tuple<float, double
@@ -71,19 +69,6 @@ const auto fp_types = std::tuple<float, double
 
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
-
-// The binomial coefficient C(m, k), with k <= m.
-cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
-{
-    cpp_int ret = 1;
-
-    // NOTE: after the iteration i, ret is C(m - k + i, i).
-    for (std::uint32_t i = 1; i <= k; ++i) {
-        ret = ret * (m - k + i) / i;
-    }
-
-    return ret;
-}
 
 // The exact shift by 1 of the interval polynomial with coefficients cfs (in ascending order), computed via the binomial
 // formula b_k = sum_{m >= k} C(m, k) * c_m in interval arithmetic.
@@ -177,11 +162,9 @@ TEST_CASE("random")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: addition does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {
@@ -228,11 +211,9 @@ TEST_CASE("rounding direction")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: addition does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const fp_t eps = std::numeric_limits<fp_t>::epsilon();
@@ -262,18 +243,6 @@ TEST_CASE("real")
     using fp_t = mppp::real;
 
     for (const auto prec : {11, 53, 113, 200}) {
-        // Generate a random value with precision prec of magnitude up to about 10.
-        const auto rand_real = [prec]() {
-            std::uniform_real_distribution<double> dist(-10., 10.);
-
-            const auto a = dist(rng);
-            const auto b = dist(rng);
-
-            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
-            // higher than double's.
-            return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
-        };
-
         // The same checks as in the "random" test case.
         for (const auto n : degrees) {
             for (const auto opt_level : {0u, 3u}) {
@@ -284,8 +253,8 @@ TEST_CASE("real")
                     std::vector<fp_t> in(2u * (n + 1u));
                     std::vector<rat_ival> in_rat;
                     for (std::uint32_t i = 0; i <= n; ++i) {
-                        const auto lo = rand_real();
-                        const auto w = rand_real();
+                        const auto lo = rand_uniform_real(rng, -10., 10., prec);
+                        const auto w = rand_uniform_real(rng, -10., 10., prec);
                         const auto hi = (i % 3u == 0u) ? lo : lo + (w < 0 ? -w : w);
 
                         in[i] = -lo;

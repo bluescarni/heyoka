@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cfenv>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -24,6 +25,7 @@
 
 #endif
 
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/mdspan.hpp>
@@ -307,6 +309,20 @@ bool mul_honours_rounding()
     return res > 1 + 2 * eps;
 }
 
+// Check whether the arithmetic of the type T honours the rounding mode, as required by the tests of the interval
+// arithmetic primitives. Only the IEEE binary128 types are checked, via add_honours_rounding() and
+// mul_honours_rounding(), because their arithmetic may be software-emulated. The other types are assumed to honour the
+// rounding mode.
+template <typename T>
+bool ival_arith_supported()
+{
+    if constexpr (heyoka::detail::is_ieee754_binary128<T>) {
+        return add_honours_rounding<T>() && mul_honours_rounding<T>();
+    } else {
+        return true;
+    }
+}
+
 // Generate a random value of type T approximately uniformly distributed in [lo, hi]. The value is the sum of two
 // doubles, thus for the types wider than double it can have up to about 106 significant bits.
 template <typename T>
@@ -326,6 +342,10 @@ template bool mul_honours_rounding<float>();
 template bool mul_honours_rounding<double>();
 template bool mul_honours_rounding<long double>();
 
+template bool ival_arith_supported<float>();
+template bool ival_arith_supported<double>();
+template bool ival_arith_supported<long double>();
+
 template float rand_uniform<float>(std::mt19937 &, double, double);
 template double rand_uniform<double>(std::mt19937 &, double, double);
 template long double rand_uniform<long double>(std::mt19937 &, double, double);
@@ -334,7 +354,26 @@ template long double rand_uniform<long double>(std::mt19937 &, double, double);
 
 template bool add_honours_rounding<mppp::real128>();
 template bool mul_honours_rounding<mppp::real128>();
+template bool ival_arith_supported<mppp::real128>();
 template mppp::real128 rand_uniform<mppp::real128>(std::mt19937 &, double, double);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Generate a random value of type mppp::real with precision prec approximately uniformly distributed in [lo, hi]. As in
+// rand_uniform(), the value is the sum of two doubles, thus for the precisions higher than double's it can have up to
+// about 106 significant bits.
+mppp::real rand_uniform_real(std::mt19937 &rng, double lo, double hi, ::mpfr_prec_t prec)
+{
+    std::uniform_real_distribution<double> dist(lo, hi);
+
+    const auto a = dist(rng);
+    const auto b = dist(rng);
+
+    // NOTE: the second double is scaled by 2**-53, so that its bits extend those of the first one.
+    return mppp::real{a, prec} + mppp::real{b, prec} * mppp::real{0x1p-53, prec};
+}
 
 #endif
 
@@ -377,6 +416,19 @@ rat_ival ival_scale(const boost::multiprecision::cpp_rational &c, const rat_ival
 rat_ival ival_add(const rat_ival &x, const rat_ival &y)
 {
     return {x.lo + y.lo, x.hi + y.hi};
+}
+
+// The binomial coefficient C(m, k), with k <= m.
+boost::multiprecision::cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
+{
+    boost::multiprecision::cpp_int ret = 1;
+
+    // NOTE: after the iteration i, ret is C(m - k + i, i).
+    for (std::uint32_t i = 1; i <= k; ++i) {
+        ret = ret * (m - k + i) / i;
+    }
+
+    return ret;
 }
 
 } // namespace heyoka_test

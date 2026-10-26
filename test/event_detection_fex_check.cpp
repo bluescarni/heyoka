@@ -927,11 +927,9 @@ TEST_CASE("scalar")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {
@@ -959,11 +957,9 @@ TEST_CASE("batch")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {

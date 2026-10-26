@@ -42,7 +42,6 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -255,11 +254,9 @@ TEST_CASE("random")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {
@@ -305,11 +302,9 @@ TEST_CASE("exact")
     tuple_for_each(fp_types, [&b_dist](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {
@@ -370,11 +365,9 @@ TEST_CASE("rounding direction")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const fp_t eps = std::numeric_limits<fp_t>::epsilon();
@@ -404,11 +397,9 @@ TEST_CASE("overflow")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const auto inf = static_cast<fp_t>(std::numeric_limits<double>::infinity());
@@ -452,18 +443,6 @@ TEST_CASE("real")
     using fp_t = mppp::real;
 
     for (const auto prec : {11, 53, 113, 200}) {
-        // Generate a random value with precision prec of magnitude up to about 10.
-        const auto rand_real = [prec]() {
-            std::uniform_real_distribution<double> dist(-10., 10.);
-
-            const auto a = dist(rng);
-            const auto b = dist(rng);
-
-            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
-            // higher than double's.
-            return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
-        };
-
         for (const auto n : degrees) {
             for (const auto opt_level : {0u, 3u}) {
                 llvm_state s{kw::opt_level = opt_level};
@@ -472,8 +451,8 @@ TEST_CASE("real")
                 for (auto trial = 0; trial < 10; ++trial) {
                     std::vector<fp_t> in(2u * (n + 1u));
                     for (std::uint32_t i = 0; i <= n; ++i) {
-                        const auto lo = rand_real();
-                        const auto w = rand_real();
+                        const auto lo = rand_uniform_real(rng, -10., 10., prec);
+                        const auto w = rand_uniform_real(rng, -10., 10., prec);
                         const auto hi = (i % 3u == 0u) ? lo : lo + (w < 0 ? -w : w);
 
                         in[2u * i] = -lo;

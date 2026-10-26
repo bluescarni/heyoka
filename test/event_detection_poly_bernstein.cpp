@@ -39,7 +39,6 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -56,7 +55,6 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 using rat = boost::multiprecision::cpp_rational;
-using boost::multiprecision::cpp_int;
 
 // The floating-point types tested.
 const auto fp_types = std::tuple<float, double
@@ -75,19 +73,6 @@ const auto fp_types = std::tuple<float, double
 // NOTE: in double precision, the binomial coefficients C(n,k) are all exactly representable only up to n = 56. The
 // degree 60 thus exercises the division by inexact binomial coefficients also in double precision.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40, 60};
-
-// The binomial coefficient C(m, j), with j <= m.
-cpp_int exact_binomial(std::uint32_t m, std::uint32_t j)
-{
-    cpp_int num = 1, den = 1;
-
-    for (std::uint32_t i = 0; i < j; ++i) {
-        num *= m - i;
-        den *= i + 1u;
-    }
-
-    return num / den;
-}
 
 // The product of the polynomials with integer coefficients a and b (stored in ascending order).
 std::vector<std::int64_t> poly_mul(const std::vector<std::int64_t> &a, const std::vector<std::int64_t> &b)
@@ -242,11 +227,9 @@ TEST_CASE("random")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         std::bernoulli_distribution sign;
@@ -297,11 +280,9 @@ TEST_CASE("overflow")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!add_honours_rounding<fp_t>() || !mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const auto inf = static_cast<fp_t>(std::numeric_limits<double>::infinity());
@@ -470,18 +451,6 @@ TEST_CASE("real")
     for (const auto prec : {11, 53, 113, 200}) {
         const fp_t zero{0, prec};
 
-        // Generate a random value with precision prec approximately uniformly distributed in [lo, hi].
-        const auto rand_real = [prec](double lo, double hi) {
-            std::uniform_real_distribution<double> dist(lo, hi);
-
-            const auto a = dist(rng);
-            const auto b = dist(rng);
-
-            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
-            // higher than double's.
-            return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
-        };
-
         for (const auto n : degrees) {
             for (const auto opt_level : {0u, 3u}) {
                 llvm_state s{kw::opt_level = opt_level};
@@ -493,11 +462,11 @@ TEST_CASE("real")
                     std::vector<fp_t> cfs(n + 1u, zero);
                     for (std::uint32_t i = 0; i <= n; ++i) {
                         if (i % 3u != 2u) {
-                            cfs[i] = rand_real(-10., 10.);
+                            cfs[i] = rand_uniform_real(rng, -10., 10., prec);
                         }
                     }
 
-                    auto h = rand_real(0.1, 10.);
+                    auto h = rand_uniform_real(rng, 0.1, 10., prec);
                     if (sign(rng)) {
                         h = -h;
                     }

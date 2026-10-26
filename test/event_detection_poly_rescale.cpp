@@ -41,7 +41,6 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -252,11 +251,9 @@ TEST_CASE("random")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const std::optional<rat> max_val = max_rat<fp_t>();
@@ -324,11 +321,9 @@ TEST_CASE("rounding direction")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto opt_level : {0u, 3u}) {
@@ -345,11 +340,9 @@ TEST_CASE("overflow")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         const auto inf = static_cast<fp_t>(std::numeric_limits<double>::infinity());
@@ -405,29 +398,11 @@ TEST_CASE("real")
         const fp_t zero{0, prec};
         const fp_t one{1, prec};
 
-        // Generate a random value with precision prec of magnitude up to about 10.
-        const auto rand_real = [prec]() {
-            std::uniform_real_distribution<double> dist(-10., 10.);
-
-            const auto a = dist(rng);
-            const auto b = dist(rng);
-
-            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
-            // higher than double's.
-            return fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
-        };
-
         // Generate a random value with precision prec of magnitude between about 0.1 and 10, with random sign.
         const auto rand_real_h = [prec]() {
-            std::uniform_real_distribution<double> dist(0.1, 10.);
             std::bernoulli_distribution sign;
 
-            const auto a = dist(rng);
-            const auto b = dist(rng);
-
-            // NOTE: adding a second double scaled by 2**-53 gives up to about 106 significant bits for the precisions
-            // higher than double's.
-            const auto ret = fp_t{a, prec} + fp_t{b, prec} * fp_t{0x1p-53, prec};
+            const auto ret = rand_uniform_real(rng, 0.1, 10., prec);
 
             return sign(rng) ? -ret : ret;
         };
@@ -443,7 +418,7 @@ TEST_CASE("real")
                     std::vector<fp_t> cfs(n + 1u, zero);
                     for (std::uint32_t i = 0; i <= n; ++i) {
                         if (i % 3u != 2u) {
-                            cfs[i] = rand_real();
+                            cfs[i] = rand_uniform_real(rng, -10., 10., prec);
                         }
                     }
 
@@ -467,7 +442,7 @@ TEST_CASE("real")
                     std::vector<fp_t> cfs(n + 1u, zero);
                     for (std::uint32_t i = 0; i <= n; ++i) {
                         if (i % 3u != 2u) {
-                            cfs[i] = rand_real();
+                            cfs[i] = rand_uniform_real(rng, -10., 10., prec);
                         }
                     }
 
