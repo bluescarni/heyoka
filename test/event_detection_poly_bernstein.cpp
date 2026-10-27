@@ -156,7 +156,7 @@ bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, s
 
         auto *const h = detail::ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
 
-        const auto ret = detail::llvm_ed_ival_poly_bernstein(ivg, cfs, h);
+        const auto ret = detail::llvm_ed_ival_poly_bernstein(ivg, cfs, h).first;
 
         // Store the output intervals in the split layout.
         for (std::uint32_t i = 0; i <= n; ++i) {

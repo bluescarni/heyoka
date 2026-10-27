@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -58,10 +59,14 @@ namespace detail
 // requires O(n**2) interval multiplications, the O(n**2) part of this approach consists only of interval additions
 // (in llvm_ed_ival_poly_shift_1()).
 //
-// The output intervals are stored in the (-lo, hi) format (that is, the lower bound of the interval is carried around
-// negated), in ascending order:
+// The return value is a pair of lists of interval polynomial coefficients, stored in the (-lo, hi) format (that is, the
+// lower bound of the interval is carried around negated), in ascending order:
 //
-// [(-b0_lo, b0_hi), (-b1_lo, b1_hi), (-b2_lo, b2_hi), ...]
+// [(-c0_lo, c0_hi), (-c1_lo, c1_hi), (-c2_lo, c2_hi), ...]
+//
+// The first element of the pair contains the coefficients of the interval Bernstein form of the original polynomial.
+// The second element of the pair contains the coefficients of q(x), that is, the original polynomial after the
+// rescaling step.
 //
 // The calculations will be performed using the arithmetic primitives from the input guard ivg. The IR is emitted at the
 // current insertion point, which must be within the function guarded by ivg.
@@ -69,8 +74,8 @@ namespace detail
 // cfs is assumed non-empty. h and all elements of cfs are assumed to have the same type as ivg.get_val_t(). All input
 // values are assumed to be finite. The output intervals enclose the exact coefficients, and they have no NaN bounds.
 // Infinite bounds may be returned in case of overflow, but never in the invalid forms [-inf, -inf] and [+inf, +inf].
-std::vector<llvm::Value *> llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg,
-                                                       const std::vector<llvm::Value *> &cfs, llvm::Value *const h)
+std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
+llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs, llvm::Value *const h)
 {
     assert(!cfs.empty());
     assert(h != nullptr);
@@ -82,6 +87,9 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_bernstein(const llvm_ival_guard &iv
 
     // Apply the rescaling.
     auto ret = llvm_ed_ival_poly_rescale(ivg, cfs, h);
+
+    // Store the rescaled polynomial (this will be the second element of the return value).
+    auto ret_rescaled = ret;
 
     // Reverse.
     std::ranges::reverse(ret);
@@ -133,7 +141,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_bernstein(const llvm_ival_guard &iv
         }
     }
 
-    return ret;
+    return std::make_pair(std::move(ret), std::move(ret_rescaled));
 }
 
 } // namespace detail
