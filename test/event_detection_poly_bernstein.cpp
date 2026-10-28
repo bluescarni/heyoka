@@ -181,7 +181,7 @@ bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, s
 template <typename T>
 bernstein_t<T> add_bernstein(llvm_state &s, std::uint32_t n, std::uint32_t batch_size = 1)
 {
-    return add_bernstein<T>(s, detail::to_external_llvm_type<T>(s.context()), n, batch_size);
+    return add_bernstein<T>(s, detail::to_internal_llvm_type<T>(s), n, batch_size);
 }
 
 // Check the output out of the conversion to the Bernstein form of the polynomial with coefficients cfs rescaled by h.

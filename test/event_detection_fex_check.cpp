@@ -903,7 +903,7 @@ using fex_check_t = void (*)(const T *, const T *, std::uint32_t *, T *);
 template <typename T>
 fex_check_t<T> add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    detail::llvm_ed_add_fex_check(s, "fex_check", detail::to_external_llvm_type<T>(s.context()), n, batch_size);
+    detail::llvm_ed_add_fex_check(s, "fex_check", detail::to_internal_llvm_type<T>(s), n, batch_size);
 
     s.compile();
 

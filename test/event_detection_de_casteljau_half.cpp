@@ -201,7 +201,7 @@ split_t<T> add_split(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 template <typename T>
 split_t<T> add_split(llvm_state &s, std::uint32_t n)
 {
-    return add_split<T>(s, detail::to_external_llvm_type<T>(s.context()), n);
+    return add_split<T>(s, detail::to_internal_llvm_type<T>(s), n);
 }
 
 std::mt19937 rng(42);

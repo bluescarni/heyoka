@@ -134,7 +134,7 @@ rescale_t<T> add_rescale(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 template <typename T>
 rescale_t<T> add_rescale(llvm_state &s, std::uint32_t n)
 {
-    return add_rescale<T>(s, detail::to_external_llvm_type<T>(s.context()), n);
+    return add_rescale<T>(s, detail::to_internal_llvm_type<T>(s), n);
 }
 
 // Check the output out of the rescaling by h of the polynomial with coefficients cfs.
