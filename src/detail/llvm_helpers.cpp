@@ -759,10 +759,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
     assert(std::ranges::all_of(args.begin() + 1, args.end(),
                                [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
 
-    [[maybe_unused]] const auto nargs = args.size();
-
-    [[maybe_unused]] auto &builder = s.builder();
-
     // Determine the type and scalar type of the arguments.
     auto *x_t = args[0]->getType();
     auto *scal_t = x_t->getScalarType();
@@ -808,6 +804,10 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
     }
 
 #if defined(HEYOKA_HAVE_REAL)
+
+    const auto nargs = args.size();
+
+    auto &builder = s.builder();
 
     // NOTE: this handles only the scalar case.
     if (llvm_is_real(x_t) != 0) {
