@@ -227,6 +227,11 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_cache.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/frpr_workspace_impl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/isolate_real_roots.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/vector_cache.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/frpr_workspace.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/find_real_poly_roots.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
