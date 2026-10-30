@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -44,15 +45,15 @@ enum class irr_interval_type {
 //
 // - lo<hi: the interval is to be regarded as an open interval (lo, hi) within which a single simple real root is
 //   guaranteed to exist;
-// - lo==hi: a root of undetermined multiplicity exists *exactly* at lo/hi.
+// - lo==hi: a root exists *exactly* at lo/hi.
 //
 // For isolating intervals, the direction of the root (that is, the sign of the derivative at the root), if available,
-// is given by 'sign'. The sign is guaranteed to be -1 or 1 for lo<hi, or zero for lo==hi (indicating that the sign is
-// undetermined).
+// is given by 'sign'. The sign is guaranteed to be -1 or 1 for lo<hi, while for lo==hi it can also be zero (the
+// derivative at the root is exactly zero) or empty (the sign could not be determined).
 //
-// If the interval type is 'undecided', it means that the real root isolation function shrunk the interval to a small
-// size without being able to fully determine if and how many roots exist in the interval. In this case, the interval is
-// to be regarded as a half-open interval [lo, hi) and the sign field is zero.
+// If the interval type is 'undecided', it means that the real root isolation function could not determine if and how
+// many roots exist in the interval. In this case, the interval is to be regarded as a half-open interval [lo, hi) and
+// the sign field is empty.
 //
 // NOTE: see the docs of isolate_real_roots() for the units of lo, hi and sign.
 template <typename T>
@@ -60,7 +61,7 @@ struct irr_interval {
     T lo{};
     T hi{};
     irr_interval_type type = irr_interval_type::undecided;
-    int sign = 0;
+    std::optional<int> sign;
 };
 
 // Isolate the real roots for a polynomial.
@@ -78,9 +79,9 @@ template <typename T>
 struct real_poly_root {
     // The root value.
     T t{};
-    // The direction: +1 if the derivative of p(t) is positive at the root, -1 if the derivative is negative, 0 if the
-    // sign is undetermined.
-    int dir = 0;
+    // The direction: +1 if the derivative of p(t) is positive at the root, -1 if the derivative is negative, 0 if it is
+    // exactly zero. If the sign could not be determined, the value is empty.
+    std::optional<int> dir;
 };
 
 // Find the real roots of a polynomial within an interval.

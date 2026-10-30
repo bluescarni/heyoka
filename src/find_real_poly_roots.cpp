@@ -43,7 +43,7 @@ HEYOKA_BEGIN_NAMESPACE
 //
 // Every real root of p(t) in this range is reported. Roots that cannot be resolved at the working precision (e.g.,
 // multiple roots, or roots closer to each other than the precision allows) may be reported as a single root, and such a
-// report may be a false positive. The dir field of such roots is zero.
+// report may be a false positive.
 //
 // lb is a non-negative value in the same units as h. Roots in the following ranges are not reported:
 //

@@ -46,12 +46,23 @@ template <typename T>
 struct frpr_workspace_jit_data {
     using bernstein_func_t = void (*)(T *, T *, const T *, const T *) noexcept;
     using decasteljau_func_t = void (*)(T *, T *, const T *) noexcept;
+#if defined(HEYOKA_HAVE_REAL)
+    // NOTE: these are the extended-precision analogs of the above functions, used in the extended-precision pass of the
+    // real root isolation (see isolate_real_roots()). They work at 3 times the number of binary digits of T (3 times
+    // the workspace precision for mppp::real).
+    using bernstein_func_3n_t = void (*)(mppp::real *, mppp::real *, const mppp::real *, const mppp::real *) noexcept;
+    using decasteljau_func_3n_t = void (*)(mppp::real *, mppp::real *, const mppp::real *) noexcept;
+#endif
 
     // The LLVM state.
     llvm_state m_state;
     // The JIT compiled functions used during root finding.
     bernstein_func_t m_bernstein_func = nullptr;
     decasteljau_func_t m_decasteljau_func = nullptr;
+#if defined(HEYOKA_HAVE_REAL)
+    bernstein_func_3n_t m_bernstein_func_3n = nullptr;
+    decasteljau_func_3n_t m_decasteljau_func_3n = nullptr;
+#endif
 
     // NOTE: needed only for s11n.
     frpr_workspace_jit_data();
@@ -82,7 +93,7 @@ struct frpr_workspace_impl {
     // Vector cache.
     //
     // NOTE: it is *very* important that this is created before, and destroyed after, any data member containing
-    // cached_vector (e.g., m_wlist).
+    // cached_vectors from this cache (e.g., m_wlist).
     vector_cache<T> m_vector_cache;
     // Value type for the working list m_wlist. It contains a half-open interval [lo, hi) paired with the rescaled
     // polynomial q(tau) = p(h*tau) represented in the Bernstein basis of [lo, hi] with interval coefficients. The
@@ -94,6 +105,20 @@ struct frpr_workspace_impl {
     };
     // Working list for the real root isolation loop.
     std::vector<wlist_item> m_wlist;
+#if defined(HEYOKA_HAVE_REAL)
+    // Vector cache for the extended-precision pass during real root isolation.
+    vector_cache<mppp::real> m_vector_cache_3n;
+    // These are the counterparts to wlist_item and m_wlist for the extended-precision pass. As usual, m_wlist_3n must
+    // be declared *after* m_vector_cache_3n.
+    struct wlist_item_3n {
+        // NOTE: lo/hi are stored using the original type T, only the poly coefficients are stored in increased
+        // precision.
+        T lo{};
+        T hi{};
+        cached_vector<mppp::real> poly;
+    };
+    std::vector<wlist_item_3n> m_wlist_3n;
+#endif
 
     // Serialisation.
     void save(boost::archive::binary_oarchive &, unsigned) const;
@@ -123,6 +148,14 @@ struct frpr_workspace_impl {
     // Getter for the polynomial degree.
     [[nodiscard]] std::uint32_t get_degree() const noexcept;
 };
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Helper to deduce the precision to use for the extended-precision pass during real root isolation.
+template <typename T>
+long long frpr_workspace_impl_get_prec_3n(long long);
+
+#endif
 
 } // namespace detail
 

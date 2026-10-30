@@ -11,6 +11,7 @@
 #include <cassert>
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -293,6 +294,10 @@ void frpr_workspace_jit_data<T>::load(boost::archive::binary_iarchive &ar, unsig
     // Fetch the function pointers from the LLVM state.
     m_bernstein_func = reinterpret_cast<bernstein_func_t>(m_state.jit_lookup("bernstein"));
     m_decasteljau_func = reinterpret_cast<decasteljau_func_t>(m_state.jit_lookup("decasteljau"));
+#if defined(HEYOKA_HAVE_REAL)
+    m_bernstein_func_3n = reinterpret_cast<bernstein_func_3n_t>(m_state.jit_lookup("bernstein_3n"));
+    m_decasteljau_func_3n = reinterpret_cast<decasteljau_func_3n_t>(m_state.jit_lookup("decasteljau_3n"));
+#endif
 }
 
 template <typename T>
@@ -336,6 +341,11 @@ void frpr_workspace_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned)
     // NOTE: m_intervals is *not* saved on purpose.
     ar << m_vector_cache;
     // NOTE: m_wlist is *not* saved on purpose.
+
+#if defined(HEYOKA_HAVE_REAL)
+    ar << m_vector_cache_3n;
+    // NOTE: m_wlist_3n is *not* saved on purpose.
+#endif
 }
 
 // NOTE: the load() behaviour matches the copy constructor behaviour - the scratch buffers are restored in an empty
@@ -343,9 +353,12 @@ void frpr_workspace_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned)
 template <typename T>
 void frpr_workspace_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
-    // NOTE: before deserialisation, make sure to clear out m_wlist. It may contain cached vectors referring to the
-    // current vector cache, which will be soon replaced below.
+    // NOTE: before deserialisation, make sure to clear out the working lists. They may contain cached vectors referring
+    // to the current vector caches, which will be soon replaced below.
     m_wlist.clear();
+#if defined(HEYOKA_HAVE_REAL)
+    m_wlist_3n.clear();
+#endif
 
     ar >> m_prec;
     ar >> m_degree;
@@ -353,6 +366,10 @@ void frpr_workspace_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     // NOTE: not strictly necessary, but this makes sure that the deserialised object starts off in a known state.
     m_intervals.clear();
     ar >> m_vector_cache;
+
+#if defined(HEYOKA_HAVE_REAL)
+    ar >> m_vector_cache_3n;
+#endif
 }
 
 template <typename T>
@@ -364,7 +381,7 @@ namespace
 // Helper to construct a vector_cache instance in the ctor of frpr_workspace_impl.
 template <typename T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-vector_cache<T> frpr_workspace_impl_make_vector_cache(const long long prec, const std::uint32_t degree)
+vector_cache<T> frpr_workspace_impl_make_vector_cache([[maybe_unused]] const long long prec, const std::uint32_t degree)
 {
     // Setup the fill value for the cache.
     T fill_value = 0;
@@ -402,33 +419,61 @@ frpr_workspace_impl<T>::frpr_workspace_impl(const long long prec, const std::uin
     : m_prec(prec), m_degree(degree),
       m_jit_data(std::make_shared<frpr_workspace_jit_data<T>>((s == nullptr) ? llvm_state{} : s->make_similar())),
       m_vector_cache(frpr_workspace_impl_make_vector_cache<T>(prec, degree))
+#if defined(HEYOKA_HAVE_REAL)
+      ,
+      m_vector_cache_3n(
+          frpr_workspace_impl_make_vector_cache<mppp::real>(frpr_workspace_impl_get_prec_3n<T>(prec), degree))
+#endif
 {
     // JIT setup.
 
     // Fetch the internal scalar type corresponding to T.
-    auto *fp_t = to_internal_llvm_type<T>(m_jit_data->m_state, prec);
+    auto *const fp_t = to_internal_llvm_type<T>(m_jit_data->m_state, prec);
 
     // Add the JIT functions.
     frpr_workspace_add_bernstein("bernstein", m_jit_data->m_state, fp_t, m_degree);
     frpr_workspace_add_de_casteljau("decasteljau", m_jit_data->m_state, fp_t, m_degree);
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    const auto prec_3n = frpr_workspace_impl_get_prec_3n<T>(prec);
+    auto *const fp_3n_t = to_internal_llvm_type<mppp::real>(m_jit_data->m_state, prec_3n);
+    frpr_workspace_add_bernstein("bernstein_3n", m_jit_data->m_state, fp_3n_t, m_degree);
+    frpr_workspace_add_de_casteljau("decasteljau_3n", m_jit_data->m_state, fp_3n_t, m_degree);
+
+#endif
+
     // Compile and fetch the pointers.
     m_jit_data->m_state.compile();
+
     m_jit_data->m_bernstein_func
         = reinterpret_cast<frpr_workspace_jit_data<T>::bernstein_func_t>(m_jit_data->m_state.jit_lookup("bernstein"));
     m_jit_data->m_decasteljau_func = reinterpret_cast<frpr_workspace_jit_data<T>::decasteljau_func_t>(
         m_jit_data->m_state.jit_lookup("decasteljau"));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    m_jit_data->m_bernstein_func_3n = reinterpret_cast<frpr_workspace_jit_data<T>::bernstein_func_3n_t>(
+        m_jit_data->m_state.jit_lookup("bernstein_3n"));
+    m_jit_data->m_decasteljau_func_3n = reinterpret_cast<frpr_workspace_jit_data<T>::decasteljau_func_3n_t>(
+        m_jit_data->m_state.jit_lookup("decasteljau_3n"));
+
+#endif
 }
 
 // Copy constructor.
 //
-// For the scratch data, we adopt the policy of a fresh init - empty m_intervals, empty m_wlist and an empty vector
-// cache inited with the width and fill value from other.
+// For the scratch data, we adopt the policy of a fresh init - empty m_intervals, empty working lists and empty vector
+// caches inited with the widths and fill values from other.
 template <typename T>
 frpr_workspace_impl<T>::frpr_workspace_impl(const frpr_workspace_impl &other)
     : m_prec(other.m_prec), m_degree(other.m_degree), m_jit_data(other.m_jit_data),
       // NOTE: the cache copy ctor will only copy the fill value and the width, not the content.
       m_vector_cache(other.m_vector_cache)
+#if defined(HEYOKA_HAVE_REAL)
+      ,
+      m_vector_cache_3n(other.m_vector_cache_3n)
+#endif
 {
 }
 
@@ -475,6 +520,38 @@ HEYOKA_DETAIL_FRPR_WORKSPACE_IMPL_INST(mppp::real);
 #endif
 
 #undef HEYOKA_DETAIL_FRPR_WORKSPACE_IMPL_INST
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Helper to deduce the precision to use for the extended-precision pass during real root isolation.
+//
+// The prec argument is relevant only if T is mppp::real.
+template <typename T>
+long long frpr_workspace_impl_get_prec_3n([[maybe_unused]] const long long prec)
+{
+    using safe_ll_t = boost::safe_numerics::safe<long long>;
+
+    if constexpr (std::same_as<T, mppp::real>) {
+        return safe_ll_t(prec) * 3;
+    } else {
+        return safe_ll_t(std::numeric_limits<T>::digits) * 3;
+    }
+}
+
+// Explicit instantiations.
+template long long frpr_workspace_impl_get_prec_3n<float>(long long);
+template long long frpr_workspace_impl_get_prec_3n<double>(long long);
+template long long frpr_workspace_impl_get_prec_3n<long double>(long long);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template long long frpr_workspace_impl_get_prec_3n<mppp::real128>(long long);
+
+#endif
+
+template long long frpr_workspace_impl_get_prec_3n<mppp::real>(long long);
+
+#endif
 
 } // namespace detail
 
