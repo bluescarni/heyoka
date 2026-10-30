@@ -759,9 +759,9 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
     assert(std::ranges::all_of(args.begin() + 1, args.end(),
                                [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
 
-    const auto nargs = args.size();
+    [[maybe_unused]] const auto nargs = args.size();
 
-    auto &builder = s.builder();
+    [[maybe_unused]] auto &builder = s.builder();
 
     // Determine the type and scalar type of the arguments.
     auto *x_t = args[0]->getType();
