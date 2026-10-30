@@ -109,7 +109,7 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
     // extra factor of 2 is a safety margin for the undecided intervals, which are also bisected. n + 1 is used instead
     // of n so that the cap is nonzero for n == 0.
     using safe_uint64_t = boost::safe_numerics::safe<std::uint64_t>;
-    const auto pp1 = [&]() {
+    const auto pp1 = [&] {
         if constexpr (std::same_as<T, mppp::real>) {
             return safe_uint64_t(orig_h.get_prec()) + 1;
         } else {
