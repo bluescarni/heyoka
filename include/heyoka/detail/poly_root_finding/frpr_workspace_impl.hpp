@@ -85,9 +85,8 @@ struct frpr_workspace_impl {
     // cached_vector (e.g., m_wlist).
     vector_cache<T> m_vector_cache;
     // Value type for the working list m_wlist. It contains a half-open interval [lo, hi) paired with the rescaled
-    // polynomial the rescaled polynomial q(tau) = p(h*tau) represented in the Bernstein basis of [lo, hi] with interval
-    // coefficients. The polynomial is stored in the usual flattened out layout with negated lower bounds for the
-    // interval coefficients.
+    // polynomial q(tau) = p(h*tau) represented in the Bernstein basis of [lo, hi] with interval coefficients. The
+    // polynomial is stored in the usual flattened out layout with negated lower bounds for the interval coefficients.
     struct wlist_item {
         T lo{};
         T hi{};
