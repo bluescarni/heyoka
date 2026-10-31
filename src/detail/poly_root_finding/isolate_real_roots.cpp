@@ -336,6 +336,17 @@ void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_i
         assert(!cur.sign || *cur.sign == 1 || *cur.sign == -1 || *cur.sign == 0);
         assert(cur.type == irr_interval_type::undecided || cur.type == irr_interval_type::isolating);
 
+#if defined(HEYOKA_HAVE_REAL)
+
+        if constexpr (std::same_as<T, mppp::real>) {
+            // Check the precision of the bounds against lb_tau, which has the precision of the workspace (see the
+            // preconditions).
+            assert(cur.lo.get_prec() == lb_tau.get_prec());
+            assert(cur.hi.get_prec() == lb_tau.get_prec());
+        }
+
+#endif
+
         if (cur.type == irr_interval_type::undecided) {
             assert(!cur.sign);
             assert(cur.lo < cur.hi);
