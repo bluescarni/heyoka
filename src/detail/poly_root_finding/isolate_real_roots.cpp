@@ -299,8 +299,9 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
 
 #endif
 
-// Helper to validate, in debug mode, the output of isolate_real_roots and to satisfy the properties documented for
-// irr_interval.
+// Helper to validate, in debug mode, the output of isolate_real_roots(): the intervals must satisfy the properties
+// documented for irr_interval and in isolate_real_roots(), they must be disjoint, and they must be sorted in increasing
+// order of tau.
 template <typename T>
 void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_interval<T>> &isol_ivals,
                                         [[maybe_unused]] const T &lb_tau)
@@ -309,7 +310,6 @@ void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_i
 
     using std::isfinite;
 
-    // NOTE: we expect isol_ivals to contain disjoint intervals in increasing order of tau.
     for (decltype(isol_ivals.size()) i = 0; i < isol_ivals.size(); ++i) {
         const auto &cur = isol_ivals[i];
 
