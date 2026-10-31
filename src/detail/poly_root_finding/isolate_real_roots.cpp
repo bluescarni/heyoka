@@ -161,6 +161,11 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
             return false;
         }
 
+        // NOTE: the body of this loop mirrors the loop in isolate_real_roots(), with two differences: undecided
+        // intervals are bisected too (see below), and the extended-precision work list, vector cache and JIT functions
+        // are used. Removing the duplication would require restructuring the logical flow, so for now the two loops are
+        // kept separate.
+
         // Pop the current item from wlist_3n.
         const auto [lo, hi, cur_poly] = std::move(wlist_3n.back());
         wlist_3n.pop_back();
@@ -260,6 +265,8 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
         //
         // If b_0 is [0, 0], the root at lo is not reported here: it will be reported once, either by the left half
         // starting at lo whose sign-change count drops to 0, or as part of an undecided interval starting at lo.
+
+        // Avoid bisecting if the interval is too small, and report it as undecided.
         if (hi - lo < min_width) {
             isol_ivals.emplace_back(lo, hi, irr_interval_type::undecided, std::nullopt);
 
