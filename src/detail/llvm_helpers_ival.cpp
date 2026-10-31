@@ -633,9 +633,8 @@ llvm::Value *llvm_ival_guard::ival_add(llvm::Value *const a, llvm::Value *const 
     if (const auto *const ival_t = m_impl->m_ival_t; ival_t->isVectorTy()) {
         auto &s = m_impl->m_state;
 
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, a);
             auto *const bw = avx512_widen_vec2(s, b);
@@ -645,14 +644,13 @@ llvm::Value *llvm_ival_guard::ival_add(llvm::Value *const a, llvm::Value *const 
 
             // Narrow back to the first two lanes.
             return avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just add the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             return llvm_fadd(s, a, b);
         }
+        // LCOV_EXCL_STOP
     } else {
         assert(ival_t->isStructTy());
 
@@ -747,9 +745,8 @@ llvm::Value *llvm_ival_guard::ival_mul_zlb(llvm::Value *const a, llvm::Value *co
 
         // Compute the multiplications with a single rounding-up size-2 vector mul.
         llvm::Value *mul_res = nullptr;
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, a);
             auto *const bw = avx512_widen_vec2(s, b_vec);
@@ -759,14 +756,13 @@ llvm::Value *llvm_ival_guard::ival_mul_zlb(llvm::Value *const a, llvm::Value *co
 
             // Narrow back to the first two lanes.
             mul_res = avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just mul the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             mul_res = llvm_fmul(s, a, b_vec);
         }
+        // LCOV_EXCL_STOP
 
         // Run the max with zero.
         auto *const zero = llvm_constantfp(s, ival_t, 0.);
@@ -841,9 +837,8 @@ llvm::Value *llvm_ival_guard::ival_mul_nn_val(llvm::Value *const a, llvm::Value 
 
         // Compute the multiplications with a single rounding-up size-2 vector mul.
         llvm::Value *mul_res = nullptr;
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, a);
             auto *const bw = avx512_widen_vec2(s, b_vec);
@@ -853,14 +848,13 @@ llvm::Value *llvm_ival_guard::ival_mul_nn_val(llvm::Value *const a, llvm::Value 
 
             // Narrow back to the first two lanes.
             mul_res = avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just mul the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             mul_res = llvm_fmul(s, a, b_vec);
         }
+        // LCOV_EXCL_STOP
 
         return mul_res;
     } else {
@@ -938,9 +932,8 @@ llvm::Value *llvm_ival_guard::val_mul_nn_ival(llvm::Value *const a, llvm::Value 
 
         // Compute the multiplications with a single rounding-up size-2 vector mul.
         llvm::Value *mul_res = nullptr;
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, abs_a_vec);
             auto *const bw = avx512_widen_vec2(s, b);
@@ -950,14 +943,13 @@ llvm::Value *llvm_ival_guard::val_mul_nn_ival(llvm::Value *const a, llvm::Value 
 
             // Narrow back to the first two lanes.
             mul_res = avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just mul the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             mul_res = llvm_fmul(s, abs_a_vec, b);
         }
+        // LCOV_EXCL_STOP
 
         // NOTE: the computation of the result requires swapping around the mul_res components if a is negative.
         // Moreover, if a==0, we want to forcibly set the result to zero in order to avoid generating NaNs via 0*inf
@@ -1075,9 +1067,8 @@ llvm::Value *llvm_ival_guard::ival_div_pos_val(llvm::Value *const a, llvm::Value
         auto *const b_vec = bld.CreateVectorSplat(2, b);
 
         llvm::Value *div_res = nullptr;
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, a);
             auto *const bw = avx512_widen_vec2(s, b_vec);
@@ -1087,14 +1078,13 @@ llvm::Value *llvm_ival_guard::ival_div_pos_val(llvm::Value *const a, llvm::Value
 
             // Narrow back to the first two lanes.
             div_res = avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just div the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             div_res = llvm_fdiv(s, a, b_vec);
         }
+        // LCOV_EXCL_STOP
 
         return div_res;
     } else {
@@ -1170,9 +1160,8 @@ llvm::Value *llvm_ival_guard::ival_div_pos_ival(llvm::Value *const a, llvm::Valu
         auto *const divisor = bld.CreateSelect(mask, yes_div, no_div);
 
         // Divide a by the divisors.
+        // LCOV_EXCL_START
         if (m_impl->m_mode == ival_mode::avx512) {
-            // LCOV_EXCL_START
-
             // Widen to full 512-bit vectors.
             auto *const aw = avx512_widen_vec2(s, a);
             auto *const dw = avx512_widen_vec2(s, divisor);
@@ -1182,14 +1171,13 @@ llvm::Value *llvm_ival_guard::ival_div_pos_ival(llvm::Value *const a, llvm::Valu
 
             // Narrow back to the first two lanes.
             return avx512_shrink_to_vec2(s, rw);
-
-            // LCOV_EXCL_STOP
         } else {
             // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
             // builder is set up to emit constrained operations, hence we can just div the vectors component-wise.
             assert(m_impl->m_mode == ival_mode::portable);
             return llvm_fdiv(s, a, divisor);
         }
+        // LCOV_EXCL_STOP
     } else {
         assert(ival_t->isStructTy());
 

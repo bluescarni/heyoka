@@ -230,6 +230,20 @@ TEST_CASE("multiple root at split point")
     check_correct(ivals, {{rat_t(1, 2), 0}});
 }
 
+TEST_CASE("multiple root below the minimum width")
+{
+    // p(t) = (t - 3)**2, with a double root at tau = 3/10. All the computations in the isolation are exact for this
+    // polynomial, thus the sign-change count stays exactly 2 on the intervals containing the root, which are bisected
+    // down to the minimum width. The root is then reported in a single undecided interval smaller than the minimum
+    // width.
+    const auto ivals = run_isolation({9., -6., 1.}, 10., 0.);
+
+    REQUIRE(ivals.size() == 1u);
+    REQUIRE(has_undecided(ivals));
+    REQUIRE(!has_wide_undecided(ivals));
+    check_correct(ivals, {{rat_t(3, 10), 0}});
+}
+
 TEST_CASE("no roots")
 {
     // p(t) = t**2 + 1.
@@ -382,6 +396,50 @@ TEST_CASE("extended precision cooldown")
 
     REQUIRE(ivals.size() == 2u);
     REQUIRE(!has_undecided(ivals));
+
+#endif
+}
+
+TEST_CASE("extended precision root at lo")
+{
+    // In both polynomials below, the close roots of the "close roots" test are needed to trigger the
+    // extended-precision pass, and there is an additional root at tau = 0. Here we check the sign of the root at
+    // tau = 0 in the extended-precision pass (if available).
+    const auto delta = std::ldexp(1., -50);
+
+    // p(t) = -t*(3t - 1)(3t - 1 - delta). The conversion to the Bernstein basis divides by 3. The derivative is
+    // negative at tau = 0 and at the larger close root, positive at the smaller one.
+    auto ivals = run_isolation({0., -(1. + delta), 6. + 3. * delta, -9.}, 1., 0.);
+    check_correct(ivals, {{rat_t(0), -1}, {rat_t(1, 3), 1}, {(1 + to_rat(delta)) / 3, -1}});
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(ivals.size() == 3u);
+    REQUIRE(!has_undecided(ivals));
+    REQUIRE(has_root_at(ivals, 0., -1));
+
+#else
+
+    REQUIRE(has_wide_undecided(ivals));
+
+#endif
+
+    // p(t) = t**2*(3t - 1)(3t - 1 - delta), with a double root at tau = 0. The conversion to the Bernstein basis
+    // divides by 6. The first two Bernstein coefficients are exactly [0, 0] on all the intervals starting at tau = 0,
+    // thus the sign of the root at tau = 0 is zero. The derivative is negative at the smaller close root, positive at
+    // the larger one.
+    ivals = run_isolation({0., 0., 1. + delta, -(6. + 3. * delta), 9.}, 1., 0.);
+    check_correct(ivals, {{rat_t(0), 0}, {rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(ivals.size() == 3u);
+    REQUIRE(!has_undecided(ivals));
+    REQUIRE(has_root_at(ivals, 0., 0));
+
+#else
+
+    REQUIRE(has_wide_undecided(ivals));
 
 #endif
 }

@@ -72,9 +72,11 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
 
     if (ws.m_impl->get_degree() != cfs.size() - 1u) [[unlikely]] {
         throw std::invalid_argument(
+            // LCOV_EXCL_START
             fmt::format("find_real_poly_roots() was invoked with inconsistent arguments: the polynomial "
                         "degree from the workspace is {}, while the polynomial degree inferred from the list of "
                         "coefficients is {}",
+                        // LCOV_EXCL_STOP
                         ws.m_impl->get_degree(), cfs.size() - 1u));
     }
 
