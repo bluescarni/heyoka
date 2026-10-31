@@ -285,17 +285,75 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
         const auto mid = isolate_real_roots_div_2(lo) + isolate_real_roots_div_2(hi);
         assert(lo < mid && mid < hi);
 
+        // NOTE: add the right before the left, so that the left is consumed first and isol_ivals will be sorted in tau
+        // chronological order.
+        wlist_3n.emplace_back(mid, hi, std::move(right_poly));
         // NOTE: don't add the left split if it falls entirely before lb_tau.
         if (lb_tau < mid) {
             wlist_3n.emplace_back(lo, mid, std::move(left_poly));
         }
-        wlist_3n.emplace_back(mid, hi, std::move(right_poly));
     }
 
     return true;
 }
 
 #endif
+
+// Helper to validate, in debug mode, the output of isolate_real_roots and to satisfy the properties documented for
+// irr_interval.
+template <typename T>
+void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_interval<T>> &isol_ivals,
+                                        [[maybe_unused]] const T &lb_tau)
+{
+#if !defined(NDEBUG)
+
+    using std::isfinite;
+
+    // NOTE: we expect isol_ivals to contain disjoint intervals in increasing order of tau.
+    for (decltype(isol_ivals.size()) i = 0; i < isol_ivals.size(); ++i) {
+        const auto &cur = isol_ivals[i];
+
+        assert(isfinite(cur.lo));
+        assert(isfinite(cur.hi));
+        assert(cur.lo >= 0);
+        assert(cur.lo < 1);
+        assert(cur.hi <= 1);
+        assert(cur.lo <= cur.hi);
+        if (cur.lo == cur.hi) {
+            // A root exactly at lo is reported only if it is not within [0, lb_tau).
+            assert(cur.lo >= lb_tau);
+        } else {
+            // Intervals lying entirely within [0, lb_tau) are not reported, but an interval may start before lb_tau.
+            assert(cur.hi > lb_tau);
+        }
+        assert(!cur.sign || *cur.sign == 1 || *cur.sign == -1 || *cur.sign == 0);
+        assert(cur.type == irr_interval_type::undecided || cur.type == irr_interval_type::isolating);
+
+        if (cur.type == irr_interval_type::undecided) {
+            assert(!cur.sign);
+            assert(cur.lo < cur.hi);
+        } else if (cur.lo < cur.hi) {
+            assert(cur.sign && (*cur.sign == 1 || *cur.sign == -1));
+        }
+
+        if (i == 0u) {
+            continue;
+        }
+
+        const auto &prev = isol_ivals[i - 1u];
+
+        if (prev.lo == prev.hi) {
+            // prev is a root exactly at prev.lo: cur must start strictly after it.
+            assert(prev.hi < cur.lo);
+        } else {
+            // prev is either an open isolating interval (prev.lo, prev.hi) or a half-open undecided interval
+            // [prev.lo, prev.hi). Neither contains prev.hi, thus cur may start exactly there.
+            assert(prev.hi <= cur.lo);
+        }
+    }
+
+#endif
+}
 
 } // namespace
 
@@ -317,6 +375,8 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
 // - lb_tau is in [0, 1);
 // - for mppp::real, cfs, h and lb_tau have the precision of ws;
 // - at least one coefficient in cfs is nonzero (the rule of signs requires a nonzero polynomial).
+//
+// The return value is guaranteed to be sorted in increasing order of tau and to contain disjoint intervals.
 template <typename T>
 const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, const std::span<const T> cfs,
                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -531,11 +591,13 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         const auto mid = isolate_real_roots_div_2(lo) + isolate_real_roots_div_2(hi);
         assert(lo < mid && mid < hi);
 
+        // NOTE: add the right before the left, so that the left is consumed first and isol_ivals will be sorted in tau
+        // chronological order.
+        wlist.emplace_back(mid, hi, std::move(right_poly));
         // NOTE: don't add the left split if it falls entirely before lb_tau.
         if (lb_tau < mid) {
             wlist.emplace_back(lo, mid, std::move(left_poly));
         }
-        wlist.emplace_back(mid, hi, std::move(right_poly));
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -556,6 +618,9 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
     }
 
 #endif
+
+    // Debug-mode validation of isol_ivals.
+    isolate_real_roots_validate_output(isol_ivals, lb_tau);
 
     return isol_ivals;
 }

@@ -177,6 +177,22 @@ TEST_CASE("root at zero")
     check_correct(ivals, {{rat_t(3, 10), 1}});
 }
 
+TEST_CASE("interval starting within the cooldown")
+{
+    // p(t) = t - 3, root at tau = 3/10, with a cooldown ending at tau = 1/10. The initial interval [0, 1) is already
+    // isolating, and it is reported even though it starts within the cooldown: only the intervals lying entirely within
+    // the cooldown are not reported.
+    const auto ivals = run_isolation({-3., 1.}, 10., 0.1);
+
+    REQUIRE(ivals.size() == 1u);
+    REQUIRE(ivals[0].type == detail::irr_interval_type::isolating);
+    REQUIRE(ivals[0].lo == 0.);
+    REQUIRE(ivals[0].hi == 1.);
+
+    // The derivative is positive at the root.
+    check_correct(ivals, {{rat_t(3, 10), 1}});
+}
+
 TEST_CASE("root at split point")
 {
     // p(t) = (t - 5)(t - 8), roots at tau = 1/2 (the first bisection point) and tau = 4/5. The derivative is negative
