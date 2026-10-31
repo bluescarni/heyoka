@@ -12,9 +12,10 @@ we need to emphasise a couple of very important **caveats**:
 
 * currently, heyoka supports serialisation only to/from binary archives;
 * the serialisation format is platform-dependent and it also depends
-  on the versions of heyoka, LLVM and Boost. Thus, the serialised
-  representation of heyoka objects is **not portable** across platforms
-  or across different versions of heyoka or its dependencies. Do **not**
+  on the versions of heyoka, LLVM and Boost, and on heyoka's build configuration.
+  Thus, the serialised representation of heyoka objects is **not portable** across platforms
+  or across different versions of heyoka or its dependencies, or across different build
+  configurations of heyoka. Do **not**
   try to use the serialised representation of heyoka objects as an exchange
   format, as this will result in undefined behaviour;
 * heyoka does not make any attempt to validate the state of a deserialised object.
@@ -34,7 +35,8 @@ Let us repeat again these warnings for visibility:
    to the execution of malicious code.
 
    Do **not** use heyoka archives as a data exchange format, and make sure that
-   all the archives you load from have been produced with the same versions of heyoka,
+   all the archives you load from have been produced with the same versions of heyoka
+   (including build configuration),
    LLVM and Boost that you are currently using.
 
 With these warnings out of the way, let us proceed to the code.

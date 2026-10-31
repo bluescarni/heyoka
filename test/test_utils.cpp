@@ -2,11 +2,16 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cfenv>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <utility>
 #include <vector>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -20,6 +25,7 @@
 
 #endif
 
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/mdspan.hpp>
@@ -206,5 +212,223 @@ compare_batch_scalar<mppp::real128>(const std::vector<std::pair<heyoka::expressi
                                     bool, bool, std::mt19937 &, float, float, mppp::real128);
 
 #endif
+
+// Convert the finite value x of type T exactly to a rational.
+//
+// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
+// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
+// range of double.
+template <typename T>
+boost::multiprecision::cpp_rational to_rat(T x)
+{
+    using rat = boost::multiprecision::cpp_rational;
+
+    rat ret = 0;
+
+    while (x != 0) {
+        const auto d = static_cast<double>(x);
+        ret += rat(d);
+        x -= static_cast<T>(d);
+    }
+
+    return ret;
+}
+
+template boost::multiprecision::cpp_rational to_rat<float>(float x);
+template boost::multiprecision::cpp_rational to_rat<double>(double x);
+template boost::multiprecision::cpp_rational to_rat<long double>(long double x);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template boost::multiprecision::cpp_rational to_rat<mppp::real128>(mppp::real128 x);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template boost::multiprecision::cpp_rational to_rat<mppp::real>(mppp::real x);
+
+#endif
+
+namespace
+{
+
+// Add a and b.
+template <typename T>
+T test_add(T a, T b)
+{
+    return a + b;
+}
+
+// Multiply a and b.
+template <typename T>
+T test_mul(T a, T b)
+{
+    return a * b;
+}
+
+} // namespace
+
+// Check whether addition in the type T honours the rounding mode set via std::fesetround(). Software-emulated
+// quadruple-precision arithmetic may not honour it.
+template <typename T>
+bool add_honours_rounding()
+{
+    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the addition at compile
+    // time nor move it across the changes of rounding mode.
+    T (*volatile f)(T, T) = &test_add<T>;
+
+    const T eps = std::numeric_limits<T>::epsilon();
+
+    REQUIRE(std::fesetround(FE_UPWARD) == 0);
+    const T res = f(T(1), eps / 4);
+    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
+
+    // The exact sum is 1 + eps / 4: rounding up gives 1 + eps, rounding to nearest 1.
+    return res > 1;
+}
+
+// Check whether multiplication in the type T honours the rounding mode set via std::fesetround(). This is not the case
+// for the software-emulated quadruple precision of LLVM's compiler-rt (used, e.g., on FreeBSD), whose multiplication
+// always rounds to nearest.
+template <typename T>
+bool mul_honours_rounding()
+{
+    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the multiplication at
+    // compile time nor move it across the changes of rounding mode.
+    T (*volatile f)(T, T) = &test_mul<T>;
+
+    const T eps = std::numeric_limits<T>::epsilon();
+    const T x = 1 + eps;
+
+    REQUIRE(std::fesetround(FE_UPWARD) == 0);
+    const T res = f(x, x);
+    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
+
+    // The exact product is 1 + 2 * eps + eps * eps: rounding up gives 1 + 3 * eps, rounding to nearest 1 + 2 * eps.
+    return res > 1 + 2 * eps;
+}
+
+// Check whether the arithmetic of the type T honours the rounding mode, as required by the tests of the interval
+// arithmetic primitives. Only the IEEE binary128 types are checked, via add_honours_rounding() and
+// mul_honours_rounding(), because their arithmetic may be software-emulated. The other types are assumed to honour the
+// rounding mode.
+template <typename T>
+bool ival_arith_supported()
+{
+    if constexpr (heyoka::detail::is_ieee754_binary128<T>) {
+        return add_honours_rounding<T>() && mul_honours_rounding<T>();
+    } else {
+        return true;
+    }
+}
+
+// Generate a random value of type T approximately uniformly distributed in [lo, hi]. The value is the sum of two
+// doubles, thus for the types wider than double it can have up to about 106 significant bits.
+template <typename T>
+T rand_uniform(std::mt19937 &rng, double lo, double hi)
+{
+    std::uniform_real_distribution<double> dist(lo, hi);
+
+    // NOTE: the second double is scaled by 2**-53, so that its bits extend those of the first one.
+    return static_cast<T>(dist(rng)) + static_cast<T>(dist(rng)) * static_cast<T>(0x1p-53);
+}
+
+template bool add_honours_rounding<float>();
+template bool add_honours_rounding<double>();
+template bool add_honours_rounding<long double>();
+
+template bool mul_honours_rounding<float>();
+template bool mul_honours_rounding<double>();
+template bool mul_honours_rounding<long double>();
+
+template bool ival_arith_supported<float>();
+template bool ival_arith_supported<double>();
+template bool ival_arith_supported<long double>();
+
+template float rand_uniform<float>(std::mt19937 &, double, double);
+template double rand_uniform<double>(std::mt19937 &, double, double);
+template long double rand_uniform<long double>(std::mt19937 &, double, double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template bool add_honours_rounding<mppp::real128>();
+template bool mul_honours_rounding<mppp::real128>();
+template bool ival_arith_supported<mppp::real128>();
+template mppp::real128 rand_uniform<mppp::real128>(std::mt19937 &, double, double);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Generate a random value of type mppp::real with precision prec approximately uniformly distributed in [lo, hi]. As in
+// rand_uniform(), the value is the sum of two doubles, thus for the precisions higher than double's it can have up to
+// about 106 significant bits.
+mppp::real rand_uniform_real(std::mt19937 &rng, double lo, double hi, ::mpfr_prec_t prec)
+{
+    std::uniform_real_distribution<double> dist(lo, hi);
+
+    const auto a = dist(rng);
+    const auto b = dist(rng);
+
+    // NOTE: the second double is scaled by 2**-53, so that its bits extend those of the first one.
+    return mppp::real{a, prec} + mppp::real{b, prec} * mppp::real{0x1p-53, prec};
+}
+
+#endif
+
+// The largest finite value of the type T, as a rational.
+//
+// NOTE: the largest finite value is (2**p - 1) * 2**(e - p), where p is the number of significand bits and e is the
+// maximum exponent, as defined by std::numeric_limits.
+template <typename T>
+boost::multiprecision::cpp_rational max_rat()
+{
+    using boost::multiprecision::cpp_int;
+
+    constexpr auto p = static_cast<unsigned>(std::numeric_limits<T>::digits);
+    constexpr auto e = static_cast<unsigned>(std::numeric_limits<T>::max_exponent);
+
+    return boost::multiprecision::cpp_rational(((cpp_int(1) << p) - 1) << (e - p));
+}
+
+template boost::multiprecision::cpp_rational max_rat<float>();
+template boost::multiprecision::cpp_rational max_rat<double>();
+template boost::multiprecision::cpp_rational max_rat<long double>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template boost::multiprecision::cpp_rational max_rat<mppp::real128>();
+
+#endif
+
+// The product of the rational c and the interval x.
+rat_ival ival_scale(const boost::multiprecision::cpp_rational &c, const rat_ival &x)
+{
+    if (c >= 0) {
+        return {c * x.lo, c * x.hi};
+    } else {
+        return {c * x.hi, c * x.lo};
+    }
+}
+
+// The sum of the intervals x and y.
+rat_ival ival_add(const rat_ival &x, const rat_ival &y)
+{
+    return {x.lo + y.lo, x.hi + y.hi};
+}
+
+// The binomial coefficient C(m, k), with k <= m.
+boost::multiprecision::cpp_int exact_binomial(std::uint32_t m, std::uint32_t k)
+{
+    boost::multiprecision::cpp_int ret = 1;
+
+    // NOTE: after the iteration i, ret is C(m - k + i, i).
+    for (std::uint32_t i = 1; i <= k; ++i) {
+        ret = ret * (m - k + i) / i;
+    }
+
+    return ret;
+}
 
 } // namespace heyoka_test

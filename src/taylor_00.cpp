@@ -85,7 +85,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 
 // Helper to compute the scaling + safety factor
 // in taylor_determine_h().
-number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t order)
+number taylor_determine_h_rhofac(llvm_state &s, const llvm::Type *const fp_t, std::uint32_t order)
 {
     assert(fp_t != nullptr);
     assert(order > 0u);

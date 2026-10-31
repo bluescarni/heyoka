@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <ostream>
 #include <random>
@@ -26,6 +27,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/containers/xfixed.hpp>
@@ -298,6 +300,52 @@ bool ir_contains(const auto &ta, const char *str)
         return boost::contains(std::get<0>(ta.get_llvm_state()).get_ir(), str);
     }
 }
+
+// Convert the finite value x of type T exactly to a rational.
+template <typename T>
+boost::multiprecision::cpp_rational to_rat(T);
+
+// Check whether addition in the type T honours the rounding mode set via std::fesetround().
+template <typename T>
+bool add_honours_rounding();
+
+// Check whether multiplication in the type T honours the rounding mode set via std::fesetround().
+template <typename T>
+bool mul_honours_rounding();
+
+// Check whether the arithmetic of the type T honours the rounding mode, as required by the tests of the interval
+// arithmetic primitives.
+template <typename T>
+bool ival_arith_supported();
+
+// Generate a random value of type T approximately uniformly distributed in [lo, hi].
+template <typename T>
+T rand_uniform(std::mt19937 &, double, double);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// Generate a random value of type mppp::real with precision prec approximately uniformly distributed in [lo, hi].
+mppp::real rand_uniform_real(std::mt19937 &, double, double, ::mpfr_prec_t);
+
+#endif
+
+// The largest finite value of the type T, as a rational.
+template <typename T>
+boost::multiprecision::cpp_rational max_rat();
+
+// An interval with rational bounds.
+struct rat_ival {
+    boost::multiprecision::cpp_rational lo, hi;
+};
+
+// The product of the rational c and the interval x.
+rat_ival ival_scale(const boost::multiprecision::cpp_rational &, const rat_ival &);
+
+// The sum of the intervals x and y.
+rat_ival ival_add(const rat_ival &, const rat_ival &);
+
+// The binomial coefficient C(m, k), with k <= m.
+boost::multiprecision::cpp_int exact_binomial(std::uint32_t, std::uint32_t);
 
 } // namespace heyoka_test
 
