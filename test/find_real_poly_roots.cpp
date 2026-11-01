@@ -444,6 +444,40 @@ TEST_CASE("extended precision root at lo")
 #endif
 }
 
+TEST_CASE("undecided interval without real roots")
+{
+    // p(t) = t**2 - 2*a*t + c0, with a = 2**-38 + 2**-54 + 2**-90 and c0 the double just above a**2. The coefficients
+    // are exactly representable. The roots are a +- i*b, with b**2 = c0 - a**2 > 0 and b ~ 2**-64: there are no real
+    // roots, but the complex pair is much closer to the real axis than the minimum width. The intervals containing a
+    // keep 2 sign changes down to the minimum width, thus the root isolation reports an undecided interval around a,
+    // although there is no real root in it (a false positive).
+    //
+    // NOTE: a must be far (relative to b**2/eps) from the bisection points, otherwise the intervals starting or ending
+    // close to a would have no sign changes and the complex pair would be resolved.
+    const auto c0 = 0x1.0002000100003p-76;
+    const auto c1 = -0x1.0001000000001p-37;
+    const auto a = -to_rat(c1) / 2;
+
+    // No real roots.
+    REQUIRE(to_rat(c0) > a * a);
+
+    const auto ivals = run_isolation({c0, c1, 1.}, 1., 0.);
+
+    // No root is certified, but there is an undecided interval containing a.
+    check_correct(ivals, {});
+    REQUIRE(std::ranges::any_of(ivals, [&a](const auto &iv) {
+        return iv.type == detail::irr_interval_type::undecided && to_rat(iv.lo) <= a && a < to_rat(iv.hi);
+    }));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // The final undecided interval is smaller than the minimum width.
+    REQUIRE(ivals.size() == 1u);
+    REQUIRE(!has_wide_undecided(ivals));
+
+#endif
+}
+
 #if defined(HEYOKA_HAVE_REAL)
 
 // Test the extended-precision pass with mppp::real.
