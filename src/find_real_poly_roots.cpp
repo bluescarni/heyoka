@@ -9,10 +9,14 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <concepts>
+#include <cstddef>
+#include <limits>
 #include <span>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <fmt/core.h>
@@ -29,17 +33,47 @@
 
 #endif
 
+#include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/poly_root_finding/frpr_workspace_impl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: helpers to compute the next/previous representable floating-point numbers.
+template <typename T>
+T frpr_nextup(T x)
+{
+    using std::nextafter;
+    // NOTE: for mppp::real, the second argument will be an infinity in single precision. This is ok, as
+    // mppp::nextafter() ignores the precision of the second argument and outputs a value with the same precision as the
+    // first argument.
+    return nextafter(std::move(x), static_cast<T>(std::numeric_limits<float>::infinity()));
+}
+
+template <typename T>
+T frpr_nextdown(T x)
+{
+    using std::nextafter;
+    return nextafter(std::move(x), static_cast<T>(-std::numeric_limits<float>::infinity()));
+}
+
+} // namespace
+
+} // namespace detail
+
 // Find the real roots of a polynomial within an interval.
 //
 // The polynomial p(t) is given by its coefficients cfs in the monomial basis, in ascending degree order, so that the
 // polynomial degree is cfs.size() - 1. This function stores in ret the real roots of p(t) for t in [0, h) if h>0, and
-// for t in (h, 0] if h<0. If h==0, ret will be empty.
+// for t in (h, 0] if h<0. If h==0, ret will be empty. If p is the zero polynomial, a single root at t = 0 with dir 0 is
+// reported, unless lb != 0.
 //
 // Every real root of p(t) in this range is reported. Roots that cannot be resolved at the working precision (e.g.,
 // multiple roots, or roots closer to each other than the precision allows) may be reported as a single root, and such a
@@ -70,14 +104,17 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
             "Cannot invoke find_real_poly_roots() with an empty list of polynomial coefficients");
     }
 
-    if (ws.m_impl->get_degree() != cfs.size() - 1u) [[unlikely]] {
+    // Cache for re-use.
+    const auto cfs_size = cfs.size();
+
+    if (ws.m_impl->get_degree() != cfs_size - 1u) [[unlikely]] {
         throw std::invalid_argument(
             // LCOV_EXCL_START
             fmt::format("find_real_poly_roots() was invoked with inconsistent arguments: the polynomial "
                         "degree from the workspace is {}, while the polynomial degree inferred from the list of "
                         "coefficients is {}",
                         // LCOV_EXCL_STOP
-                        ws.m_impl->get_degree(), cfs.size() - 1u));
+                        ws.m_impl->get_degree(), cfs_size - 1u));
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -132,6 +169,83 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
     // No roots are reported if lb covers the entire [0, 1) range.
     if (lb_tau >= 1) {
         return;
+    }
+
+    // Determine the index of the last nonzero coefficient in the polynomial. If all the coefficients are zero,
+    // last_nz_idx is set to cfs_size.
+    auto last_nz_idx = cfs_size;
+    for (std::size_t i = 0; i < cfs_size; ++i) {
+        if (cfs[i] != 0) {
+            last_nz_idx = i;
+        }
+    }
+
+    // Special handling for the zero polynomial: a single root at t = 0 with zero direction (the derivative is exactly
+    // zero), unless lb != 0. isolate_real_roots() requires a nonzero polynomial.
+    if (last_nz_idx == cfs_size) {
+        if (lb == 0) {
+            ret.emplace_back(detail::num_zero_like(h), 0);
+        }
+
+        return;
+    }
+
+    // Special casing for constant non-zero polynomials.
+    if (last_nz_idx == 0u) {
+        return;
+    }
+
+    // Special casing for linear polynomials.
+    if (last_nz_idx == 1u) {
+        // Compute the root.
+        //
+        // NOTE: for mppp::real, this is guaranteed to keep the same precision as the original coefficients.
+        const auto root = -cfs[0] / cfs[1];
+        // Compute a rigorous enclosure for the root. The division is correctly rounded, so the exact root differs from
+        // root by less than one ulp, and it lies within [nextdown(root), nextup(root)].
+        const auto root_lo = detail::frpr_nextdown(root);
+        const auto root_hi = detail::frpr_nextup(root);
+
+        // The direction of the root, that is, the sign of the derivative dp/dt = c1 (which is nonzero here, by
+        // definition of last_nz_idx).
+        assert(cfs[1] != 0);
+        const auto dir = (cfs[1] < 0) ? -1 : 1;
+
+        if (h > 0) {
+            if (root_hi < 0 || root_lo >= h) {
+                // The root is outside [0, h), exit early.
+                return;
+            }
+
+            if (root_lo >= 0 && root_hi < h) {
+                // The root falls within [0, h), add it if it is outside [0, lb).
+                if (root >= lb) {
+                    ret.emplace_back(root, dir);
+                }
+
+                return;
+            }
+
+            // NOTE: if we end up here, it means that the root straddles the bounds of [0, h). We fall through to the
+            // general case.
+        } else {
+            if (root_lo > 0 || root_hi <= h) {
+                // The root is outside (h, 0], exit early.
+                return;
+            }
+
+            if (root_lo > h && root_hi <= 0) {
+                // The root falls within (h, 0], add it if it is outside (-lb, 0].
+                if (root <= -lb) {
+                    ret.emplace_back(root, dir);
+                }
+
+                return;
+            }
+
+            // NOTE: if we end up here, it means that the root straddles the bounds of (h, 0]. We fall through to the
+            // general case.
+        }
     }
 }
 

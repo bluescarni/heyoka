@@ -56,6 +56,18 @@ ivals_t<T> run_isolation(const std::vector<T> &cfs, T h, T lb_tau)
     return detail::isolate_real_roots(ws, std::span<const T>(cfs), h, lb_tau);
 }
 
+// Run find_real_poly_roots() on the polynomial with coefficients cfs (ascending degree order) and return the list of
+// roots.
+template <typename T>
+std::vector<real_poly_root<T>> run_find_roots(const std::vector<T> &cfs, T h, T lb)
+{
+    frpr_workspace<T> ws(static_cast<std::uint32_t>(cfs.size() - 1u));
+    std::vector<real_poly_root<T>> ret;
+    find_real_poly_roots(ret, ws, std::span<const T>(cfs), h, lb);
+
+    return ret;
+}
+
 // Check if two lists of intervals are identical.
 template <typename T>
 bool ivals_equal(const ivals_t<T> &a, const ivals_t<T> &b)
@@ -725,6 +737,99 @@ TEST_CASE("input checks real")
     REQUIRE_THROWS_MATCHES(find_real_poly_roots(ret, ws, span, h, mppp::real{nan, prec}), std::invalid_argument,
                            Message("The lb value passed to find_real_poly_roots() must not be NaN"));
     REQUIRE_THROWS_AS(find_real_poly_roots(ret, ws, span, h, mppp::real{-1., prec}), std::invalid_argument);
+}
+
+#endif
+
+TEST_CASE("find_real_poly_roots zero polynomial")
+{
+    // The zero polynomial is reported as a single root at t = 0 with zero direction, for any degree and either sign of
+    // h, unless lb is nonzero.
+    for (const auto &cfs : {std::vector{0.}, std::vector{0., 0., 0.}}) {
+        for (const auto h : {1., -1.}) {
+            const auto ret = run_find_roots(cfs, h, 0.);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t == 0);
+            REQUIRE(ret[0].dir == 0);
+
+            REQUIRE(run_find_roots(cfs, h, 0.5).empty());
+        }
+    }
+}
+
+TEST_CASE("find_real_poly_roots constant polynomials")
+{
+    // Nonzero constants have no roots, for any degree and either sign of h.
+    for (const auto &cfs : {std::vector{2.}, std::vector{-2., 0., 0.}}) {
+        for (const auto h : {1., -1.}) {
+            REQUIRE(run_find_roots(cfs, h, 0.).empty());
+        }
+    }
+}
+
+TEST_CASE("find_real_poly_roots linear polynomials")
+{
+    // Helper to check that the polynomial with coefficients cfs has a single root at t with direction dir.
+    const auto check_root = [](const std::vector<double> &cfs, double h, double lb, double t, int dir) {
+        const auto ret = run_find_roots(cfs, h, lb);
+        REQUIRE(ret.size() == 1u);
+        REQUIRE(ret[0].t == t);
+        REQUIRE(ret[0].dir == dir);
+    };
+
+    // Roots within the range, for both signs of the derivative and of h. The roots are computed exactly here.
+    check_root({-3., 1.}, 10., 0., 3., 1);
+    check_root({6., -2.}, 10., 0., 3., -1);
+    check_root({3., 1.}, -10., 0., -3., 1);
+    check_root({-6., -2.}, -10., 0., -3., -1);
+
+    // A polynomial of higher degree whose coefficients of degree 2 and higher are all zero.
+    check_root({-3., 1., 0., 0.}, 10., 0., 3., 1);
+
+    // Roots outside the range.
+    REQUIRE(run_find_roots({-30., 1.}, 10., 0.).empty());
+    REQUIRE(run_find_roots({3., 1.}, 10., 0.).empty());
+    REQUIRE(run_find_roots({-3., 1.}, -10., 0.).empty());
+    REQUIRE(run_find_roots({30., 1.}, -10., 0.).empty());
+
+    // Roots in [0, lb) (h > 0) or in (-lb, 0] (h < 0) are not reported, roots exactly at lb or -lb are.
+    REQUIRE(run_find_roots({-3., 1.}, 10., 5.).empty());
+    check_root({-3., 1.}, 10., 3., 3., 1);
+    REQUIRE(run_find_roots({3., 1.}, -10., 5.).empty());
+    check_root({3., 1.}, -10., 3., -3., 1);
+
+    // The return value is cleared out before adding the roots.
+    std::vector<real_poly_root<double>> ret(3);
+    frpr_workspace<double> ws(1);
+    const std::vector cfs = {-3., 1.};
+    find_real_poly_roots(ret, ws, std::span<const double>(cfs), 10.);
+    REQUIRE(ret.size() == 1u);
+    REQUIRE(ret[0].t == 3);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots linear polynomials real")
+{
+    using mppp::real;
+
+    const auto prec = 100;
+    frpr_workspace<real> ws(1, prec);
+    const real h{1, prec};
+    std::vector<real_poly_root<real>> ret;
+
+    // p(t) = 3t - 1, with a root at t = 1/3 (not exactly representable). The root has the precision of the workspace.
+    const std::vector cfs = {real{-1, prec}, real{3, prec}};
+    find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+    REQUIRE(ret.size() == 1u);
+    REQUIRE(ret[0].t.get_prec() == prec);
+    REQUIRE(ret[0].t == real{1, prec} / 3);
+    REQUIRE(ret[0].dir == 1);
+
+    // p(t) = t - 2, with a root outside the range.
+    const std::vector cfs2 = {real{-2, prec}, real{1, prec}};
+    find_real_poly_roots(ret, ws, std::span<const real>(cfs2), h);
+    REQUIRE(ret.empty());
 }
 
 #endif
