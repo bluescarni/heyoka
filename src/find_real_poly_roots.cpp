@@ -84,6 +84,9 @@ T frpr_nextdown(T x)
 // - t in [0, lb) if h>0;
 // - t in (-lb, 0] if h<0.
 //
+// The exclusion is decided on the computed values of the roots, which are subject to rounding: a root lying within
+// rounding error of lb (or -lb) may or may not be reported. If lb is zero, no root is excluded.
+//
 // ws must have been constructed for the degree of p. cfs and h must be finite, and lb must be non-NaN and non-negative.
 // For mppp::real, cfs and h must have the precision of ws, and lb is rounded to it.
 template <typename T>
