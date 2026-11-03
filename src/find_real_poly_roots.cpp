@@ -327,7 +327,11 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
         if (h_sgn == 1) {
             assert(root >= 0);
             if (root >= h) {
+                // LCOV_EXCL_START
+                // NOTE: unreachable in practice: since root_tau < 1, root_tau * h can round to h only if |h| is at the
+                // bottom of the exponent range (e.g., subnormal).
                 root = detail::frpr_nextdown(h);
+                // LCOV_EXCL_STOP
             }
 
             if (root < lb) {
@@ -336,7 +340,10 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
         } else {
             assert(root <= 0);
             if (root <= h) {
+                // LCOV_EXCL_START
+                // NOTE: see above.
                 root = detail::frpr_nextup(h);
+                // LCOV_EXCL_STOP
             }
 
             if (root > mlb) {
@@ -401,8 +408,14 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
             // finding function.
             using std::nextafter;
             if (nextafter(cur_lo, cur_hi) == cur_hi) {
+                // LCOV_EXCL_START
+                // NOTE: unreachable in practice: an isolating interval with adjacent bounds requires bisecting down to
+                // the minimum width in [1/2, 1), which happens only around roots (or complex pairs) closer to each
+                // other than ~2**-p.
+                //
                 // No numbers between lo and hi, report a root at lo directly.
                 add_root(cur_lo, cur_sign);
+                // LCOV_EXCL_STOP
             } else {
                 // lo and hi are suitable for root finding, run it.
                 //
