@@ -20,6 +20,7 @@
 #include <concepts>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -53,6 +54,8 @@ struct frpr_workspace_jit_data {
     using bernstein_func_3n_t = void (*)(mppp::real *, mppp::real *, const mppp::real *, const mppp::real *) noexcept;
     using decasteljau_func_3n_t = void (*)(mppp::real *, mppp::real *, const mppp::real *) noexcept;
 #endif
+    // The root finder function to be used in isolating intervals.
+    using root_finder_func_t = void (*)(const T *, const T *, const std::int32_t *, T *) noexcept;
 
     // The LLVM state.
     llvm_state m_state;
@@ -63,6 +66,7 @@ struct frpr_workspace_jit_data {
     bernstein_func_3n_t m_bernstein_func_3n = nullptr;
     decasteljau_func_3n_t m_decasteljau_func_3n = nullptr;
 #endif
+    root_finder_func_t m_root_finder_func = nullptr;
 
     // NOTE: needed only for s11n.
     frpr_workspace_jit_data();
@@ -105,6 +109,10 @@ struct frpr_workspace_impl {
     };
     // Working list for the real root isolation loop.
     std::vector<wlist_item> m_wlist;
+    // The rescaled polynomial q(tau) = p(h*tau) in the monomial basis, with interval coefficients, stored in the same
+    // layout as wlist_item::poly. It is filled in by isolate_real_roots() so that it can be passed to the root finder
+    // function.
+    std::optional<cached_vector<T>> m_rescaled_poly;
 #if defined(HEYOKA_HAVE_REAL)
     // Vector cache for the extended-precision pass during real root isolation.
     vector_cache<mppp::real> m_vector_cache_3n;

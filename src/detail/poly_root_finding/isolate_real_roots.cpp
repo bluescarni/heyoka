@@ -394,7 +394,58 @@ void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_i
 // - for mppp::real, cfs, h and lb_tau have the precision of ws;
 // - at least one coefficient in cfs is nonzero (the rule of signs requires a nonzero polynomial).
 //
-// The return value is guaranteed to be sorted in increasing order of tau and to contain disjoint intervals.
+// The return value is guaranteed to be sorted in increasing order of tau and to contain disjoint intervals. Every real
+// root of q in [lb_tau, 1) lies in one of the returned intervals (an interval may start before lb_tau).
+//
+// The q(tau) polynomial will be stored in ws.m_impl->m_rescaled_poly (overwriting whatever content may exist there).
+//
+// NOTE: the algorithm implemented here is a variation on the standard bisection-based real root isolation procedure
+// described here:
+//
+// https://en.wikipedia.org/wiki/Real-root_isolation
+//
+// The standard algorithm uses Descartes' rule of signs combined with variable transformations to repeatedly probe the
+// existence of real roots within sub-intervals of an initial interval. Throughout the algorithm, the transformed
+// polynomials are kept represented in the monomial basis. In order to ensure that roots are not missed or misidentified
+// due to floating-point rounding, the standard algorithm is typically implemented in exact arithmetic, and it requires
+// a square-free polynomial as input.
+//
+// Our version of the algorithm differs in several ways.
+//
+// The first difference is that the main bisection loop of the algorithm operates on polynomials represented in the
+// Bernstein basis, instead of the monomial basis. This is mathematically equivalent, but it enables a more efficient
+// implementation because it avoids repeated transformations of variables. The fundamental insight is that the rule of
+// signs can be applied directly to the coefficients in the Bernstein basis, see Theorem 2.22 here:
+//
+// https://publikationen.sulb.uni-saarland.de/bitstream/20.500.11880/26046/1/Dissertation_8200_Eige_Arno_2008.pdf
+//
+// Secondly, in order to improve performance, our version is implemented using floating-point interval arithmetic
+// instead of exact arithmetic. This is an idea from this paper:
+//
+// https://www.sciencedirect.com/science/article/pii/S0377042703007271?via%3Dihub
+//
+// Floating-point interval arithmetic greatly improves performance, but it comes with a conceptual cost: an interval may
+// remain undecided, either because some interval coefficients straddle zero (so that the number of sign changes cannot
+// be determined), or because the number of sign changes is 2 or more and the interval is too small to be bisected at
+// the working precision. Thus a decision needs to be taken on how to handle such undecided intervals, which typically
+// arise for multiple roots, roots very close to each other or complex roots close to the real axis, or when a root is
+// close to the lower/upper bound of an interval.
+//
+// In our implementation, if the first pass leaves undecided intervals wider than the epsilon of the working precision
+// (min_width), the algorithm is re-run from scratch with 3 times the number of binary digits (via mppp::real). In this
+// second pass, undecided intervals are bisected as if the rule of signs had returned 2 or more sign changes, until
+// their width is less than min_width. Although strictly speaking these small undecided intervals are not guaranteed to
+// contain a real root, it can be shown that the value of the polynomial in these intervals will be very close to zero,
+// and they can thus be regarded as roots.
+//
+// The second pass is expected to reduce roots of multiplicity up to 3 to small undecided intervals, so that the
+// algorithm does not require a square-free polynomial as input. Roots of multiplicity 4 or higher may trigger an
+// internal iteration limit in the second pass, in which case the results of the first pass, which may contain wide
+// undecided intervals, are returned.
+//
+// NOTE: a fully exact variant of the algorithm is possible: the second pass could be run in exact integer/rational
+// arithmetic on the square-free part of the polynomial (obtained by dividing out gcd(p, p')). This variant would never
+// produce undecided intervals, at a significantly higher computational cost.
 template <typename T>
 const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, const std::span<const T> cfs,
                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -439,6 +490,10 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
     // Fetch the working list and clear it out.
     auto &wlist = ws.m_impl->m_wlist;
     wlist.clear();
+
+    // Clear out m_rescaled_poly. This makes the previous content of m_rescaled_poly immediately available for use by
+    // the cache.
+    ws.m_impl->m_rescaled_poly.reset();
 
     // Fetch the function pointers.
     auto *const bernstein_f = ws.m_impl->m_jit_data->m_bernstein_func;
@@ -639,6 +694,9 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
 
     // Debug-mode validation of isol_ivals.
     isolate_real_roots_validate_output(isol_ivals, lb_tau);
+
+    // Fill in m_rescaled_poly before returning.
+    ws.m_impl->m_rescaled_poly.emplace(std::move(rescaled_poly));
 
     return isol_ivals;
 }

@@ -10,12 +10,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <numbers>
 #include <optional>
+#include <random>
 #include <span>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -23,14 +27,22 @@
 
 #include <fmt/core.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #if defined(HEYOKA_HAVE_REAL)
 
 #include <mp++/real.hpp>
 
 #endif
 
+#include <heyoka/expression.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -45,6 +57,38 @@ template <typename T>
 using ivals_t = std::vector<detail::irr_interval<T>>;
 
 using rat_t = boost::multiprecision::cpp_rational;
+
+// The floating-point types tested in the find_real_poly_roots() tests.
+const auto fp_types = std::tuple<float, double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+// Check whether the exact value r lies within k floating-point values of x.
+template <typename T>
+bool within_steps(const T &x, const rat_t &r, unsigned k)
+{
+    using std::nextafter;
+
+    // NOTE: the directions are given via the infinity of double converted to T, because std::numeric_limits is not
+    // specialised for mppp::real (its infinity() is zero).
+    const auto inf = static_cast<T>(std::numeric_limits<double>::infinity());
+
+    auto below = x;
+    auto above = x;
+    for (unsigned i = 0; i < k; ++i) {
+        below = nextafter(below, -inf);
+        above = nextafter(above, inf);
+    }
+
+    return to_rat(below) <= r && r <= to_rat(above);
+}
 
 // Run the real-root isolation on the polynomial with coefficients cfs (ascending degree order) and return a copy of
 // the list of intervals.
@@ -77,6 +121,13 @@ bool ivals_equal(const ivals_t<T> &a, const ivals_t<T> &b)
     });
 }
 
+// Check if two lists of roots returned by find_real_poly_roots() are identical.
+template <typename T>
+bool roots_equal(const std::vector<real_poly_root<T>> &a, const std::vector<real_poly_root<T>> &b)
+{
+    return std::ranges::equal(a, b, [](const auto &x, const auto &y) { return x.t == y.t && x.dir == y.dir; });
+}
+
 // Check if ivals contains undecided intervals.
 template <typename T>
 bool has_undecided(const ivals_t<T> &ivals)
@@ -104,9 +155,9 @@ bool has_root_at(const ivals_t<T> &ivals, T x, std::optional<int> sign)
     });
 }
 
-// Check that ivals is a correct output for a polynomial whose real roots in [0, 1), excluding those within the
-// cooldown, are exactly the distinct values in roots, each paired with the sign of the derivative at the root (zero
-// for a multiple root):
+// Check that ivals is a correct output for a polynomial whose real roots in [0, 1), excluding those within
+// [0, lb_tau), are exactly the distinct values in roots, each paired with the sign of the derivative at the root
+// (zero for a multiple root):
 //
 // - an isolating interval (lo, hi) with lo < hi contains exactly one root, and its sign is the sign of that root;
 // - an entry with lo == hi is exactly at a root, and its sign is either empty or the sign of that root;
@@ -180,7 +231,7 @@ TEST_CASE("root at zero")
     REQUIRE(has_root_at(ivals, 0., -1));
     check_correct(ivals, {{rat_t(0), -1}, {rat_t(3, 10), 1}});
 
-    // With a cooldown, the root at zero is not reported.
+    // With a lower bound lb_tau = 0.1, the root at zero is not reported.
     ivals = run_isolation(cfs, 10., 0.1);
 
     REQUIRE(ivals.size() == 1u);
@@ -189,11 +240,11 @@ TEST_CASE("root at zero")
     check_correct(ivals, {{rat_t(3, 10), 1}});
 }
 
-TEST_CASE("interval starting within the cooldown")
+TEST_CASE("interval starting below the lower bound")
 {
-    // p(t) = t - 3, root at tau = 3/10, with a cooldown ending at tau = 1/10. The initial interval [0, 1) is already
-    // isolating, and it is reported even though it starts within the cooldown: only the intervals lying entirely within
-    // the cooldown are not reported.
+    // p(t) = t - 3, root at tau = 3/10, with a lower bound lb_tau = 1/10. The initial interval [0, 1) is already
+    // isolating, and it is reported even though it starts below the lower bound: only the intervals lying entirely
+    // within [0, lb_tau) are not reported.
     const auto ivals = run_isolation({-3., 1.}, 10., 0.1);
 
     REQUIRE(ivals.size() == 1u);
@@ -379,16 +430,16 @@ TEST_CASE("extended precision root at split point")
 #endif
 }
 
-TEST_CASE("extended precision cooldown")
+TEST_CASE("extended precision lower bound")
 {
     // p(t) = t*(3t - 1)(3t - 1 - delta), with the two close roots of the "close roots" test and an additional root at
     // tau = 0. As in the "close roots" test, the conversion to the Bernstein basis is inexact (it divides by 3), and
     // the extended-precision pass is needed to separate the two close roots. Here we check that the extended-precision
-    // pass (if available) reports the root at tau = 0 only if it is not within the cooldown.
+    // pass (if available) reports the root at tau = 0 only if it is not within [0, lb_tau).
     const auto delta = std::ldexp(1., -50);
     const std::vector cfs = {0., 1. + delta, -(6. + 3. * delta), 9.};
 
-    // No cooldown. The derivative is positive at tau = 0 and at the larger close root, negative at the smaller one.
+    // No lower bound. The derivative is positive at tau = 0 and at the larger close root, negative at the smaller one.
     auto ivals = run_isolation(cfs, 1., 0.);
     check_correct(ivals, {{rat_t(0), 1}, {rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
@@ -400,7 +451,7 @@ TEST_CASE("extended precision cooldown")
 
 #endif
 
-    // With a cooldown, the root at tau = 0 is not reported.
+    // With a lower bound lb_tau = 0.1, the root at tau = 0 is not reported.
     ivals = run_isolation(cfs, 1., 0.1);
     check_correct(ivals, {{rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
@@ -693,7 +744,7 @@ TEST_CASE("input checks real")
 
     // Invalid precision for the workspace.
     REQUIRE_THROWS_MATCHES(frpr_workspace<mppp::real>(2, 0), std::invalid_argument,
-                           Message(fmt::format("Invalid precision value 0 specified to the constructor of a "
+                           Message(fmt::format("Invalid precision value 0 specified to the constructor of an "
                                                "frpr_workspace: the value must be within the [{}, {}] bounds",
                                                mppp::real_prec_min(), mppp::real_prec_max())));
 
@@ -833,3 +884,898 @@ TEST_CASE("find_real_poly_roots linear polynomials real")
 }
 
 #endif
+
+TEST_CASE("find_real_poly_roots simple roots")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check that the roots of the polynomial with coefficients cfs are, in order, within k
+        // floating-point values of the exact values in roots, with the given directions.
+        //
+        // NOTE: k = 40 has been measured by exact emulation of the root finder and of the conversion t = h*tau (the
+        // maximum distance is 34 floating-point values, at t = 2 and t = -2).
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h, const std::vector<std::pair<rat_t, int>> &roots) {
+            const auto ret = run_find_roots(cfs, h, fp_t(0));
+            REQUIRE(ret.size() == roots.size());
+            for (std::size_t i = 0; i < roots.size(); ++i) {
+                REQUIRE(within_steps(ret[i].t, roots[i].first, 40));
+                REQUIRE(ret[i].dir == roots[i].second);
+            }
+        };
+
+        // p(t) = (t - 1)(t - 2)(2t - 5) with h = 3. In the tau variable the roots are 1/3, 2/3 and 5/6, which are
+        // not dyadic and thus are found by the root finder. With an integer h, the rescaled polynomial is computed
+        // exactly.
+        check({fp_t(-10), fp_t(19), fp_t(-11), fp_t(2)}, fp_t(3), {{rat_t(1), 1}, {rat_t(2), -1}, {rat_t(5, 2), 1}});
+
+        // The mirror image (t + 1)(t + 2)(2t + 5) with h = -3: same roots in the tau variable, reported in decreasing
+        // order of t.
+        check({fp_t(10), fp_t(19), fp_t(11), fp_t(2)}, fp_t(-3), {{rat_t(-1), 1}, {rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots simple roots real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots simple roots" test, plus the precision of the roots.
+        //
+        // NOTE: k = 40 has been measured by exact emulation for all the precisions used here.
+        const auto check
+            = [prec](const std::vector<real> &cfs, const real &h, const std::vector<std::pair<rat_t, int>> &roots) {
+                  frpr_workspace<real> ws(static_cast<std::uint32_t>(cfs.size() - 1u), prec);
+                  std::vector<real_poly_root<real>> ret;
+                  find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+
+                  REQUIRE(ret.size() == roots.size());
+                  for (std::size_t i = 0; i < roots.size(); ++i) {
+                      REQUIRE(ret[i].t.get_prec() == prec);
+                      REQUIRE(within_steps(ret[i].t, roots[i].first, 40));
+                      REQUIRE(ret[i].dir == roots[i].second);
+                  }
+              };
+
+        check({r(-10), r(19), r(-11), r(2)}, r(3), {{rat_t(1), 1}, {rat_t(2), -1}, {rat_t(5, 2), 1}});
+        check({r(10), r(19), r(11), r(2)}, r(-3), {{rat_t(-1), 1}, {rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+    }
+}
+
+#endif
+
+// The polynomials in the "root at zero" tests: p(t) = t(t - 3) with h = 10, and p(t) = t(t + 3) with h = -10. In both
+// cases the rescaled polynomial is q(tau) = 100 tau**2 - 30 tau, with an exact root at tau = 0 (found by the isolation
+// as a root exactly at the lower bound of an interval) and a root at tau = 0.3 (found by the root finder). For h = -10,
+// the root at tau = 0 is computed as -10 * 0 = -0, which must be reported as +0.
+//
+// NOTE: the tolerance k = 4 for the root at tau = 0.3 has been measured by exact emulation (the maximum distance is 1
+// floating-point value).
+
+TEST_CASE("find_real_poly_roots root at zero")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check that the polynomial with coefficients cfs has a root at +0 with direction dir0, followed by
+        // a root within 4 floating-point values of root1 with direction -dir0.
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h, int dir0, const rat_t &root1) {
+            using std::signbit;
+
+            const auto ret = run_find_roots(cfs, h, fp_t(0));
+            REQUIRE(ret.size() == 2u);
+            REQUIRE(ret[0].t == 0);
+            REQUIRE(!signbit(ret[0].t));
+            REQUIRE(ret[0].dir == dir0);
+            REQUIRE(within_steps(ret[1].t, root1, 4));
+            REQUIRE(ret[1].dir == -dir0);
+        };
+
+        check({fp_t(0), fp_t(-3), fp_t(1)}, fp_t(10), -1, rat_t(3));
+        check({fp_t(0), fp_t(3), fp_t(1)}, fp_t(-10), 1, rat_t(-3));
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots root at zero real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots root at zero" test, plus the precision of the roots.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h, int dir0, const rat_t &root1) {
+            frpr_workspace<real> ws(2, prec);
+            std::vector<real_poly_root<real>> ret;
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+
+            REQUIRE(ret.size() == 2u);
+            REQUIRE(ret[0].t == 0);
+            REQUIRE(!signbit(ret[0].t));
+            REQUIRE(ret[0].t.get_prec() == prec);
+            REQUIRE(ret[0].dir == dir0);
+            REQUIRE(ret[1].t.get_prec() == prec);
+            REQUIRE(within_steps(ret[1].t, root1, 4));
+            REQUIRE(ret[1].dir == -dir0);
+        };
+
+        check({r(0), r(-3), r(1)}, r(10), -1, rat_t(3));
+        check({r(0), r(3), r(1)}, r(-10), 1, rat_t(-3));
+    }
+}
+
+#endif
+
+// The polynomials in the "root at split point" tests are those of the "root at split point" and "multiple root at
+// split point" isolation tests, (t - 5)(t - 8), (t - 2)(t - 5) and (t - 5)**2 with h = 10, together with their mirror
+// images (t + 5)(t + 8), (t + 2)(t + 5) and (t + 5)**2 with h = -10, which have the same rescaled polynomials. The
+// roots at t = 5 and t = -5 (tau = 1/2) are exact roots at the lower bound of an interval, and they must be reported
+// exactly. The double root has zero direction.
+//
+// NOTE: the tolerance k = 8 for the other roots has been measured by exact emulation (the maximum distance is 5
+// floating-point values).
+
+TEST_CASE("find_real_poly_roots root at split point")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check the roots of the polynomial with coefficients cfs. Each element of roots contains the exact
+        // value, the direction and a flag signalling if the root must be reported exactly (otherwise, it must be within
+        // 8 floating-point values of the exact value).
+        const auto check
+            = [](const std::vector<fp_t> &cfs, fp_t h, const std::vector<std::tuple<rat_t, int, bool>> &roots) {
+                  const auto ret = run_find_roots(cfs, h, fp_t(0));
+                  REQUIRE(ret.size() == roots.size());
+                  for (std::size_t i = 0; i < roots.size(); ++i) {
+                      const auto &[r, dir, exact] = roots[i];
+                      REQUIRE(within_steps(ret[i].t, r, exact ? 0u : 8u));
+                      REQUIRE(ret[i].dir == dir);
+                  }
+              };
+
+        check({fp_t(40), fp_t(-13), fp_t(1)}, fp_t(10), {{rat_t(5), -1, true}, {rat_t(8), 1, false}});
+        check({fp_t(40), fp_t(13), fp_t(1)}, fp_t(-10), {{rat_t(-5), 1, true}, {rat_t(-8), -1, false}});
+
+        check({fp_t(10), fp_t(-7), fp_t(1)}, fp_t(10), {{rat_t(2), -1, false}, {rat_t(5), 1, true}});
+        check({fp_t(10), fp_t(7), fp_t(1)}, fp_t(-10), {{rat_t(-2), 1, false}, {rat_t(-5), -1, true}});
+
+        check({fp_t(25), fp_t(-10), fp_t(1)}, fp_t(10), {{rat_t(5), 0, true}});
+        check({fp_t(25), fp_t(10), fp_t(1)}, fp_t(-10), {{rat_t(-5), 0, true}});
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots root at split point real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots root at split point" test, plus the precision of the roots.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h,
+                                  const std::vector<std::tuple<rat_t, int, bool>> &roots) {
+            frpr_workspace<real> ws(2, prec);
+            std::vector<real_poly_root<real>> ret;
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+
+            REQUIRE(ret.size() == roots.size());
+            for (std::size_t i = 0; i < roots.size(); ++i) {
+                const auto &[rt, dir, exact] = roots[i];
+                REQUIRE(ret[i].t.get_prec() == prec);
+                REQUIRE(within_steps(ret[i].t, rt, exact ? 0u : 8u));
+                REQUIRE(ret[i].dir == dir);
+            }
+        };
+
+        check({r(40), r(-13), r(1)}, r(10), {{rat_t(5), -1, true}, {rat_t(8), 1, false}});
+        check({r(40), r(13), r(1)}, r(-10), {{rat_t(-5), 1, true}, {rat_t(-8), -1, false}});
+
+        check({r(10), r(-7), r(1)}, r(10), {{rat_t(2), -1, false}, {rat_t(5), 1, true}});
+        check({r(10), r(7), r(1)}, r(-10), {{rat_t(-2), 1, false}, {rat_t(-5), -1, true}});
+
+        check({r(25), r(-10), r(1)}, r(10), {{rat_t(5), 0, true}});
+        check({r(25), r(10), r(1)}, r(-10), {{rat_t(-5), 0, true}});
+    }
+}
+
+#endif
+
+// The polynomials in the "double root" tests: (t - 3)**2 with h = 10 (the polynomial of the "multiple root below the
+// minimum width" isolation test), and its mirror image (t + 3)**2 with h = -10, which has the same rescaled polynomial.
+// All the computations in the isolation are exact, so that the double root at tau = 3/10 ends up in a single undecided
+// interval [lo, hi) with hi - lo = 2**-p (p being the number of binary digits), which is reported as a root at its
+// midpoint, t = h*mid with mid = lo/2 + hi/2, with an empty direction.
+//
+// NOTE: the tolerance k = 4 has been measured by exact computation of h*mid (the maximum distance is 1 floating-point
+// value).
+
+TEST_CASE("find_real_poly_roots double root")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check that the polynomial with coefficients cfs has a single root within 4 floating-point values of
+        // root, with an empty direction.
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h, const rat_t &root) {
+            const auto ret = run_find_roots(cfs, h, fp_t(0));
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(within_steps(ret[0].t, root, 4));
+            REQUIRE(!ret[0].dir);
+        };
+
+        check({fp_t(9), fp_t(-6), fp_t(1)}, fp_t(10), rat_t(3));
+        check({fp_t(9), fp_t(6), fp_t(1)}, fp_t(-10), rat_t(-3));
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots double root real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots double root" test, plus the precision of the root.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h, const rat_t &root) {
+            frpr_workspace<real> ws(2, prec);
+            std::vector<real_poly_root<real>> ret;
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t.get_prec() == prec);
+            REQUIRE(within_steps(ret[0].t, root, 4));
+            REQUIRE(!ret[0].dir);
+        };
+
+        check({r(9), r(-6), r(1)}, r(10), rat_t(3));
+        check({r(9), r(6), r(1)}, r(-10), rat_t(-3));
+    }
+}
+
+#endif
+
+// The polynomials in the "undecided interval straddling lb" tests: (3t - 1)**2 with h = 1, and its mirror image
+// (3t + 1)**2 with h = -1, which has the same rescaled polynomial. As in the "double root" tests, all the computations
+// in the isolation are exact, and the double root at tau = 1/3 ends up in a single undecided interval [lo, hi) with hi
+// - lo = 2**-p, which is reported as a root at its midpoint mid = lo/2 + hi/2 (representable, since 1/3 is in
+// [1/4, 1/2)). With |h| = 1, lb_tau = lb and t = h*tau are computed exactly. The checks:
+//
+// - with lb = lo, and with lb = mid (the interval straddles lb_tau), the root is reported at h*mid;
+// - with lb = hi no root is reported (the interval lies entirely within [0, lb_tau)).
+
+TEST_CASE("find_real_poly_roots undecided interval straddling lb")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h) {
+            // Fetch the undecided interval from the isolation.
+            const auto ivals = run_isolation(cfs, h, fp_t(0));
+            REQUIRE(ivals.size() == 1u);
+            REQUIRE(ivals[0].type == detail::irr_interval_type::undecided);
+            const auto lo = ivals[0].lo, hi = ivals[0].hi;
+            const auto mid = lo / 2 + hi / 2;
+            REQUIRE(lo < mid);
+            REQUIRE(mid < hi);
+
+            auto ret = run_find_roots(cfs, h, mid);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t == h * mid);
+            REQUIRE(!ret[0].dir);
+
+            ret = run_find_roots(cfs, h, lo);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t == h * mid);
+            REQUIRE(!ret[0].dir);
+
+            REQUIRE(run_find_roots(cfs, h, hi).empty());
+        };
+
+        check({fp_t(1), fp_t(-6), fp_t(9)}, fp_t(1));
+        check({fp_t(1), fp_t(6), fp_t(9)}, fp_t(-1));
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots undecided interval straddling lb real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots undecided interval straddling lb" test, plus the precision of
+        // the roots.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h) {
+            frpr_workspace<real> ws(2, prec);
+            std::vector<real_poly_root<real>> ret;
+
+            // Fetch the undecided interval from the isolation.
+            const auto ivals = detail::isolate_real_roots(ws, std::span<const real>(cfs), h, real{0, prec});
+            REQUIRE(ivals.size() == 1u);
+            REQUIRE(ivals[0].type == detail::irr_interval_type::undecided);
+            const auto lo = ivals[0].lo, hi = ivals[0].hi;
+            // NOTE: div_2ui() keeps the precision.
+            const auto mid = mppp::div_2ui(lo, 1u) + mppp::div_2ui(hi, 1u);
+            REQUIRE(lo < mid);
+            REQUIRE(mid < hi);
+
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h, mid);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t.get_prec() == prec);
+            REQUIRE(ret[0].t == h * mid);
+            REQUIRE(!ret[0].dir);
+
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h, lo);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t.get_prec() == prec);
+            REQUIRE(ret[0].t == h * mid);
+            REQUIRE(!ret[0].dir);
+
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h, hi);
+            REQUIRE(ret.empty());
+        };
+
+        check({r(1), r(-6), r(9)}, r(1));
+        check({r(1), r(6), r(9)}, r(-1));
+    }
+}
+
+#endif
+
+TEST_CASE("find_real_poly_roots wide undecided interval")
+{
+    using Catch::Matchers::StartsWith;
+
+    // p(t) = (t - 3)**6 with h = 10.1 (the polynomial of the "extended precision fallback" isolation test), and its
+    // mirror image (t + 3)**6 with h = -10.1, which has the same rescaled polynomial. The isolation returns undecided
+    // intervals wider than the minimum width, and find_real_poly_roots() throws.
+    const std::vector cfs = {729., -1458., 1215., -540., 135., -18., 1.};
+    const std::vector cfs_mirror = {729., 1458., 1215., 540., 135., 18., 1.};
+
+    for (const auto &[c, h] : {std::pair{cfs, 10.1}, std::pair{cfs_mirror, -10.1}}) {
+        REQUIRE_THROWS_AS(run_find_roots(c, h, 0.), std::runtime_error);
+        REQUIRE_THROWS_WITH(run_find_roots(c, h, 0.),
+                            StartsWith("find_real_poly_roots() was unable to isolate the real roots of a polynomial: "
+                                       "the interval ["));
+    }
+
+    // With h = 10 (and h = -10 for the mirror image), all the computations in the isolation are exact, the root is
+    // bisected down to the minimum width with an exact sign-change count, and it is reported as a single root with an
+    // empty direction.
+    //
+    // NOTE: as in the "double root" tests, the root is reported at t = h*mid, where mid is the midpoint of the undecided
+    // interval [lo, lo + 2**-53) containing tau = 3/10. The tolerance k = 4 has been measured by exact computation of
+    // h*mid (the distance is at most 1 floating-point value).
+    for (const auto &[c, h, root] : {std::tuple{cfs, 10., rat_t(3)}, std::tuple{cfs_mirror, -10., rat_t(-3)}}) {
+        const auto ret = run_find_roots(c, h, 0.);
+        REQUIRE(ret.size() == 1u);
+        REQUIRE(within_steps(ret[0].t, root, 4));
+        REQUIRE(!ret[0].dir);
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// The polynomials in the "merged undecided intervals" tests: (t - 5)(t - 8)(t - 9) with h = 10 (the polynomial of the
+// "extended precision root at split point" isolation test), and its mirror image (t + 5)(t + 8)(t + 9) with h = -10,
+// which has the same rescaled polynomial. The conversion to the Bernstein basis is inexact (it divides by 3), thus the
+// value of the polynomial at tau = 1/2 is computed as an interval straddling zero in both isolation passes, and the
+// root at tau = 1/2 ends up in the two adjacent undecided intervals [1/2 - 2**-p, 1/2) and [1/2, 1/2 + 2**-p). These
+// are merged into a single undecided range whose midpoint is exactly 1/2: the root must be reported once, exactly at
+// t = 5 (t = -5 for the mirror image), with an empty direction. The other two roots are found by the root finder.
+//
+// NOTE: without mp++, the first isolation pass leaves undecided intervals wider than the minimum width, and
+// find_real_poly_roots() throws.
+//
+// NOTE: the tolerance k = 160 for the other two roots has been measured by exact emulation (the maximum distance is
+// 131 floating-point values).
+
+TEST_CASE("find_real_poly_roots merged undecided intervals")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check that the polynomial with coefficients cfs has a root exactly at root0 with an empty
+        // direction, followed by two roots within 160 floating-point values of root1 and root2, with directions -1
+        // and 1.
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h, const rat_t &root0, const rat_t &root1,
+                              const rat_t &root2) {
+            const auto ret = run_find_roots(cfs, h, fp_t(0));
+            REQUIRE(ret.size() == 3u);
+            REQUIRE(within_steps(ret[0].t, root0, 0));
+            REQUIRE(!ret[0].dir);
+            REQUIRE(within_steps(ret[1].t, root1, 160));
+            REQUIRE(ret[1].dir == -1);
+            REQUIRE(within_steps(ret[2].t, root2, 160));
+            REQUIRE(ret[2].dir == 1);
+        };
+
+        check({fp_t(-360), fp_t(157), fp_t(-22), fp_t(1)}, fp_t(10), rat_t(5), rat_t(8), rat_t(9));
+        check({fp_t(360), fp_t(157), fp_t(22), fp_t(1)}, fp_t(-10), rat_t(-5), rat_t(-8), rat_t(-9));
+    });
+}
+
+TEST_CASE("find_real_poly_roots merged undecided intervals real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots merged undecided intervals" test, plus the precision of the
+        // roots.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h, const rat_t &root0, const rat_t &root1,
+                                  const rat_t &root2) {
+            frpr_workspace<real> ws(3, prec);
+            std::vector<real_poly_root<real>> ret;
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+
+            REQUIRE(ret.size() == 3u);
+            for (const auto &root : ret) {
+                REQUIRE(root.t.get_prec() == prec);
+            }
+            REQUIRE(within_steps(ret[0].t, root0, 0));
+            REQUIRE(!ret[0].dir);
+            REQUIRE(within_steps(ret[1].t, root1, 160));
+            REQUIRE(ret[1].dir == -1);
+            REQUIRE(within_steps(ret[2].t, root2, 160));
+            REQUIRE(ret[2].dir == 1);
+        };
+
+        check({r(-360), r(157), r(-22), r(1)}, r(10), rat_t(5), rat_t(8), rat_t(9));
+        check({r(360), r(157), r(22), r(1)}, r(-10), rat_t(-5), rat_t(-8), rat_t(-9));
+    }
+}
+
+#endif
+
+// The polynomials in the "lb filter" tests are those of the "simple roots" tests: (t - 1)(t - 2)(2t - 5) with h = 3,
+// and its mirror image (t + 1)(t + 2)(2t + 5) with h = -3. The values of lb are far from the roots (relative to the
+// tolerance k = 40 of the "simple roots" tests):
+//
+// - lb = 0.5 excludes no root;
+// - lb = 1.8 excludes the root at t = 1 (t = -1 for the mirror image);
+// - lb = 2.1 excludes the roots at t = 1 and t = 2 (t = -1 and t = -2);
+// - lb = 2.6 excludes all the roots.
+//
+// For lb = 1.8 and lb = 2.1, lb_tau lies strictly inside the isolating interval of the root at tau = 2/3 (on either
+// side of the root), so that the exclusion of the root is decided after the root finding.
+
+TEST_CASE("find_real_poly_roots lb filter")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        // Helper to check that the roots of the polynomial with coefficients cfs are, in order, within 40
+        // floating-point values of the exact values in roots, with the given directions.
+        const auto check
+            = [](const std::vector<fp_t> &cfs, fp_t h, fp_t lb, const std::vector<std::pair<rat_t, int>> &roots) {
+                  const auto ret = run_find_roots(cfs, h, lb);
+                  REQUIRE(ret.size() == roots.size());
+                  for (std::size_t i = 0; i < roots.size(); ++i) {
+                      REQUIRE(within_steps(ret[i].t, roots[i].first, 40));
+                      REQUIRE(ret[i].dir == roots[i].second);
+                  }
+              };
+
+        // Helper to check that lb_tau = lb/|h| lies strictly inside an isolating interval.
+        const auto check_straddle = [](const std::vector<fp_t> &cfs, fp_t h, fp_t lb) {
+            using std::abs;
+
+            const auto lb_tau = lb / abs(h);
+            const auto ivals = run_isolation(cfs, h, lb_tau);
+            REQUIRE(std::ranges::any_of(ivals, [&lb_tau](const auto &iv) {
+                return iv.type == detail::irr_interval_type::isolating && iv.lo < lb_tau && lb_tau < iv.hi;
+            }));
+        };
+
+        const std::vector cfs = {fp_t(-10), fp_t(19), fp_t(-11), fp_t(2)};
+        const std::vector cfs_mirror = {fp_t(10), fp_t(19), fp_t(11), fp_t(2)};
+
+        check(cfs, fp_t(3), fp_t(0.5), {{rat_t(1), 1}, {rat_t(2), -1}, {rat_t(5, 2), 1}});
+        check(cfs, fp_t(3), fp_t(1.8), {{rat_t(2), -1}, {rat_t(5, 2), 1}});
+        check(cfs, fp_t(3), fp_t(2.1), {{rat_t(5, 2), 1}});
+        check(cfs, fp_t(3), fp_t(2.6), {});
+
+        check(cfs_mirror, fp_t(-3), fp_t(0.5), {{rat_t(-1), 1}, {rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+        check(cfs_mirror, fp_t(-3), fp_t(1.8), {{rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+        check(cfs_mirror, fp_t(-3), fp_t(2.1), {{rat_t(-5, 2), 1}});
+        check(cfs_mirror, fp_t(-3), fp_t(2.6), {});
+
+        for (const auto lb : {fp_t(1.8), fp_t(2.1)}) {
+            check_straddle(cfs, fp_t(3), lb);
+            check_straddle(cfs_mirror, fp_t(-3), lb);
+        }
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots lb filter real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](double v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots lb filter" test, plus the precision of the roots.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h, const real &lb,
+                                  const std::vector<std::pair<rat_t, int>> &roots) {
+            frpr_workspace<real> ws(3, prec);
+            std::vector<real_poly_root<real>> ret;
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h, lb);
+
+            REQUIRE(ret.size() == roots.size());
+            for (std::size_t i = 0; i < roots.size(); ++i) {
+                REQUIRE(ret[i].t.get_prec() == prec);
+                REQUIRE(within_steps(ret[i].t, roots[i].first, 40));
+                REQUIRE(ret[i].dir == roots[i].second);
+            }
+        };
+
+        const auto check_straddle = [prec](const std::vector<real> &cfs, const real &h, const real &lb) {
+            frpr_workspace<real> ws(3, prec);
+
+            const auto lb_tau = lb / abs(h);
+            const auto ivals = detail::isolate_real_roots(ws, std::span<const real>(cfs), h, lb_tau);
+            REQUIRE(std::ranges::any_of(ivals, [&lb_tau](const auto &iv) {
+                return iv.type == detail::irr_interval_type::isolating && iv.lo < lb_tau && lb_tau < iv.hi;
+            }));
+        };
+
+        const std::vector cfs = {r(-10), r(19), r(-11), r(2)};
+        const std::vector cfs_mirror = {r(10), r(19), r(11), r(2)};
+
+        check(cfs, r(3), r(0.5), {{rat_t(1), 1}, {rat_t(2), -1}, {rat_t(5, 2), 1}});
+        check(cfs, r(3), r(1.8), {{rat_t(2), -1}, {rat_t(5, 2), 1}});
+        check(cfs, r(3), r(2.1), {{rat_t(5, 2), 1}});
+        check(cfs, r(3), r(2.6), {});
+
+        check(cfs_mirror, r(-3), r(0.5), {{rat_t(-1), 1}, {rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+        check(cfs_mirror, r(-3), r(1.8), {{rat_t(-2), -1}, {rat_t(-5, 2), 1}});
+        check(cfs_mirror, r(-3), r(2.1), {{rat_t(-5, 2), 1}});
+        check(cfs_mirror, r(-3), r(2.6), {});
+
+        for (const auto lb : {1.8, 2.1}) {
+            check_straddle(cfs, r(3), r(lb));
+            check_straddle(cfs_mirror, r(-3), r(lb));
+        }
+    }
+}
+
+#endif
+
+// Linear polynomials whose root enclosure [nextdown(root), nextup(root)] straddles a bound of the range fall through to
+// the general case:
+//
+// - p(t) = 3t and p(t) = -3t: the root is exactly at t = 0. The isolation reports it as a root exactly at tau = 0, and
+//   it is reported at +0 for either sign of h, with the direction given by the sign of the derivative c1;
+// - p(t) = t - 10 with h = 10, and its mirror image p(t) = t + 10 with h = -10: the root is exactly at t = h, outside
+//   the range, and no root is reported.
+
+TEST_CASE("find_real_poly_roots linear fall-through")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+        using std::signbit;
+
+        for (const auto h : {fp_t(10), fp_t(-10)}) {
+            for (const auto c1 : {fp_t(3), fp_t(-3)}) {
+                const auto ret = run_find_roots({fp_t(0), c1}, h, fp_t(0));
+                REQUIRE(ret.size() == 1u);
+                REQUIRE(ret[0].t == 0);
+                REQUIRE(!signbit(ret[0].t));
+                REQUIRE(ret[0].dir == ((c1 > 0) ? 1 : -1));
+            }
+        }
+
+        REQUIRE(run_find_roots({fp_t(-10), fp_t(1)}, fp_t(10), fp_t(0)).empty());
+        REQUIRE(run_find_roots({fp_t(10), fp_t(1)}, fp_t(-10), fp_t(0)).empty());
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots linear fall-through real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots linear fall-through" test, plus the precision of the roots.
+        frpr_workspace<real> ws(1, prec);
+        std::vector<real_poly_root<real>> ret;
+
+        for (const auto &h : {r(10), r(-10)}) {
+            for (const auto &c1 : {r(3), r(-3)}) {
+                const std::vector cfs = {r(0), c1};
+                find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+                REQUIRE(ret.size() == 1u);
+                REQUIRE(ret[0].t.get_prec() == prec);
+                REQUIRE(ret[0].t == 0);
+                REQUIRE(!signbit(ret[0].t));
+                REQUIRE(ret[0].dir == ((c1 > 0) ? 1 : -1));
+            }
+        }
+
+        const std::vector cfs1 = {r(-10), r(1)};
+        find_real_poly_roots(ret, ws, std::span<const real>(cfs1), r(10));
+        REQUIRE(ret.empty());
+
+        const std::vector cfs2 = {r(10), r(1)};
+        find_real_poly_roots(ret, ws, std::span<const real>(cfs2), r(-10));
+        REQUIRE(ret.empty());
+    }
+}
+
+#endif
+
+// Workspace reuse in the general case: the results computed with a reused, copied or deserialised workspace must be
+// identical to those computed with a fresh workspace. In particular, the rescaled polynomial used by the root finder
+// must be the one of the current polynomial. The two polynomials, (t - 1)(t - 2)(2t - 5) with h = 3 (from the
+// "find_real_poly_roots simple roots" test) and (t - 3)(t - 6)(t - 8.5) with h = 10 (from the "simple roots" isolation
+// test), have different rescaled polynomials, and all their roots are found by the root finder. Every call also starts
+// from a non-empty ret, which must be cleared out.
+
+TEST_CASE("find_real_poly_roots workspace reuse")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        const std::vector cfs1 = {fp_t(-10), fp_t(19), fp_t(-11), fp_t(2)};
+        const auto h1 = fp_t(3);
+        const std::vector cfs2 = {fp_t(-153), fp_t(94.5), fp_t(-17.5), fp_t(1)};
+        const auto h2 = fp_t(10);
+
+        // The reference results, computed with fresh workspaces.
+        const auto ref1 = run_find_roots(cfs1, h1, fp_t(0));
+        const auto ref2 = run_find_roots(cfs2, h2, fp_t(0));
+        REQUIRE(ref1.size() == 3u);
+        REQUIRE(ref2.size() == 3u);
+
+        // Helper to run find_real_poly_roots() with the workspace w, starting from a non-empty ret.
+        const auto run = [](frpr_workspace<fp_t> &w, const std::vector<fp_t> &cfs, fp_t h) {
+            std::vector<real_poly_root<fp_t>> ret(5);
+            find_real_poly_roots(ret, w, std::span<const fp_t>(cfs), h);
+            return ret;
+        };
+
+        // A workspace used for the two polynomials alternately.
+        frpr_workspace<fp_t> ws(3);
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+        REQUIRE(roots_equal(run(ws, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+
+        // A copy of the workspace, and the original after the copy.
+        auto ws_copy = ws;
+        REQUIRE(roots_equal(run(ws_copy, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+
+        // A deserialised workspace.
+        std::stringstream ss;
+        {
+            boost::archive::binary_oarchive oa(ss);
+            oa << ws;
+        }
+        frpr_workspace<fp_t> ws_s11n(3);
+        {
+            boost::archive::binary_iarchive ia(ss);
+            ia >> ws_s11n;
+        }
+        REQUIRE(roots_equal(run(ws_s11n, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws_s11n, cfs1, h1), ref1));
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots workspace reuse real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](double v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots workspace reuse" test.
+        const std::vector cfs1 = {r(-10), r(19), r(-11), r(2)};
+        const auto h1 = r(3);
+        const std::vector cfs2 = {r(-153), r(94.5), r(-17.5), r(1)};
+        const auto h2 = r(10);
+
+        const auto run = [](frpr_workspace<real> &w, const std::vector<real> &cfs, const real &h) {
+            std::vector<real_poly_root<real>> ret(5);
+            find_real_poly_roots(ret, w, std::span<const real>(cfs), h);
+            return ret;
+        };
+
+        frpr_workspace<real> ws_ref1(3, prec), ws_ref2(3, prec);
+        const auto ref1 = run(ws_ref1, cfs1, h1);
+        const auto ref2 = run(ws_ref2, cfs2, h2);
+        REQUIRE(ref1.size() == 3u);
+        REQUIRE(ref2.size() == 3u);
+
+        frpr_workspace<real> ws(3, prec);
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+        REQUIRE(roots_equal(run(ws, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+
+        auto ws_copy = ws;
+        REQUIRE(roots_equal(run(ws_copy, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws, cfs1, h1), ref1));
+
+        std::stringstream ss;
+        {
+            boost::archive::binary_oarchive oa(ss);
+            oa << ws;
+        }
+        frpr_workspace<real> ws_s11n(3, prec);
+        {
+            boost::archive::binary_iarchive ia(ss);
+            ia >> ws_s11n;
+        }
+        REQUIRE(roots_equal(run(ws_s11n, cfs2, h2), ref2));
+        REQUIRE(roots_equal(run(ws_s11n, cfs1, h1), ref1));
+    }
+}
+
+#endif
+
+// The polynomials in the "undecided interval with adjacent bounds" tests: (t - 3)**2 with h = 5, and its mirror image
+// (t + 3)**2 with h = -5, which has the same rescaled polynomial. As in the "double root" tests, all the computations
+// in the isolation are exact, and the double root at tau = 3/5 ends up in a single undecided interval [lo, hi) with
+// hi - lo = 2**-p. Since 3/5 is in [1/2, 1), lo and hi are adjacent floating-point values, and the computed midpoint
+// lo/2 + hi/2 is a tie, rounded to the value with an even significand. For the floating-point types tested here, this
+// is hi (the integer floor(3 * 2**p / 5) is odd), which is outside the interval: the root must then be reported at
+// t = h*lo. For mppp::real, this is the case for all the precisions tested except 11, for which the tie is rounded to
+// lo (the root is again reported at t = h*lo).
+
+TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds")
+{
+    tuple_for_each(fp_types, [](auto x) {
+        using fp_t = decltype(x);
+
+        const auto check = [](const std::vector<fp_t> &cfs, fp_t h) {
+            using std::nextafter;
+
+            // Fetch the undecided interval from the isolation, and check that its bounds are adjacent and that the
+            // computed midpoint is hi.
+            const auto ivals = run_isolation(cfs, h, fp_t(0));
+            REQUIRE(ivals.size() == 1u);
+            REQUIRE(ivals[0].type == detail::irr_interval_type::undecided);
+            const auto lo = ivals[0].lo, hi = ivals[0].hi;
+            REQUIRE(nextafter(lo, hi) == hi);
+            REQUIRE(lo / 2 + hi / 2 == hi);
+
+            const auto ret = run_find_roots(cfs, h, fp_t(0));
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t == h * lo);
+            REQUIRE(!ret[0].dir);
+        };
+
+        check({fp_t(9), fp_t(-6), fp_t(1)}, fp_t(5));
+        check({fp_t(9), fp_t(6), fp_t(1)}, fp_t(-5));
+    });
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds real")
+{
+    using mppp::real;
+
+    for (const auto prec : {11, 53, 113, 200}) {
+        const auto r = [prec](int v) { return real{v, prec}; };
+
+        // Same checks as in the "find_real_poly_roots undecided interval with adjacent bounds" test (except for the
+        // computed midpoint, see above), plus the precision of the root.
+        const auto check = [prec](const std::vector<real> &cfs, const real &h) {
+            frpr_workspace<real> ws(2, prec);
+            std::vector<real_poly_root<real>> ret;
+
+            const auto ivals = detail::isolate_real_roots(ws, std::span<const real>(cfs), h, real{0, prec});
+            REQUIRE(ivals.size() == 1u);
+            REQUIRE(ivals[0].type == detail::irr_interval_type::undecided);
+            const auto lo = ivals[0].lo, hi = ivals[0].hi;
+            REQUIRE(nextafter(lo, hi) == hi);
+
+            find_real_poly_roots(ret, ws, std::span<const real>(cfs), h);
+            REQUIRE(ret.size() == 1u);
+            REQUIRE(ret[0].t.get_prec() == prec);
+            REQUIRE(ret[0].t == h * lo);
+            REQUIRE(!ret[0].dir);
+        };
+
+        check({r(9), r(-6), r(1)}, r(5));
+        check({r(9), r(6), r(1)}, r(-5));
+    }
+}
+
+#endif
+
+// A test with the Taylor polynomials of an actual numerical integration. The harmonic oscillator x' = v, v' = -x is
+// integrated in double precision from random initial conditions, step by step, until a step crosses x = 0. The
+// polynomial of the event equation x = 0 over that step is the Taylor polynomial of x, whose coefficients are the
+// first order + 1 Taylor coefficients of the step. Its root is compared with the exact solution
+// x(t) = x0*cos(t) + v0*sin(t) = R*cos(t - phi), with R = hypot(x0, v0) and phi = atan2(v0, x0), whose roots are
+// t = phi + pi/2 + k*pi, where the derivative -R*sin(t - phi) has the sign of (-1)**(k+1).
+TEST_CASE("find_real_poly_roots harmonic oscillator")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 0.}};
+    const auto order = ta.get_order();
+
+    frpr_workspace<double> ws(order);
+    std::vector<real_poly_root<double>> ret;
+
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    for (auto i = 0; i < 100; ++i) {
+        // Random initial conditions at t = 0, with an amplitude R of at least 0.5.
+        //
+        // NOTE: the error in the time of the crossing is of the order of the integration error in x divided by
+        // R, the magnitude of the derivative at the crossing. Keeping R away from zero keeps it small.
+        double x0 = 0, v0 = 0;
+        do {
+            x0 = rdist(rng);
+            v0 = rdist(rng);
+        } while (std::hypot(x0, v0) < .5);
+
+        ta.get_state_data()[0] = x0;
+        ta.get_state_data()[1] = v0;
+        ta.set_time(0.);
+
+        // Step, recording the Taylor coefficients, until a step crosses x = 0.
+        while (true) {
+            const auto x_start = ta.get_state()[0];
+            REQUIRE(std::get<0>(ta.step(true)) == taylor_outcome::success);
+            if ((x_start < 0) != (ta.get_state()[0] < 0)) {
+                break;
+            }
+        }
+
+        // Find the root of the Taylor polynomial of x over the last step, which started at t_start and has size h.
+        const auto h = ta.get_last_h();
+        const auto t_start = ta.get_time() - h;
+        find_real_poly_roots(ret, ws, std::span<const double>(ta.get_tc().data(), order + 1u), h);
+
+        // Consecutive roots of the exact solution are pi apart: if the step is shorter than pi, x cannot come back to
+        // zero within the step, and the crossing is the only root. Otherwise, since x changes sign over the step, the
+        // number of roots is odd.
+        if (h < std::numbers::pi) {
+            REQUIRE(ret.size() == 1u);
+        } else {
+            REQUIRE(ret.size() % 2u == 1u);
+        }
+
+        // Compare each root with the nearest root of the exact solution.
+        //
+        // NOTE: the difference is dominated by the error of the numerical integration, of the order of eps / R after
+        // the few steps taken. 1e-12 is a generous bound.
+        const auto phi = std::atan2(v0, x0);
+        for (const auto &root : ret) {
+            const auto t_root = t_start + root.t;
+            const auto k = std::round((t_root - phi - std::numbers::pi / 2) / std::numbers::pi);
+            const auto t_exact = phi + std::numbers::pi / 2 + k * std::numbers::pi;
+            REQUIRE(std::abs(t_root - t_exact) < 1e-12);
+
+            // The direction of the root is the sign of (-1)**(k+1).
+            REQUIRE(root.dir == ((static_cast<long long>(k) % 2 == 0) ? -1 : 1));
+        }
+    }
+}

@@ -9,11 +9,14 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -64,6 +67,25 @@ T frpr_nextdown(T x)
     return nextafter(std::move(x), static_cast<T>(-std::numeric_limits<float>::infinity()));
 }
 
+// Small helper to divide an input value by 2, with mppp::real specialisation.
+template <typename T>
+T find_real_poly_roots_div_2(T x)
+{
+    return x / 2;
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It also uses
+// a specialised division primitive for performance.
+template <>
+mppp::real find_real_poly_roots_div_2<mppp::real>(mppp::real x)
+{
+    return mppp::div_2ui(std::move(x), 1u);
+}
+
+#endif
+
 } // namespace
 
 } // namespace detail
@@ -77,7 +99,11 @@ T frpr_nextdown(T x)
 //
 // Every real root of p(t) in this range is reported. Roots that cannot be resolved at the working precision (e.g.,
 // multiple roots, or roots closer to each other than the precision allows) may be reported as a single root, and such a
-// report may be a false positive.
+// report may be a false positive. If the location of a root cannot be narrowed down to the working precision (this can
+// happen, e.g., for roots of high multiplicity), a std::runtime_error is thrown.
+//
+// Each reported root value is a point where p is zero within rounding error, but its distance from the exact root is
+// not certified. Reports that may be false positives always have an empty dir.
 //
 // lb is a non-negative value in the same units as h. Roots in the following ranges are not reported:
 //
@@ -88,7 +114,11 @@ T frpr_nextdown(T x)
 // rounding error of lb (or -lb) may or may not be reported. If lb is zero, no root is excluded.
 //
 // ws must have been constructed for the degree of p. cfs and h must be finite, and lb must be non-NaN and non-negative.
-// For mppp::real, cfs and h must have the precision of ws, and lb is rounded to it.
+// For mppp::real, cfs and h must have the precision of ws, and lb is rounded to it. If any of these requirements is not
+// met, a std::invalid_argument is thrown.
+//
+// The roots in ret are reported in increasing t for h > 0, decreasing t for h < 0. Consecutive roots in ret may have
+// the same value. All reported roots are guaranteed to be finite.
 template <typename T>
 void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T> &ws, const std::span<const T> cfs,
                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -167,12 +197,22 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
     }
 
     // Convert lb to the tau variable.
-    const auto lb_tau = lb / abs(h);
+    //
+    // NOTE: for mppp::real, lb_tau is guaranteed to have the same precision as lb and h (i.e., the working precision).
+    const auto abs_h = abs(h);
+    const auto lb_tau = lb / abs_h;
 
-    // No roots are reported if lb covers the entire [0, 1) range.
-    if (lb_tau >= 1) {
+    // No roots are reported if lb covers the entire range. The check on lb_tau also ensures the lb_tau < 1 precondition
+    // of isolate_real_roots().
+    if (lb >= abs_h || lb_tau >= 1) {
         return;
     }
+
+    // Zero constant with the workspace precision for mppp::real.
+    const auto zero = detail::num_zero_like(h);
+
+    // Sign of h (guaranteed to be nonzero at this point).
+    const auto h_sgn = (h > 0) ? 1 : -1;
 
     // Determine the index of the last nonzero coefficient in the polynomial. If all the coefficients are zero,
     // last_nz_idx is set to cfs_size.
@@ -187,7 +227,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
     // zero), unless lb != 0. isolate_real_roots() requires a nonzero polynomial.
     if (last_nz_idx == cfs_size) {
         if (lb == 0) {
-            ret.emplace_back(detail::num_zero_like(h), 0);
+            ret.emplace_back(zero, 0);
         }
 
         return;
@@ -197,6 +237,9 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
     if (last_nz_idx == 0u) {
         return;
     }
+
+    // Negative of lb, used below.
+    const auto mlb = -lb;
 
     // Special casing for linear polynomials.
     if (last_nz_idx == 1u) {
@@ -214,7 +257,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
         assert(cfs[1] != 0);
         const auto dir = (cfs[1] < 0) ? -1 : 1;
 
-        if (h > 0) {
+        if (h_sgn == 1) {
             if (root_hi < 0 || root_lo >= h) {
                 // The root is outside [0, h), exit early.
                 return;
@@ -239,7 +282,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
 
             if (root_lo > h && root_hi <= 0) {
                 // The root falls within (h, 0], add it if it is outside (-lb, 0].
-                if (root <= -lb) {
+                if (root <= mlb) {
                     ret.emplace_back(root, dir);
                 }
 
@@ -249,6 +292,170 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
             // NOTE: if we end up here, it means that the root straddles the bounds of (h, 0]. We fall through to the
             // general case.
         }
+    }
+
+    // We have exhausted the special cases, we can handle the general case now.
+    //
+    // Run the real root isolation algorithm.
+    const auto &ivals = detail::isolate_real_roots(ws, cfs, h, lb_tau);
+
+    // This is ensured to be set by isolate_real_roots().
+    assert(ws.m_impl->m_rescaled_poly);
+    const auto *const rescaled_poly_data = ws.m_impl->m_rescaled_poly->get_span().data();
+
+    // Helper to add a root to ret.
+    //
+    // An input root from the [0, 1) interval will be rescaled back to the original [0, h)/(h, 0] interval and clamped
+    // before being added to ret. If the root falls within the [0, lb)/(-lb, 0] range, it is ignored.
+    const auto add_root = [&ret, &h, h_sgn, lb, &mlb, &zero](T root_tau, const std::optional<int> &sign) {
+        assert(root_tau >= 0);
+        assert(root_tau < 1);
+
+        // Step 1: rescale the value.
+        auto root = std::move(root_tau) * h;
+
+        // Step 2: check for finiteness.
+        //
+        // NOTE: this is likely unreachable currently, but let's be defensive about this.
+        if (!isfinite(root)) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(fmt::format("find_real_poly_roots() produced the non-finite root {}", root));
+            // LCOV_EXCL_STOP
+        }
+
+        // Step 3: clamp the root to the [0, h)/(h, 0] interval, and handle lb.
+        if (h_sgn == 1) {
+            assert(root >= 0);
+            if (root >= h) {
+                root = detail::frpr_nextdown(h);
+            }
+
+            if (root < lb) {
+                return;
+            }
+        } else {
+            assert(root <= 0);
+            if (root <= h) {
+                root = detail::frpr_nextup(h);
+            }
+
+            if (root > mlb) {
+                return;
+            }
+        }
+
+        // Normalise -0 to 0.
+        if (root == 0) {
+            root = zero;
+        }
+
+        // Compute the direction if possible and add the root.
+        if (sign) {
+            const auto dir = h_sgn * (*sign);
+            ret.emplace_back(std::move(root), dir);
+        } else {
+            ret.emplace_back(std::move(root), std::nullopt);
+        }
+    };
+
+    // Fetch the root finding function from the JIT.
+    auto *const root_finder = ws.m_impl->m_jit_data->m_root_finder_func;
+
+    // Helper to check if an undecided interval is too wide.
+    //
+    // Undecided intervals not smaller than min_width (in the tau variable) will throw an exception, smaller ones are
+    // reported as roots. min_width must match the one used in isolate_real_roots().
+    const auto check_undecided_too_wide = [min_width = detail::num_eps_like(h)](const detail::irr_interval<T> &ival) {
+        assert(ival.type == detail::irr_interval_type::undecided);
+        // NOTE: undecided intervals never have a sign.
+        assert(!ival.sign);
+
+        if (ival.hi - ival.lo >= min_width) [[unlikely]] {
+            throw std::runtime_error(fmt::format(
+                "find_real_poly_roots() was unable to isolate the real roots of a polynomial: the interval "
+                "[{}, {}) of the normalised variable t/h could not be resolved (this can happen, e.g., with "
+                "roots of high multiplicity)",
+                ival.lo, ival.hi));
+        }
+    };
+
+    // Handle each item in ivals.
+    for (decltype(ivals.size()) i = 0; i < ivals.size(); ++i) {
+        const auto &[cur_lo, cur_hi, cur_type, cur_sign] = ivals[i];
+
+        if (cur_type == detail::irr_interval_type::isolating) {
+            // Isolating interval or exact root.
+
+            // Handle an exact root first. This is flagged by cur_lo == cur_hi.
+            if (cur_lo == cur_hi) {
+                // Add the root and move on.
+                add_root(cur_lo, cur_sign);
+                continue;
+            }
+
+            // NOTE: isolating intervals must always have a sign. This sign has to be 1 or -1.
+            assert(cur_sign);
+            assert(*cur_sign == 1 || *cur_sign == -1);
+
+            // Check if there are numbers between cur_lo and cur_hi. If this is not the case, we cannot run the root
+            // finding function.
+            using std::nextafter;
+            if (nextafter(cur_lo, cur_hi) == cur_hi) {
+                // No numbers between lo and hi, report a root at lo directly.
+                add_root(cur_lo, cur_sign);
+            } else {
+                // lo and hi are suitable for root finding, run it.
+                //
+                // NOTE: the root finder requires lo/2, hi/2 and lo/2 + hi/2 to be exactly representable. Isolating
+                // intervals come from bisections of [0, 1) (in both isolation passes), so they have width 2^-j with j
+                // <= p (p = binary digits of T) and bounds that are multiples of 2^-j. For j < p, the halves and the
+                // midpoint are multiples of 2^-p in [0, 1), hence representable. For j = p, they are multiples of
+                // 2^-(p+1), representable below 0.5, while in [0.5, 1) an interval of width 2^-p has adjacent bounds,
+                // which are handled above.
+                const std::array bounds = {cur_lo, cur_hi};
+                // NOTE: the root finder requires the sign of the exact poly at lo. This is the opposite of the sign of
+                // the interval, which is the sign of the derivative at the root.
+                const std::int32_t sign = -*cur_sign;
+                auto root = zero;
+                root_finder(rescaled_poly_data, bounds.data(), &sign, &root);
+
+                // Add the root.
+                add_root(std::move(root), cur_sign);
+            }
+
+            // Move to the next interval.
+            continue;
+        }
+
+        // The current interval is undecided. Check if it is too wide.
+        check_undecided_too_wide(ivals[i]);
+
+        // The current interval is a small undecided interval. Check if it is the first of a run of adjacent small
+        // undecided intervals (each starting exactly where the previous one ends). If it is, we will merge the run and
+        // report a single root.
+        //
+        // NOTE: eff_hi will end up pointing to the last hi bound in case of a run of consecutive small undecided
+        // intervals. Otherwise, it will remain cur_hi.
+        const auto *eff_hi = &cur_hi;
+        while (i + 1u < ivals.size() && ivals[i + 1u].type == detail::irr_interval_type::undecided
+               && ivals[i + 1u].lo == ivals[i].hi) {
+            ++i;
+
+            // Check the next interval in the run.
+            check_undecided_too_wide(ivals[i]);
+
+            // Re-assign eff_hi.
+            eff_hi = &ivals[i].hi;
+        }
+
+        // At this point [cur_lo, *eff_hi) is either a single small undecided interval, or it is a larger merged
+        // undecided interval. We report it as a single root at its midpoint.
+        auto candidate = detail::find_real_poly_roots_div_2(cur_lo) + detail::find_real_poly_roots_div_2(*eff_hi);
+        if (cur_lo > candidate || candidate >= *eff_hi) {
+            // If rounding places the midpoint outside the range, report the root at cur_lo.
+            candidate = cur_lo;
+        }
+        add_root(std::move(candidate), std::nullopt);
     }
 }
 

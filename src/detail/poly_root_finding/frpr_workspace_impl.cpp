@@ -298,6 +298,7 @@ void frpr_workspace_jit_data<T>::load(boost::archive::binary_iarchive &ar, unsig
     m_bernstein_func_3n = reinterpret_cast<bernstein_func_3n_t>(m_state.jit_lookup("bernstein_3n"));
     m_decasteljau_func_3n = reinterpret_cast<decasteljau_func_3n_t>(m_state.jit_lookup("decasteljau_3n"));
 #endif
+    m_root_finder_func = reinterpret_cast<root_finder_func_t>(m_state.jit_lookup("root_finder"));
 }
 
 template <typename T>
@@ -340,7 +341,7 @@ void frpr_workspace_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned)
     ar << m_jit_data;
     // NOTE: m_intervals is *not* saved on purpose.
     ar << m_vector_cache;
-    // NOTE: m_wlist is *not* saved on purpose.
+    // NOTE: m_wlist and m_rescaled_poly are *not* saved on purpose.
 
 #if defined(HEYOKA_HAVE_REAL)
     ar << m_vector_cache_3n;
@@ -353,9 +354,10 @@ void frpr_workspace_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned)
 template <typename T>
 void frpr_workspace_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
-    // NOTE: before deserialisation, make sure to clear out the working lists. They may contain cached vectors referring
-    // to the current vector caches, which will be soon replaced below.
+    // NOTE: before deserialisation, make sure to clear out the working lists and m_rescaled_poly. They may contain
+    // cached vectors referring to the current vector caches, which will be soon replaced below.
     m_wlist.clear();
+    m_rescaled_poly.reset();
 #if defined(HEYOKA_HAVE_REAL)
     m_wlist_3n.clear();
 #endif
@@ -391,7 +393,7 @@ vector_cache<T> frpr_workspace_impl_make_vector_cache([[maybe_unused]] const lon
     // NOTE: for mppp::real, validate the prec argument and make sure the fill value has the correct precision.
     if constexpr (std::same_as<T, mppp::real>) {
         if (prec < mppp::real_prec_min() || prec > mppp::real_prec_max()) [[unlikely]] {
-            throw std::invalid_argument(fmt::format("Invalid precision value {} specified to the constructor of a "
+            throw std::invalid_argument(fmt::format("Invalid precision value {} specified to the constructor of an "
                                                     "frpr_workspace: the value must be within the [{}, {}] bounds",
                                                     prec, mppp::real_prec_min(), mppp::real_prec_max()));
         }
@@ -425,6 +427,27 @@ frpr_workspace_impl<T>::frpr_workspace_impl(const long long prec, const std::uin
           frpr_workspace_impl_make_vector_cache<mppp::real>(frpr_workspace_impl_get_prec_3n<T>(prec), degree))
 #endif
 {
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: the real root isolation and the root finding assume that 2**-(p+1) is representable, where p is the working
+    // precision. For mppp::real (2**-(p+1) = 0.5 * 2**-p), this requires p <= -mpfr_get_emin(). Note that the
+    // assumption in mp++ is that the default emin is not touched, thus we are also here assuming that emin won't be
+    // changed after the creation of the workspace (which could make the check void).
+    //
+    // NOTE: we are assuming that all builtin FP types and mppp::real128 are one of the standard IEEE formats, for which
+    // this property is always guaranteed to hold.
+    if constexpr (std::same_as<T, mppp::real>) {
+        if (prec > -mpfr_get_emin()) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(fmt::format("Invalid precision value {} specified to the constructor of an "
+                                                    "frpr_workspace: the value must not be greater than {}",
+                                                    prec, -mpfr_get_emin()));
+            // LCOV_EXCL_STOP
+        }
+    }
+
+#endif
+
     // JIT setup.
 
     // Fetch the internal scalar type corresponding to T.
@@ -443,6 +466,8 @@ frpr_workspace_impl<T>::frpr_workspace_impl(const long long prec, const std::uin
 
 #endif
 
+    irr_add_poly_root_finder("root_finder", m_jit_data->m_state, fp_t, m_degree);
+
     // Compile and fetch the pointers.
     m_jit_data->m_state.compile();
 
@@ -459,12 +484,15 @@ frpr_workspace_impl<T>::frpr_workspace_impl(const long long prec, const std::uin
         m_jit_data->m_state.jit_lookup("decasteljau_3n"));
 
 #endif
+
+    m_jit_data->m_root_finder_func = reinterpret_cast<frpr_workspace_jit_data<T>::root_finder_func_t>(
+        m_jit_data->m_state.jit_lookup("root_finder"));
 }
 
 // Copy constructor.
 //
-// For the scratch data, we adopt the policy of a fresh init - empty m_intervals, empty working lists and empty vector
-// caches inited with the widths and fill values from other.
+// For the scratch data, we adopt the policy of a fresh init - empty m_intervals, empty working lists, empty
+// m_rescaled_poly and empty vector caches inited with the widths and fill values from other.
 template <typename T>
 frpr_workspace_impl<T>::frpr_workspace_impl(const frpr_workspace_impl &other)
     : m_prec(other.m_prec), m_degree(other.m_degree), m_jit_data(other.m_jit_data),
