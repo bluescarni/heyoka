@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <limits>
 #include <random>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -21,6 +22,7 @@
 
 #if defined(HEYOKA_HAVE_REAL)
 
+#include <mp++/integer.hpp>
 #include <mp++/real.hpp>
 
 #endif
@@ -215,23 +217,56 @@ compare_batch_scalar<mppp::real128>(const std::vector<std::pair<heyoka::expressi
 
 // Convert the finite value x of type T exactly to a rational.
 //
-// x is split into a sum of doubles, each of which is converted exactly. Each subtraction is exact by Sterbenz's lemma,
-// as d (x rounded to double) is within a factor 2 of x. This requires x and the remainders to be within the normal
-// range of double.
+// For mppp::real, x is decomposed exactly as n * 2**e, with n an integer. For the other types, x is written as m * 2**e
+// via frexp(), with 0.5 <= |m| < 1, and m is split into a sum of doubles, each of which is converted exactly: at each
+// step, d is m rounded to double, the subtraction m - d is exact by Sterbenz's lemma (d is within a factor 2 of m), and
+// the remainder is renormalised via frexp(). Because m is always in [0.5, 1) in absolute value when it is converted to
+// double, the conversion never underflows or overflows, whatever the exponent of x.
 template <typename T>
 boost::multiprecision::cpp_rational to_rat(T x)
 {
     using rat = boost::multiprecision::cpp_rational;
+    using int_t = boost::multiprecision::cpp_int;
 
-    rat ret = 0;
+    // Helper to compute 2**e as a rational.
+    const auto pow2 = [](long long e) { return e >= 0 ? rat(int_t(1) << e) : rat(int_t(1), int_t(1) << -e); };
 
-    while (x != 0) {
-        const auto d = static_cast<double>(x);
-        ret += rat(d);
-        x -= static_cast<T>(d);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: zero must be handled separately, because for zero mpfr_get_z_2exp() returns the minimum exponent of
+        // MPFR (e.g., 1 - 2**30), and computing 2**e would be prohibitively expensive.
+        if (x.zero_p()) {
+            return rat(0);
+        }
+
+        mppp::integer<1> n;
+        const auto e = mppp::get_z_2exp(n, x);
+
+        return rat(int_t(n.to_string())) * pow2(e);
+    } else {
+#endif
+        using std::frexp;
+
+        rat ret = 0;
+
+        int e = 0;
+        auto m = frexp(x, &e);
+
+        while (m != 0) {
+            const auto d = static_cast<double>(m);
+            ret += rat(d) * pow2(e);
+            m -= static_cast<T>(d);
+
+            // Renormalise the remainder.
+            int e_rem = 0;
+            m = frexp(m, &e_rem);
+            e += e_rem;
+        }
+
+        return ret;
+#if defined(HEYOKA_HAVE_REAL)
     }
-
-    return ret;
+#endif
 }
 
 template boost::multiprecision::cpp_rational to_rat<float>(float x);

@@ -13,10 +13,12 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -28,6 +30,10 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS frpr_workspace;
 
 namespace detail
 {
+
+// Helper to add a polynomial root finder to an llvm_state.
+HEYOKA_DLL_PUBLIC llvm::Function *irr_add_poly_root_finder(const std::string &, llvm_state &, llvm::Type *,
+                                                           std::uint32_t);
 
 // Enum describing the type of an interval returned by isolate_real_roots().
 //
