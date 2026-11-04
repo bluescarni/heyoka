@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Event detection now uses a rigorous real root isolation algorithm based on interval arithmetic
+  (`#561 <https://github.com/bluescarni/heyoka/pull/561>`__).
 - The ``propagate_grid()`` function of the batch integrator now supports
   grids in which different batch elements are propagated in different directions
   (`#558 <https://github.com/bluescarni/heyoka/pull/558>`__).
