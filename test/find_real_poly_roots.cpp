@@ -1256,9 +1256,9 @@ TEST_CASE("find_real_poly_roots wide undecided interval")
     // bisected down to the minimum width with an exact sign-change count, and it is reported as a single root with an
     // empty direction.
     //
-    // NOTE: as in the "double root" tests, the root is reported at t = h*mid, where mid is the midpoint of the undecided
-    // interval [lo, lo + 2**-53) containing tau = 3/10. The tolerance k = 4 has been measured by exact computation of
-    // h*mid (the distance is at most 1 floating-point value).
+    // NOTE: as in the "double root" tests, the root is reported at t = h*mid, where mid is the midpoint of the
+    // undecided interval [lo, lo + 2**-53) containing tau = 3/10. The tolerance k = 4 has been measured by exact
+    // computation of h*mid (the distance is at most 1 floating-point value).
     for (const auto &[c, h, root] : {std::tuple{cfs, 10., rat_t(3)}, std::tuple{cfs_mirror, -10., rat_t(-3)}}) {
         const auto ret = run_find_roots(c, h, 0.);
         REQUIRE(ret.size() == 1u);
@@ -1291,17 +1291,17 @@ TEST_CASE("find_real_poly_roots merged undecided intervals")
         // Helper to check that the polynomial with coefficients cfs has a root exactly at root0 with an empty
         // direction, followed by two roots within 160 floating-point values of root1 and root2, with directions -1
         // and 1.
-        const auto check = [](const std::vector<fp_t> &cfs, fp_t h, const rat_t &root0, const rat_t &root1,
-                              const rat_t &root2) {
-            const auto ret = run_find_roots(cfs, h, fp_t(0));
-            REQUIRE(ret.size() == 3u);
-            REQUIRE(within_steps(ret[0].t, root0, 0));
-            REQUIRE(!ret[0].dir);
-            REQUIRE(within_steps(ret[1].t, root1, 160));
-            REQUIRE(ret[1].dir == -1);
-            REQUIRE(within_steps(ret[2].t, root2, 160));
-            REQUIRE(ret[2].dir == 1);
-        };
+        const auto check
+            = [](const std::vector<fp_t> &cfs, fp_t h, const rat_t &root0, const rat_t &root1, const rat_t &root2) {
+                  const auto ret = run_find_roots(cfs, h, fp_t(0));
+                  REQUIRE(ret.size() == 3u);
+                  REQUIRE(within_steps(ret[0].t, root0, 0));
+                  REQUIRE(!ret[0].dir);
+                  REQUIRE(within_steps(ret[1].t, root1, 160));
+                  REQUIRE(ret[1].dir == -1);
+                  REQUIRE(within_steps(ret[2].t, root2, 160));
+                  REQUIRE(ret[2].dir == 1);
+              };
 
         check({fp_t(-360), fp_t(157), fp_t(-22), fp_t(1)}, fp_t(10), rat_t(5), rat_t(8), rat_t(9));
         check({fp_t(360), fp_t(157), fp_t(22), fp_t(1)}, fp_t(-10), rat_t(-5), rat_t(-8), rat_t(-9));
@@ -1717,7 +1717,7 @@ TEST_CASE("find_real_poly_roots low precision real")
     using mppp::real;
 
     const auto prec = 10;
-    const auto r = [prec](int v) { return real{v, prec}; };
+    const auto r = [&](int v) { return real{v, prec}; };
 
     std::vector<real_poly_root<real>> ret;
 
@@ -1739,8 +1739,8 @@ TEST_CASE("find_real_poly_roots low precision real")
         REQUIRE(ret[0].t.get_prec() == prec);
     }
 
-    // p(t) = (t - 1)(t - 2)(2t - 5) with h = 3, and lb = 1.5 with a precision of 200 bits: the roots at t = 2 and t = 2.5
-    // are reported.
+    // p(t) = (t - 1)(t - 2)(2t - 5) with h = 3, and lb = 1.5 with a precision of 200 bits: the roots at t = 2 and t
+    // = 2.5 are reported.
     {
         frpr_workspace<real> ws(3, prec);
         const std::vector cfs = {r(-10), r(19), r(-11), r(2)};
