@@ -190,31 +190,31 @@ void detect_events_common_impl(auto &out, const std::vector<Event> &ev_vec, cons
         // the root. The latter is needed only for terminal events, but it may be computed for non-terminal events if
         // the root direction is not available from the output of poly root finding.
         auto [d_sgn, der_opt] = [&root, &cfs, order] {
-            std::optional<T> der_opt;
+            std::optional<T> d_opt;
             if (is_terminal_event_v<Event> || !root.dir) {
                 // NOTE: for mppp::real poly_eval_1 may produce a value whose precision is greater than the working
                 // precision. This is ok, as the derivative is used only for its sign and, for terminal events, for the
                 // automatic cooldown deduction, where the cooldown values are allowed to have a different precision.
-                der_opt.emplace(poly_eval_1(cfs.data(), root.t, order));
+                d_opt.emplace(poly_eval_1(cfs.data(), root.t, order));
 
                 // Check it before proceeding.
-                if (!isfinite(*der_opt)) [[unlikely]] {
+                if (!isfinite(*d_opt)) [[unlikely]] {
                     // LCOV_EXCL_START
                     throw std::runtime_error(fmt::format("The evaluation of the derivative of an event function during "
                                                          "event detection produced the non-finite value {}",
-                                                         *der_opt));
+                                                         *d_opt));
                     // LCOV_EXCL_STOP
                 }
             }
 
             if (root.dir) {
                 // The direction is available, use it.
-                return std::make_pair(*root.dir, std::move(der_opt));
+                return std::make_pair(*root.dir, std::move(d_opt));
             } else {
                 // Compute the sign of the derivative from der_opt.
-                assert(der_opt);
-                const auto d_sgn = detail::sgn(*der_opt);
-                return std::make_pair(d_sgn, std::move(der_opt));
+                assert(d_opt);
+                const auto der_sgn = detail::sgn(*d_opt);
+                return std::make_pair(der_sgn, std::move(d_opt));
             }
         }();
 
