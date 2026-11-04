@@ -118,7 +118,7 @@ mppp::real find_real_poly_roots_div_2<mppp::real>(mppp::real x)
 // met, a std::invalid_argument is thrown.
 //
 // The roots in ret are reported in increasing t for h > 0, decreasing t for h < 0. Consecutive roots in ret may have
-// the same value. All reported roots are guaranteed to be finite.
+// the same value. All reported roots are guaranteed to be finite. Roots at zero are always reported as +0.
 template <typename T>
 void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T> &ws, const std::span<const T> cfs,
                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)

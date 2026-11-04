@@ -8,28 +8,22 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
-#include <cerrno>
 #include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <initializer_list>
-#include <iterator>
-#include <limits>
 #include <memory>
+#include <optional>
+#include <span>
 #include <stdexcept>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
-#include <boost/cstdint.hpp>
-#include <boost/math/policies/policy.hpp>
-#include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/core.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -41,65 +35,19 @@
 
 #include <mp++/real.hpp>
 
-#include <boost/math/special_functions/sign.hpp>
-#include <boost/math/tools/roots.hpp>
-
 #endif
-
-#include <fmt/format.h>
-
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constant.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
 
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/visibility.hpp>
+#include <heyoka/detail/tbb_isolated.hpp>
+#include <heyoka/find_real_poly_roots.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
-
-#if defined(HEYOKA_HAVE_REAL)
-
-namespace boost::math
-{
-
-// NOTE: specialise the Boost sign() function for mppp::real,
-// as this is needed in the bisection algorithm.
-template <>
-int sign(const mppp::real &z)
-{
-    // NOTE: avoid throwing if z is nan,
-    // and return zero for consistency with
-    // the branchless sign function.
-    if (z.nan_p()) {
-        return 0;
-    }
-
-    const auto ret = z.sgn();
-
-    // NOLINTNEXTLINE(readability-avoid-nested-conditional-operator)
-    return ret == 0 ? 0 : (ret < 0 ? -1 : 1);
-}
-
-} // namespace boost::math
-
-#endif
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -109,148 +57,10 @@ namespace detail
 namespace
 {
 
-// Helper to fetch the number of binary digits in the significand of x.
-template <typename T>
-std::uint64_t num_digits_of([[maybe_unused]] const T &x)
-{
-#if defined(HEYOKA_HAVE_REAL)
-    if constexpr (std::same_as<T, mppp::real>) {
-        return boost::numeric_cast<std::uint64_t>(x.get_prec());
-    } else {
-#endif
-        return boost::numeric_cast<std::uint64_t>(std::numeric_limits<T>::digits);
-#if defined(HEYOKA_HAVE_REAL)
-    }
-#endif
-}
-
-// LCOV_EXCL_START
-
-#if defined(HEYOKA_HAVE_STRERROR_R)
-
-// NOTE: the strerror_r() function is the thread-safe counterpart to strerror(), and it can come in 2 flavours with
-// different signatures: POSIX and GNU. We want to be able to use either. See:
+// Evaluate the first derivative of a polynomial. Requires random-access iterator.
 //
-// https://www.man7.org/linux/man-pages/man3/strerror.3.html
-
-// NOTE: we introduce a small wrapper for the invocation of strerror_r(). The reason is that we will need to examine the
-// signature of strerror_r() in order to determine how to call it (see below), but it is underspecified whether or not
-// strerror_r() is marked noexcept, which complicates the logic. Thus, we introduce this wrapper which is explicitly
-// noexcept.
-decltype(auto) strerror_r_wrap(int errnum, char *buf, std::size_t buflen) noexcept
-{
-    return ::strerror_r(errnum, buf, buflen);
-}
-
-// This is the strerror_r() wrapper we will be using in the code below. It will return a pointer to the storage
-// containing the null-terminated error message on success, nullptr on failure. The returned pointer could be buf or a
-// pointer to static storage, depending on the strerror_r() variant being called.
-template <typename T = decltype(&strerror_r_wrap)>
-const char *errno_to_str(int errnum, char *buf, std::size_t buflen, T f = &strerror_r_wrap) noexcept
-{
-    if constexpr (std::same_as<T, int (*)(int, char *, std::size_t) noexcept>) {
-        // POSIX version. This one can fail, if it succeeds the error will be written into buf.
-        //
-        // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
-        if (f(errnum, buf, buflen) == 0) [[likely]] {
-            return buf;
-        } else {
-            return nullptr;
-        }
-    } else {
-        // GNU version. This one never fails, but it could write into and return something other than buf.
-        static_assert(std::same_as<T, char *(*)(int, char *, std::size_t) noexcept>);
-        return f(errnum, buf, buflen);
-    }
-}
-
-#endif
-
-// LCOV_EXCL_STOP
-
-// Given an input polynomial a(x), substitute
-// x with x_1 * scal and write to ret the resulting
-// polynomial in the new variable x_1. Requires
-// random-access iterators.
-// NOTE: aliasing allowed.
-template <typename OutputIt, typename InputIt, typename T>
-void poly_rescale(OutputIt ret, InputIt a, const T &scal, std::uint32_t n)
-{
-#if defined(HEYOKA_HAVE_REAL)
-
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        assert(std::all_of(ret, ret + n + 1u, [&](const auto &x) { return x.get_prec() == scal.get_prec(); }));
-        assert(std::all_of(a, a + n + 1u, [&](const auto &x) { return x.get_prec() == scal.get_prec(); }));
-    }
-
-#endif
-
-    auto cur_f = num_one_like(scal);
-
-    for (std::uint32_t i = 0; i <= n; ++i) {
-        // NOTE: possible optimisation for mppp::real here:
-        // don't assign separately, do the ternary mul instead.
-        ret[i] = a[i];
-        ret[i] *= cur_f;
-        cur_f *= scal;
-    }
-}
-
-// Transform the polynomial a(x) into 2**n * a(x / 2).
-// Requires random-access iterators.
-// NOTE: aliasing allowed.
-template <typename OutputIt, typename InputIt>
-void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
-{
-    using value_type = std::iterator_traits<InputIt>::value_type;
-
-#if defined(HEYOKA_HAVE_REAL)
-    if constexpr (std::is_same_v<value_type, mppp::real>) {
-        assert(std::all_of(ret, ret + n + 1u, [&](const auto &x) { return x.get_prec() == ret[0].get_prec(); }));
-        assert(std::all_of(a, a + n + 1u, [&](const auto &x) { return x.get_prec() == ret[0].get_prec(); }));
-
-        for (std::uint32_t i = 0; i <= n; ++i) {
-            mppp::mul_2ui(ret[n - i], a[n - i], boost::numeric_cast<unsigned long>(i));
-        }
-    } else {
-#endif
-        value_type cur_f(1);
-
-        for (std::uint32_t i = 0; i <= n; ++i) {
-            ret[n - i] = cur_f * a[n - i];
-            cur_f *= 2;
-        }
-#if defined(HEYOKA_HAVE_REAL)
-    }
-#endif
-}
-
-// Generic branchless sign function.
-template <typename T>
-int sgn(T val)
-{
-    return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
-}
-
-#if defined(HEYOKA_HAVE_REAL)
-
-int sgn(const mppp::real &val)
-{
-    // NOTE: this is only used when val is guaranteed
-    // to be finite, thus this should never throw.
-    assert(!val.nan_p());
-    const auto ret = val.sgn();
-
-    // NOTE: for consistency with the other implementation,
-    // don't return ret directly (as it could be different from
-    // 0, -1 or 1).
-    return sgn(ret);
-}
-
-#endif
-
-// Evaluate the first derivative of a polynomial.
-// Requires random-access iterator.
+// NOTE: if T is mppp::real, the output of this function may have a precision greater than that of the poly coefficients
+// and x.
 template <typename InputIt, typename T>
 auto poly_eval_1(InputIt a, const T &x, std::uint32_t n)
 {
@@ -268,143 +78,6 @@ auto poly_eval_1(InputIt a, const T &x, std::uint32_t n)
     return ret1;
 }
 
-// Evaluate polynomial.
-// Requires random-access iterator.
-template <typename InputIt, typename T>
-auto poly_eval(InputIt a, const T &x, std::uint32_t n)
-{
-    auto ret = a[n];
-
-    for (std::uint32_t i = 1; i <= n; ++i) {
-        // NOTE: possible optimisation for mppp::real here:
-        // use fma() directly, at least in case of MPFR 4 and later.
-        ret = a[n - i] + std::move(ret) * x;
-    }
-
-    return ret;
-}
-
-#if defined(HEYOKA_HAVE_REAL)
-
-// Custom implementation of the tolerance class
-// for mppp::real, for use in the bisection algorithm.
-// This is copied/adapted from the default implementation
-// of boost::math::tools::eps_tolerance.
-class real_eps_tolerance
-{
-public:
-    explicit real_eps_tolerance(const mppp::real &x) : eps(4 * num_eps_like(x)) {}
-    bool operator()(const mppp::real &a, const mppp::real &b)
-    {
-        using std::abs;
-
-        return abs(a - b) <= (eps * std::min(abs(a), abs(b)));
-    }
-
-private:
-    mppp::real eps;
-};
-
-#endif
-
-// Find the only existing root for the polynomial poly of the given order
-// existing in [lb, ub).
-template <typename T>
-std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb, T ub)
-{
-    using std::isfinite;
-    using std::nextafter;
-
-    // NOTE: the Boost root finding routine searches in a closed interval,
-    // but the goal here is to find a root in [lb, ub). Thus, we move ub
-    // one position down so that it is not considered in the root finding routine.
-    if (isfinite(lb) && isfinite(ub) && ub > lb) {
-        ub = nextafter(ub, lb);
-    }
-
-    // NOTE: iter limit will be derived from the number of binary digits
-    // in the significand.
-    const boost::uintmax_t iter_limit = [&] {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            // NOTE: we use lb here, but any of lb, ub or the poly
-            // coefficients should be guaranteed to have at least the
-            // working precision of the root finding scheme.
-            // NOTE: since we use bisection for mppp::real, we need to allow
-            // for more iterations than the number of digits.
-            return boost::safe_numerics::safe<boost::uintmax_t>(lb.get_prec()) * 2;
-        } else {
-#endif
-            return boost::numeric_cast<boost::uintmax_t>(std::numeric_limits<T>::digits);
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
-    }();
-
-    auto max_iter = iter_limit;
-
-    // Ensure that root finding does not throw on error,
-    // rather it will write something to errno instead.
-    // https://www.boost.org/doc/libs/1_75_0/libs/math/doc/html/math_toolkit/pol_tutorial/namespace_policies.html
-    using boost::math::policies::domain_error;
-    using boost::math::policies::errno_on_error;
-    using boost::math::policies::evaluation_error;
-    using boost::math::policies::overflow_error;
-    using boost::math::policies::pole_error;
-    using boost::math::policies::policy;
-
-    using pol = policy<domain_error<errno_on_error>, pole_error<errno_on_error>, overflow_error<errno_on_error>,
-                       evaluation_error<errno_on_error>>;
-
-    // Clear out errno before running the root finding.
-    errno = 0;
-
-    // Run the root finder.
-    //
-    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-    //
-    // NOLINTNEXTLINE(misc-const-correctness)
-    auto p = [&] {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            return boost::math::tools::bisect([poly, order](const auto &x) { return poly_eval(poly, x, order); }, lb,
-                                              ub, real_eps_tolerance(lb), max_iter, pol{});
-        } else {
-#endif
-            return boost::math::tools::toms748_solve([poly, order](T x) { return poly_eval(poly, x, order); }, lb, ub,
-                                                     boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
-    }();
-
-    // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-    //
-    // NOLINTNEXTLINE(misc-const-correctness)
-    auto ret = std::move(p.first) / 2 + std::move(p.second) / 2;
-
-    SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
-
-    if (errno > 0) {
-        // Some error condition arose during root finding,
-        // return zero and errno.
-        return std::tuple{static_cast<T>(0), errno};
-    }
-
-    if (max_iter < iter_limit) {
-        // Root finding terminated within the
-        // iteration limit, return ret and success.
-        return std::tuple{std::move(ret), 0};
-    } else {
-        // LCOV_EXCL_START
-        // Root finding needed too many iterations,
-        // return the (possibly wrong) result
-        // and flag -1.
-        return std::tuple{std::move(ret), -1};
-        // LCOV_EXCL_STOP
-    }
-}
-
 // Helper to detect events of terminal type.
 template <typename>
 struct is_terminal_event : std::false_type {};
@@ -414,110 +87,6 @@ struct is_terminal_event<t_event_impl<T, B>> : std::true_type {};
 
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
-
-} // namespace
-
-// Helper to add a polynomial translation function
-// to the state 's'.
-// NOTE: these event-detection-related LLVM functions are currently not mangled in any way.
-llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint32_t order, std::uint32_t batch_size)
-{
-    assert(order > 0u); // LCOV_EXCL_LINE
-
-    // Overflow check: we need to be able to index
-    // into the array of coefficients.
-    // LCOV_EXCL_START
-    if (order == std::numeric_limits<std::uint32_t>::max()
-        || batch_size > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
-        throw std::overflow_error("Overflow detected while adding a polynomial translation function");
-    }
-    // LCOV_EXCL_STOP
-
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the external type corresponding to fp_t.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
-    // Helper to fetch the (i, j) binomial coefficient from
-    // a precomputed global array. The returned value is already
-    // splatted.
-    auto get_bc = [&, bc_ptr = llvm_add_bc_array(s, fp_t, order)](llvm::Value *i, llvm::Value *j) {
-        auto *idx = builder.CreateMul(i, builder.getInt32(order + 1u));
-        idx = builder.CreateAdd(idx, j);
-
-        auto *val = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, bc_ptr, idx));
-
-        return vector_splat(builder, val, batch_size);
-    };
-
-    // Fetch the current insertion block.
-    auto *orig_bb = builder.GetInsertBlock();
-
-    // The function arguments:
-    //
-    // - the output pointer,
-    // - the pointer to the poly coefficients (read-only).
-    //
-    // No overlap is allowed, all pointers are to external types.
-    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(context));
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-    // Now create the function.
-    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
-
-    // Set the names/attributes of the function arguments.
-    auto *out_ptr = f->args().begin();
-    out_ptr->setName("out_ptr");
-    llvm_add_no_capture_argattr(s, out_ptr);
-    out_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    auto *cf_ptr = f->args().begin() + 1;
-    cf_ptr->setName("cf_ptr");
-    llvm_add_no_capture_argattr(s, cf_ptr);
-    cf_ptr->addAttr(llvm::Attribute::NoAlias);
-    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
-    // Init the return values as zeroes.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
-        ext_store_vector_to_memory(s, ptr, vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size));
-    });
-
-    // Do the translation.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        auto *ai = ext_load_vector_from_memory(
-            s, fp_t, builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
-            batch_size);
-
-        llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
-            auto *tmp = llvm_fmul(s, ai, get_bc(i, k));
-
-            auto *ptr
-                = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto *new_val = llvm_fadd(s, ext_load_vector_from_memory(s, fp_t, ptr, batch_size), tmp);
-            ext_store_vector_to_memory(s, ptr, new_val);
-        });
-    });
-
-    // Create the return value.
-    builder.CreateRetVoid();
-
-    // Restore the original insertion block.
-    builder.SetInsertPoint(orig_bb);
-
-    // NOTE: the optimisation pass will be run outside.
-    return f;
-}
-
-namespace
-{
 
 // Helper to automatically deduce the cooldown for a terminal event. g_eps is the maximum absolute error on the Taylor
 // series of the event equation (which depends on the integrator tolerance and the infinity norm of the state
@@ -559,416 +128,143 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     }
 }
 
+// Generic branchless sign function.
+template <typename T>
+int sgn(T val)
+{
+    return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+int sgn(const mppp::real &val)
+{
+    // NOTE: this is only used when val is guaranteed to be finite, thus this should never throw.
+    assert(!val.nan_p());
+    const auto ret = val.sgn();
+
+    // NOTE: for consistency with the other implementation, don't return ret directly (as it could be different from 0,
+    // -1 or 1).
+    return sgn(ret);
+}
+
+#endif
+
 // Helper to factor out common event detection code in the scalar and batch implementations.
 //
-// h is the integration timestep (assumed finite and nonzero). ptr is a pointer to the Taylor polynomial for the event,
-// whose order is 'order'. It must point to a scalar polynomial with order + 1 contiguous coefficients. poly_cache is
-// the polynomial cache. rtscc and pt are, respectively, the sign changes counting and polynomial translation functions.
-// isol is the list of isolating intervals. wlist the working list. out is the output vector for the detected events.
-// ev_vec is the vector of events. ev_idx is the index of the event being detected in ev_vec. te_cooldowns is the vector
-// of cooldowns for terminal events, relevant only if Event is a terminal event type. tmp, tmp1 and tmp2 are temporary
-// polynomials used in the bisection loop. poly_init is the value that will be used to initialise the coefficients of
-// newly-created polynomials in the caches.
+// out is the output vector for the detected events. ev_vec is the vector of events. ev_idx is the index of the event
+// being detected in ev_vec. te_cooldowns is the vector of cooldowns for terminal events, relevant only if Event is a
+// terminal event type. roots is scratch storage for the roots detected by find_real_poly_roots() (its content is not
+// important, as it will be cleared out before usage). ws is the workspace for find_real_poly_roots(), which must have
+// been constructed for the polynomial degree of cfs (and, for mppp::real, with the precision of cfs and h). cfs
+// contains the Taylor coefficients of the event function in ascending order (assumed finite, with at least 3
+// coefficients). h is the integration timestep (assumed finite and nonzero).
 //
 // This function will detect the trigger time(s) of the event at index ev_idx in ev_vec and append the detected events
-// (possibly including duplicates) to the output vector out.
+// to the output vector out. The appended events may include duplicates (i.e., events with the same index and trigger
+// time), which may differ in the sign of the derivative.
+//
+// Exceptions raised by find_real_poly_roots() are propagated. Additionally, a std::runtime_error is thrown if the
+// evaluation of the derivative of the event function at a root produces a non-finite value.
 template <typename T, typename Event>
-void detect_events_common_impl(const T &h, const T *const ptr, const std::uint32_t order,
-                               taylor_poly_cache<T> &poly_cache, auto *const rtscc, auto *const pt, auto &isol,
-                               auto &wlist, auto &out, const std::vector<Event> &ev_vec, const std::uint32_t ev_idx,
-                               [[maybe_unused]] const auto &te_cooldowns, taylor_pwrap<T> &tmp, taylor_pwrap<T> &tmp1,
-                               taylor_pwrap<T> &tmp2, const T &poly_init)
+void detect_events_common_impl(auto &out, const std::vector<Event> &ev_vec, const std::uint32_t ev_idx,
+                               [[maybe_unused]] const auto &te_cooldowns, std::vector<real_poly_root<T>> &roots,
+                               frpr_workspace<T> &ws, const std::span<const T> cfs, const T &h)
 {
     using std::abs;
     using std::isfinite;
-    using std::nextafter;
 
-    assert(ptr != nullptr);
-    assert(order >= 2u);
-    assert(rtscc != nullptr);
-    assert(pt != nullptr);
     assert(isfinite(h));
     assert(h != 0);
-    assert(ev_idx < ev_vec.size());
+    assert(cfs.size() > 2u);
 
-    // The minimum width (in the [0, 1) range of the timestep) of the intervals that can be bisected in the real-root
-    // isolation algorithm. Intervals narrower than this that would need further bisection are dropped.
-    //
-    // NOTE: roots closer to each other than eps (in the [0, 1) range of the timestep) cannot be meaningfully separated.
-    // Additionally, because intervals are bisected only if their width is at least eps, all interval bounds are
-    // multiples of 2**-digits in [0, 1], which are exactly representable. Thus, the bounds and their midpoints are
-    // computed exactly.
-    const auto min_width = num_eps_like(h);
-
-    // The maximum number of iterations in the real-root isolation algorithm.
-    //
-    // NOTE: due to min_width, the bisection depth is at most the number of binary digits in the significand of h. For
-    // a well-behaved polynomial, at most order intervals are processed at each depth level. We add a safety factor
-    // of 2.
-    const std::uint64_t max_iter = (boost::safe_numerics::safe<std::uint64_t>(num_digits_of(h)) + 1u) * order * 2u;
-
-    // Clear out the list of isolating intervals.
-    isol.clear();
-
-    // Reset the working list.
-    wlist.clear();
+    // Fetch the order from cfs.
+    const auto order = static_cast<std::uint32_t>(cfs.size() - 1u);
 
     // Helper to add a detected event to out.
     //
-    // NOTE: the root here is expected to be already rescaled to the [0, h) range.
-    const auto add_d_event = [&](T root) {
-        // NOTE: we do one last check on the root in order to avoid non-finite event times. This guarantees that sorting
-        // the events by time is safe.
-        if (!isfinite(root)) [[unlikely]] {
-            // LCOV_EXCL_START
-            get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
-                               fp_to_string(root));
-            return;
-            // LCOV_EXCL_STOP
-        }
+    // NOTE: the roots detected via find_real_poly_roots() are guaranteed to be finite and to be reported in the
+    // original [0, h)/(h, 0] range.
+    const auto add_d_event = [&out, &cfs, order, &ev_vec, ev_idx](real_poly_root<T> &root) {
+        // Get the direction of the root and an optional containing the value of the derivative of the event function at
+        // the root. The latter is needed only for terminal events, but it may be computed for non-terminal events if
+        // the root direction is not available from the output of poly root finding.
+        auto [d_sgn, der_opt] = [&root, &cfs, order] {
+            std::optional<T> der_opt;
+            if (is_terminal_event_v<Event> || !root.dir) {
+                // NOTE: for mppp::real poly_eval_1 may produce a value whose precision is greater than the working
+                // precision. This is ok, as the derivative is used only for its sign and, for terminal events, for the
+                // automatic cooldown deduction, where the cooldown values are allowed to have a different precision.
+                der_opt.emplace(poly_eval_1(cfs.data(), root.t, order));
 
-        if (abs(root) >= abs(h)) [[unlikely]] {
-            // LCOV_EXCL_START
+                // Check it before proceeding.
+                if (!isfinite(*der_opt)) [[unlikely]] {
+                    // LCOV_EXCL_START
+                    throw std::runtime_error(fmt::format("The evaluation of the derivative of an event function during "
+                                                         "event detection produced the non-finite value {}",
+                                                         *der_opt));
+                    // LCOV_EXCL_STOP
+                }
+            }
 
-            // NOTE: although event detection nominally happens in the [0, h) range, due to floating-point rounding we
-            // may end up detecting an abs(root) >= abs(h) in corner cases. If that happens, let us clamp root to be
-            // strictly < h in absolute value in order to respect the guarantee that events are always detected in the
-            // [0, h) range.
-            //
-            // NOTE: root cannot exit the [0, h) range from the other side, because all interval bounds in the rescaled
-            // [0, 1) range are non-negative and root finding never moves outside the isolating intervals.
-            get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
-                               "value, than the integration timestep {}",
-                               fp_to_string(root), fp_to_string(h));
-
-            root = nextafter(h, static_cast<T>(0));
-
-            // LCOV_EXCL_STOP
-        }
-
-        // Evaluate the derivative.
-        const auto der = poly_eval_1(ptr, root, order);
-
-        // Check it before proceeding.
-        if (!isfinite(der)) [[unlikely]] {
-            // LCOV_EXCL_START
-            get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
-                               "skipping the event",
-                               fp_to_string(root), fp_to_string(der));
-            return;
-            // LCOV_EXCL_STOP
-        }
-
-        // Compute the sign of the derivative.
-        const auto d_sgn = detail::sgn(der);
+            if (root.dir) {
+                // The direction is available, use it.
+                return std::make_pair(*root.dir, std::move(der_opt));
+            } else {
+                // Compute the sign of the derivative from der_opt.
+                assert(der_opt);
+                const auto d_sgn = detail::sgn(*der_opt);
+                return std::make_pair(d_sgn, std::move(der_opt));
+            }
+        }();
 
         // Fetch and cache the desired event direction.
         const auto dir = ev_vec[ev_idx].get_direction();
 
-        // The event must be added if the event direction does not matter, or if it matches the sign of the
-        // derivative.
+        // The event must be added if the event direction does not matter, or if it matches the sign of the derivative.
         if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
             if constexpr (is_terminal_event_v<Event>) {
-                out.emplace_back(ev_idx, std::move(root), d_sgn, abs(der));
+                assert(der_opt);
+                out.emplace_back(ev_idx, std::move(root.t), d_sgn, abs(std::move(*der_opt)));
             } else {
-                out.emplace_back(ev_idx, std::move(root), d_sgn);
+                out.emplace_back(ev_idx, std::move(root.t), d_sgn);
             }
         }
     };
 
     // NOTE: if we are dealing with a terminal event on cooldown, we will need to ignore roots within the cooldown
-    // period. lb_offset is the end of the cooldown in the [0, 1) range of the whole step.
-    const auto lb_offset = [&] {
+    // period. lb is the distance from the beginning of the timestep to the end of the cooldown.
+    //
+    // NOTE: for mppp::real, lb may come out with the wrong precision because the cooldown values are not guaranteed to
+    // have the working precision. This is ok, as find_real_poly_roots() will fix lb's precision as needed.
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
+    auto lb = [&] {
         if constexpr (is_terminal_event_v<Event>) {
             if (te_cooldowns[ev_idx]) {
                 // NOTE: need to distinguish between forward and backward integration.
                 //
-                // NOTE: the division by abs(h) will ensure that, in case of mppp::real, the result is computed
-                // in a precision no less than h's.
-                //
-                // NOTE: the cooldown values are finite with |first| <= second, thus the numerators are finite and
-                // non-negative. In these two computations, the worst outcome is the generation of a positive infinity
-                // (via overflow), which is correctly handled below.
+                // NOTE: the cooldown values are finite and |first| <= second, thus the worst that can happen here is
+                // the generation of a positive infinity or negative 0 (which are valid values for
+                // find_real_poly_roots()).
                 if (h < 0) {
-                    return (te_cooldowns[ev_idx]->second + te_cooldowns[ev_idx]->first) / abs(h);
+                    return te_cooldowns[ev_idx]->second + te_cooldowns[ev_idx]->first;
                 } else {
-                    return (te_cooldowns[ev_idx]->second - te_cooldowns[ev_idx]->first) / abs(h);
+                    return te_cooldowns[ev_idx]->second - te_cooldowns[ev_idx]->first;
                 }
             }
         }
 
         // NOTE: we end up here if the event is not terminal or not on cooldown.
-        //
-        // NOTE: ensure this is inited properly, precision-wise.
         return num_zero_like(h);
     }();
 
-    if (lb_offset >= 1) {
-        // LCOV_EXCL_START
+    // Run root finding.
+    find_real_poly_roots(roots, ws, cfs, h, std::move(lb));
 
-        // NOTE: the whole integration range is in the cooldown range, move to the next event.
-        SPDLOG_LOGGER_DEBUG(
-            get_logger(),
-            "the integration timestep falls within the cooldown range for the terminal event {}, skipping", ev_idx);
-        return;
-
-        // LCOV_EXCL_STOP
-    }
-
-    // Rescale the event polynomial so that the range [0, h) becomes [0, 1), and write the resulting polynomial into
-    // tmp.
-    //
-    // NOTE: tmp has been constructed correctly outside this function. Below, tmp will first be moved into wlist (thus
-    // rendering it invalid) but it will immediately be revived at the first iteration of the do/while loop. Thus, tmp
-    // is in a well-formed state on exit.
-    assert(!tmp.v.empty());
-    assert(tmp.v.size() - 1u == order);
-    poly_rescale(tmp.v.data(), ptr, h, order);
-
-    // Place the first element in the working list.
-    //
-    // NOTE: it's important that the initial bounds are created with the appropriate precision, in case of mppp::real.
-    // Otherwise, we risk of running the bisection at 32 bits of precision.
-    wlist.emplace_back(num_zero_like(h), num_one_like(h), std::move(tmp));
-
-#if !defined(NDEBUG)
-    // NOTE: in debug mode, we keep track of the max sizes of wlist and isol.
-    auto max_wl_size = wlist.size();
-    auto max_isol_size = isol.size();
-#endif
-
-    // Flag to signal that the do-while loop below failed.
-    bool loop_failed = false;
-
-    // Iteration counter for the do-while loop below.
-    std::uint64_t n_iter = 0;
-
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
-    do {
-        // Fetch the current interval and polynomial from the working list.
-        //
-        // NOTE: from now on, tmp contains the polynomial referred to as q(x) in the real-root isolation wikipedia page.
-        //
-        // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will be looking for. lb and ub
-        // represent what 0 and 1 correspond to in the *original* [0, 1) range.
-        //
-        // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-        //
-        // NOLINTNEXTLINE(misc-const-correctness)
-        auto lb = std::move(std::get<0>(wlist.back()));
-        // NOLINTNEXTLINE(misc-const-correctness)
-        auto ub = std::move(std::get<1>(wlist.back()));
-        // NOTE: this will either revive an invalid tmp (first iteration), or it will replace it with one of the
-        // bisecting polynomials.
-        tmp = std::move(std::get<2>(wlist.back()));
-        wlist.pop_back();
-
-        // Check for an event at the lower bound, which occurs if the constant term of the polynomial is zero. We also
-        // check for finiteness of all the other coefficients, otherwise we cannot really claim to have detected an
-        // event. Non-finite polynomials are otherwise dealt with by the finiteness checks on the root and on the
-        // derivative in add_d_event().
-        //
-        // NOTE: this is necessary because the sign-change counting algorithm provides information on the existence of
-        // real roots in the open interval (lb, ub) - if the root is exactly at lb, it will not be detected.
-        bool root_at_lb = false;
-        if (tmp.v[0] == 0 && std::ranges::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order, [](const auto &x) {
-                return isfinite(x);
-            })) {
-            root_at_lb = true;
-
-            // NOTE: we will have to skip the event if we are dealing with a terminal event on cooldown and the lower
-            // bound falls within the cooldown time.
-            std::conditional_t<is_terminal_event_v<Event>, bool, const bool> skip_event = false;
-            if constexpr (is_terminal_event_v<Event>) {
-                if (lb < lb_offset) {
-                    SPDLOG_LOGGER_DEBUG(get_logger(),
-                                        "terminal event {} detected at the lower bound of an interval is "
-                                        "subject to cooldown, ignoring",
-                                        ev_idx);
-                    skip_event = true;
-                }
-            }
-
-            if (!skip_event) {
-                // NOTE: the original range had been rescaled wrt to h. Thus, we need to rescale back when
-                // adding the detected event.
-                add_d_event(lb * h);
-            }
-        }
-
-        // Reverse tmp into tmp1, translate tmp1 by 1 with output in tmp2, and count the sign changes in tmp2.
-        std::uint32_t n_sc{};
-        rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
-
-        // NOTE: if root_at_lb is true and there is 1 sign change, the interval contains two distinct roots: one at lb
-        // and one in (lb, ub). Such an interval cannot be passed to the root finding below, which would return the root
-        // at lb instead of the one in (lb, ub). Thus, we keep on bisecting until the root in (lb, ub) ends up in an
-        // interval without a root at the lower bound.
-        if (n_sc == 1u && !root_at_lb) {
-            // Found isolating interval, add it to isol.
-            isol.emplace_back(std::move(lb), std::move(ub));
-        } else if (n_sc >= 1u) {
-            // Either more than one sign change, or one sign change and a root at the lower bound. Bisect, unless the
-            // interval is too small.
-            if (ub - lb < min_width) [[unlikely]] {
-                // NOTE: the roots in an interval narrower than min_width cannot be meaningfully separated. Drop
-                // the interval, but keep processing the other intervals.
-                SPDLOG_LOGGER_DEBUG(get_logger(),
-                                    "dropping an interval of width {} with {} sign change(s) during the "
-                                    "real-root isolation for the event {}",
-                                    fp_to_string(ub - lb), n_sc, ev_idx);
-            } else {
-                // First we transform q into 2**n * q(x/2) and store the result into tmp1.
-                poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
-                // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                pt(tmp2.v.data(), tmp1.v.data());
-
-                // Finally we add tmp1 and tmp2 to the working list.
-                //
-                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                //
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto mid = lb / 2 + ub / 2;
-
-                // NOTE: mid is computed exactly (see the explanation for min_width).
-                assert(lb < mid && mid < ub);
-
-                // NOTE: don't add the lower range if it falls entirely within the cooldown range.
-                if (lb_offset < mid) {
-                    wlist.emplace_back(std::move(lb), mid, std::move(tmp1));
-
-                    // Revive tmp1.
-                    tmp1 = taylor_pwrap<T>(poly_cache, order, poly_init);
-                } else {
-                    // LCOV_EXCL_START
-                    SPDLOG_LOGGER_DEBUG(get_logger(), "ignoring lower interval in a bisection that would fall "
-                                                      "entirely in the cooldown period");
-                    // LCOV_EXCL_STOP
-                }
-                wlist.emplace_back(std::move(mid), std::move(ub), std::move(tmp2));
-
-                // Revive tmp2.
-                tmp2 = taylor_pwrap<T>(poly_cache, order, poly_init);
-            }
-        }
-
-#if !defined(NDEBUG)
-        max_wl_size = std::max(max_wl_size, wlist.size());
-        max_isol_size = std::max(max_isol_size, isol.size());
-#endif
-
-        // LCOV_EXCL_START
-        // We want to put limits in order to avoid an endless loop when the algorithm fails. The first check is on the
-        // number of iterations (see the explanation for max_iter). The second check is that we cannot possibly find
-        // more isolating intervals than the degree of the polynomial.
-        if (++n_iter > max_iter || isol.size() > order) [[unlikely]] {
-            get_logger()->warn("the polynomial root isolation algorithm failed during event detection: the number of "
-                               "iterations is {} and the number of isolating intervals is {}",
-                               n_iter, isol.size());
-
-            loop_failed = true;
-
-            break;
-        }
-        // LCOV_EXCL_STOP
-
-    } while (!wlist.empty());
-
-#if !defined(NDEBUG)
-    SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
-    SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
-#endif
-
-    if (isol.empty() || loop_failed) {
-        // Don't do root finding for this event if the loop failed, or if the list of isolating intervals is empty. Just
-        // exit.
-        return;
-    }
-
-    // Reconstruct a version of the original event polynomial in which the range [0, h) is rescaled to [0, 1). We need
-    // to do root finding on the rescaled polynomial because the isolating intervals are also rescaled to [0, 1).
-    //
-    // NOTE: tmp1 was either created with the correct size outside this function, or it was re-created in the bisection
-    // above.
-    poly_rescale(tmp1.v.data(), ptr, h, order);
-
-    // Run the root finding in the isolating intervals.
-    for (auto &[lb, ub] : isol) {
-        if constexpr (is_terminal_event_v<Event>) {
-            // NOTE: if we are dealing with a terminal event subject to cooldown, we need to ensure that we don't look
-            // for roots before the cooldown has expired.
-            if (lb < lb_offset) {
-                // Make sure we move lb past the cooldown.
-                lb = lb_offset;
-
-                // NOTE: this should be ensured by the fact that we ensure above (lb_offset < mid) that we don't end up
-                // with an invalid interval.
-                assert(lb < ub);
-
-                // Check if the interval still contains a zero.
-                //
-                // NOTE: clang-tidy suggests constness but this prevents moving (important for mppp::real).
-                //
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto f_lb = poly_eval(tmp1.v.data(), lb, order);
-                // NOLINTNEXTLINE(misc-const-correctness)
-                auto f_ub = poly_eval(tmp1.v.data(), ub, order);
-
-                if (!(std::move(f_lb) * std::move(f_ub) < 0)) {
-                    SPDLOG_LOGGER_DEBUG(get_logger(), "terminal event {} is subject to cooldown, ignoring", ev_idx);
-                    continue;
-                }
-            }
-        }
-
-        // Run the root finding.
-        const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
-
-        if (cflag == 0) [[likely]] {
-            // Root finding finished successfully, record the event. The found root needs to be rescaled by h.
-            add_d_event(root * h);
-        } else {
-            // LCOV_EXCL_START
-            // Root finding encountered some issue. Ignore the event and log the issue.
-            if (cflag == -1) {
-                get_logger()->warn("polynomial root finding during event detection failed due to too many iterations");
-            } else {
-                // Helper to log with a default error message.
-                //
-                // NOLINTNEXTLINE(modernize-type-traits)
-                const auto log_default = [cflag] {
-                    get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                       "errno with error code {}",
-                                       cflag);
-                };
-
-#if defined(HEYOKA_HAVE_STRERROR_R)
-                // We have strerror_r() available, try to use it to produce a better error message.
-
-                // Buffer for the error message.
-                char err_msg_buf[256u];
-
-                // Attempt to produce the error message.
-                const auto *const err_msg = errno_to_str(cflag, err_msg_buf, std::ranges::size(err_msg_buf));
-
-                // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
-                if (err_msg == nullptr) [[unlikely]] {
-                    // Something went wrong while constructing the error message, log with the default error
-                    // message.
-                    log_default();
-                } else {
-                    // Log with the descriptive error message.
-                    get_logger()->warn("polynomial root finding during event detection returned a nonzero "
-                                       "errno with message '{}'",
-                                       err_msg);
-                }
-#else
-                // No strerror_r() available, log with the default error message.
-                log_default();
-#endif
-            }
-            // LCOV_EXCL_STOP
-        }
+    // Add the detected events.
+    for (auto &root : roots) {
+        add_d_event(root);
     }
 }
 
@@ -1012,308 +308,97 @@ mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
 
 #endif
 
-// Add a function that, given an input polynomial of order n represented
-// as an array of coefficients:
-// - reverses it,
-// - translates it by 1,
-// - counts the sign changes in the coefficients
-//   of the resulting polynomial.
-llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size)
-{
-    assert(batch_size > 0u); // LCOV_EXCL_LINE
-
-    // Overflow check: we need to be able to index
-    // into the array of coefficients.
-    // LCOV_EXCL_START
-    if (n == std::numeric_limits<std::uint32_t>::max()
-        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
-        throw std::overflow_error("Overflow detected while adding an rtscc function");
-    }
-    // LCOV_EXCL_STOP
-
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the external type.
-    auto *ext_fp_t = make_external_llvm_type(fp_t);
-
-    // Add the translator and the sign changes counting function.
-    auto *pt = add_poly_translator_1(s, fp_t, n, batch_size);
-    auto *scc = llvm_add_csc(s, fp_t, n, batch_size);
-
-    // Fetch the current insertion block.
-    auto *orig_bb = builder.GetInsertBlock();
-
-    // The function arguments:
-    //
-    // - two poly coefficients output pointers,
-    // - the output pointer to the number of sign changes (write-only),
-    // - the input pointer to the original poly coefficients (read-only).
-    //
-    // No overlap is allowed. The coefficient pointers are to external types.
-    const std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(context));
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-    // Now create the function.
-    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
-
-    // Set the names/attributes of the function arguments.
-    // NOTE: out_ptr1/2 are used both in read and write mode,
-    // even though this function never actually reads from them
-    // (they are just forwarded to other functions reading from them).
-    // Because I am not 100% sure about the writeonly attribute
-    // in this case, let's err on the side of caution and do not
-    // mark them as writeonly.
-    auto *out_ptr1 = f->args().begin();
-    out_ptr1->setName("out_ptr1");
-    llvm_add_no_capture_argattr(s, out_ptr1);
-    out_ptr1->addAttr(llvm::Attribute::NoAlias);
-
-    auto *out_ptr2 = f->args().begin() + 1;
-    out_ptr2->setName("out_ptr2");
-    llvm_add_no_capture_argattr(s, out_ptr2);
-    out_ptr2->addAttr(llvm::Attribute::NoAlias);
-
-    auto *n_sc_ptr = f->args().begin() + 2;
-    n_sc_ptr->setName("n_sc_ptr");
-    llvm_add_no_capture_argattr(s, n_sc_ptr);
-    n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
-    n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    auto *cf_ptr = f->args().begin() + 3;
-    cf_ptr->setName("cf_ptr");
-    llvm_add_no_capture_argattr(s, cf_ptr);
-    cf_ptr->addAttr(llvm::Attribute::NoAlias);
-    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
-    // Do the reversion into out_ptr1.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n + 1u), [&](llvm::Value *i) {
-        auto *load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
-        auto *store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
-
-        auto *cur_cf
-            = ext_load_vector_from_memory(s, fp_t, builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, load_idx), batch_size);
-        ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, out_ptr1, store_idx), cur_cf);
-    });
-
-    // Translate out_ptr1 into out_ptr2.
-    builder.CreateCall(pt, {out_ptr2, out_ptr1});
-
-    // Count the sign changes in out_ptr2.
-    builder.CreateCall(scc, {n_sc_ptr, out_ptr2});
-
-    // Return.
-    builder.CreateRetVoid();
-
-    // Restore the original insertion block.
-    builder.SetInsertPoint(orig_bb);
-
-    // NOTE: the optimisation pass will be run outside.
-    return f;
-}
-
-// A RAII helper to extract polys from a cache and
-// return them to the cache upon destruction.
-template <typename T>
-class taylor_pwrap
-{
-    auto get_poly_from_cache(std::uint32_t n, const T &poly_init)
-    {
-        if (pc->empty()) {
-            // No polynomials are available, create a new one.
-            return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(n + 1u), poly_init);
-        } else {
-            // Extract an existing polynomial from the cache.
-            auto retval = std::move(pc->back());
-            pc->pop_back();
-
-            assert(retval.size() == n + 1u);
-
-            return retval;
-        }
-    }
-
-    void back_to_cache()
-    {
-        // NOTE: v will be empty when this has been
-        // moved-from. In that case, we do not want
-        // to send v back to the cache.
-        if (!v.empty()) {
-            assert(pc->empty() || (*pc)[0].size() == v.size());
-
-            // Move v into the cache.
-            pc->push_back(std::move(v));
-        }
-    }
-
-public:
-    explicit taylor_pwrap(taylor_poly_cache<T> &cache, std::uint32_t n, const T &poly_init)
-        : pc(&cache), v(get_poly_from_cache(n, poly_init))
-    {
-    }
-
-    taylor_pwrap(taylor_pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
-    {
-        // Make sure we moved from a valid taylor_pwrap.
-        assert(!v.empty()); // LCOV_EXCL_LINE
-
-        // NOTE: we must ensure that other.v is cleared out, because
-        // otherwise, when other is destructed, we could end up
-        // returning to the cache a polynomial of the wrong size.
-        //
-        // In basically every existing implementation, moving a std::vector
-        // will leave the original object empty, but technically this
-        // does not seem to be guaranteed by the standard, so, better
-        // safe than sorry. Quick checks on godbolt indicate that compilers
-        // are anyway able to elide this clearing out of the vector.
-        other.v.clear();
-    }
-    // NOTE: this does not support self-move, and requires that
-    // the cache of other is the same as the cache of this.
-    taylor_pwrap &operator=(taylor_pwrap &&other) noexcept
-    {
-        // Disallow self move.
-        assert(this != &other); // LCOV_EXCL_LINE
-
-        // Make sure the polyomial caches match.
-        assert(pc == other.pc); // LCOV_EXCL_LINE
-
-        // Make sure we are not moving from a
-        // moved-from taylor_pwrap.
-        assert(!other.v.empty()); // LCOV_EXCL_LINE
-
-        // Put the current v in the cache.
-        back_to_cache();
-
-        // Do the move-assignment.
-        v = std::move(other.v);
-
-        // NOTE: we must ensure that other.v is cleared out, because
-        // otherwise, when other is destructed, we could end up
-        // returning to the cache a polynomial of the wrong size.
-        //
-        // In basically every existing implementation, moving a std::vector
-        // will leave the original object empty, but technically this
-        // does not seem to be guaranteed by the standard, so, better
-        // safe than sorry. Quick checks on godbolt indicate that compilers
-        // are anyway able to elide this clearing out of the vector.
-        other.v.clear();
-
-        return *this;
-    }
-
-    // Delete copy semantics.
-    taylor_pwrap(const taylor_pwrap &) = delete;
-    taylor_pwrap &operator=(const taylor_pwrap &) = delete;
-
-    ~taylor_pwrap()
-    {
-#if !defined(NDEBUG)
-
-        // Run consistency checks on the cache in debug mode.
-        // The cache must not contain empty vectors
-        // and all vectors in the cache must have the same size.
-        if (!pc->empty()) {
-            const auto op1 = (*pc)[0].size();
-
-            for (const auto &vec : *pc) {
-                assert(!vec.empty());
-                assert(vec.size() == op1);
-            }
-        }
-
-#endif
-
-        // Put the current v in the cache.
-        back_to_cache();
-    }
-
-    taylor_poly_cache<T> *pc;
-    std::vector<T> v;
-};
-
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>
 ed_data<T>::ed_data() = default;
 
+// Main ctor.
 template <typename T>
-ed_data<T>::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
-                    std::uint32_t dim, const T &s0)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes)),
-      m_jit_data(std::make_shared<ed_jit_data<T>>(ed_jit_data<T>{.m_state = std::move(s)}))
+ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                    const std::uint32_t order, const std::uint32_t dim, const T &s0)
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
 
-    auto &m_state = m_jit_data->m_state;
-
-    // Fetch the scalar FP type.
-    //
-    // NOTE: s0 is the first value in the state vector of the integrator, from which the internal floating-point type is
-    // deduced.
-    auto *fp_t = internal_llvm_type_like(m_state, s0);
-
-    // NOTE: the numeric cast will also ensure that we can
-    // index into the events using 32-bit ints.
+    // NOTE: the numeric cast will also ensure that we can index into the events using 32-bit ints.
     const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
     const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
 
     // Setup m_ev_jet.
-    // NOTE: check that we can represent
-    // the requested size for m_ev_jet using
-    // both its size type and std::uint32_t.
-    // LCOV_EXCL_START
-    if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes || order == std::numeric_limits<std::uint32_t>::max()
-        || dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
-        || dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (order + 1u)
-        || dim + (n_tes + n_ntes) > std::numeric_limits<decltype(m_ev_jet.size())>::max() / (order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-
-    m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u), num_zero_like(s0));
+    //
+    // NOTE: check that we can represent the requested size for m_ev_jet using both its size type and std::uint32_t.
+    const auto ev_jet_size = [&] {
+        try {
+            using safe_ev_jet_size_t = boost::safe_numerics::safe<decltype(m_ev_jet.size())>;
+            const auto ret = (safe_ev_jet_size_t(n_tes) + n_ntes + dim) * (order + 1u);
+            static_cast<void>(static_cast<std::uint32_t>(ret));
+            return ret;
+            // LCOV_EXCL_START
+        } catch (...) {
+            throw std::overflow_error(
+                "Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                "or the state size is too large");
+        }
+        // LCOV_EXCL_STOP
+    }();
+    m_ev_jet.resize(ev_jet_size, num_zero_like(s0));
 
     // Setup the vector of cooldowns.
     m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
 
-    // Setup the JIT-compiled functions.
+    // Setup in parallel the JIT data and the poly root finding workspace.
+    tbb_isolated_parallel_invoke(
+        [this, &s, order, &s0] {
+            // Create the ed_jit_data instance.
+            m_jit_data = std::make_shared<ed_jit_data<T>>(s.make_similar());
 
-    // Add the rtscc function. This will also indirectly
-    // add the translator function.
-    llvm_add_poly_rtscc(m_state, fp_t, order, 1);
+            // Fetch the constructed state.
+            auto &state = m_jit_data->m_state;
 
-    // Add the function for the fast exclusion check.
-    llvm_ed_add_fex_check(m_state, "fex_check", fp_t, order, 1);
+            // Fetch the scalar FP type.
+            //
+            // NOTE: s0 is the first value in the state vector of the integrator, from which the internal floating-point
+            // type is deduced.
+            auto *const fp_t = internal_llvm_type_like(state, s0);
 
-    // Compile.
-    m_state.compile();
+            // Add the function for the fast exclusion check.
+            llvm_ed_add_fex_check(state, "fex_check", fp_t, order, 1);
 
-    // Fetch the function pointers.
-    m_jit_data->m_pt = reinterpret_cast<ed_jit_data<T>::pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_jit_data->m_rtscc = reinterpret_cast<ed_jit_data<T>::rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(m_state.jit_lookup("fex_check"));
+            // Compile.
+            state.compile();
+
+            // Fetch the function pointer.
+            m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(state.jit_lookup("fex_check"));
+        },
+        [this, &s, order, &s0] {
+            // Infer the precision argument for the polynomial root finding workspace.
+            const auto prec = [&s0] -> long long {
+                static_cast<void>(s0);
+
+#if defined(HEYOKA_HAVE_REAL)
+                if constexpr (std::same_as<T, mppp::real>) {
+                    return boost::numeric_cast<long long>(s0.get_prec());
+                }
+
+#endif
+                return 0;
+            }();
+
+            // Setup the polynomial root finding workspace.
+            m_frpr_ws = frpr_workspace<T>(order, prec, &s);
+        });
 }
 
 template <typename T>
 ed_data<T>::ed_data(const ed_data &o)
+    // NOTE: no need to copy m_poly_roots, empty initialisation is fine.
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns),
-      m_jit_data(o.m_jit_data), m_poly_cache(o.m_poly_cache)
+      m_jit_data(o.m_jit_data), m_frpr_ws(o.m_frpr_ws)
 {
     // For the vectors of detected events, just reserve the same amount of space.
     // These vectors are cleared out anyway during event detection.
     m_d_tes.reserve(o.m_d_tes.capacity());
     m_d_ntes.reserve(o.m_d_ntes.capacity());
-
-    // Reserve space in m_wlist and m_isol.
-    m_wlist.reserve(o.m_wlist.capacity());
-    m_isol.reserve(o.m_isol.capacity());
 }
 
 template <typename T>
@@ -1327,14 +412,12 @@ void ed_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_ev_jet;
     ar << m_te_cooldowns;
     ar << m_jit_data;
-    ar << m_poly_cache;
+    ar << m_frpr_ws;
+    // NOTE: we do NOT save m_poly_roots on purpose.
 
-    // Save the capacities of the vectors of detected events and
-    // the root finding structures.
+    // Save the capacities of the vectors of detected events.
     ar << m_d_tes.capacity();
     ar << m_d_ntes.capacity();
-    ar << m_wlist.capacity();
-    ar << m_isol.capacity();
 }
 
 template <typename T>
@@ -1345,27 +428,22 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_ev_jet;
     ar >> m_te_cooldowns;
     ar >> m_jit_data;
-    ar >> m_poly_cache;
+    ar >> m_frpr_ws;
 
     // Fetch the capacities.
     decltype(m_d_tes.capacity()) d_tes_cap{};
     ar >> d_tes_cap;
     decltype(m_d_ntes.capacity()) d_ntes_cap{};
     ar >> d_ntes_cap;
-    decltype(m_wlist.capacity()) wlist_cap{};
-    ar >> wlist_cap;
-    decltype(m_isol.capacity()) isol_cap{};
-    ar >> isol_cap;
 
     // Clear and reserve the capacities.
     m_d_tes.clear();
     m_d_tes.reserve(d_tes_cap);
     m_d_ntes.clear();
     m_d_ntes.reserve(d_ntes_cap);
-    m_wlist.clear();
-    m_wlist.reserve(wlist_cap);
-    m_isol.clear();
-    m_isol.reserve(isol_cap);
+
+    // Clear out m_poly_roots.
+    m_poly_roots.clear();
 }
 
 // Implementation of event detection.
@@ -1387,24 +465,15 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
         return;
     }
 
-    assert(order >= 2u);
-
-    // The value that will be used to initialise the coefficients of newly-created polynomials in the caches.
-    const auto poly_init = num_zero_like(h);
-
-    // Temporary polynomials used in the bisection loop.
-    taylor_pwrap<T> tmp1(m_poly_cache, order, poly_init), tmp2(m_poly_cache, order, poly_init),
-        tmp(m_poly_cache, order, poly_init);
-
-    // Fetch the function pointers.
+    // Fetch the fex check function pointer.
     auto *const m_fex_check = m_jit_data->m_fex_check;
-    auto *const m_rtscc = m_jit_data->m_rtscc;
-    auto *const m_pt = m_jit_data->m_pt;
 
-    // NOTE: array to store the polynomial enclosures computed by m_fex_check(). We re-use poly_init in order to make
-    // sure that the array is inited with the correct precision for mppp::real. The content does not matter. The
-    // enclosures are not needed here, and they are ignored.
-    T enc[] = {poly_init, poly_init};
+    // Array to store the polynomial enclosures computed by m_fex_check().
+    //
+    // NOTE: make sure that we create a value with the correct precision for mppp::real. The content does not matter.
+    // The enclosures are not needed here, and they are ignored.
+    const auto zero = num_zero_like(h);
+    T enc[] = {zero, zero};
 
     // Helper to run event detection on a vector of events (terminal or not). 'out' is the vector of detected events,
     // 'ev_vec' the input vector of events to detect.
@@ -1425,8 +494,8 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
             }
 
             // Run the event detection.
-            detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, m_isol, m_wlist, out, ev_vec,
-                                              i, m_te_cooldowns, tmp, tmp1, tmp2, poly_init);
+            const std::span<const T> cfs(ptr, boost::numeric_cast<std::size_t>(order + 1u));
+            detail::detect_events_common_impl(out, ev_vec, i, m_te_cooldowns, m_poly_roots, m_frpr_ws, cfs, h);
         }
     };
 
@@ -1456,42 +525,35 @@ template <typename T>
 ed_data_batch<T>::ed_data_batch() = default;
 
 template <typename T>
-ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
-                                std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes)),
-      m_jit_data(std::make_shared<ed_jit_data<T>>(ed_jit_data<T>{.m_state = std::move(s)}))
+ed_data_batch<T>::ed_data_batch(const llvm_state &s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                const std::uint32_t order, const std::uint32_t dim, const std::uint32_t batch_size)
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
     assert(order >= 2u);
     assert(!m_tes.empty() || !m_ntes.empty());
     assert(batch_size != 0u);
 
-    auto &m_state = m_jit_data->m_state;
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_external_llvm_type<T>(m_state.context());
-
-    // NOTE: the numeric cast will also ensure that we can
-    // index into the events using 32-bit ints.
+    // NOTE: the numeric cast will also ensure that we can index into the events using 32-bit ints.
     const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
     const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
 
     // Setup m_ev_jet.
-    // NOTE: check that we can represent
-    // the requested size for m_ev_jet using
-    // both its size type and std::uint32_t.
-    // LCOV_EXCL_START
-    if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes || order == std::numeric_limits<std::uint32_t>::max()
-        || dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
-        || dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (order + 1u)
-        || (dim + (n_tes + n_ntes)) * (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
-        || (dim + (n_tes + n_ntes)) * (order + 1u)
-               > std::numeric_limits<decltype(m_ev_jet.size())>::max() / batch_size) {
-        throw std::overflow_error(
-            "Overflow detected in the initialisation of an adaptive Taylor integrator in batch mode: the order "
-            "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-    m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u) * batch_size);
+    //
+    // NOTE: check that we can represent the requested size for m_ev_jet using both its size type and std::uint32_t.
+    const auto ev_jet_size = [&] {
+        try {
+            using safe_ev_jet_size_t = boost::safe_numerics::safe<decltype(m_ev_jet.size())>;
+            const auto ret = (safe_ev_jet_size_t(n_tes) + n_ntes + dim) * (order + 1u) * batch_size;
+            static_cast<void>(static_cast<std::uint32_t>(ret));
+            return ret;
+            // LCOV_EXCL_START
+        } catch (...) {
+            throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator in "
+                                      "batch mode: the order or the state size is too large");
+        }
+        // LCOV_EXCL_STOP
+    }();
+    m_ev_jet.resize(ev_jet_size);
 
     // Prepare m_ed_finite.
     m_ed_finite.resize(boost::numeric_cast<decltype(m_ed_finite.size())>(batch_size));
@@ -1531,33 +593,48 @@ ed_data_batch<T>::ed_data_batch(llvm_state s, std::vector<t_event_t> tes, std::v
     // maximum possible size, it is guaranteed that no exceptions will be thrown when pushing back.
     m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
 
-    // Setup the JIT-compiled functions.
+    // Prepare m_scal_poly.
+    //
+    // NOTE: order + 1u is safe for conversion to the size type of m_scal_poly: the size type is the same as m_ev_jet's,
+    // which has been proven earlier to be able to represent order + 1u.
+    m_scal_poly.resize(order + 1u);
 
-    // Add the rtscc function. This will also indirectly
-    // add the translator function.
-    // NOTE: keep batch size to 1 because the real-root
-    // isolation is scalarised.
-    llvm_add_poly_rtscc(m_state, fp_t, order, 1);
+    // Setup in parallel the JIT data and the poly root finding workspace.
+    tbb_isolated_parallel_invoke(
+        [this, &s, order, batch_size] {
+            // Create the ed_jit_data instance.
+            m_jit_data = std::make_shared<ed_jit_data<T>>(s.make_similar());
 
-    // Add the function for the fast exclusion check.
-    // NOTE: the fast exclusion check is vectorised.
-    llvm_ed_add_fex_check(m_state, "fex_check", fp_t, order, batch_size);
+            // Fetch the constructed state.
+            auto &state = m_jit_data->m_state;
 
-    // Compile.
-    m_state.compile();
+            // Fetch the scalar FP type.
+            auto *const fp_t = to_external_llvm_type<T>(state.context());
 
-    // Fetch the function pointers.
-    m_jit_data->m_pt = reinterpret_cast<ed_jit_data<T>::pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_jit_data->m_rtscc = reinterpret_cast<ed_jit_data<T>::rtscc_t>(m_state.jit_lookup("poly_rtscc"));
-    m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(m_state.jit_lookup("fex_check"));
+            // Add the function for the fast exclusion check.
+            //
+            // NOTE: the fast exclusion check is vectorised.
+            llvm_ed_add_fex_check(state, "fex_check", fp_t, order, batch_size);
+
+            // Compile.
+            state.compile();
+
+            // Fetch the function pointer.
+            m_jit_data->m_fex_check = reinterpret_cast<ed_jit_data<T>::fex_check_t>(state.jit_lookup("fex_check"));
+        },
+        [this, &s, order] {
+            // Setup the polynomial root finding workspace.
+            m_frpr_ws = frpr_workspace<T>(order, 0, &s);
+        });
 }
 
 template <typename T>
 ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
+    // NOTE: no need to copy m_poly_roots, empty initialisation is fine.
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_ed_finite(o.m_ed_finite),
       m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps), m_te_cooldowns(o.m_te_cooldowns),
       m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res), m_fex_check_enc(o.m_fex_check_enc),
-      m_poly_cache(o.m_poly_cache)
+      m_scal_poly(o.m_scal_poly), m_frpr_ws(o.m_frpr_ws)
 {
     // Fetch the batch size.
     const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
@@ -1573,10 +650,6 @@ ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_ntes[i].reserve(o.m_d_ntes[i].capacity());
     }
-
-    // Reserve space in m_wlist and m_isol.
-    m_wlist.reserve(o.m_wlist.capacity());
-    m_isol.reserve(o.m_isol.capacity());
 
     // Reserve space in m_cb_eptrs.
     m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
@@ -1598,7 +671,9 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_jit_data;
     ar << m_fex_check_res;
     ar << m_fex_check_enc;
-    ar << m_poly_cache;
+    ar << m_scal_poly;
+    ar << m_frpr_ws;
+    // NOTE: we do NOT save m_poly_roots on purpose.
 
     // Save the batch size.
     ar << static_cast<std::uint32_t>(m_d_tes.size());
@@ -1612,10 +687,6 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     for (const auto &v : m_d_ntes) {
         ar << v.capacity();
     }
-
-    // Save the capacities of m_wlist and m_isol.
-    ar << m_wlist.capacity();
-    ar << m_isol.capacity();
 }
 
 template <typename T>
@@ -1631,7 +702,8 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_jit_data;
     ar >> m_fex_check_res;
     ar >> m_fex_check_enc;
-    ar >> m_poly_cache;
+    ar >> m_scal_poly;
+    ar >> m_frpr_ws;
 
     // Recover the batch size.
     std::uint32_t batch_size{};
@@ -1646,7 +718,7 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
         v.reserve(cap);
     }
 
-    // Recover m_d_mtes.
+    // Recover m_d_ntes.
     m_d_ntes.resize(batch_size);
     for (auto &v : m_d_ntes) {
         decltype(v.capacity()) cap{};
@@ -1655,19 +727,12 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
         v.reserve(cap);
     }
 
-    // Recover the capacities of m_wlist and m_isol.
-    decltype(m_wlist.capacity()) wlist_cap{};
-    ar >> wlist_cap;
-    decltype(m_isol.capacity()) isol_cap{};
-    ar >> isol_cap;
-
-    // Clear and reserve the capacities.
-    m_wlist.clear();
-    m_wlist.reserve(wlist_cap);
-    m_isol.clear();
-    m_isol.reserve(isol_cap);
+    // Clear and reserve the capacity in m_cb_eptrs.
     m_cb_eptrs.clear();
     m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
+
+    // Clear out m_poly_roots.
+    m_poly_roots.clear();
 }
 
 // Implementation of event detection.
@@ -1682,27 +747,14 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
 {
     using std::isfinite;
 
-    assert(order >= 2u);
-
     // Clear the vectors of detected events.
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         m_d_tes[i].clear();
         m_d_ntes[i].clear();
     }
 
-    // The value that will be used to initialise the coefficients of newly-created polynomials in the caches.
-    const T poly_init = 0;
-
-    // Temporary polynomials used in the bisection loop.
-    taylor_pwrap<T> tmp1(m_poly_cache, order, poly_init), tmp2(m_poly_cache, order, poly_init),
-        tmp(m_poly_cache, order, poly_init);
-    // The temporary polynomial used when extracting a specific batch element from a polynomial of batches.
-    taylor_pwrap<T> scal_poly(m_poly_cache, order, poly_init);
-
-    // Fetch the function pointers.
+    // Fetch the fex check function pointer.
     auto *const m_fex_check = m_jit_data->m_fex_check;
-    auto *const m_rtscc = m_jit_data->m_rtscc;
-    auto *const m_pt = m_jit_data->m_pt;
 
     // Helper to run event detection on a vector of events (terminal or not). 'out_vec' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
@@ -1745,15 +797,15 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                 // Fetch a reference to the vector of detected events.
                 auto &out = out_vec[j];
 
-                // Copy the polynomial coefficients from batch_ptr to scal_poly.
+                // Copy the polynomial coefficients from batch_ptr to m_scal_poly.
                 for (std::uint32_t k = 0; k <= order; ++k) {
-                    scal_poly.v[k] = *(batch_ptr + j + k * batch_size);
+                    m_scal_poly[k] = *(batch_ptr + j + k * batch_size);
                 }
-                const auto *const ptr = std::as_const(scal_poly.v).data();
+                const auto *const ptr = m_scal_poly.data();
 
                 // Run the event detection.
-                detail::detect_events_common_impl(h, ptr, order, m_poly_cache, m_rtscc, m_pt, m_isol, m_wlist, out,
-                                                  ev_vec, i, m_te_cooldowns[j], tmp, tmp1, tmp2, poly_init);
+                const std::span<const T> cfs(ptr, boost::numeric_cast<std::size_t>(order + 1u));
+                detail::detect_events_common_impl(out, ev_vec, i, m_te_cooldowns[j], m_poly_roots, m_frpr_ws, cfs, h);
             }
         }
     };

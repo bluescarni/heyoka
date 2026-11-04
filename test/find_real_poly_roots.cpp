@@ -1706,6 +1706,54 @@ TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds real")
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+// Precision of the roots at a working precision lower than the precision mp++ assigns to values created from an int (32
+// bits), so that any int value leaking into the computation of a root would show up in its precision. The zero and
+// linear polynomial cases are not covered at such low precision by the other real tests, nor is a nonzero lb with a
+// precision different from the working one.
+TEST_CASE("find_real_poly_roots low precision real")
+{
+    using mppp::real;
+
+    const auto prec = 10;
+    const auto r = [prec](int v) { return real{v, prec}; };
+
+    std::vector<real_poly_root<real>> ret;
+
+    // Zero polynomial: a single root at t = 0.
+    {
+        frpr_workspace<real> ws(2, prec);
+        const std::vector cfs = {r(0), r(0), r(0)};
+        find_real_poly_roots(ret, ws, std::span<const real>(cfs), r(10));
+        REQUIRE(ret.size() == 1u);
+        REQUIRE(ret[0].t.get_prec() == prec);
+    }
+
+    // Linear polynomial p(t) = 3t - 2, with h = 10: a root at t = 2/3, computed by the linear case.
+    {
+        frpr_workspace<real> ws(1, prec);
+        const std::vector cfs = {r(-2), r(3)};
+        find_real_poly_roots(ret, ws, std::span<const real>(cfs), r(10));
+        REQUIRE(ret.size() == 1u);
+        REQUIRE(ret[0].t.get_prec() == prec);
+    }
+
+    // p(t) = (t - 1)(t - 2)(2t - 5) with h = 3, and lb = 1.5 with a precision of 200 bits: the roots at t = 2 and t = 2.5
+    // are reported.
+    {
+        frpr_workspace<real> ws(3, prec);
+        const std::vector cfs = {r(-10), r(19), r(-11), r(2)};
+        find_real_poly_roots(ret, ws, std::span<const real>(cfs), r(3), real{1.5, 200});
+        REQUIRE(ret.size() == 2u);
+        for (const auto &root : ret) {
+            REQUIRE(root.t.get_prec() == prec);
+        }
+    }
+}
+
+#endif
+
 // A test with the Taylor polynomials of an actual numerical integration. The harmonic oscillator x' = v, v' = -x is
 // integrated in double precision from random initial conditions, step by step, until a step crosses x = 0. The
 // polynomial of the event equation x = 0 over that step is the Taylor polynomial of x, whose coefficients are the

@@ -555,8 +555,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // NOTE: in principle this can be done in parallel with the rest of the constructor, once we have m_order/m_dim and
     // we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<detail::ed_data<T>>(m_tplt_state.make_similar(), std::move(tes), std::move(ntes),
-                                                         m_order, m_dim, m_state[0]);
+        m_ed_data = std::make_unique<detail::ed_data<T>>(m_tplt_state, std::move(tes), std::move(ntes), m_order, m_dim,
+                                                         m_state[0]);
     }
 
     if (auto_ic_setup) {
@@ -745,6 +745,8 @@ detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view na
 // - event detection happens in the [0, h) half-open range (that is, all detected events are guaranteed to trigger
 //   within the [0, h) range). Thus, if the timestep ends up being zero (either because max_delta_t == 0 or the inferred
 //   timestep is zero), then event detection is skipped altogether;
+// - if event detection fails (e.g., the location of a root cannot be determined at the working precision), an
+//   exception is thrown and the integrator is left unchanged;
 // - the execution of the events' callbacks is guaranteed to proceed in chronological order;
 // - a timestep h == 0 will still result in m_last_h being updated (to zero) and the Taylor coefficients being recorded
 //   in the internal array (if wtc == true, or always in the presence of events). That is, h == 0 is not treated in any
@@ -912,11 +914,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
             // We now have to post-process the list of detected events, which are unordered and may contain duplicates.
             // For terminal events, we are interested only in the first event triggering in chronological order. It will
-            // be placed at the first position of edd.m_d_tes. Duplicates are irrelevant here, as only the first event
-            // is used.
+            // be placed at the first position of edd.m_d_tes. Duplicates need not be removed here, as only the first
+            // event is used.
             //
-            // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index
-            // takes precedence.
+            // NOTE: in case of separate events triggering at exactly the same time, the implementation of taylor_ev_cmp
+            // guarantees that the event with the lowest index takes precedence.
             if (!edd.m_d_tes.empty()) {
                 const auto earliest_it = std::ranges::min_element(edd.m_d_tes, detail::taylor_ev_cmp);
                 std::iter_swap(earliest_it, edd.m_d_tes.begin());
@@ -924,8 +926,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
             // For non-terminal events, we want to sort the detected events and remove duplicates.
             if (!edd.m_d_ntes.empty()) {
-                // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index
-                // and same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
+                // NOTE: the sort is deterministic, since equivalent tuples are identical (the comparator uses abs(t),
+                // but the nonzero times all have the same sign, and the zero times are all +0).
                 std::ranges::sort(edd.m_d_ntes, detail::taylor_ev_cmp);
 
                 // Remove duplicates.
@@ -937,15 +939,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             if (!edd.m_d_tes.empty()) {
 #if defined(HEYOKA_HAVE_REAL)
                 if constexpr (std::is_same_v<T, mppp::real>) {
-                    // NOTE: use set() so that no matter what happens during event detection,
-                    // we will not change the precision of h to an invalid value.
-                    h.set(std::get<1>(edd.m_d_tes[0]));
-                } else {
-#endif
-                    h = std::get<1>(edd.m_d_tes[0]);
-#if defined(HEYOKA_HAVE_REAL)
+                    // NOTE: event detection is expected to preserve the working precision for mppp::real. Assert it.
+                    assert(std::get<1>(edd.m_d_tes[0]).get_prec() == this->get_prec());
                 }
 #endif
+                h = std::get<1>(edd.m_d_tes[0]);
             }
         }
 
@@ -1013,10 +1011,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::same_as<T, mppp::real>) {
-                // NOTE: for mppp::real, we must ensure that the time coordinate of the event is computed with the
-                // correct precision (we are getting the time coordinate from the event detection machinery, which does
-                // not enforce preservation of the correct precision).
-                cb_tm.prec_round(this->get_prec());
+                // NOTE: for mppp::real the event detection machinery is expected to keep the correct working precision.
+                assert(cb_tm.get_prec() == this->get_prec());
             }
 #endif
 
@@ -1039,8 +1035,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             } else {
                 // Deduce the cooldown automatically.
                 //
-                // NOTE: if g_eps is not finite, we never end up here. If the derivative of the event equation is not
-                // finite, the event is also skipped.
+                // NOTE: if g_eps is not finite, we never end up here. The derivative of the event equation must also be
+                // finite, otherwise event detection would have thrown.
                 edd.m_te_cooldowns[te_idx].emplace(0,
                                                    detail::taylor_deduce_cooldown(g_eps, std::get<3>(edd.m_d_tes[0])));
             }

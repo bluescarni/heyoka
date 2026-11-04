@@ -115,6 +115,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS frpr_workspace
                                         const T &, T);
 
 public:
+    frpr_workspace() noexcept;
     explicit frpr_workspace(std::uint32_t, long long = 0, const llvm_state * = nullptr);
     frpr_workspace(const frpr_workspace &);
     frpr_workspace(frpr_workspace &&) noexcept;

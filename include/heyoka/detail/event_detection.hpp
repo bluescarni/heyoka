@@ -98,16 +98,6 @@ template <typename T>
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
 llvm_ed_ival_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
-
-// Machinery to add a function that, given an input polynomial of order n represented
-// as an array of coefficients:
-// - reverses it,
-// - translates it by 1,
-// - counts the sign changes in the coefficients
-//   of the resulting polynomial.
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
-
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

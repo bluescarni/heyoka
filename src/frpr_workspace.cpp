@@ -55,6 +55,12 @@ void frpr_workspace<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     // LCOV_EXCL_STOP
 }
 
+// Default constructor.
+//
+// NOTE: the default ctor initialises the workspace in the moved-from state.
+template <typename T>
+frpr_workspace<T>::frpr_workspace() noexcept = default;
+
 // Main constructor.
 //
 // This constructor will set up a workspace for polynomials of degree 'degree'. The 'prec' argument (defaulting to zero)

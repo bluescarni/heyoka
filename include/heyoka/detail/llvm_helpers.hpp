@@ -263,10 +263,6 @@ HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, llvm::Type *, st
 llvm::Function *llvm_add_inv_kep_F(llvm_state &, llvm::Type *, std::uint32_t);
 llvm::Function *llvm_add_inv_kep_DE(llvm_state &, llvm::Type *, std::uint32_t);
 
-// Event-detection helpers.
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
-
 // Algorithms.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_upper_bound(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
