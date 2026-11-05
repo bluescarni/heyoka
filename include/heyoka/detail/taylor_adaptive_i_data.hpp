@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_I_DATA_HPP
-#define HEYOKA_DETAIL_I_DATA_HPP
+#ifndef HEYOKA_DETAIL_TAYLOR_ADAPTIVE_I_DATA_HPP
+#define HEYOKA_DETAIL_TAYLOR_ADAPTIVE_I_DATA_HPP
 
 #if !defined(HEYOKA_BUILD_LIBRARY)
 
@@ -45,10 +45,10 @@ struct ed_data_batch;
 template <typename>
 struct ta_jit_data;
 
-} // namespace detail
-
+// Internal data class for taylor_adaptive.
 template <typename T>
-struct taylor_adaptive<T>::i_data {
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
+struct taylor_adaptive_i_data {
     // The busy flag.
     //
     // This is set to true whenever a public step()/propagate_*() function is invoked, and it is automatically reset to
@@ -57,9 +57,9 @@ struct taylor_adaptive<T>::i_data {
     // State vector.
     std::vector<T> m_state;
     // Time.
-    detail::dfloat<T> m_time;
+    dfloat<T> m_time;
     // JIT data.
-    std::shared_ptr<detail::ta_jit_data<T>> m_ta_jit_data;
+    std::shared_ptr<ta_jit_data<T>> m_ta_jit_data;
     // A template LLVM state we keep around to create states similar to m_ta_jit_data->m_llvm_state as needed. This is
     // created with the same settings as m_ta_jit_data->m_llvm_state.
     llvm_state m_tplt_state;
@@ -80,7 +80,7 @@ struct taylor_adaptive<T>::i_data {
     // Compact mode tape.
     //
     // NOTE: we init this with an alignment of max_align_t, the correct alignment will be set at a later stage.
-    detail::aligned_vector<std::byte> m_cm_tape{detail::aligned_allocator<std::byte>(alignof(std::max_align_t))};
+    aligned_vector<std::byte> m_cm_tape{aligned_allocator<std::byte>(alignof(std::max_align_t))};
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -90,11 +90,11 @@ struct taylor_adaptive<T>::i_data {
     // The vector for the dense output.
     std::vector<T> m_d_out;
     // The ODE sys.
-    sys_t m_vsys;
+    taylor_adaptive<T>::sys_t m_vsys;
     // Variational data.
-    std::unique_ptr<detail::vsys_data<T>> m_vsys_data;
+    std::unique_ptr<vsys_data<T>> m_vsys_data;
     // Event detection data.
-    std::unique_ptr<detail::ed_data<T>> m_ed_data;
+    std::unique_ptr<ed_data<T>> m_ed_data;
 
 private:
     // Serialisation.
@@ -104,22 +104,23 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // NOTE: used only for serialisation.
-    i_data();
+    taylor_adaptive_i_data();
 
 public:
-    explicit i_data(llvm_state);
+    explicit taylor_adaptive_i_data(llvm_state);
 
-    i_data(const i_data &);
+    taylor_adaptive_i_data(const taylor_adaptive_i_data &);
 
-    i_data(i_data &&) noexcept = delete;
-    i_data &operator=(const i_data &) = delete;
-    i_data &operator=(i_data &&) noexcept = delete;
+    taylor_adaptive_i_data(taylor_adaptive_i_data &&) noexcept = delete;
+    taylor_adaptive_i_data &operator=(const taylor_adaptive_i_data &) = delete;
+    taylor_adaptive_i_data &operator=(taylor_adaptive_i_data &&) noexcept = delete;
 
-    ~i_data();
+    ~taylor_adaptive_i_data();
 };
 
+// Internal data class for taylor_adaptive_batch.
 template <typename T>
-struct taylor_adaptive_batch<T>::i_data {
+struct taylor_adaptive_batch_i_data {
     // The busy flag.
     //
     // This is set to true whenever a public step()/propagate_*() function is invoked, and it is automatically reset to
@@ -132,7 +133,7 @@ struct taylor_adaptive_batch<T>::i_data {
     // Times.
     std::vector<T> m_time_hi, m_time_lo;
     // JIT data.
-    std::shared_ptr<detail::ta_jit_data<T>> m_ta_jit_data;
+    std::shared_ptr<ta_jit_data<T>> m_ta_jit_data;
     // A template LLVM state we keep around to create states similar to m_ta_jit_data->m_llvm_state as needed. This is
     // created with the same settings as m_ta_jit_data->m_llvm_state.
     llvm_state m_tplt_state;
@@ -153,7 +154,7 @@ struct taylor_adaptive_batch<T>::i_data {
     // Compact mode tape.
     //
     // NOTE: we init this with an alignment of max_align_t, the correct alignment will be set at a later stage.
-    detail::aligned_vector<std::byte> m_cm_tape{detail::aligned_allocator<std::byte>(alignof(std::max_align_t))};
+    aligned_vector<std::byte> m_cm_tape{aligned_allocator<std::byte>(alignof(std::max_align_t))};
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -177,19 +178,19 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
-    std::vector<detail::dfloat<T>> m_pfor_ts;
+    std::vector<dfloat<T>> m_pfor_ts;
     std::vector<int> m_t_dir;
-    std::vector<detail::dfloat<T>> m_rem_time;
+    std::vector<dfloat<T>> m_rem_time;
     std::vector<T> m_time_copy_hi, m_time_copy_lo;
     std::vector<int> m_nf_detected;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // The ODE sys.
-    sys_t m_vsys;
+    taylor_adaptive_batch<T>::sys_t m_vsys;
     // Variational data.
-    std::unique_ptr<detail::vsys_data<T>> m_vsys_data;
+    std::unique_ptr<vsys_data<T>> m_vsys_data;
     // Event detection data.
-    std::unique_ptr<detail::ed_data_batch<T>> m_ed_data;
+    std::unique_ptr<ed_data_batch<T>> m_ed_data;
 
 private:
     // Serialisation.
@@ -199,19 +200,21 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // NOTE: used only for serialisation.
-    i_data();
+    taylor_adaptive_batch_i_data();
 
 public:
-    explicit i_data(llvm_state);
+    explicit taylor_adaptive_batch_i_data(llvm_state);
 
-    i_data(const i_data &);
+    taylor_adaptive_batch_i_data(const taylor_adaptive_batch_i_data &);
 
-    i_data(i_data &&) noexcept = delete;
-    i_data &operator=(const i_data &) = delete;
-    i_data &operator=(i_data &&) noexcept = delete;
+    taylor_adaptive_batch_i_data(taylor_adaptive_batch_i_data &&) noexcept = delete;
+    taylor_adaptive_batch_i_data &operator=(const taylor_adaptive_batch_i_data &) = delete;
+    taylor_adaptive_batch_i_data &operator=(taylor_adaptive_batch_i_data &&) noexcept = delete;
 
-    ~i_data();
+    ~taylor_adaptive_batch_i_data();
 };
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 

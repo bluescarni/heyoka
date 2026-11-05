@@ -47,10 +47,10 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
