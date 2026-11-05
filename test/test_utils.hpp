@@ -33,11 +33,7 @@
 #include <xtensor/containers/xfixed.hpp>
 #include <xtensor/core/xshape.hpp>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/taylor.hpp>
@@ -53,8 +49,6 @@ struct approximately {
     explicit approximately(T x, T eps_mul = T(100)) : m_value(x), m_eps_mul(eps_mul) {}
 };
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 struct approximately<mppp::real> {
     const mppp::real m_value;
@@ -64,8 +58,6 @@ struct approximately<mppp::real> {
 
     explicit approximately(mppp::real, mppp::real = default_tol);
 };
-
-#endif
 
 template <typename T>
 bool operator==(const T &cmp, const approximately<T> &a)
@@ -81,12 +73,8 @@ bool operator==(const T &cmp, const approximately<T> &a)
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 bool operator== <mppp::real>(const mppp::real &, const approximately<mppp::real> &);
-
-#endif
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const approximately<T> &a)
@@ -98,12 +86,8 @@ std::ostream &operator<<(std::ostream &os, const approximately<T> &a)
     return os << oss.str();
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 std::ostream &operator<< <mppp::real>(std::ostream &, const approximately<mppp::real> &);
-
-#endif
 
 // Tuple for_each(). It will apply the input functor f to each element of
 // the input tuple tup, sequentially.
@@ -322,12 +306,8 @@ bool ival_arith_supported();
 template <typename T>
 T rand_uniform(std::mt19937 &, double, double);
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // Generate a random value of type mppp::real with precision prec approximately uniformly distributed in [lo, hi].
 mppp::real rand_uniform_real(std::mt19937 &, double, double, ::mpfr_prec_t);
-
-#endif
 
 // The largest finite value of the type T, as a rational.
 template <typename T>

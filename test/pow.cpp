@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -62,11 +58,7 @@ auto square_wrapper(const expression &x)
     return x * x;
 }
 
-#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
-
 using namespace mppp::literals;
-
-#endif
 
 const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -256,9 +248,9 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf1({pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, {x, y},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+            cfunc<fp_t> cf1({pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, {x, y}, kw::batch_size = batch_size,
+                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                            kw::opt_level = opt_level);
 
             cfunc<fp_t> cf2({expression{func{detail::pow_impl(x, 0_dbl)}}, pow(x, fp_t{-3}),
                              pow(x, -std::numeric_limits<fp_t>::infinity())},
@@ -271,9 +263,8 @@ TEST_CASE("cfunc")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs1 = std::get<1>(cf1.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs1, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.pow.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs1, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.pow."); }));
                 REQUIRE(std::ranges::any_of(irs1, [](const auto &ir) {
                     return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_half_3.");
                 }));
@@ -346,8 +337,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -357,9 +346,8 @@ TEST_CASE("cfunc_mp")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf(
-                {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
-                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+                {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})}, {x, y},
+                kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
             const std::vector pars{mppp::real{"3.1", prec}};
@@ -376,17 +364,11 @@ TEST_CASE("cfunc_mp")
     }
 }
 
-#endif
-
 TEST_CASE("pow special cases")
 {
     REQUIRE(pow(1.1_dbl, 2.2_dbl) == expression{std::pow(1.1, 2.2)});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(pow(2_dbl, mppp::real{"1.1", 123}) == expression{mppp::pow(2., mppp::real{"1.1", 123})});
-
-#endif
 }
 
 TEST_CASE("pow overloads")
@@ -409,11 +391,9 @@ TEST_CASE("pow overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
     k = pow("x"_var, 1.1_r256);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
-#endif
 }
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.

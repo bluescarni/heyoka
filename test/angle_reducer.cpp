@@ -24,11 +24,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/callback/angle_reducer.hpp>
 #include <heyoka/expression.hpp>
@@ -158,8 +154,6 @@ TEST_CASE("s11n")
 
     tuple_for_each(fp_types, tester);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     std::stringstream ss;
 
     callback::angle_reducer a0 = {"a", "b", "c"};
@@ -182,8 +176,6 @@ TEST_CASE("s11n")
 
     REQUIRE(cb);
     REQUIRE(value_isa<callback::angle_reducer>(cb));
-
-#endif
 }
 
 TEST_CASE("scalar")
@@ -235,8 +227,6 @@ TEST_CASE("scalar")
 
     tuple_for_each(fp_types, tester);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         using fp_t = mppp::real;
 
@@ -263,8 +253,6 @@ TEST_CASE("scalar")
         REQUIRE(fen0 == approximately(en0, fp_t(1000, prec)));
         REQUIRE(fen1 == approximately(en1, fp_t(1000, prec)));
     }
-
-#endif
 }
 
 TEST_CASE("batch")

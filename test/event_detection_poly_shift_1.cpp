@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -236,8 +232,6 @@ TEST_CASE("rounding direction")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("real")
 {
     using fp_t = mppp::real;
@@ -299,5 +293,3 @@ TEST_CASE("real")
         }
     }
 }
-
-#endif

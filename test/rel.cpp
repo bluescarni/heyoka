@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -86,11 +82,7 @@ TEST_CASE("basic")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(lte(mppp::real{"1.1", 14}, par[0]) == lte(expression{mppp::real{"1.1", 14}}, par[0]));
-
-#endif
 }
 
 TEST_CASE("stream")
@@ -296,8 +288,6 @@ TEST_CASE("cfunc nan")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -362,8 +352,6 @@ TEST_CASE("cfunc_mp nan")
         }
     }
 }
-
-#endif
 
 TEST_CASE("taylor_adaptive")
 {

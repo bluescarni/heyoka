@@ -32,22 +32,18 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -60,11 +56,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
-
 using namespace mppp::literals;
-
-#endif
 
 const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -150,11 +142,9 @@ TEST_CASE("kepE overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
     k = kepE("x"_var, 1.1_r256);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
-#endif
 
     k = kepE(1.1f, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
@@ -174,11 +164,9 @@ TEST_CASE("kepE overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
     k = kepE(1.1_r256, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1_r256});
-#endif
 }
 
 TEST_CASE("kepE cse")
@@ -288,16 +276,14 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf(
-                {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
-                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+            cfunc<fp_t> cf({kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.kepE.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.kepE."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 5u, batch_size),
@@ -326,8 +312,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc mp")
 {
     using fp_t = mppp::real;
@@ -352,16 +336,13 @@ TEST_CASE("cfunc mp")
             std::generate(outs.begin(), outs.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf(
-                {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
-                kw::prec = prec, kw::compact_mode = compact_mode,
-                kw::opt_level = opt_level);
+            cfunc<fp_t> cf({kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
+                           kw::prec = prec, kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.kepE.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.kepE."); }));
             }
 
             cf(outs, ins, kw::pars = pars);
@@ -374,5 +355,3 @@ TEST_CASE("cfunc mp")
         }
     }
 }
-
-#endif

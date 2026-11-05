@@ -28,19 +28,15 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -142,14 +138,13 @@ TEST_CASE("cfunc")
 
             cfunc<fp_t> cf(
                 {cos(x - heyoka::time), heyoka::time + cos(expression{fp_t(-.5)}), cos(par[0]) * heyoka::time}, {x},
-                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.time.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.time."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -175,8 +170,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto x = make_vars("x");
@@ -185,11 +178,9 @@ TEST_CASE("cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<mppp::real> cf(
-                {cos(x - heyoka::time), heyoka::time + cos(expression{mppp::real{-.5, prec}}),
-                 cos(par[0]) * heyoka::time},
-                {x}, kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({cos(x - heyoka::time), heyoka::time + cos(expression{mppp::real{-.5, prec}}),
+                                  cos(par[0]) * heyoka::time},
+                                 {x}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
@@ -204,5 +195,3 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif

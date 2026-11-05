@@ -54,11 +54,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -399,15 +395,11 @@ TEST_CASE("compound ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     x = expression{mppp::real{"1.1", 128}};
     x *= expression{mppp::real{"1.1", 256}};
 
     REQUIRE(std::holds_alternative<mppp::real>(std::get<number>(x.value()).value()));
     REQUIRE(x == expression(mppp::real{"1.1", 128} * mppp::real{"1.1", 256}));
-
-#endif
 }
 
 TEST_CASE("is_time_dependent")
@@ -1087,8 +1079,6 @@ TEST_CASE("cfunc nbody")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc nbody mp")
 {
     using std::pow;
@@ -1178,8 +1168,6 @@ TEST_CASE("cfunc nbody mp")
         }
     }
 }
-
-#endif
 
 // cfunc N-body with parametric masses.
 TEST_CASE("cfunc nbody par")
@@ -1349,8 +1337,6 @@ TEST_CASE("cfunc nbody par")
         }
     }
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("cfunc nbody par mp")
 {
@@ -1526,8 +1512,6 @@ TEST_CASE("cfunc nbody par mp")
     }
 }
 
-#endif
-
 // A test in which all outputs are equal to numbers or params.
 TEST_CASE("cfunc numparams")
 {
@@ -1581,8 +1565,6 @@ TEST_CASE("cfunc numparams")
         }
     }
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("cfunc numparams mp")
 {
@@ -1645,8 +1627,6 @@ TEST_CASE("cfunc numparams mp")
         }
     }
 }
-
-#endif
 
 // A test with explicit variable list.
 TEST_CASE("cfunc explicit")
@@ -1752,8 +1732,6 @@ TEST_CASE("cfunc failure modes")
     }
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         llvm_state s;
 
@@ -1762,8 +1740,6 @@ TEST_CASE("cfunc failure modes")
                                                    "value must be in the [{}, {}] range)",
                                                    mppp::real_prec_min(), mppp::real_prec_max())));
     }
-
-#endif
 }
 
 TEST_CASE("cfunc vsop2013")
@@ -1794,8 +1770,6 @@ TEST_CASE("cfunc vsop2013")
     REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));
     REQUIRE(out[2] == approximately(ta.get_state()[2], 100.));
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("mp interop")
 {
@@ -1841,8 +1815,6 @@ TEST_CASE("mp interop")
     x2 /= expression{1.1_r256};
     REQUIRE(x == x2);
 }
-
-#endif
 
 TEST_CASE("output too long")
 {

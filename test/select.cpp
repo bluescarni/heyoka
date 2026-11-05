@@ -26,11 +26,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -82,12 +78,8 @@ TEST_CASE("basic")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(select(mppp::real{"3.1", 14}, x, mppp::real{"2.1", 14})
             == select(expression{mppp::real{"3.1", 14}}, x, expression{mppp::real{"2.1", 14}}));
-
-#endif
 }
 
 TEST_CASE("stream")
@@ -205,8 +197,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -231,8 +221,6 @@ TEST_CASE("cfunc mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("taylor_adaptive")
 {

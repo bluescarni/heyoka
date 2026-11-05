@@ -27,16 +27,12 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/dayfrac.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -172,16 +168,13 @@ TEST_CASE("dayfrac cfunc")
             outs.resize(batch_size);
             ins.resize(batch_size);
 
-            cfunc<fp_t> cf(
-                {model::dayfrac(kw::time_expr = x)}, {x},
-                kw::batch_size = batch_size, kw::compact_mode = compact_mode,
-                kw::opt_level = opt_level);
+            cfunc<fp_t> cf({model::dayfrac(kw::time_expr = x)}, {x}, kw::batch_size = batch_size,
+                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.dayfrac");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.dayfrac"); }));
             }
 
             std::ranges::fill(ins, fp_t(9331.558968320602));
@@ -202,8 +195,6 @@ TEST_CASE("dayfrac cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the point of the multiprecision test is just to check we used the correct llvm primitives in the
 // implementation.
 TEST_CASE("dayfrac cfunc_mp")
@@ -214,10 +205,8 @@ TEST_CASE("dayfrac cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            cfunc<mppp::real> cf(
-                {model::dayfrac(kw::time_expr = x)}, {x},
-                kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({model::dayfrac(kw::time_expr = x)}, {x}, kw::compact_mode = compact_mode,
+                                 kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             std::vector<mppp::real> outs{mppp::real{0, prec}};
@@ -228,8 +217,6 @@ TEST_CASE("dayfrac cfunc_mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("dayfrac taylor scalar")
 {

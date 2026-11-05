@@ -25,11 +25,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 
@@ -186,13 +182,9 @@ TEST_CASE("exhaustive")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("real")
 {
     for (const auto prec : {11, 53, 200}) {
         run_exhaustive_test<mppp::real>(6, [prec](double v) { return mppp::real{v, prec}; });
     }
 }
-
-#endif

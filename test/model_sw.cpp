@@ -18,11 +18,7 @@
 #include <variant>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/expression.hpp>
@@ -357,8 +353,6 @@ TEST_CASE("f107 interpolation")
     REQUIRE(close(eval(t0 + (frac * (t1 - t0))), f0 + (frac * (f1 - f0))));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the point of the multiprecision test is just to check we used the correct
 // llvm primitives in the implementation.
 TEST_CASE("sw cfunc_mp")
@@ -386,8 +380,6 @@ TEST_CASE("sw cfunc_mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("taylor scalar")
 {

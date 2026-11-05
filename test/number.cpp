@@ -38,11 +38,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
@@ -76,12 +72,8 @@ TEST_CASE("number basic")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(std::holds_alternative<mppp::real>(number{mppp::real{1.1, 23}}.value()));
     REQUIRE(std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).get_prec() == 23);
-
-#endif
 }
 
 TEST_CASE("number lt")
@@ -332,16 +324,12 @@ TEST_CASE("number ostream")
         REQUIRE(oss.str() == cmp);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         std::ostringstream oss;
         oss << number{mppp::real{1.1, 23}};
 
         REQUIRE(oss.str() == std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).to_string());
     }
-
-#endif
 }
 
 TEST_CASE("llvm_codegen")
@@ -640,8 +628,6 @@ TEST_CASE("llvm_codegen")
         REQUIRE(f_ptr() == boost::math::constants::pi<float>());
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // Codegen high-precision pi real to double.
     {
         llvm_state s{kw::opt_level = 0u};
@@ -697,8 +683,6 @@ TEST_CASE("llvm_codegen")
         REQUIRE(out == real_pi_256);
         REQUIRE(out.get_prec() == real_pi_256.get_prec());
     }
-
-#endif
 }
 
 TEST_CASE("number_like")
@@ -790,8 +774,6 @@ TEST_CASE("binomial")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     using namespace mppp::literals;
 
     n = binomial(number(4._r128), number(2._r128));
@@ -808,8 +790,6 @@ TEST_CASE("binomial")
     REQUIRE(n == number(6._r256));
     REQUIRE(std::holds_alternative<mppp::real>(n.value()));
     REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 256);
-
-#endif
 
     REQUIRE_THROWS_MATCHES(binomial(number(4.), number(2.f)), std::invalid_argument,
                            Message("Cannot compute the binomial coefficient of two numbers of different type"));
@@ -844,12 +824,8 @@ TEST_CASE("is_zero")
     REQUIRE(is_zero(number{0.}));
     REQUIRE(!is_zero(number{1.}));
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(is_zero(number{mppp::real{0.}}));
     REQUIRE(!is_zero(number{mppp::real{1.}}));
-
-#endif
 }
 
 TEST_CASE("is_one")
@@ -857,12 +833,8 @@ TEST_CASE("is_one")
     REQUIRE(!is_one(number{0.}));
     REQUIRE(is_one(number{1.}));
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(!is_one(number{mppp::real{0.}}));
     REQUIRE(is_one(number{mppp::real{1.}}));
-
-#endif
 }
 
 TEST_CASE("is_negative_one")
@@ -870,12 +842,8 @@ TEST_CASE("is_negative_one")
     REQUIRE(!is_negative_one(number{0.}));
     REQUIRE(is_negative_one(number{-1.}));
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(!is_negative_one(number{mppp::real{0.}}));
     REQUIRE(is_negative_one(-number{mppp::real{1.}}));
-
-#endif
 }
 
 TEST_CASE("move semantics")

@@ -28,20 +28,16 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -205,15 +201,13 @@ TEST_CASE("pi cfunc")
 
             outs.resize(batch_size);
 
-            cfunc<fp_t> cf({heyoka::pi}, {},
-                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+            cfunc<fp_t> cf({heyoka::pi}, {}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.pi.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.pi."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 1u, batch_size),
@@ -235,8 +229,6 @@ TEST_CASE("pi cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("pi cfunc mp")
 {
     using fp_t = mppp::real;
@@ -249,15 +241,13 @@ TEST_CASE("pi cfunc mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             outs[0] = mppp::real{0, prec};
 
-            cfunc<fp_t> cf({heyoka::pi}, {},
-                           kw::prec = prec, kw::compact_mode = compact_mode,
+            cfunc<fp_t> cf({heyoka::pi}, {}, kw::prec = prec, kw::compact_mode = compact_mode,
                            kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.pi.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.pi."); }));
             }
 
             cf(outs, std::vector<fp_t>{});
@@ -266,5 +256,3 @@ TEST_CASE("pi cfunc mp")
         }
     }
 }
-
-#endif

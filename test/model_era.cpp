@@ -33,11 +33,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/eop_sw_helpers.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -46,8 +42,8 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/model/eop.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -325,19 +321,15 @@ TEST_CASE("era erap cfunc")
 
             cfunc<fp_t> cf(
                 {model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
-                 model::erap(kw::time_expr = expression{fp_t(0.)}), model::erap(),
-                 model::erap(kw::time_expr = x)},
-                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode,
-                kw::opt_level = opt_level);
+                 model::erap(kw::time_expr = expression{fp_t(0.)}), model::erap(), model::erap(kw::time_expr = x)},
+                {x}, kw::batch_size = batch_size, kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.eop_era_");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.eop_erap_");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_era_"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.eop_erap_"); }));
             }
 
             if (opt_level == 3u) {
@@ -400,8 +392,6 @@ TEST_CASE("era erap cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the point of the multiprecision test is just to check we used the correct
 // llvm primitives in the implementation.
 TEST_CASE("era erap cfunc_mp")
@@ -412,11 +402,9 @@ TEST_CASE("era erap cfunc_mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 3u}) {
-            cfunc<mppp::real> cf(
-                {model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
-                 model::erap(kw::time_expr = expression{0.}), model::erap()},
-                {x}, kw::compact_mode = compact_mode, kw::prec = prec,
-                kw::opt_level = opt_level);
+            cfunc<mppp::real> cf({model::era(kw::time_expr = x), model::era(kw::time_expr = par[0]),
+                                  model::erap(kw::time_expr = expression{0.}), model::erap()},
+                                 {x}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{0, prec}};
             const std::vector pars{mppp::real{0, prec}};
@@ -436,8 +424,6 @@ TEST_CASE("era erap cfunc_mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("taylor scalar era_erap")
 {
@@ -661,8 +647,6 @@ TEST_CASE("taylor batch era_erap")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the point of the multiprecision test is just to check we used the correct
 // llvm primitives in the implementation.
 TEST_CASE("taylor mp era_erap")
@@ -746,8 +730,6 @@ TEST_CASE("taylor mp era_erap")
         }
     }
 }
-
-#endif
 
 // Test expression simplification with era/erap.
 TEST_CASE("taylor era_erap cse")

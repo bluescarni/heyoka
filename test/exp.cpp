@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -137,15 +133,14 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf({exp(x), exp(expression{fp_t(-.5)}), exp(par[0])}, {x},
-                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+            cfunc<fp_t> cf({exp(x), exp(expression{fp_t(-.5)}), exp(par[0])}, {x}, kw::batch_size = batch_size,
+                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.exp.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.exp."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -170,8 +165,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto x = make_vars("x");
@@ -181,8 +174,7 @@ TEST_CASE("cfunc_mp")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({exp(x), exp(expression{mppp::real{1.5, prec}}), exp(par[0])}, {x},
-                                 kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{"1.7", prec}};
             const std::vector pars{mppp::real{"2.1", prec}};
@@ -197,8 +189,6 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

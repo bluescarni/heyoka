@@ -23,11 +23,7 @@
 
 #include <fmt/core.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/exceptions.hpp>
@@ -365,8 +361,6 @@ TEST_CASE("nbody")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("nbody mp")
 {
     using std::pow;
@@ -470,8 +464,6 @@ TEST_CASE("nbody mp")
         }
     }
 }
-
-#endif
 
 // N-body with parametric masses.
 TEST_CASE("nbody par")
@@ -661,8 +653,6 @@ TEST_CASE("nbody par")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("nbody par mp")
 {
     using std::pow;
@@ -845,8 +835,6 @@ TEST_CASE("nbody par mp")
     }
 }
 
-#endif
-
 // A test in which all outputs are equal to numbers or params.
 TEST_CASE("numparams")
 {
@@ -919,8 +907,6 @@ TEST_CASE("numparams")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("numparams mp")
 {
     const auto prec = 237u;
@@ -989,8 +975,6 @@ TEST_CASE("numparams mp")
         }
     }
 }
-
-#endif
 
 // Test for stride values under the batch size.
 TEST_CASE("bogus stride")
@@ -1071,16 +1055,12 @@ TEST_CASE("failure modes")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<mppp::real>(llvm_state{}, "cfunc", {1_dbl, par[0]}, {}, 1, false,
                                                                 false, 0, detail::default_parjit),
                            std::invalid_argument,
                            Message(fmt::format("An invalid precision value of 0 was passed to make_multi_cfunc() (the "
                                                "value must be in the [{}, {}] range)",
                                                mppp::real_prec_min(), mppp::real_prec_max())));
-
-#endif
 
     REQUIRE_THROWS_MATCHES(detail::make_multi_cfunc<double>(llvm_state{}, "", {1_dbl, par[0]}, {}, 1, false, false, 0,
                                                             detail::default_parjit),

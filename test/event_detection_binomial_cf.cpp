@@ -29,11 +29,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 
@@ -109,13 +105,11 @@ void check_binomial(std::uint32_t n, std::uint32_t k, const T &x, std::uint32_t 
     const rat C(C_int);
     const auto [lo, hi] = detail::ed_make_ival_binomial_cf_like(n, k, x);
 
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::same_as<T, mppp::real>) {
         // The results must have the precision of x.
         REQUIRE(lo.get_prec() == x.get_prec());
         REQUIRE(hi.get_prec() == x.get_prec());
     }
-#endif
 
     // C(n, k) is representable if and only if its odd part fits in p bits.
     if (boost::multiprecision::msb(C_int) - boost::multiprecision::lsb(C_int) + 1u <= p) {
@@ -163,8 +157,6 @@ TEST_CASE("fixed precision")
                            Message(overflow_message(132496419, 5)));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("real")
 {
     for (const auto prec : {11, 24, 53, 64, 113, 200}) {
@@ -177,5 +169,3 @@ TEST_CASE("real")
         }
     }
 }
-
-#endif

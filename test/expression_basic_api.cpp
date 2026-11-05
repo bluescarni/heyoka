@@ -16,11 +16,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/number.hpp>
@@ -41,11 +37,7 @@ TEST_CASE("number ctors")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(std::get<number>(expression{mppp::real{"1.1", 123}}.value()) == number{mppp::real{"1.1", 123}});
-
-#endif
 }
 
 TEST_CASE("literals")
@@ -90,12 +82,8 @@ TEST_CASE("number binary ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(1_dbl + mppp::real{"1.1", 345} == expression{1. + mppp::real{"1.1", 345}});
     REQUIRE(mppp::real{"1.1", 345} + 1_dbl == expression{1. + mppp::real{"1.1", 345}});
-
-#endif
 
     REQUIRE(1_flt - 1.1f == expression{1.f - 1.1f});
     REQUIRE(1.1f - 1_flt == expression{1.1f - 1.f});
@@ -113,12 +101,8 @@ TEST_CASE("number binary ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(1_dbl - mppp::real{"1.1", 345} == expression{1. - mppp::real{"1.1", 345}});
     REQUIRE(mppp::real{"1.1", 345} - 1_dbl == expression{mppp::real{"1.1", 345} - 1.});
-
-#endif
 
     REQUIRE(1_flt * 1.1f == expression{1.f * 1.1f});
     REQUIRE(1.1f * 1_flt == expression{1.1f * 1.f});
@@ -136,12 +120,8 @@ TEST_CASE("number binary ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(1_dbl * mppp::real{"1.1", 345} == expression{1. * mppp::real{"1.1", 345}});
     REQUIRE(mppp::real{"1.1", 345} * 1_dbl == expression{mppp::real{"1.1", 345} * 1.});
-
-#endif
 
     REQUIRE(1_flt / 1.1f == expression{1.f / 1.1f});
     REQUIRE(1.1f / 1_flt == expression{1.1f / 1.f});
@@ -159,12 +139,8 @@ TEST_CASE("number binary ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(1_dbl / mppp::real{"1.1", 345} == expression{1. / mppp::real{"1.1", 345}});
     REQUIRE(mppp::real{"1.1", 345} / 1_dbl == expression{mppp::real{"1.1", 345} / 1.});
-
-#endif
 }
 
 TEST_CASE("number compound ops")
@@ -199,15 +175,11 @@ TEST_CASE("number compound ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto ex = 1_dbl;
         ex += mppp::real{"1.1", 345};
         REQUIRE(ex == 1_dbl + mppp::real{"1.1", 345});
     }
-
-#endif
 
     {
         auto ex = 1_flt;
@@ -239,15 +211,11 @@ TEST_CASE("number compound ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto ex = 1_dbl;
         ex -= mppp::real{"1.1", 345};
         REQUIRE(ex == 1_dbl - mppp::real{"1.1", 345});
     }
-
-#endif
 
     {
         auto ex = 1_flt;
@@ -279,15 +247,11 @@ TEST_CASE("number compound ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto ex = 1_dbl;
         ex *= mppp::real{"1.1", 345};
         REQUIRE(ex == 1_dbl * mppp::real{"1.1", 345});
     }
-
-#endif
 
     {
         auto ex = 1_flt;
@@ -319,13 +283,9 @@ TEST_CASE("number compound ops")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto ex = 1_dbl;
         ex /= mppp::real{"1.1", 345};
         REQUIRE(ex == 1_dbl / mppp::real{"1.1", 345});
     }
-
-#endif
 }

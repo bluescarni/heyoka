@@ -29,18 +29,14 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/relu.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -362,18 +358,16 @@ TEST_CASE("cfunc")
             ins.resize(batch_size);
             pars.resize(batch_size * 2u);
 
-            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
-                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                           kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x}, kw::batch_size = batch_size,
+                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                           kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relu.");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relup.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relu."); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relup."); }));
             }
 
             for (auto niter = 0; niter < 100; ++niter) {
@@ -436,12 +430,10 @@ TEST_CASE("cfunc leaky")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x"); }));
             }
 
             for (auto niter = 0; niter < 100; ++niter) {
@@ -478,8 +470,6 @@ TEST_CASE("cfunc leaky")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc mp")
 {
     using fp_t = mppp::real;
@@ -498,18 +488,15 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
-                           kw::compact_mode = compact_mode, kw::prec = prec,
-                           kw::opt_level = opt_level);
+            cfunc<fp_t> cf({relu(x), relu(par[0]), relup(x), relup(par[1])}, {x}, kw::compact_mode = compact_mode,
+                           kw::prec = prec, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relu.");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relup.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relu."); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relup."); }));
             }
 
             // Generate the x and pars.
@@ -546,17 +533,14 @@ TEST_CASE("cfunc mp leaky")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<fp_t> cf({relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
-                           kw::compact_mode = compact_mode, kw::prec = prec,
-                           kw::opt_level = opt_level);
+                           kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relu_0x"); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.relup_0x"); }));
             }
 
             // Generate the x and pars.
@@ -573,5 +557,3 @@ TEST_CASE("cfunc mp leaky")
         }
     }
 }
-
-#endif
