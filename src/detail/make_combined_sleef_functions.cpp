@@ -85,7 +85,7 @@ llvm::Function *make_combined_sleef_array_wrapper(llvm_state &s, const std::stri
     auto *retval = bld.CreateAlloca(arr_t);
 
     // Fetch a pointer to the beginning of retval.
-    auto *ptr = bld.CreateInBoundsGEP(arr_t, retval, {bld.getInt32(0), bld.getInt32(0)});
+    auto *ptr = llvm_unsigned_gep(bld, arr_t, retval, {bld.getInt32(0), bld.getInt32(0)});
 
     // Invoke the C++ function.
     llvm_invoke_external(s, cpp_wrapper_name, bld.getVoidTy(), {ptr, x});

@@ -165,7 +165,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                 [&](llvm::Value *arr_idx) {
                     // Fetch the index value from the array.
                     auto *cur_idx = builder.CreateLoad(
-                        builder.getInt32Ty(), builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
+                        builder.getInt32Ty(), llvm_unsigned_gep(builder, builder.getInt32Ty(), svf_ptr, arr_idx));
 
                     builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_state),
                                                            taylor_c_load_diff(s, vec_t, diff_arr, n_uvars,
@@ -297,7 +297,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
         auto *fp_vec_t = make_vector_type(fp_t, batch_size);
         auto *array_type = llvm::ArrayType::get(fp_vec_t, n_eq);
         auto *array_inst = builder.CreateAlloca(array_type);
-        auto *res_arr = builder.CreateInBoundsGEP(array_type, array_inst, {builder.getInt32(0), builder.getInt32(0)});
+        auto *res_arr = llvm_unsigned_gep(builder, array_type, array_inst, {builder.getInt32(0), builder.getInt32(0)});
 
         // Init the return value, filling it with the values of the
         // coefficients of the highest-degree monomial in each polynomial.
@@ -305,7 +305,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
             // Load the value from diff_arr and store it in res_arr.
             builder.CreateStore(
                 taylor_c_load_diff(s, fp_vec_t, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
-                builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx));
+                llvm_unsigned_gep(builder, fp_vec_t, res_arr, cur_var_idx));
         });
 
         // Run the evaluation.
@@ -320,7 +320,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_multihorner(
                                                             cur_var_idx);
 
                               // Accumulate in res_arr.
-                              auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
+                              auto *res_ptr = llvm_unsigned_gep(builder, fp_vec_t, res_arr, cur_var_idx);
                               builder.CreateStore(
                                   llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(fp_vec_t, res_ptr), h)), res_ptr);
                           });
@@ -374,9 +374,10 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_ceval(
         auto *array_type = llvm::ArrayType::get(fp_vec_t, n_eq);
         auto *res_arr_inst = builder.CreateAlloca(array_type);
         auto *comp_arr_inst = builder.CreateAlloca(array_type);
-        auto *res_arr = builder.CreateInBoundsGEP(array_type, res_arr_inst, {builder.getInt32(0), builder.getInt32(0)});
+        auto *res_arr
+            = llvm_unsigned_gep(builder, array_type, res_arr_inst, {builder.getInt32(0), builder.getInt32(0)});
         auto *comp_arr
-            = builder.CreateInBoundsGEP(array_type, comp_arr_inst, {builder.getInt32(0), builder.getInt32(0)});
+            = llvm_unsigned_gep(builder, array_type, comp_arr_inst, {builder.getInt32(0), builder.getInt32(0)});
 
         // Init res_arr with the order-0 coefficients, and the running
         // compensations with zero.
@@ -385,11 +386,11 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_ceval(
             auto *val = taylor_c_load_diff(s, fp_vec_t, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx);
 
             // Store it in res_arr.
-            builder.CreateStore(val, builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx));
+            builder.CreateStore(val, llvm_unsigned_gep(builder, fp_vec_t, res_arr, cur_var_idx));
 
             // Zero-init the element in comp_arr.
             builder.CreateStore(llvm_constantfp(s, fp_vec_t, 0.),
-                                builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx));
+                                llvm_unsigned_gep(builder, fp_vec_t, comp_arr, cur_var_idx));
         });
 
         // Init the running updater for the powers of h.
@@ -407,8 +408,8 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>> taylor_run_ceval(
                 auto *tmp = llvm_fmul(s, cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
-                auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
-                auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
+                auto *comp_ptr = llvm_unsigned_gep(builder, fp_vec_t, comp_arr, cur_var_idx);
+                auto *res_ptr = llvm_unsigned_gep(builder, fp_vec_t, res_arr, cur_var_idx);
                 auto *y = llvm_fsub(s, tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
                 auto *cur_res = builder.CreateLoad(fp_vec_t, res_ptr);
                 auto *t = llvm_fadd(s, cur_res, y);
@@ -528,7 +529,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                                             builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                     // Store into tc_ptr.
-                    ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, out_idx), diff_val);
+                    ext_store_vector_to_memory(s, llvm_unsigned_gep(builder, ext_fp_t, tc_ptr, out_idx), diff_val);
                 });
         });
 
@@ -537,7 +538,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
                 // Fetch the u var index from svf_ptr.
                 auto *cur_idx = builder.CreateLoad(builder.getInt32Ty(),
-                                                   builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
+                                                   llvm_unsigned_gep(builder, builder.getInt32Ty(), svf_ptr, arr_idx));
 
                 llvm_loop_u32(
                     s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
@@ -552,7 +553,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                                                 builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                         // Store into tc_ptr.
-                        ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, out_idx), diff_val);
+                        ext_store_vector_to_memory(s, llvm_unsigned_gep(builder, ext_fp_t, tc_ptr, out_idx), diff_val);
                     });
             });
         }
@@ -576,8 +577,8 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                     = (static_cast<decltype(diff_arr.size())>(order + 1u) * batch_size * j) + (cur_order * batch_size);
 
                 // Write to tc_ptr.
-                auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, tc_ptr,
-                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+                auto *out_ptr = llvm_unsigned_gep(builder, ext_fp_t, tc_ptr,
+                                                  builder.getInt32(static_cast<std::uint32_t>(out_idx)));
                 ext_store_vector_to_memory(s, out_ptr, val);
             }
         }
@@ -816,12 +817,11 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
         auto *new_state = std::get<llvm::Value *>(new_state_var);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto *val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
-            ext_store_vector_to_memory(
-                s,
-                builder.CreateInBoundsGEP(ext_fp_t, state_ptr,
-                                          builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
-                val);
+            auto *val = builder.CreateLoad(fp_vec_t, llvm_unsigned_gep(builder, fp_vec_t, new_state, cur_var_idx));
+            ext_store_vector_to_memory(s,
+                                       llvm_unsigned_gep(builder, ext_fp_t, state_ptr,
+                                                         builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
+                                       val);
         });
     } else {
         const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
@@ -830,7 +830,7 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
 
         for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
             ext_store_vector_to_memory(
-                s, builder.CreateInBoundsGEP(ext_fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
+                s, llvm_unsigned_gep(builder, ext_fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
                 new_state[var_idx]);
         }
     }

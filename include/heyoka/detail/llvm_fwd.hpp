@@ -36,6 +36,9 @@ class IRBuilderDefaultInserter;
 template <typename, typename>
 class IRBuilder;
 
+template <typename>
+class ArrayRef;
+
 } // namespace llvm
 
 HEYOKA_BEGIN_NAMESPACE

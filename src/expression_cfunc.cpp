@@ -968,8 +968,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
 
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
-        auto *ptr
-            = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, in_ptr,
+                                      builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
         eval_arr.push_back(ext_load_vector_from_memory(s, fp_t, ptr, batch_size));
     }
 
@@ -987,8 +987,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
         const auto out_idx = static_cast<std::uint32_t>(i - nuvars);
 
         // Compute the pointer to write to.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr,
-                                              builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, out_ptr,
+                                      builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
 
         std::visit(
             [&](const auto &v) {
@@ -1128,7 +1128,7 @@ void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_a
 {
     auto &builder = s.builder();
 
-    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
+    auto *ptr = llvm_unsigned_gep(builder, fp_vec_t, eval_arr, idx);
 
     builder.CreateStore(val, ptr);
 }
@@ -1139,7 +1139,7 @@ llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value 
 {
     auto &builder = s.builder();
 
-    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
+    auto *ptr = llvm_unsigned_gep(builder, fp_vec_t, eval_arr, idx);
 
     return builder.CreateLoad(fp_vec_t, ptr);
 }
@@ -1281,22 +1281,21 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
         // NOTE: if all outputs are u variables, there's
         // no need to lookup the index in the global array (which will just contain
         // a range).
-        auto *out_idx = all_out_vars
-                            ? cur_idx
-                            : builder.CreateLoad(builder.getInt32Ty(),
-                                                 builder.CreateInBoundsGEP(out_gl[0]->getValueType(), out_gl[0],
-                                                                           {builder.getInt32(0), cur_idx}));
+        auto *out_idx = all_out_vars ? cur_idx
+                                     : builder.CreateLoad(builder.getInt32Ty(),
+                                                          llvm_unsigned_gep(builder, out_gl[0]->getValueType(),
+                                                                            out_gl[0], {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[1]->getValueType(), out_gl[1],
-                                                                                 {builder.getInt32(0), cur_idx}));
+            = builder.CreateLoad(builder.getInt32Ty(), llvm_unsigned_gep(builder, out_gl[1]->getValueType(), out_gl[1],
+                                                                         {builder.getInt32(0), cur_idx}));
 
         // Fetch from eval_arr the value of the u variable u_idx.
         auto *ret = cfunc_c_load_eval(s, fp_vec_t, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         ext_store_vector_to_memory(s, ptr, ret);
@@ -1306,18 +1305,18 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[2]->getValueType(), out_gl[2],
-                                                                                 {builder.getInt32(0), cur_idx}));
+            = builder.CreateLoad(builder.getInt32Ty(), llvm_unsigned_gep(builder, out_gl[2]->getValueType(), out_gl[2],
+                                                                         {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
-        auto *num = builder.CreateLoad(
-            fp_scal_t, builder.CreateInBoundsGEP(out_gl[3]->getValueType(), out_gl[3], {builder.getInt32(0), cur_idx}));
+        auto *num = builder.CreateLoad(fp_scal_t, llvm_unsigned_gep(builder, out_gl[3]->getValueType(), out_gl[3],
+                                                                    {builder.getInt32(0), cur_idx}));
 
         // Splat it out.
         auto *ret = vector_splat(builder, num, batch_size);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         ext_store_vector_to_memory(s, ptr, ret);
@@ -1327,20 +1326,20 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[4]->getValueType(), out_gl[4],
-                                                                                 {builder.getInt32(0), cur_idx}));
+            = builder.CreateLoad(builder.getInt32Ty(), llvm_unsigned_gep(builder, out_gl[4]->getValueType(), out_gl[4],
+                                                                         {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[5]->getValueType(), out_gl[5],
-                                                                                 {builder.getInt32(0), cur_idx}));
+            = builder.CreateLoad(builder.getInt32Ty(), llvm_unsigned_gep(builder, out_gl[5]->getValueType(), out_gl[5],
+                                                                         {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
         auto *ret = ext_load_vector_from_memory(s, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
-        ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        ptr = llvm_unsigned_gep(builder, ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         ext_store_vector_to_memory(s, ptr, ret);
@@ -1682,7 +1681,7 @@ llvm::Function *llvm_c_eval_func(const func &fn, llvm_state &s, llvm::Type *fp_t
                     // LCOV_EXCL_STOP
 
                     auto *ptr
-                        = bld.CreateInBoundsGEP(ext_fp_t, par_ptr, bld.CreateMul(stride, to_size_t(s, cur_f_arg)));
+                        = llvm_unsigned_gep(bld, ext_fp_t, par_ptr, bld.CreateMul(stride, to_size_t(s, cur_f_arg)));
 
                     return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
                 } else {
@@ -2149,8 +2148,8 @@ std::array<std::size_t, 2> add_multi_cfunc_impl(llvm::Type *fp_t, std::list<llvm
     // Copy over the values of the variables.
     llvm_loop_u32(main_state, main_builder.getInt32(0), main_builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
-        auto *ptr = main_builder.CreateInBoundsGEP(main_ext_fp_t, in_ptr,
-                                                   main_builder.CreateMul(stride, to_size_t(main_state, cur_var_idx)));
+        auto *ptr = llvm_unsigned_gep(main_builder, main_ext_fp_t, in_ptr,
+                                      main_builder.CreateMul(stride, to_size_t(main_state, cur_var_idx)));
 
         // Load as a vector.
         auto *vec = ext_load_vector_from_memory(main_state, main_fp_t, ptr, batch_size);

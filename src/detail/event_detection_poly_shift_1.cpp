@@ -51,7 +51,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
     auto *const cfs_arr_alloca = llvm_entry_alloca(s, array_t);
     // Copy the original coefficients into the alloca.
     for (std::uint32_t idx = 0; idx < op1; ++idx) {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
         bld.CreateStore(cfs[idx], ptr);
     }
 
@@ -71,11 +71,11 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
             // ai_idx = op1 - 1 - i.
             auto *ai_idx = bld.CreateSub(val_op1, val_1);
             ai_idx = bld.CreateSub(ai_idx, i);
-            auto *const ai_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, ai_idx});
+            auto *const ai_ptr = llvm_unsigned_gep(bld, array_t, cfs_arr_alloca, {val_0, ai_idx});
 
             // aim1_idx = op1 - i.
             auto *const aim1_idx = bld.CreateSub(val_op1, i);
-            auto *const aim1_ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, aim1_idx});
+            auto *const aim1_ptr = llvm_unsigned_gep(bld, array_t, cfs_arr_alloca, {val_0, aim1_idx});
 
             // Compute the result: a[i] + a[i-1].
             auto *const ai = bld.CreateLoad(ival_t, ai_ptr);
@@ -93,7 +93,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
 
     // Load the values from cfs_arr_alloca to fill in the return value.
     for (std::uint32_t idx = 0; idx < op1; ++idx) {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, cfs_arr_alloca, {val_0, bld.getInt32(idx)});
         ret.push_back(bld.CreateLoad(ival_t, ptr));
     }
 

@@ -225,7 +225,7 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
                                                        llvm::GlobalVariable::PrivateLinkage, sv_funcs_dc_arr);
 
         // Get out a pointer to the beginning of the array.
-        return builder.CreateInBoundsGEP(arr_type, g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
+        return llvm_unsigned_gep(builder, arr_type, g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
     }
 }
 
@@ -416,13 +416,13 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         auto *sv_idx = all_der_vars
                            ? cur_idx
                            : builder.CreateLoad(builder.getInt32Ty(),
-                                                builder.CreateInBoundsGEP(sv_diff_gl[0]->getValueType(), sv_diff_gl[0],
-                                                                          {builder.getInt32(0), cur_idx}));
+                                                llvm_unsigned_gep(builder, sv_diff_gl[0]->getValueType(), sv_diff_gl[0],
+                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(sv_diff_gl[1]->getValueType(), sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
+            llvm_unsigned_gep(builder, sv_diff_gl[1]->getValueType(), sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
 
         // Fetch from diff_arr the derivative of order 'order - 1' of the u variable u_idx.
         auto *ret
@@ -441,12 +441,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // Fetch the index of the state variable.
         auto *sv_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(sv_diff_gl[2]->getValueType(), sv_diff_gl[2], {builder.getInt32(0), cur_idx}));
+            llvm_unsigned_gep(builder, sv_diff_gl[2]->getValueType(), sv_diff_gl[2], {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
         auto *num = builder.CreateLoad(
             fp_vec_t->getScalarType(),
-            builder.CreateInBoundsGEP(sv_diff_gl[3]->getValueType(), sv_diff_gl[3], {builder.getInt32(0), cur_idx}));
+            llvm_unsigned_gep(builder, sv_diff_gl[3]->getValueType(), sv_diff_gl[3], {builder.getInt32(0), cur_idx}));
 
         // If the first-order derivative is being requested,
         // do the codegen for the constant itself, otherwise
@@ -466,12 +466,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // Fetch the index of the state variable.
         auto *sv_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(sv_diff_gl[4]->getValueType(), sv_diff_gl[4], {builder.getInt32(0), cur_idx}));
+            llvm_unsigned_gep(builder, sv_diff_gl[4]->getValueType(), sv_diff_gl[4], {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(sv_diff_gl[5]->getValueType(), sv_diff_gl[5], {builder.getInt32(0), cur_idx}));
+            llvm_unsigned_gep(builder, sv_diff_gl[5]->getValueType(), sv_diff_gl[5], {builder.getInt32(0), cur_idx}));
 
         // If the first-order derivative is being requested,
         // do the codegen for the constant itself, otherwise
@@ -791,14 +791,14 @@ void taylor_cm_codegen_segment_diff_parallel(llvm_state &s, llvm::Type *fp_vec_t
     auto *workers_arr_gv = new llvm::GlobalVariable(md, workers_arr_carr->getType(), true,
                                                     llvm::GlobalVariable::PrivateLinkage, workers_arr_carr);
     auto *workers_ptr
-        = bld.CreateInBoundsGEP(workers_arr_carr->getType(), workers_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
+        = llvm_unsigned_gep(bld, workers_arr_carr->getType(), workers_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
 
     auto *ncalls_arr_tp = llvm::ArrayType::get(ptr_tp, boost::numeric_cast<std::uint64_t>(ncalls_arr.size()));
     auto *ncalls_arr_carr = llvm::ConstantArray::get(ncalls_arr_tp, ncalls_arr);
     auto *ncalls_arr_gv = new llvm::GlobalVariable(md, ncalls_arr_carr->getType(), true,
                                                    llvm::GlobalVariable::PrivateLinkage, ncalls_arr_carr);
     auto *ncalls_ptr
-        = bld.CreateInBoundsGEP(ncalls_arr_carr->getType(), ncalls_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
+        = llvm_unsigned_gep(bld, ncalls_arr_carr->getType(), ncalls_arr_gv, {bld.getInt32(0), bld.getInt32(0)});
 
     // Fetch the arguments for heyoka_taylor_cm_par_segment() from the driver prototype.
     auto *driver_f = bld.GetInsertBlock()->getParent();
@@ -1241,8 +1241,8 @@ std::pair<std::array<std::size_t, 2>, std::vector<llvm_state>> taylor_compute_je
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(main_state, main_bld.getInt32(0), main_bld.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from order0.
-        auto *ptr = main_bld.CreateInBoundsGEP(main_ext_fp_t, order0,
-                                               main_bld.CreateMul(cur_var_idx, main_bld.getInt32(batch_size)));
+        auto *ptr = llvm_unsigned_gep(main_bld, main_ext_fp_t, order0,
+                                      main_bld.CreateMul(cur_var_idx, main_bld.getInt32(batch_size)));
 
         // Load as a vector.
         auto *vec = ext_load_vector_from_memory(main_state, main_fp_t, ptr, batch_size);
@@ -1278,7 +1278,7 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
         // NOTE: overflow checking is done in the parent function.
-        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in, builder.getInt32(i * batch_size));
+        auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
         retval.push_back(ext_load_vector_from_memory(s, fp_t, ptr, batch_size));

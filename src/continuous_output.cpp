@@ -206,10 +206,14 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
             // - !(tm > *tidx), if integrating backward.
             auto *tidx_val_hi = detail::ext_load_vector_from_memory(
                 m_llvm_state, fp_t,
-                builder.CreateInBoundsGEP(ext_fp_t, times_ptr_hi, builder.CreateLoad(builder.getInt32Ty(), tidx)), 1);
+                detail::llvm_unsigned_gep(builder, ext_fp_t, times_ptr_hi,
+                                          builder.CreateLoad(builder.getInt32Ty(), tidx)),
+                1);
             auto *tidx_val_lo = detail::ext_load_vector_from_memory(
                 m_llvm_state, fp_t,
-                builder.CreateInBoundsGEP(ext_fp_t, times_ptr_lo, builder.CreateLoad(builder.getInt32Ty(), tidx)), 1);
+                detail::llvm_unsigned_gep(builder, ext_fp_t, times_ptr_lo,
+                                          builder.CreateLoad(builder.getInt32Ty(), tidx)),
+                1);
             auto *zero_val = detail::llvm_constantfp(m_llvm_state, fp_t, 0.);
             auto *cond = dir ? detail::llvm_dl_lt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo)
                              : detail::llvm_dl_gt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo);
@@ -270,9 +274,9 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     // Load the time corresponding to tc_idx.
     auto *start_tm_hi = detail::ext_load_vector_from_memory(
-        m_llvm_state, fp_t, builder.CreateInBoundsGEP(ext_fp_t, times_ptr_hi, tc_idx), 1);
+        m_llvm_state, fp_t, detail::llvm_unsigned_gep(builder, ext_fp_t, times_ptr_hi, tc_idx), 1);
     auto *start_tm_lo = detail::ext_load_vector_from_memory(
-        m_llvm_state, fp_t, builder.CreateInBoundsGEP(ext_fp_t, times_ptr_lo, tc_idx), 1);
+        m_llvm_state, fp_t, detail::llvm_unsigned_gep(builder, ext_fp_t, times_ptr_lo, tc_idx), 1);
 
     // Compute and store the value of h = tm - start_tm into tm_ptr.
     auto [h_hi, h_lo] = detail::llvm_dl_sub(m_llvm_state, tm, detail::llvm_constantfp(m_llvm_state, fp_t, 0.),
@@ -283,7 +287,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     tc_idx = builder.CreateMul(tc_idx, builder.getInt32(dim * (order + 1u)));
 
     // Invoke the d_out function.
-    builder.CreateCall(d_out_f, {out_ptr, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, tc_idx), tm_ptr});
+    builder.CreateCall(d_out_f, {out_ptr, detail::llvm_unsigned_gep(builder, ext_fp_t, tc_ptr, tc_idx), tm_ptr});
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -746,8 +750,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                              batch_offset);
 
             // Compute the pointers for loading the time data.
-            auto tptr_hi = builder.CreateInBoundsGEP(fp_t, times_ptr_hi_vec, tl_idx);
-            auto tptr_lo = builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tl_idx);
+            auto tptr_hi = detail::llvm_unsigned_gep(builder, fp_t, times_ptr_hi_vec, tl_idx);
+            auto tptr_lo = detail::llvm_unsigned_gep(builder, fp_t, times_ptr_lo_vec, tl_idx);
 
             // Gather the hi/lo values.
             auto tidx_val_hi = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_hi);
@@ -812,7 +816,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     {
         // In debug mode, invoke the index checking function.
         auto *array_t = llvm::ArrayType::get(builder.getInt32Ty(), m_batch_size);
-        auto *tc_idx_debug_ptr = builder.CreateInBoundsGEP(array_t, builder.CreateAlloca(array_t),
+        auto *tc_idx_debug_ptr = detail::llvm_unsigned_gep(builder, array_t, builder.CreateAlloca(array_t),
                                                            {builder.getInt32(0), builder.getInt32(0)});
         detail::store_vector_to_memory(builder, tc_idx_debug_ptr, tc_idx);
         detail::llvm_invoke_external(m_llvm_state, "heyoka_continuous_output_batch_tc_idx_debug", builder.getVoidTy(),
@@ -829,10 +833,10 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto *tc_l_idx = builder.CreateAdd(builder.CreateMul(tc_idx, batch_splat), batch_offset);
 
     // Load the times corresponding to tc_idx.
-    auto start_tm_hi = detail::gather_vector_from_memory(builder, fp_vec_t,
-                                                         builder.CreateInBoundsGEP(fp_t, times_ptr_hi_vec, tc_l_idx));
-    auto start_tm_lo = detail::gather_vector_from_memory(builder, fp_vec_t,
-                                                         builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx));
+    auto start_tm_hi = detail::gather_vector_from_memory(
+        builder, fp_vec_t, detail::llvm_unsigned_gep(builder, fp_t, times_ptr_hi_vec, tc_l_idx));
+    auto start_tm_lo = detail::gather_vector_from_memory(
+        builder, fp_vec_t, detail::llvm_unsigned_gep(builder, fp_t, times_ptr_lo_vec, tc_l_idx));
 
     // Compute the value of h = tm - start_tm.
     auto h = detail::llvm_dl_sub(m_llvm_state, tm, zero_vec_fp, start_tm_hi, start_tm_lo).first;
@@ -846,13 +850,13 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // NOTE: each pointer in tc_ptrs points to the Taylor coefficient of
     // order 0 for the first state variable in the timestep data block selected
     // for that batch index.
-    auto tc_ptrs = builder.CreateInBoundsGEP(fp_t, tc_ptr, tc_idx);
+    auto tc_ptrs = detail::llvm_unsigned_gep(builder, fp_t, tc_ptr, tc_idx);
 
     // Run the Horner scheme.
     if (high_accuracy) {
         // Create the array for storing the running compensations.
         auto array_type = llvm::ArrayType::get(fp_vec_t, dim);
-        auto comp_arr = builder.CreateInBoundsGEP(array_type, builder.CreateAlloca(array_type),
+        auto comp_arr = detail::llvm_unsigned_gep(builder, array_type, builder.CreateAlloca(array_type),
                                                   {builder.getInt32(0), builder.getInt32(0)});
 
         // Start by writing into out_ptr the zero-order coefficients
@@ -862,15 +866,15 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
             // m_batch_size * (order + 1u) * cur_var_idx.
             auto *load_idx = builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx);
             auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
-                                                          builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
+                                                          detail::llvm_unsigned_gep(builder, fp_t, tc_ptrs, load_idx));
 
             // Store it in out_ptr. The index is:
             // m_batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
-            detail::store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx), tcs);
+            detail::store_vector_to_memory(builder, detail::llvm_unsigned_gep(builder, fp_t, out_ptr, out_idx), tcs);
 
             // Zero-init the element in comp_arr.
-            builder.CreateStore(zero_vec_fp, builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx));
+            builder.CreateStore(zero_vec_fp, detail::llvm_unsigned_gep(builder, fp_vec_t, comp_arr, cur_var_idx));
         });
 
         // Init the running updater for the powers of h.
@@ -891,13 +895,13 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                             builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
                             builder.CreateMul(builder.getInt32(m_batch_size), cur_order));
                         auto *cf = detail::gather_vector_from_memory(
-                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
+                            builder, fp_vec_t, detail::llvm_unsigned_gep(builder, fp_t, tc_ptrs, load_idx));
                         auto *tmp = detail::llvm_fmul(m_llvm_state, cf, cur_h_val);
 
                         // Compute the quantities for the compensation.
-                        auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
+                        auto *comp_ptr = detail::llvm_unsigned_gep(builder, fp_vec_t, comp_arr, cur_var_idx);
                         auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
-                        auto *res_ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx);
+                        auto *res_ptr = detail::llvm_unsigned_gep(builder, fp_t, out_ptr, out_idx);
                         auto *y = detail::llvm_fsub(m_llvm_state, tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
                         auto *cur_res = detail::load_vector_from_memory(builder, fp_t, res_ptr, m_batch_size);
                         auto *t = detail::llvm_fadd(m_llvm_state, cur_res, y);
@@ -921,12 +925,12 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                 = builder.CreateAdd(builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
                                     builder.getInt32(m_batch_size * order));
             auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
-                                                          builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
+                                                          detail::llvm_unsigned_gep(builder, fp_t, tc_ptrs, load_idx));
 
             // Store it in out_ptr. The index is:
             // m_batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
-            detail::store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx), tcs);
+            detail::store_vector_to_memory(builder, detail::llvm_unsigned_gep(builder, fp_t, out_ptr, out_idx), tcs);
         });
 
         // Now let's run the Horner scheme.
@@ -945,12 +949,12 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                             builder.CreateMul(builder.getInt32(m_batch_size),
                                               builder.CreateSub(builder.getInt32(order), cur_order)));
                         auto *tcs = detail::gather_vector_from_memory(
-                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
+                            builder, fp_vec_t, detail::llvm_unsigned_gep(builder, fp_t, tc_ptrs, load_idx));
 
                         // Accumulate in out_ptr. The index is:
                         // m_batch_size * cur_var_idx.
                         auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
-                        auto *out_p = builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx);
+                        auto *out_p = detail::llvm_unsigned_gep(builder, fp_t, out_ptr, out_idx);
                         auto *cur_out = detail::load_vector_from_memory(builder, fp_t, out_p, m_batch_size);
                         detail::store_vector_to_memory(
                             builder, out_p,
