@@ -24,6 +24,7 @@
 
 #include <oneapi/tbb/global_control.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/logging.hpp>
@@ -37,7 +38,7 @@ void run_benchmark(unsigned long long nevals, std::uint32_t batch_size, bool com
     // Fetch the logger.
     create_logger();
     set_logger_level_trace();
-    auto logger = spdlog::get("heyoka");
+    auto logger = spdlog::get("heyoka-" HEYOKA_VERSION_STRING);
 
     // Buffers.
     std::vector<T> out_buffer(nevals), in_buffer(nevals * 6u, static_cast<T>(0.1));

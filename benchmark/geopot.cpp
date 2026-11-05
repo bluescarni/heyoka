@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     // Fetch the logger.
     create_logger();
     set_logger_level_trace();
-    auto logger = spdlog::get("heyoka");
+    auto logger = spdlog::get("heyoka-" HEYOKA_VERSION_STRING);
 
     // State variables.
     const auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");

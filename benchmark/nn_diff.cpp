@@ -13,6 +13,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/logging.hpp>
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
     create_logger();
     set_logger_level_trace();
 
-    auto logger = spdlog::get("heyoka");
+    auto logger = spdlog::get("heyoka-" HEYOKA_VERSION_STRING);
 
     unsigned nn_layer{};
 

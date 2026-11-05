@@ -25,6 +25,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/logging.hpp>
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
     // Fetch the logger.
     create_logger();
     set_logger_level_trace();
-    auto logger = spdlog::get("heyoka");
+    auto logger = spdlog::get("heyoka-" HEYOKA_VERSION_STRING);
 
     // Number of particles.
     static const auto N = N_sqrt * N_sqrt;
