@@ -638,7 +638,6 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     jet_ptr->setName("jet_ptr");
     llvm_add_no_capture_argattr(s, jet_ptr);
     jet_ptr->addAttr(llvm::Attribute::NoAlias);
-    jet_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *state_ptr = jet_ptr + 1;
     state_ptr->setName("state_ptr");
@@ -667,7 +666,6 @@ taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *fp_t, const std:
     max_abs_state_ptr->setName("max_abs_state_ptr");
     llvm_add_no_capture_argattr(s, max_abs_state_ptr);
     max_abs_state_ptr->addAttr(llvm::Attribute::NoAlias);
-    max_abs_state_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     llvm::Argument *tape_ptr = nullptr;
     if (compact_mode) {
@@ -783,7 +781,6 @@ taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, 
     tc_ptr->setName("tc_ptr");
     llvm_add_no_capture_argattr(s, tc_ptr);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
-    tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     llvm::Argument *tape_ptr = nullptr;
     if (compact_mode) {
