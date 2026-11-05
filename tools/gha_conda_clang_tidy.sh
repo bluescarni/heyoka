@@ -30,7 +30,6 @@ unset CFLAGS
 cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DCMAKE_CXX_CLANG_TIDY=`which clang-tidy` \

@@ -20,11 +20,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -204,15 +200,11 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, tru
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real, false> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
-
-#endif
 
 // Explicit instantiation.
 #define HEYOKA_T_EVENT_INST(F)                                                                                         \
@@ -229,11 +221,7 @@ HEYOKA_T_EVENT_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template class HEYOKA_DLL_PUBLIC t_event_impl<mppp::real, false>;
-
-#endif
 
 #undef HEYOKA_T_EVENT_INST
 

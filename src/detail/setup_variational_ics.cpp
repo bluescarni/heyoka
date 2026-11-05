@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -62,17 +58,13 @@ void setup_variational_ics_varpar(std::vector<T> &state, const var_ode_sys &vsys
 
     // Prepare the state vector.
     // NOTE: the appended items will all be zeroes.
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::same_as<T, mppp::real>) {
         // NOTE: at this point we know that all the elements in state
         // are set up properly with the correct precision.
         state.resize(safe_state_size_t(batch_size) * sys.size(), mppp::real{0, state[0].get_prec()});
     } else {
-#endif
         state.resize(safe_state_size_t(batch_size) * sys.size());
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 
     // Fetch the range of multiindices.
     const auto didx_rng = vsys.get_didx_range();
@@ -108,15 +100,11 @@ void setup_variational_ics_varpar(std::vector<T> &state, const var_ode_sys &vsys
         const auto state_idx = static_cast<decltype(state.size())>(i) * batch_size;
 
         for (std::uint32_t j = 0; j < batch_size; ++j) {
-#if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::same_as<T, mppp::real>) {
                 state[state_idx + j].set(1);
             } else {
-#endif
                 state[state_idx + j] = 1;
-#if defined(HEYOKA_HAVE_REAL)
             }
-#endif
         }
     }
 }
@@ -173,17 +161,13 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
 
     // Setup the prec argument for the compiled function.
     const auto prec = [&] -> long long {
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::same_as<mppp::real, T>) {
             // NOTE: here we know that m_state is not empty and that it contains
             // values with the correct precision.
             return boost::numeric_cast<long long>(state[0].get_prec());
         } else {
-#endif
             return 0;
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
     }();
 
     // Add the compiled function to st.
@@ -243,11 +227,7 @@ HEYOKA_INST_SETUP_VARIATIONAL_ICS(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(mppp::real)
-
-#endif
 
 #undef HEYOKA_INST_SETUP_VARIATIONAL_ICS
 

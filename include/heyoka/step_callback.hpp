@@ -21,11 +21,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -66,8 +62,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<false, bool
     // inherit the call operator from the callable_iface implementation and the default (no-op) pre_hook()
     // implementation from step_cb_iface.
     template <typename Base, typename T>
-    struct impl : step_cb_impl_base<TA, Base, T> {
-    };
+    struct impl : step_cb_impl_base<TA, Base, T> {};
 
     // Implementation of the step_cb interface for callable objects providing the pre_hook() member function.
     template <typename Base, typename T>
@@ -204,11 +199,7 @@ HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real)
-
-#endif
 
 #undef HEYOKA_SCS_EXTERN_TEMPLATE
 
@@ -277,10 +268,6 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp:
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
-
-#endif
 
 #endif

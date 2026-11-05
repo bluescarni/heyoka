@@ -19,13 +19,8 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -48,10 +43,8 @@ llvm::Value *llvm_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpULT(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_ult(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ult values of type '{}'", llvm_type_name(fp_t)));
@@ -73,10 +66,8 @@ llvm::Value *llvm_fcmp_uge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUGE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_uge(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_uge values of type '{}'", llvm_type_name(fp_t)));
@@ -98,10 +89,8 @@ llvm::Value *llvm_fcmp_ule(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpULE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_ule(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ule values of type '{}'", llvm_type_name(fp_t)));
@@ -123,10 +112,8 @@ llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOGE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_oge(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_oge values of type '{}'", llvm_type_name(fp_t)));
@@ -148,10 +135,8 @@ llvm::Value *llvm_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOLE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_ole(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ole values of type '{}'", llvm_type_name(fp_t)));
@@ -173,10 +158,8 @@ llvm::Value *llvm_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOLT(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_olt(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_olt values of type '{}'", llvm_type_name(fp_t)));
@@ -198,10 +181,8 @@ llvm::Value *llvm_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOGT(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_ogt(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ogt values of type '{}'", llvm_type_name(fp_t)));
@@ -223,10 +204,8 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpOEQ(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_oeq(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_oeq values of type '{}'", llvm_type_name(fp_t)));
@@ -248,10 +227,8 @@ llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpONE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_one(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_one values of type '{}'", llvm_type_name(fp_t)));
@@ -273,10 +250,8 @@ llvm::Value *llvm_fcmp_une(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUNE(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_une(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_une values of type '{}'", llvm_type_name(fp_t)));
@@ -298,10 +273,8 @@ llvm::Value *llvm_fcmp_ord(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpORD(a, b);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fcmp_ord(s, a, b);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ord values of type '{}'", llvm_type_name(fp_t)));
@@ -323,10 +296,8 @@ llvm::Value *llvm_fnz(llvm_state &s, llvm::Value *x)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFCmpUNE(x, llvm::ConstantFP::get(x->getType(), 0.));
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_fnz(s, x);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(
@@ -405,13 +376,9 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
         return builder.CreateSub(icmp0, icmp1);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if (llvm_is_real(val->getType()) != 0) {
         return llvm_real_sgn(s, val);
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
@@ -437,10 +404,8 @@ llvm::Value *llvm_is_finite(llvm_state &s, llvm::Value *x)
 
         // Put the conditions together and return.
         return s.builder().CreateLogicalAnd(x_not_pinf, x_not_minf);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(x_t) != 0) {
         return llvm_real_isfinite(s, x);
-#endif
         // LCOV_EXCL_START
         //
         // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)

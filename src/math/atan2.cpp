@@ -39,11 +39,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -808,14 +804,10 @@ expression atan2(expression y, mppp::real128 x)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 expression atan2(expression y, mppp::real x)
 {
     return atan2(std::move(y), expression(std::move(x)));
 }
-
-#endif
 
 expression atan2(float y, expression x)
 {
@@ -841,14 +833,10 @@ expression atan2(mppp::real128 y, expression x)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 expression atan2(mppp::real y, expression x)
 {
     return atan2(expression(std::move(y)), std::move(x));
 }
-
-#endif
 
 HEYOKA_END_NAMESPACE
 

@@ -39,15 +39,10 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -138,13 +133,11 @@ number sqrt_pi_2_like(llvm_state &s, const llvm::Type *const tp)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::sqrt(mppp::pi_128) / 2};
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = llvm_is_real(tp)) {
         auto ret = mppp::sqrt(mppp::real_pi(real_prec));
         mppp::div_2ui(ret, ret, 1ul);
 
         return number{std::move(ret)};
-#endif
     }
 
     // LCOV_EXCL_START

@@ -35,7 +35,6 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_BUILD_TUTORIALS=OFF \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \

@@ -24,11 +24,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/ed_data.hpp>
@@ -230,11 +226,7 @@ HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST
 

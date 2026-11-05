@@ -1,8 +1,6 @@
 # Remember several build options.
 set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
-set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
 set(heyoka_WITH_REAL128 @_HEYOKA_WITH_REAL128@)
-set(heyoka_WITH_REAL @_HEYOKA_WITH_REAL@)
 set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 
 # Record the LLVM major version against which
@@ -12,9 +10,7 @@ set(heyoka_LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@)
 # Record also the versions of the public dependencies.
 set(heyoka_Boost_VERSION @Boost_VERSION@)
 set(heyoka_fmt_VERSION @fmt_VERSION@)
-if(${heyoka_WITH_MPPP})
-    set(heyoka_mp++_VERSION @mp++_VERSION@)
-endif()
+set(heyoka_mp++_VERSION @mp++_VERSION@)
 
 # Mandatory public dependencies on Boost and fmt.
 
@@ -33,23 +29,19 @@ endif()
 
 find_package(fmt @_HEYOKA_MIN_SUPPORTED_FMT_VERSION@...<@_HEYOKA_MAX_SUPPORTED_FMT_VERSION@ REQUIRED CONFIG)
 
-# Optional public dependency on mp++.
-if(${heyoka_WITH_MPPP})
-    find_package(mp++ REQUIRED CONFIG)
-    if(${mp++_VERSION_MAJOR} VERSION_LESS @_HEYOKA_MIN_SUPPORTED_MPPP_VERSION@ OR
-       ${mp++_VERSION_MAJOR} VERSION_GREATER @_HEYOKA_MAX_SUPPORTED_MPPP_VERSION@)
-        message(FATAL_ERROR "The supported mp++ versions are in the range [@_HEYOKA_MIN_SUPPORTED_MPPP_VERSION@, @_HEYOKA_MAX_SUPPORTED_MPPP_VERSION@], but version ${mp++_VERSION_MAJOR} was found instead.")
-    endif()
-
-    # NOTE: this is necessary for the serialisation of several classes.
-    if(NOT mp++_WITH_BOOST_S11N)
-        message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
-    endif()
-
-    # NOTE: needed for formatting numbers.
-    if(NOT mp++_WITH_FMT)
-        message(FATAL_ERROR "mp++ must be installed with support for fmt.")
-    endif()
+# Mandatory public dependency on mp++.
+find_package(mp++ 2...<3 REQUIRED CONFIG)
+# NOTE: this is necessary for the serialisation of several classes.
+if(NOT mp++_WITH_BOOST_S11N)
+    message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
+endif()
+# NOTE: needed for formatting numbers.
+if(NOT mp++_WITH_FMT)
+    message(FATAL_ERROR "mp++ must be installed with support for fmt.")
+endif()
+# NOTE: poly root finding requires mppp::real.
+if(NOT mp++_WITH_MPFR)
+    message(FATAL_ERROR "mp++ must be installed with support for MPFR.")
 endif()
 
 # Get current dir.

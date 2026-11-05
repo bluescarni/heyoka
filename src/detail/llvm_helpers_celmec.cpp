@@ -35,16 +35,11 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -77,10 +72,8 @@ number inv_kep_E_pi_like(llvm_state &s, const llvm::Type *const tp)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::pi_128};
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(tp)) {
         return number{mppp::real_pi(prec)};
-#endif
     }
 
     // LCOV_EXCL_START
@@ -109,10 +102,8 @@ number inv_kep_E_eps_like(llvm_state &s, const llvm::Type *const tp)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{std::numeric_limits<mppp::real128>::epsilon()};
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(tp)) {
         return number{eps_from_prec(prec)};
-#endif
     }
 
     // LCOV_EXCL_START

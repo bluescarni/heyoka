@@ -16,6 +16,13 @@ heyoka has the following **mandatory** dependencies:
 * the `LLVM <https://llvm.org/>`__ compiler infrastructure library (versions >=19 and <=23 are officially supported),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.85),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=12),
+* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library,
+  which provides support for arbitrary-precision integrations on all platforms,
+  and for quadruple-precision integrations on platforms
+  supporting the non-standard ``__float128`` type. heyoka requires
+  an mp++ installation in which the ``MPPP_WITH_MPFR``, ``MPPP_WITH_BOOST_S11N`` and
+  ``MPPP_WITH_FMT`` options are enabled (see the :ref:`mp++ installation instructions <mppp:installation>`).
+  heyoka currently requires mp++ 2.x;
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
 * the `TBB <https://github.com/oneapi-src/oneTBB>`__ library,
 * the `OpenSSL <https://www.openssl.org/>`__ library,
@@ -23,14 +30,6 @@ heyoka has the following **mandatory** dependencies:
 
 Additionally, heyoka has the following **optional** dependencies:
 
-* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library,
-  which provides support for arbitrary-precision integrations on all platforms,
-  and for quadruple-precision integrations on platforms
-  supporting the non-standard ``__float128`` type. heyoka requires
-  an mp++ installation with support for Boost.serialization and for the
-  {fmt} library
-  (see the :ref:`mp++ installation instructions <mppp:installation>`).
-  heyoka currently requires mp++ 2.x;
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
@@ -77,10 +76,8 @@ on platforms such as x86-64, quadruple-precision computations are supported if:
 
 * the nonstandard ``__float128`` floating-point type is
   available and supported, and
-* an installation of the `mp++ <https://bluescarni.github.io/mppp/>`__ library with support
-  for the :cpp:class:`mppp::real128` class is available (see the :ref:`mp++ installation instructions <mppp:installation>`),
-  and
-* heyoka is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+* the mp++ installation in use supports the :cpp:class:`mppp::real128` class
+  (see the :ref:`mp++ installation instructions <mppp:installation>`).
 
 If these conditions are satisfied, then quadruple-precision computations are supported in heyoka
 via the :cpp:class:`mppp::real128` type.
@@ -94,10 +91,7 @@ via the :cpp:class:`mppp::real128` type.
 Arbitrary-precision
 ^^^^^^^^^^^^^^^^^^^
 
-Arbitrary-precision integrations are supported on all platforms, provided that heyoka
-is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`)
-and that the mp++ library is compiled with the ``MPPP_WITH_MPFR`` option enabled
-(see the :ref:`mp++ installation instructions <mppp:installation>`).
+Arbitrary-precision integrations are supported on all platforms via the :cpp:class:`mppp::real` type.
 
 Packages
 --------
@@ -162,7 +156,6 @@ of heyoka, you can use ``cmake`` to configure the build to your liking
 (e.g., enabling optional features, customizing the installation
 path, etc.). The available configuration options are:
 
-* ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (off by default),
 * ``HEYOKA_WITH_SLEEF``: enable features relying on the SLEEF library (off by default),
 * ``HEYOKA_BUILD_TESTS``: build the test suite (off by default),
 * ``HEYOKA_TEST_SUITE``: what type of test suite to build (``quick`` or ``full``), relevant
@@ -297,11 +290,8 @@ heyoka's config-file package also exports the following boolean variables to sig
 dependencies heyoka was compiled:
 
 * ``heyoka_WITH_SLEEF`` if SLEEF support was enabled,
-* ``heyoka_WITH_MPPP`` if mp++ support was enabled,
 * ``heyoka_WITH_REAL128`` (new in version 0.19) if quadruple-precision
-  computations via the :cpp:class:`mppp::real128` type are supported,
-* ``heyoka_WITH_REAL`` (new in version 0.20) if arbitrary-precision
-  computations via the :cpp:class:`mppp::real` type are supported.
+  computations via the :cpp:class:`mppp::real128` type are supported.
 
 .. versionadded:: 0.17.0
 

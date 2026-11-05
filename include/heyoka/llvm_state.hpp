@@ -34,11 +34,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -109,12 +105,8 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
-
-#endif
 
 // Code model.
 //
@@ -130,8 +122,7 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::code_model> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::code_model> : fmt::ostream_formatter {};
 
 } // namespace fmt
 

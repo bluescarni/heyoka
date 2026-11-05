@@ -23,11 +23,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -48,11 +44,8 @@ public:
                                     ,
                                     mppp::real128
 #endif
-#if defined(HEYOKA_HAVE_REAL)
                                     ,
-                                    mppp::real
-#endif
-                                    >;
+                                    mppp::real>;
 
 private:
     value_type m_value;
@@ -71,9 +64,7 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     explicit number(mppp::real128) noexcept;
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     explicit number(mppp::real);
-#endif
     number(const number &);
     number(number &&) noexcept;
     ~number();

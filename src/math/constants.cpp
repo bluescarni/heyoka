@@ -46,16 +46,11 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -111,15 +106,7 @@ std::string pi_constant_func::operator()(unsigned prec) const
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     return mppp::real_pi(boost::numeric_cast<mpfr_prec_t>(prec)).to_string();
-
-#else
-
-    throw std::invalid_argument(fmt::format("Unable to generate a pi constant with a precision of {} bits", prec));
-
-#endif
 }
 
 namespace
@@ -226,14 +213,12 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
 
         // Generate the APFloat and the constant.
         return llvm::ConstantFP::get(tp, llvm::APFloat(sem, str_rep));
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = detail::llvm_is_real(tp)) {
         // Fetch the string representation at the desired precision.
         const auto str_rep = operator()(boost::numeric_cast<unsigned>(real_prec));
 
         // Go through llvm_codegen().
         return llvm::cast<llvm::Constant>(llvm_codegen(s, tp, number{mppp::real{str_rep, real_prec}}));
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(

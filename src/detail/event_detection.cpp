@@ -31,11 +31,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
@@ -135,8 +131,6 @@ int sgn(T val)
     return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 int sgn(const mppp::real &val)
 {
     // NOTE: this is only used when val is guaranteed to be finite, thus this should never throw.
@@ -147,8 +141,6 @@ int sgn(const mppp::real &val)
     // -1 or 1).
     return sgn(ret);
 }
-
-#endif
 
 // Helper to factor out common event detection code in the scalar and batch implementations.
 //
@@ -298,15 +290,11 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
 {
     return taylor_deduce_cooldown_impl(std::move(g_eps), std::move(abs_der));
 }
-
-#endif
 
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>
@@ -375,12 +363,10 @@ ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector
             const auto prec = [&s0] -> long long {
                 static_cast<void>(s0);
 
-#if defined(HEYOKA_HAVE_REAL)
                 if constexpr (std::same_as<T, mppp::real>) {
                     return boost::numeric_cast<long long>(s0.get_prec());
                 }
 
-#endif
                 return 0;
             }();
 
@@ -514,11 +500,7 @@ template struct ed_data<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template struct ed_data<mppp::real>;
-
-#endif
 
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>

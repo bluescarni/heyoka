@@ -23,11 +23,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -103,11 +99,7 @@ extern template class continuous_output<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 extern template class continuous_output<mppp::real>;
-
-#endif
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const continuous_output<T> &)
@@ -133,12 +125,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_outp
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real> &);
-
-#endif
 
 namespace detail
 {
@@ -214,11 +202,7 @@ extern template class continuous_output_batch<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 extern template class continuous_output_batch<mppp::real>;
-
-#endif
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &)

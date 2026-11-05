@@ -32,7 +32,6 @@ option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_BUILD_TUTORIALS "Build tutorials." OFF)
 option(HEYOKA_BUILD_UTILS "Build utilities." OFF)
-option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires compiler support)." OFF)
@@ -225,8 +224,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/irr_add_poly_root_finder.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/frpr_workspace.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/find_real_poly_roots.cpp"
-    # NOTE: this will be an empty file in case we are not
-    # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/validate_ode_sys.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
@@ -601,38 +598,25 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 # NOTE: make sure we do not use deprecated ASIO bits.
 target_compile_definitions(heyoka PRIVATE BOOST_ASIO_NO_DEPRECATED)
 
-# Optional dependency on mp++.
-set(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION 2)
-set(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION 2)
-if(HEYOKA_WITH_MPPP)
-    find_package(mp++ REQUIRED CONFIG)
-    if(${mp++_VERSION_MAJOR} VERSION_LESS ${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION} OR
-       ${mp++_VERSION_MAJOR} VERSION_GREATER ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION})
-        message(FATAL_ERROR "The supported mp++ versions are in the range [${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION}, ${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION}], but version ${mp++_VERSION_MAJOR} was found instead.")
-    endif()
-    message(STATUS "mp++ version: ${mp++_VERSION}")
-
-    # NOTE: this is necessary for the serialisation of several classes.
-    if(NOT mp++_WITH_BOOST_S11N)
-        message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
-    endif()
-
-    # NOTE: needed for formatting numbers.
-    if(NOT mp++_WITH_FMT)
-        message(FATAL_ERROR "mp++ must be installed with support for fmt.")
-    endif()
-
-    target_link_libraries(heyoka PUBLIC mp++::mp++)
-
-    # NOTE: _HEYOKA_WITH_REAL128 is used to signal the support
-    # for mppp::real128 in the config-file package.
-    set(_HEYOKA_WITH_REAL128 ${mp++_WITH_QUADMATH})
-    # Similarly for mppp::real.
-    set(_HEYOKA_WITH_REAL ${mp++_WITH_MPFR})
-else()
-    set(_HEYOKA_WITH_REAL128 NO)
-    set(_HEYOKA_WITH_REAL NO)
+# Mandatory dependency on mp++.
+find_package(mp++ 2...<3 REQUIRED CONFIG)
+message(STATUS "mp++ version: ${mp++_VERSION}")
+# NOTE: this is necessary for the serialisation of several classes.
+if(NOT mp++_WITH_BOOST_S11N)
+    message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
 endif()
+# NOTE: needed for formatting numbers.
+if(NOT mp++_WITH_FMT)
+    message(FATAL_ERROR "mp++ must be installed with support for fmt.")
+endif()
+# NOTE: poly root finding requires mppp::real.
+if(NOT mp++_WITH_MPFR)
+    message(FATAL_ERROR "mp++ must be installed with support for MPFR.")
+endif()
+target_link_libraries(heyoka PUBLIC mp++::mp++)
+# NOTE: _HEYOKA_WITH_REAL128 is used to signal the support
+# for mppp::real128 in the config-file package.
+set(_HEYOKA_WITH_REAL128 ${mp++_WITH_QUADMATH})
 
 # Optional dependency on SLEEF.
 if(HEYOKA_WITH_SLEEF)
@@ -698,10 +682,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINAT
 
 # Cleanup.
 unset(_HEYOKA_MIN_BOOST_VERSION)
-unset(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION)
-unset(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
-unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)

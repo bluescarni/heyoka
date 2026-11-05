@@ -8,8 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <cassert>
 #include <charconv>
 #include <cstdint>
@@ -1013,5 +1011,3 @@ HEYOKA_DLL_PUBLIC void heyoka_double_to_mpfr(mppp::mpfr_struct_t *ret, const dou
     ::mpfr_set_d(ret, x, MPFR_RNDN);
 }
 }
-
-#endif

@@ -29,7 +29,6 @@ cmake ../ -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DHEYOKA_BUILD_TESTS=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DHEYOKA_ENABLE_IPO=yes
 

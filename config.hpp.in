@@ -17,11 +17,8 @@
 #define HEYOKA_ABI_VERSION @HEYOKA_ABI_VERSION@
 // clang-format on
 
-#cmakedefine HEYOKA_WITH_MPPP
 #cmakedefine HEYOKA_WITH_SLEEF
 #cmakedefine HEYOKA_BUILD_STATIC_LIBRARY
-
-#if defined(HEYOKA_WITH_MPPP)
 
 #include <mp++/config.hpp>
 
@@ -37,17 +34,15 @@
 
 #endif
 
+#if !defined(MPPP_WITH_MPFR)
+
+#error mp++ must be configured with support for the MPFR library.
+
+#endif
+
 #if defined(MPPP_WITH_QUADMATH)
 
 #define HEYOKA_HAVE_REAL128
-
-#endif
-
-#if defined(MPPP_WITH_MPFR)
-
-#define HEYOKA_HAVE_REAL
-
-#endif
 
 #endif
 

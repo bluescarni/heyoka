@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/safe_integer.hpp>
@@ -181,11 +177,7 @@ HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST
 

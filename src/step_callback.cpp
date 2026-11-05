@@ -21,11 +21,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/step_callback.hpp>
@@ -84,8 +80,7 @@ constexpr auto scs_index_err_msg = "Out of range index {} when accessing a step 
 } // namespace
 
 template <typename T, bool Batch>
-const step_callback_set_impl<T, Batch>::step_cb_t &
-step_callback_set_impl<T, Batch>::operator[](size_type i) const
+const step_callback_set_impl<T, Batch>::step_cb_t &step_callback_set_impl<T, Batch>::operator[](size_type i) const
 {
     if (i >= size()) {
         throw std::out_of_range(fmt::format(scs_index_err_msg, i, size()));
@@ -165,13 +160,9 @@ template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real128, false
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template class HEYOKA_DLL_PUBLIC step_callback_set_impl<mppp::real, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real, false> &,
                                      step_callback_set_impl<mppp::real, false> &) noexcept;
-
-#endif
 
 } // namespace detail
 
@@ -192,8 +183,4 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(heyoka::step_callback_batch_set
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::step_callback_set<mppp::real>, mppp::real)
-
-#endif

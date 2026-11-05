@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/poly_root_finding/frpr_workspace_impl.hpp>
@@ -74,8 +70,6 @@ T find_real_poly_roots_div_2(T x)
     return x / 2;
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It also uses
 // a specialised division primitive for performance.
 template <>
@@ -83,8 +77,6 @@ mppp::real find_real_poly_roots_div_2<mppp::real>(mppp::real x)
 {
     return mppp::div_2ui(std::move(x), 1u);
 }
-
-#endif
 
 } // namespace
 
@@ -150,8 +142,6 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
                         ws.m_impl->get_degree(), cfs_size - 1u));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // Precision checks for mppp::real.
     if constexpr (std::same_as<T, mppp::real>) {
         const auto expected_prec = ws.m_impl->get_prec();
@@ -167,8 +157,6 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
         // the precision from the zero int literal its default value is constructed from.
         lb.prec_round(expected_prec);
     }
-
-#endif
 
     // Finiteness checks.
     if (!is_finite(h)) [[unlikely]] {
@@ -486,11 +474,7 @@ HEYOKA_FIND_REAL_POLY_ROOTS_INST(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_FIND_REAL_POLY_ROOTS_INST(mppp::real);
-
-#endif
 
 #undef HEYOKA_FIND_REAL_POLY_ROOTS_INST
 

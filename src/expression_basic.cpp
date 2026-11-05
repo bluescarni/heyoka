@@ -43,11 +43,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -82,11 +78,7 @@ expression::expression(mppp::real128 x) noexcept : expression(number{x}) {}
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 expression::expression(mppp::real x) : expression(number{std::move(x)}) {}
-
-#endif
 
 expression::expression(std::string s) : expression(variable{std::move(s)}) {}
 
@@ -540,8 +532,7 @@ namespace
 
 // Exception to signal that the stream output
 // for an expression has become too large.
-struct output_too_long : std::exception {
-};
+struct output_too_long : std::exception {};
 
 } // namespace
 

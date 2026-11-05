@@ -37,11 +37,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/aligned_vector.hpp>
@@ -84,8 +80,6 @@ template <typename T, typename Derived>
 void taylor_adaptive_base<T, Derived>::load(boost::archive::binary_iarchive &, unsigned)
 {
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 template <typename Derived>
 void taylor_adaptive_base<mppp::real, Derived>::save(boost::archive::binary_oarchive &ar, unsigned) const
@@ -163,8 +157,6 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
     }
 }
 
-#endif
-
 } // namespace detail
 
 template <typename T>
@@ -229,8 +221,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // just re-validate for peace of mind.
     validate_ode_sys(sys, tes, ntes);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // Setup the m_prec data member for multiprecision integrations.
     if constexpr (std::same_as<T, mppp::real>) {
         if (!prec && state.empty()) [[unlikely]] {
@@ -243,8 +233,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         this->m_prec = prec ? boost::numeric_cast<mpfr_prec_t>(*prec) : state[0].get_prec();
     }
 
-#endif
-
     // Fetch the original number of equations/state variables.
     const auto n_orig_sv = is_variational ? std::get<1>(vsys).get_n_orig_sv()
                                           : boost::numeric_cast<std::uint32_t>(std::get<0>(vsys).size());
@@ -256,19 +244,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         // NOTE: we will perform further initialisation for the variational quantities
         // at a later stage, if needed.
 
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::same_as<T, mppp::real>) {
             state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv),
                          mppp::real{mppp::real_kind::zero, this->get_prec()});
         } else {
-#endif
             state.resize(boost::numeric_cast<decltype(state.size())>(n_orig_sv));
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
     } else {
-#if defined(HEYOKA_HAVE_REAL)
-
         if constexpr (std::same_as<T, mppp::real>) {
             // The user passed in a non-empty multiprecision state. We need
             // to either enforce the desired precision, or to check that the
@@ -300,8 +282,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                 }
             }
         }
-
-#endif
     }
 
     // NOTE: at this point, state must be a non-empty vector.
@@ -343,26 +323,18 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     // Init the time.
     if (time) {
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             // NOTE: enforce the correct precision for mppp::real.
             m_time = detail::dfloat<T>(mppp::real{std::move(*time), this->get_prec()});
         } else {
-#endif
             m_time = detail::dfloat<T>(std::move(*time));
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
     } else {
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             m_time = detail::dfloat<T>(mppp::real{mppp::real_kind::zero, this->get_prec()});
         } else {
-#endif
             m_time = detail::dfloat<T>(static_cast<T>(0));
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
     }
 
     // Compute the total number of params, including the rhs and the event functions.
@@ -370,18 +342,14 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     // Check/setup pars.
     if (pars.empty()) {
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::same_as<T, mppp::real>) {
             // For mppp::real, ensure that the parameter
             // values all have the inferred precision.
             pars.resize(boost::numeric_cast<decltype(pars.size())>(tot_n_pars),
                         mppp::real{mppp::real_kind::zero, this->get_prec()});
         } else {
-#endif
             pars.resize(boost::numeric_cast<decltype(pars.size())>(tot_n_pars));
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
         // NOLINTNEXTLINE(readability-inconsistent-ifelse-braces)
     } else if (pars.size() != tot_n_pars) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
@@ -393,8 +361,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // Assign the parameter values.
     m_pars = std::move(pars);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // Enforce the correct precision for mppp::real.
     // NOTE: this is redundant in case pars was originally empty,
     // but let us keep it like this in order not to complicate further
@@ -404,8 +370,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
             val.prec_round(this->get_prec());
         }
     }
-
-#endif
 
     // High accuracy and compact mode flags.
     m_high_accuracy = high_accuracy;
@@ -430,16 +394,12 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         m_tol = detail::num_eps_like(m_state[0]);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         // Force the tolerance to have the inferred precision.
         // NOTE: this is important as in taylor_add_adaptive_step*()
         // we use the tolerance value to infer the internal type.
         m_tol.prec_round(this->get_prec());
     }
-
-#endif
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -526,29 +486,21 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
     // Setup the vector for the Taylor coefficients.
     using su32_t = boost::safe_numerics::safe<std::uint32_t>;
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the Taylor coefficients are all generated
         // with the inferred precision.
         m_tc.resize(m_state.size() * (su32_t(m_order) + 1), mppp::real{mppp::real_kind::zero, this->get_prec()});
     } else {
-#endif
         m_tc.resize(m_state.size() * (su32_t(m_order) + 1));
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 
     // Setup the vector for the dense output.
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the values are all generated with the inferred precision.
         m_d_out.resize(m_state.size(), mppp::real{mppp::real_kind::zero, this->get_prec()});
     } else {
-#endif
         m_d_out.resize(m_state.size());
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 
     // Init the event data structure if needed.
     //
@@ -567,21 +519,15 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     }
 
     if (is_variational) {
-#if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             m_vsys_data
                 = std::make_unique<detail::vsys_data<T>>(std::get<1>(vsys), static_cast<long long>(this->get_prec()),
                                                          m_tplt_state, 1, high_accuracy, compact_mode, parjit);
         } else {
-#endif
             m_vsys_data = std::make_unique<detail::vsys_data<T>>(std::get<1>(vsys), 0, m_tplt_state, 1, high_accuracy,
                                                                  compact_mode, parjit);
-#if defined(HEYOKA_HAVE_REAL)
         }
-#endif
     }
-
-#if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
         // Fix the precision of m_last_h, which was inited from '0'.
@@ -596,8 +542,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
 #endif
     }
-
-#endif
 
     // Move vsys in.
     m_vsys = std::move(vsys);
@@ -766,16 +710,12 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     assert(m_i_data);
     assert(m_i_data->m_busy);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         assert(max_delta_t.get_prec() == this->get_prec());
 
         // Run the data precision checks.
         this->data_prec_check();
     }
-
-#endif
 
     // Small helper to reduce typing below.
     constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
@@ -884,13 +824,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
         }();
 
-#if defined(HEYOKA_HAVE_REAL)
-
         if constexpr (std::is_same_v<T, mppp::real>) {
             assert(g_eps.get_prec() == this->get_prec());
         }
-
-#endif
 
         // Flag to signal that all the input data for event detection is finite.
         //
@@ -937,12 +873,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
             // If we have terminal events we need to update the value of h.
             if (!edd.m_d_tes.empty()) {
-#if defined(HEYOKA_HAVE_REAL)
                 if constexpr (std::is_same_v<T, mppp::real>) {
                     // NOTE: event detection is expected to preserve the working precision for mppp::real. Assert it.
                     assert(std::get<1>(edd.m_d_tes[0]).get_prec() == this->get_prec());
                 }
-#endif
                 h = std::get<1>(edd.m_d_tes[0]);
             }
         }
@@ -1009,12 +943,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // NOLINTNEXTLINE(misc-const-correctness)
             auto cb_tm = static_cast<T>(new_time - m_last_h + std::get<1>(t));
 
-#if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::same_as<T, mppp::real>) {
                 // NOTE: for mppp::real the event detection machinery is expected to keep the correct working precision.
                 assert(cb_tm.get_prec() == this->get_prec());
             }
-#endif
 
             cb(*this, std::move(cb_tm), std::get<2>(t));
         }
@@ -1078,15 +1010,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return step_impl(mppp::real{mppp::real_kind::inf, this->get_prec()}, wtc);
     } else {
-#endif
         return step_impl(std::numeric_limits<T>::infinity(), wtc);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template <typename T>
@@ -1094,15 +1022,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
     const auto bg = make_busy_guard("step_backward");
 
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return step_impl(mppp::real{mppp::real_kind::inf, -1, this->get_prec()}, wtc);
     } else {
-#endif
         return step_impl(-std::numeric_limits<T>::infinity(), wtc);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template <typename T>
@@ -1117,13 +1041,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
             "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         max_delta_t.prec_round(this->get_prec());
     }
-
-#endif
 
     return step_impl(std::move(max_delta_t), wtc);
 }
@@ -1181,8 +1101,6 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         assert(t.hi.get_prec() == t.lo.get_prec());
         t.hi.prec_round(this->get_prec());
@@ -1190,8 +1108,6 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
 
         max_delta_t.prec_round(this->get_prec());
     }
-
-#endif
 
     // Check max_delta_t.
     if (isnan(max_delta_t)) [[unlikely]] {
@@ -1495,13 +1411,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         max_delta_t.prec_round(this->get_prec());
     }
-
-#endif
 
     // Check max_delta_t.
     if (isnan(max_delta_t)) [[unlikely]] {
@@ -1529,16 +1441,12 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         throw std::invalid_argument(nf_err_msg);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // Ensure all grid points have the correct precision for real.
     if constexpr (std::is_same_v<T, mppp::real>) {
         for (auto &val : grid) {
             val.prec_round(this->get_prec());
         }
     }
-
-#endif
 
     if (grid.size() > 1u) {
         // Establish the direction of the grid from the first two points.
@@ -2005,11 +1913,9 @@ const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sy
 template <typename T>
 void taylor_adaptive<T>::set_time(T t)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         t.prec_round(this->get_prec());
     }
-#endif
 
     m_i_data->m_time = detail::dfloat<T>(std::move(t));
 }
@@ -2017,12 +1923,10 @@ void taylor_adaptive<T>::set_time(T t)
 template <typename T>
 void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         hi.prec_round(this->get_prec());
         lo.prec_round(this->get_prec());
     }
-#endif
 
     // Check the components.
     detail::dtime_checks(hi, lo);
@@ -2033,9 +1937,6 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 {
-
-#if defined(HEYOKA_HAVE_REAL)
-
     // NOTE: here it is not necessary to run the precision
     // check on the state/params, as they are never used
     // in the computation.
@@ -2043,8 +1944,6 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     if constexpr (std::is_same_v<T, mppp::real>) {
         time.prec_round(this->get_prec());
     }
-
-#endif
 
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
@@ -2133,8 +2032,6 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
                                                 s.extent(0), nvargs));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         for (std::uint32_t i = 0; i < s.extent(0); ++i) {
             if (s(i).get_prec() != this->get_prec()) [[unlikely]] {
@@ -2149,8 +2046,6 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
         // from the state vector.
         this->data_prec_check();
     }
-
-#endif
 
     // Run the compiled function.
     assert(m_i_data->m_vsys_data); // LCOV_EXCL_LINE
@@ -2240,11 +2135,7 @@ HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_INST
 

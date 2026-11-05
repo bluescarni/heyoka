@@ -21,8 +21,8 @@ The :cpp:class:`~heyoka::number` class
 
       .. note::
 
-         :cpp:class:`mppp::real128` and :cpp:class:`mppp::real` are supported only if heyoka was built
-         with support for the mp++ library (see the :ref:`installation instructions <installation>`).
+         :cpp:class:`mppp::real128` is supported only on some platforms (see the
+         :ref:`installation instructions <ep_support>`).
 
       The union of floating-point types.
 
@@ -50,8 +50,8 @@ The :cpp:class:`~heyoka::number` class
 
       .. note::
 
-         The :cpp:class:`mppp::real128` and :cpp:class:`mppp::real` overloads are available only
-         if heyoka was built with support for the mp++ library (see the :ref:`installation instructions <installation>`).
+         The :cpp:class:`mppp::real128` overload is available only on some platforms (see the
+         :ref:`installation instructions <ep_support>`).
 
       Numbers can be initialised from values of the supported floating-point types.
 

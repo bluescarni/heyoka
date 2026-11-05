@@ -11,9 +11,9 @@ not only in single and double precision, but also in extended precision. Specifi
 
 How these extended precision floating-point types can be accessed and used from C++ varies depending on the platform. The 80-bit
 extended-precision format is available as the C++ ``long double`` type on most platforms based on Intel x86 processors. Quadruple-precision
-computations are supported either via the ``long double`` type (e.g., on 64-bit Linux ARM) or via the the :cpp:class:`mppp::real128` type
-(provided that the platform supports the nonstandard ``__float128`` floating-point type and that heyoka was compiled with support
-for the mp++ library - see the :ref:`installation instructions <installation>`).
+computations are supported either via the ``long double`` type (e.g., on 64-bit Linux ARM) or via the :cpp:class:`mppp::real128` type
+(provided that the platform supports the nonstandard ``__float128`` floating-point type and that the mp++ library was compiled
+with support for :cpp:class:`mppp::real128` - see the :ref:`installation instructions <ep_support>`).
 
 A simple example
 ----------------

@@ -97,11 +97,7 @@ llvm::Value *llvm_math_intr(llvm_state &, const std::string &,
 #if defined(HEYOKA_HAVE_REAL128)
                             const std::string &,
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                            const std::string &,
-#endif
-
-                            const std::vector<llvm::Value *> &);
+                            const std::string &, const std::vector<llvm::Value *> &);
 llvm::Value *llvm_math_cmath(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
 llvm::Value *llvm_math_ir_defined(llvm_state &, const std::string &, const std::vector<llvm::Value *> &);
 

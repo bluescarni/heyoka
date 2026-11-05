@@ -21,11 +21,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/poly_root_finding/vector_cache.hpp>
 #include <heyoka/s11n.hpp>
@@ -93,11 +89,7 @@ template class vector_cache<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template class vector_cache<mppp::real>;
-
-#endif
 
 namespace
 {
@@ -199,11 +191,7 @@ template class cached_vector<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template class cached_vector<mppp::real>;
-
-#endif
 
 } // namespace detail
 

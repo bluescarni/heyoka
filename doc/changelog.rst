@@ -22,6 +22,11 @@ New
 Changes
 ~~~~~~~
 
+- The mp++ library (with support for MPFR) is now a mandatory dependency, and the ``HEYOKA_WITH_MPPP``
+  build option has been removed. Arbitrary-precision computations via :cpp:class:`mppp::real`
+  are now always supported. The ``HEYOKA_WITH_MPPP`` and ``HEYOKA_HAVE_REAL`` macros and the
+  ``heyoka_WITH_MPPP`` and ``heyoka_WITH_REAL`` CMake variables have been removed
+  (`#562 <https://github.com/bluescarni/heyoka/pull/562>`__).
 - Invoking the stepping/propagation functions of an integrator, copy-assigning to it or deserialising into it
   from within one of its own event or step callbacks now raises an exception
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).

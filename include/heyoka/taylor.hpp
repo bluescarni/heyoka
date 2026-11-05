@@ -42,11 +42,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/dfloat.hpp>
@@ -226,13 +222,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     }();
 
     // Compact mode (defaults to false, except for real where it defaults to true).
-    const auto compact_mode = p(kw::compact_mode,
-#if defined(HEYOKA_HAVE_REAL)
-                                std::same_as<T, mppp::real>
-#else
-                                false
-#endif
-    );
+    const auto compact_mode = p(kw::compact_mode, std::same_as<T, mppp::real>);
 
     // Vector of parameters (defaults to empty vector).
     auto pars = [&p] -> std::vector<T> {
@@ -333,8 +323,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <typename Derived>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base<mppp::real, Derived>
 {
@@ -352,8 +340,6 @@ protected:
 public:
     [[nodiscard]] mpfr_prec_t get_prec() const;
 };
-
-#endif
 
 template <typename T>
 void setup_variational_ics_varpar(std::vector<T> &, const var_ode_sys &, std::uint32_t);
@@ -722,11 +708,7 @@ HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST
 
@@ -1182,11 +1164,7 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST
 
@@ -1214,12 +1192,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real> &);
-
-#endif
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
@@ -1296,14 +1270,10 @@ BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real128>, heyoka::detail
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_adaptive_s11n_version);
 
 // NOTE: this is not really necessary as the batch integrator cannot be used with real, but let's
 // just leave it for consistency.
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real>, heyoka::detail::taylor_adaptive_batch_s11n_version);
-
-#endif
 
 #endif

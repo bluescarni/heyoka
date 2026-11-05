@@ -44,11 +44,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -95,9 +91,7 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     explicit expression(mppp::real128) noexcept;
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     explicit expression(mppp::real);
-#endif
     explicit expression(std::string);
 
     explicit expression(number);
@@ -201,8 +195,7 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::expression> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::expression> : fmt::ostream_formatter {};
 
 } // namespace fmt
 
@@ -233,18 +226,14 @@ HEYOKA_DLL_PUBLIC expression operator+(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real);
-#endif
 HEYOKA_DLL_PUBLIC expression operator+(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, const expression &);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator+(mppp::real, const expression &);
-#endif
 
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, double);
@@ -253,18 +242,14 @@ HEYOKA_DLL_PUBLIC expression operator-(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real);
-#endif
 HEYOKA_DLL_PUBLIC expression operator-(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, const expression &);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator-(mppp::real, const expression &);
-#endif
 
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, double);
@@ -273,18 +258,14 @@ HEYOKA_DLL_PUBLIC expression operator*(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real);
-#endif
 HEYOKA_DLL_PUBLIC expression operator*(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, const expression &);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator*(mppp::real, const expression &);
-#endif
 
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, float);
@@ -293,18 +274,14 @@ HEYOKA_DLL_PUBLIC expression operator/(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real);
-#endif
 HEYOKA_DLL_PUBLIC expression operator/(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, const expression &);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator/(mppp::real, const expression &);
-#endif
 
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, float);
@@ -313,9 +290,7 @@ HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real);
-#endif
 
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, float);
@@ -324,9 +299,7 @@ HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real);
-#endif
 
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, float);
@@ -335,9 +308,7 @@ HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real);
-#endif
 
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, float);
@@ -346,9 +317,7 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real);
-#endif
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexcept;
@@ -500,8 +469,7 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::dtens> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::dtens> : fmt::ostream_formatter {};
 
 } // namespace fmt
 
@@ -632,11 +600,7 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_CFUNC_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_CFUNC_EXTERN_INST
 
@@ -658,13 +622,7 @@ auto cfunc_common_opts(const KwArgs &...kw_args)
     const auto high_accuracy = p(kw::high_accuracy, false);
 
     // Compact mode (defaults to false, except for real where it defaults to true).
-    const auto compact_mode = p(kw::compact_mode,
-#if defined(HEYOKA_HAVE_REAL)
-                                std::same_as<T, mppp::real>
-#else
-                                false
-#endif
-    );
+    const auto compact_mode = p(kw::compact_mode, std::same_as<T, mppp::real>);
 
     // Parallel mode (defaults to false).
     const auto parallel_mode = p(kw::parallel_mode, false);
@@ -830,12 +788,8 @@ public:
     [[nodiscard]] std::uint32_t get_nouts() const;
     [[nodiscard]] bool is_time_dependent() const;
 
-#if defined(HEYOKA_HAVE_REAL)
-
     [[nodiscard]] mpfr_prec_t get_prec() const
         requires std::same_as<T, mppp::real>;
-
-#endif
 
     using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
     using out_1d = mdspan<T, dextents<std::size_t, 1>>;
@@ -984,11 +938,7 @@ HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_CFUNC_CLASS_EXTERN_INST
 
@@ -1017,11 +967,7 @@ BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real128>, heyoka::detail::cfunc_s11n_ver
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 BOOST_CLASS_VERSION(heyoka::cfunc<mppp::real>, heyoka::detail::cfunc_s11n_version);
-
-#endif
 
 // fmt formatter for cfunc, implemented
 // on top of the streaming operator.
@@ -1029,8 +975,7 @@ namespace fmt
 {
 
 template <typename T>
-struct formatter<heyoka::cfunc<T>> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::cfunc<T>> : fmt::ostream_formatter {};
 
 } // namespace fmt
 

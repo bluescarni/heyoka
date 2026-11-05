@@ -31,7 +31,5 @@ ADD_HEYOKA_TUTORIAL(par_mode)
 ADD_HEYOKA_TUTORIAL(extended_precision)
 ADD_HEYOKA_TUTORIAL(single_precision)
 ADD_HEYOKA_TUTORIAL(compiled_functions)
+ADD_HEYOKA_TUTORIAL(arbitrary_precision)
 
-if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
-  ADD_HEYOKA_TUTORIAL(arbitrary_precision)
-endif()

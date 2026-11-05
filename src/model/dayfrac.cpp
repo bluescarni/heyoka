@@ -28,16 +28,11 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/erfa_decls.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -196,14 +191,10 @@ llvm::Value *fp_to_dbl(llvm_state &s, llvm::Value *x)
         return bld.CreateFPTrunc(x, dbl_t);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if (hd::llvm_is_real(x_t) > 0) {
         // x is a real.
         return hd::llvm_real_to_double(s, x);
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(fmt::format(
@@ -238,14 +229,10 @@ llvm::Value *dbl_to_fp(llvm_state &s, llvm::Value *x, llvm::Type *fp_t)
         return bld.CreateFPExt(x, fp_t);
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if (hd::llvm_is_real(fp_t) > 0) {
         // fp_t is a real type.
         return hd::llvm_double_to_real(s, x, fp_t);
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(

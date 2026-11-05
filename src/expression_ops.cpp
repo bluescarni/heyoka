@@ -23,11 +23,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -124,14 +120,10 @@ HEYOKA_EX_BINARY_OP_R(/, mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_EX_BINARY_OP_R(+, mppp::real)
 HEYOKA_EX_BINARY_OP_R(-, mppp::real)
 HEYOKA_EX_BINARY_OP_R(*, mppp::real)
 HEYOKA_EX_BINARY_OP_R(/, mppp::real)
-
-#endif
 
 HEYOKA_EX_BINARY_OP_L(+, float)
 HEYOKA_EX_BINARY_OP_L(+, double)
@@ -155,14 +147,10 @@ HEYOKA_EX_BINARY_OP_L(/, mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_EX_BINARY_OP_L(+, mppp::real)
 HEYOKA_EX_BINARY_OP_L(-, mppp::real)
 HEYOKA_EX_BINARY_OP_L(*, mppp::real)
 HEYOKA_EX_BINARY_OP_L(/, mppp::real)
-
-#endif
 
 #undef HEYOKA_EX_BINARY_OP_R
 #undef HEYOKA_EX_BINARY_OP_L
@@ -222,14 +210,10 @@ HEYOKA_EX_COMPOUND_OP(/=, mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_EX_COMPOUND_OP(+=, mppp::real)
 HEYOKA_EX_COMPOUND_OP(-=, mppp::real)
 HEYOKA_EX_COMPOUND_OP(*=, mppp::real)
 HEYOKA_EX_COMPOUND_OP(/=, mppp::real)
-
-#endif
 
 #undef HEYOKA_EX_COMPOUND_OP
 

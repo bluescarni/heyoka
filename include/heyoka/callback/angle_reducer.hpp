@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -132,12 +128,8 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 extern template bool angle_reducer::operator()<mppp::real>(taylor_adaptive<mppp::real> &);
 extern template void angle_reducer::pre_hook<mppp::real>(taylor_adaptive<mppp::real> &);
-
-#endif
 
 #undef HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST
 
@@ -160,11 +152,7 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_KEY(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::callback::angle_reducer, mppp::real)
-
-#endif
 
 #undef HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_KEY
 

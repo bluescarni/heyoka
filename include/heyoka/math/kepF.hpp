@@ -20,11 +20,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -83,11 +79,7 @@ HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real);
-
-#endif
 
 #undef HEYOKA_DECLARE_KEPF_OVERLOADS
 

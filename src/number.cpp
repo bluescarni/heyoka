@@ -51,17 +51,12 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
 
 #include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
@@ -87,11 +82,7 @@ number::number(mppp::real128 x) noexcept : m_value(x) {}
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 number::number(mppp::real x) : m_value(std::move(x)) {}
-
-#endif
 
 number::number(const number &) = default;
 
@@ -177,11 +168,9 @@ std::ostream &operator<<(std::ostream &os, const number &n)
         [&os](const auto &arg) {
             using type = std::remove_cvref_t<decltype(arg)>;
 
-#if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
                 os << arg.to_string();
             } else {
-#endif
                 // NOTE: we make sure to print all digits
                 // necessary for short-circuiting. Make also
                 // sure to always print the decimal point and to
@@ -196,9 +185,7 @@ std::ostream &operator<<(std::ostream &os, const number &n)
                 oss << arg;
 
                 os << oss.str();
-#if defined(HEYOKA_HAVE_REAL)
             }
-#endif
         },
         n.value());
 
@@ -211,15 +198,11 @@ bool is_zero(const number &n)
         [](const auto &arg) {
             using type [[maybe_unused]] = std::remove_cvref_t<decltype(arg)>;
 
-#if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
                 return arg.zero_p();
             } else {
-#endif
                 return arg == 0;
-#if defined(HEYOKA_HAVE_REAL)
             }
-#endif
         },
         n.value());
 }
@@ -230,15 +213,11 @@ bool is_one(const number &n)
         [](const auto &arg) {
             using type [[maybe_unused]] = std::remove_cvref_t<decltype(arg)>;
 
-#if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<type, mppp::real>) {
                 return arg.is_one();
             } else {
-#endif
                 return arg == 1;
-#if defined(HEYOKA_HAVE_REAL)
             }
-#endif
         },
         n.value());
 }
@@ -490,7 +469,6 @@ number binomial(const number &i, const number &j)
                         detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2)),
                     };
 #endif
-#if defined(HEYOKA_HAVE_REAL)
                 } else if constexpr (std::is_same_v<type1, mppp::real>) {
                     // For real, we transform the input arguments into mppp::integer,
                     // invoke binomial and then convert back to real.
@@ -499,7 +477,6 @@ number binomial(const number &i, const number &j)
 
                     // NOTE: do the conversion using the maximum precision among the operands, as usual.
                     return number{mppp::real{binomial(n1, n2), std::max(v1.get_prec(), v2.get_prec())}};
-#endif
                     // LCOV_EXCL_START
                 } else {
                     throw std::invalid_argument(fmt::format("Arguments of type '{}' are not supported by binomial()",
@@ -602,7 +579,6 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         //
         // NOTE: llvm will deduce the correct type for the codegen from the supplied floating-point semantics.
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = detail::llvm_is_real(tp)) {
         // From the number, generate a real with the desired precision.
         const auto r = std::visit([real_prec](const auto &v) { return mppp::real{v, real_prec}; }, n.value());
@@ -628,7 +604,6 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 
         // Generate the struct.
         return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
-#endif
     }
 
     // LCOV_EXCL_START
@@ -658,10 +633,8 @@ number number_like(llvm_state &s, const llvm::Type *const tp, double val)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{static_cast<mppp::real128>(val)};
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = llvm_is_real(tp)) {
         return number{mppp::real{val, real_prec}};
-#endif
     }
 
     throw std::invalid_argument(
@@ -788,7 +761,6 @@ std::pair<number, number> dl_twopi_like(llvm_state &s, const llvm::Type *const f
             "Cannot generate a double-length 2*pi approximation for the LLVM type '{}'", detail::llvm_type_name(fp_t)));
         // LCOV_EXCL_STOP
 
-#if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(fp_t)) {
         // Generate the 2*pi constant with prec * 4 precision.
         auto twopi = mppp::real_pi(boost::safe_numerics::safe<::mpfr_prec_t>(prec) * 4);
@@ -801,7 +773,6 @@ std::pair<number, number> dl_twopi_like(llvm_state &s, const llvm::Type *const f
         assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
 
         return std::make_pair(number(std::move(twopi_hi)), number(std::move(twopi_lo)));
-#endif
         // LCOV_EXCL_START
     } else {
         throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",

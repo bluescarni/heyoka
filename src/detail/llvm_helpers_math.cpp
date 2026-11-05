@@ -34,13 +34,8 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -55,10 +50,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "floorq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_floor",
-#endif
-                          {x});
+                          "mpfr_floor", {x});
 }
 
 // Trunc.
@@ -68,10 +60,7 @@ llvm::Value *llvm_trunc(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "truncq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_trunc",
-#endif
-                          {x});
+                          "mpfr_trunc", {x});
 }
 
 // Two-argument arctan.
@@ -87,10 +76,7 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "expq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_exp",
-#endif
-                          {x});
+                          "mpfr_exp", {x});
 }
 
 // Exponential minus one.
@@ -106,10 +92,7 @@ llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "cosq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_cos",
-#endif
-                          {x});
+                          "mpfr_cos", {x});
 }
 
 // Sine.
@@ -119,10 +102,7 @@ llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "sinq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_sin",
-#endif
-                          {x});
+                          "mpfr_sin", {x});
 }
 
 // Hyperbolic cosine.
@@ -150,10 +130,7 @@ llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "logq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_log",
-#endif
-                          {x});
+                          "mpfr_log", {x});
 }
 
 // Natural logarithm of 1+x.
@@ -231,10 +208,7 @@ llvm::Value *llvm_sqrt(llvm_state &s, llvm::Value *x)
 #if defined(HEYOKA_HAVE_REAL128)
                           "sqrtq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_sqrt",
-#endif
-                          {x});
+                          "mpfr_sqrt", {x});
 }
 
 // Tangent.
@@ -256,10 +230,7 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
 #if defined(HEYOKA_HAVE_REAL128)
                           "powq",
 #endif
-#if defined(HEYOKA_HAVE_REAL)
-                          "mpfr_pow",
-#endif
-                          {x, y});
+                          "mpfr_pow", {x, y});
 }
 
 namespace
@@ -423,8 +394,6 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
         return;
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if (llvm_is_real(scal_t) != 0) {
         // Fetch the current insertion block.
         auto *orig_bb = bld.GetInsertBlock();
@@ -454,8 +423,6 @@ void create_combined_sincos_scalar_wrapper(llvm_state &s, const std::string_view
 
         return;
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(fmt::format(

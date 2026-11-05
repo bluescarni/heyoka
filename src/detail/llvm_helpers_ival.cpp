@@ -37,15 +37,8 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/llvm_state.hpp>
-
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <mp++/real.hpp>
-
 #include <heyoka/detail/real_helpers.hpp>
-
-#endif
+#include <heyoka/llvm_state.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -202,13 +195,9 @@ ival_mode llvm_get_ival_mode(const llvm::Type *const val_t)
         // LCOV_EXCL_STOP
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if (llvm_is_real(fp_t) != 0) {
         return ival_mode::multiprecision;
     }
-
-#endif
 
     // NOTE: at this point we are sure that fp_t must be a builtin fp type.
     assert(fp_t->isFloatingPointTy());
@@ -393,7 +382,6 @@ struct llvm_ival_guard::impl {
             case ival_mode::avx512:
                 return avx512_binop_up(m_state, name, a, b);
                 // LCOV_EXCL_STOP
-#if defined(HEYOKA_HAVE_REAL)
             case ival_mode::multiprecision:
                 // NOTE: explicit rounding mode passed to the MPFR primitive.
                 //
@@ -402,7 +390,6 @@ struct llvm_ival_guard::impl {
                 assert(!m_val_t->isVectorTy());
                 return m_state.builder().CreateCall(
                     real_nary_op(m_state, m_val_t, fmt::format("mpfr_{}", name), 2, MPFR_RNDU), {a, b});
-#endif
             default:
                 assert(m_mode == ival_mode::portable);
                 // NOTE: in portable mode the rounding mode is set to up already, and the builder setup will ensure

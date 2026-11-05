@@ -40,23 +40,14 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
-
-#include <mp++/integer.hpp>
-
-#endif
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
+#include <mp++/integer.hpp>
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
@@ -186,12 +177,9 @@ std::optional<safe_int64_t> ex_is_integral(const expression &ex)
                         }
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
                         else if constexpr (std::is_same_v<num_type, mppp::real>) {
                             return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(x));
                         }
-#endif
-
                         // LCOV_EXCL_START
                         else {
                             static_assert(always_false_v<num_type>);
@@ -264,12 +252,9 @@ std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
                         }
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
                         else if constexpr (std::is_same_v<num_type, mppp::real>) {
                             return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(y));
                         }
-#endif
-
                         // LCOV_EXCL_START
                         else {
                             static_assert(always_false_v<num_type>);
@@ -1112,14 +1097,10 @@ expression pow(const expression &b, mppp::real128 e)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 expression pow(const expression &b, mppp::real e)
 {
     return pow(b, expression{std::move(e)});
 }
-
-#endif
 
 HEYOKA_END_NAMESPACE
 

@@ -26,11 +26,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/taylor.hpp>
@@ -54,13 +50,9 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
 
     oss << "C++ datatype            : " << boost::core::demangle(typeid(T).name()) << '\n';
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         oss << "Precision               : " << ta.get_prec() << " bits\n";
     }
-
-#endif
 
     oss << "Tolerance               : " << fp_to_string(ta.get_tol()) << '\n';
     oss << "High accuracy           : " << ta.get_high_accuracy() << '\n';
@@ -198,15 +190,11 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real128> 
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real> &ta)
 {
     return detail::taylor_adaptive_stream_impl(os, ta);
 }
-
-#endif
 
 template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<float> &ta)

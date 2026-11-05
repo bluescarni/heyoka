@@ -60,11 +60,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/composite_function.hpp>
@@ -1386,8 +1382,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     }
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
 
@@ -1397,8 +1391,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
                                                     sprec, mppp::real_prec_min(), mppp::real_prec_max()));
         }
     }
-
-#endif
 
     // Decompose the function and cache the number of vars and outputs.
     auto dc = function_decompose(fn.first, fn.second, false);
@@ -1525,11 +1517,7 @@ HEYOKA_ADD_CFUNC_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_ADD_CFUNC_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_ADD_CFUNC_INST
 
@@ -2447,8 +2435,6 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
     }
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
 
@@ -2459,8 +2445,6 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
                             sprec, mppp::real_prec_min(), mppp::real_prec_max()));
         }
     }
-
-#endif
 
     // Fetch the internal scalar fp type from the template state. We will be cloning
     // this throughout the rest of the implementation.
@@ -2486,11 +2470,7 @@ HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_MAKE_MULTI_CFUNC_INST
 

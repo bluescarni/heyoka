@@ -17,15 +17,10 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/num_utils.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -35,15 +30,11 @@ namespace detail
 template <typename T>
 T num_zero_like([[maybe_unused]] const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return mppp::real{mppp::real_kind::zero, x.get_prec()};
     } else {
-#endif
         return 0;
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template float num_zero_like(const float &);
@@ -58,24 +49,16 @@ template mppp::real128 num_zero_like(const mppp::real128 &);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template mppp::real num_zero_like(const mppp::real &);
-
-#endif
 
 template <typename T>
 T num_one_like([[maybe_unused]] const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return mppp::real{1u, x.get_prec()};
     } else {
-#endif
         return 1;
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template float num_one_like(const float &);
@@ -90,24 +73,16 @@ template mppp::real128 num_one_like(const mppp::real128 &);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template mppp::real num_one_like(const mppp::real &);
-
-#endif
 
 template <typename T>
 T num_eps_like([[maybe_unused]] const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return eps_from_prec(x.get_prec());
     } else {
-#endif
         return std::numeric_limits<T>::epsilon();
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template float num_eps_like(const float &);
@@ -122,24 +97,16 @@ template mppp::real128 num_eps_like(const mppp::real128 &);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template mppp::real num_eps_like(const mppp::real &);
-
-#endif
 
 template <typename T>
 T num_inf_like([[maybe_unused]] const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return mppp::real{mppp::real_kind::inf, x.get_prec()};
     } else {
-#endif
         return std::numeric_limits<T>::infinity();
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template float num_inf_like(const float &);
@@ -154,11 +121,7 @@ template mppp::real128 num_inf_like(const mppp::real128 &);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template mppp::real num_inf_like(const mppp::real &);
-
-#endif
 
 } // namespace detail
 

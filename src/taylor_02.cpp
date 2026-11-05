@@ -51,11 +51,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -1429,18 +1425,14 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
 template <typename T>
 T taylor_default_max_delta_t()
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: the precision here does not matter,
         // it will be rounded to the correct precision in
         // any case.
         return mppp::real{mppp::real_kind::inf, 128};
     } else {
-#endif
         return std::numeric_limits<T>::infinity();
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Explicit instantiations.
@@ -1456,11 +1448,7 @@ template HEYOKA_DLL_PUBLIC mppp::real128 taylor_default_max_delta_t<mppp::real12
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template HEYOKA_DLL_PUBLIC mppp::real taylor_default_max_delta_t<mppp::real>();
-
-#endif
 
 } // namespace detail
 

@@ -18,11 +18,7 @@
 
 #include <fmt/format.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/dfloat.hpp>
 
@@ -30,8 +26,6 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
-
-#if defined(HEYOKA_HAVE_REAL)
 
 dfloat<mppp::real>::dfloat() = default;
 
@@ -75,8 +69,6 @@ dfloat<mppp::real>::operator mppp::real() &&
 {
     return std::move(hi);
 }
-
-#endif
 
 } // namespace detail
 
