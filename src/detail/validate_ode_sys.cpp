@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/taylor.hpp>
@@ -194,11 +190,7 @@ HEYOKA_VALIDATE_ODE_SYS_INST_BATCH(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_VALIDATE_ODE_SYS_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_VALIDATE_ODE_SYS_INST
 #undef HEYOKA_VALIDATE_ODE_SYS_INST_BATCH

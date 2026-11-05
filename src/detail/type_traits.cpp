@@ -16,11 +16,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/type_traits.hpp>
 
@@ -72,16 +68,13 @@ double get_fp_unit_cost()
 #endif
     }
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     else if constexpr (std::same_as<mppp::real, T>) {
         // NOTE: this should be improved to take into account
         // the selected precision.
         // NOTE: for reference, mppp::real with 113 bits of precision
         // is slightly slower than software-implemented quadmath.
         return 1000;
-    }
-#endif
-    else {
+    } else {
         static_assert(always_false_v<T>, "Unknown fp cost model for an unsupported floating-point type.");
     }
 }
@@ -97,11 +90,7 @@ template double get_fp_unit_cost<mppp::real128>();
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template double get_fp_unit_cost<mppp::real>();
-
-#endif
 
 } // namespace detail
 

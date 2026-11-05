@@ -34,11 +34,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -434,8 +430,6 @@ TEST_CASE("overflow")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // The "random" and "rounding direction" test cases for mppp::real at several precisions. The output must also keep the
 // precision of the input.
 TEST_CASE("real")
@@ -491,5 +485,3 @@ TEST_CASE("real")
         }
     }
 }
-
-#endif

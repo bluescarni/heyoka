@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -58,9 +54,7 @@ TEST_CASE("simd size")
     REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
     REQUIRE(recommended_simd_size<mppp::real>() == 1u);
-#endif
 
 #if defined(__GNUC__)
 

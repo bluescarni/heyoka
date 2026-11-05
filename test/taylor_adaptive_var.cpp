@@ -15,11 +15,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
@@ -172,8 +168,6 @@ TEST_CASE("auto ic setup")
                     "number of original (i.e., non-variational) equations, which for this system is 2"));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto vsys = var_ode_sys(orig_sys, {par[0], v}, 2);
 
@@ -195,8 +189,6 @@ TEST_CASE("auto ic setup")
 
         REQUIRE(std::ranges::all_of(ta.get_state(), [prec](const auto &r) { return r.get_prec() == prec; }));
     }
-
-#endif
 
     // A couple of tests for derivatives wrt the initial time.
     {
@@ -253,8 +245,6 @@ TEST_CASE("auto ic setup")
                 "specified instead"));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         auto vsys = var_ode_sys(orig_sys, {v, heyoka::time, x}, 1);
 
@@ -280,8 +270,6 @@ TEST_CASE("auto ic setup")
 
         REQUIRE(std::ranges::all_of(ta.get_state(), [prec](const auto &r) { return r.get_prec() == prec; }));
     }
-
-#endif
 }
 
 TEST_CASE("auto ic setup batch")
@@ -753,8 +741,6 @@ TEST_CASE("taylor map")
         REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     {
         const auto prec = 14;
 
@@ -792,8 +778,6 @@ TEST_CASE("taylor map")
                                Message("A state variable with precision 21 was detected in the state vector: this is "
                                        "incompatible with the integrator precision of 14"));
     }
-
-#endif
 }
 
 TEST_CASE("taylor map batch")

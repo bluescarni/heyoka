@@ -22,11 +22,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -353,8 +349,6 @@ TEST_CASE("multieval mt real128")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("multieval st mp")
 {
     using Catch::Matchers::Message;
@@ -475,5 +469,3 @@ TEST_CASE("multieval mt real")
         }
     }
 }
-
-#endif

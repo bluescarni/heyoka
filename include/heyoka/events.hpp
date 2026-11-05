@@ -25,11 +25,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -130,11 +126,7 @@ HEYOKA_T_EVENT_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_T_EVENT_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_T_EVENT_EXTERN_INST
 
@@ -208,11 +200,7 @@ HEYOKA_NT_EVENT_EXTERN_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_NT_EVENT_EXTERN_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_NT_EVENT_EXTERN_INST
 
@@ -248,12 +236,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<m
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real, false> &);
-
-#endif
 
 template <typename T, bool B>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
@@ -287,12 +271,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mp
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real, false> &);
-
-#endif
 
 } // namespace detail
 
@@ -317,8 +297,7 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::event_direction> : fmt::ostream_formatter {
-};
+struct formatter<heyoka::event_direction> : fmt::ostream_formatter {};
 
 } // namespace fmt
 

@@ -20,12 +20,8 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/integer.hpp>
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -38,8 +34,6 @@
 
 namespace heyoka_test
 {
-
-#if defined(HEYOKA_HAVE_REAL)
 
 const mppp::real approximately<mppp::real>::default_tol(100);
 
@@ -72,8 +66,6 @@ std::ostream &operator<< <mppp::real>(std::ostream &os, const approximately<mppp
 {
     return os << a.m_value.to_string();
 }
-
-#endif
 
 template <typename T>
 std::vector<T> tc_to_jet(const heyoka::taylor_adaptive<T> &ta)
@@ -135,11 +127,7 @@ template std::vector<mppp::real128> tc_to_jet(const heyoka::taylor_adaptive_batc
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template std::vector<mppp::real> tc_to_jet(const heyoka::taylor_adaptive<mppp::real> &);
-
-#endif
 
 template <typename T>
 void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &sys, unsigned opt_level,
@@ -231,7 +219,6 @@ boost::multiprecision::cpp_rational to_rat(T x)
     // Helper to compute 2**e as a rational.
     const auto pow2 = [](long long e) { return e >= 0 ? rat(int_t(1) << e) : rat(int_t(1), int_t(1) << -e); };
 
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: zero must be handled separately, because for zero mpfr_get_z_2exp() returns the minimum exponent of
         // MPFR (e.g., 1 - 2**30), and computing 2**e would be prohibitively expensive.
@@ -244,7 +231,6 @@ boost::multiprecision::cpp_rational to_rat(T x)
 
         return rat(int_t(n.to_string())) * pow2(e);
     } else {
-#endif
         using std::frexp;
 
         rat ret = 0;
@@ -264,9 +250,7 @@ boost::multiprecision::cpp_rational to_rat(T x)
         }
 
         return ret;
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 template boost::multiprecision::cpp_rational to_rat<float>(float x);
@@ -279,11 +263,7 @@ template boost::multiprecision::cpp_rational to_rat<mppp::real128>(mppp::real128
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template boost::multiprecision::cpp_rational to_rat<mppp::real>(mppp::real x);
-
-#endif
 
 namespace
 {
@@ -394,8 +374,6 @@ template mppp::real128 rand_uniform<mppp::real128>(std::mt19937 &, double, doubl
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // Generate a random value of type mppp::real with precision prec approximately uniformly distributed in [lo, hi]. As in
 // rand_uniform(), the value is the sum of two doubles, thus for the precisions higher than double's it can have up to
 // about 106 significant bits.
@@ -409,8 +387,6 @@ mppp::real rand_uniform_real(std::mt19937 &rng, double lo, double hi, ::mpfr_pre
     // NOTE: the second double is scaled by 2**-53, so that its bits extend those of the first one.
     return mppp::real{a, prec} + mppp::real{b, prec} * mppp::real{0x1p-53, prec};
 }
-
-#endif
 
 // The largest finite value of the type T, as a rational.
 //

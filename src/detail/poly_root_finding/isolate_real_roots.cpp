@@ -26,11 +26,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/num_utils.hpp>
@@ -54,8 +50,6 @@ T isolate_real_roots_div_2(T x)
 {
     return x / 2;
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 // NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It also uses
 // a specialised division primitive for performance.
@@ -304,8 +298,6 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
     return true;
 }
 
-#endif
-
 // Helper to validate, in debug mode, the output of isolate_real_roots(): the intervals must satisfy the properties
 // documented for irr_interval and in isolate_real_roots(), they must be disjoint, and they must be sorted in increasing
 // order of tau.
@@ -336,16 +328,12 @@ void isolate_real_roots_validate_output([[maybe_unused]] const std::vector<irr_i
         assert(!cur.sign || *cur.sign == 1 || *cur.sign == -1 || *cur.sign == 0);
         assert(cur.type == irr_interval_type::undecided || cur.type == irr_interval_type::isolating);
 
-#if defined(HEYOKA_HAVE_REAL)
-
         if constexpr (std::same_as<T, mppp::real>) {
             // Check the precision of the bounds against lb_tau, which has the precision of the workspace (see the
             // preconditions).
             assert(cur.lo.get_prec() == lb_tau.get_prec());
             assert(cur.hi.get_prec() == lb_tau.get_prec());
         }
-
-#endif
 
         if (cur.type == irr_interval_type::undecided) {
             assert(!cur.sign);
@@ -462,16 +450,12 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
     assert(ws.m_impl->get_degree() == cfs.size() - 1u);
     assert(std::ranges::any_of(cfs, [](const auto &x) { return x != 0; }));
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::same_as<T, mppp::real>) {
         [[maybe_unused]] const auto expected_prec = ws.m_impl->get_prec();
         assert(h.get_prec() == expected_prec);
         assert(std::ranges::all_of(cfs, [expected_prec](const auto &x) { return x.get_prec() == expected_prec; }));
         assert(lb_tau.get_prec() == expected_prec);
     }
-
-#endif
 
     assert(is_finite(h));
     assert(h != 0);
@@ -619,8 +603,7 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         //   info on the roots in (lo, hi)), or
         // - b_0 straddles 0 (meaning that we don't know if a root occurs exactly at lo).
         //
-        // We will attempt to remove the undecidedness on these intervals with a second bisection pass (if mp++ is
-        // available).
+        // We will attempt to remove the undecidedness on these intervals with a second bisection pass.
         if (V_min != V_max || b_0_sz) {
             isol_ivals.emplace_back(lo, hi, irr_interval_type::undecided, std::nullopt);
 
@@ -673,8 +656,6 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         }
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // NOTE: the extended-precision pass is run if we have one or more undecided intervals whose width is at least
     // min_width.
     if (std::ranges::any_of(isol_ivals, [&min_width](const auto &ival) {
@@ -689,8 +670,6 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
             isol_ivals.swap(orig_isol_ivals);
         }
     }
-
-#endif
 
     // Debug-mode validation of isol_ivals.
     isolate_real_roots_validate_output(isol_ivals, lb_tau);
@@ -715,11 +694,7 @@ HEYOKA_ISOLATE_REAL_ROOTS_INST(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_ISOLATE_REAL_ROOTS_INST(mppp::real);
-
-#endif
 
 #undef HEYOKA_ISOLATE_REAL_ROOTS_INST
 

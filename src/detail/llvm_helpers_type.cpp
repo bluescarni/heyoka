@@ -44,15 +44,10 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -118,8 +113,6 @@ const auto type_map = [] {
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     retval[typeid(mppp::real)] = [](llvm::LLVMContext &c) -> llvm::Type * {
         if (auto *ptr = llvm::StructType::getTypeByName(c, "heyoka.real")) {
             return ptr;
@@ -139,8 +132,6 @@ const auto type_map = [] {
 
         return ret;
     };
-
-#endif
 
     // Associate a few unsigned/signed integral types.
     retval[typeid(unsigned)] = int_to_llvm<unsigned>;
@@ -308,7 +299,6 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
 {
     auto &c = s.context();
 
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::same_as<T, mppp::real>) {
         // Checks on prec.
         // LCOV_EXCL_START
@@ -346,13 +336,10 @@ llvm::Type *to_internal_llvm_type(llvm_state &s, [[maybe_unused]] long long prec
 
         return ret;
     } else {
-#endif
         // NOTE: for anything else than mppp::real, the internal and
         // external types coincide.
         return to_external_llvm_type<T>(c);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Explicit instantiations.
@@ -368,28 +355,20 @@ template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<mppp::real128>(llvm
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<mppp::real>(llvm_state &, long long);
-
-#endif
 
 // This helper returns the type to be used for the internal LLVM representation
 // of the input value x.
 template <typename T>
 llvm::Type *internal_llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return to_internal_llvm_type<T>(s, x.get_prec());
     } else {
-#endif
         // NOTE: for anything else than mppp::real, the internal and
         // external types coincide.
         return to_external_llvm_type<T>(s.context());
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Explicit instantiations.
@@ -405,21 +384,15 @@ template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<mppp::real128>(ll
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<mppp::real>(llvm_state &, const mppp::real &);
-
-#endif
 
 // Fetch the external llvm type corresponding to the input internal llvm type.
 llvm::Type *make_external_llvm_type(llvm::Type *fp_t)
 {
     if (fp_t->isFloatingPointTy() || fp_t->isIntegerTy()) {
         return fp_t;
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return to_external_llvm_type<mppp::real>(fp_t->getContext());
-#endif
         // LCOV_EXCL_START
     } else {
         throw std::invalid_argument(
@@ -464,8 +437,6 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
         HEYOKA_LLVM_CLONE_TYPE_IMPL(FP128);
         default: {
 
-#if defined(HEYOKA_HAVE_REAL)
-
             if (const auto prec = llvm_is_real(tp_scal); prec != 0) {
                 // tp_scal is the internal counterpart of mppp::real.
                 ret_scal_t = to_internal_llvm_type<mppp::real>(s, prec);
@@ -475,8 +446,6 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
                 ret_scal_t = to_external_llvm_type<mppp::real>(ctx);
                 break;
             }
-
-#endif
 
             throw std::invalid_argument(
                 fmt::format("Cannot clone the LLVM type '{}' to another context", llvm_type_name(tp)));

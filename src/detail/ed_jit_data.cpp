@@ -14,11 +14,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -55,11 +51,7 @@ template struct ed_jit_data<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template struct ed_jit_data<mppp::real>;
-
-#endif
 
 } // namespace detail
 

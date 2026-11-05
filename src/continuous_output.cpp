@@ -45,11 +45,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/dfloat.hpp>
@@ -71,8 +67,6 @@ HEYOKA_BEGIN_NAMESPACE
 template <typename T>
 void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         // Double check that the initialisation of the continuous_output
         // object in the integrator code set up everything
@@ -87,8 +81,6 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
         assert(std::all_of(m_output.begin(), m_output.end(),
                            [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
     }
-
-#endif
 
     // Overflow check: we want to be able to index into the arrays of
     // times and Taylor coefficients using 32-bit ints.
@@ -366,8 +358,6 @@ void continuous_output<T>::call_impl(T t)
     // hi/lo parts of times must have the same sizes.
     assert(m_times_hi.size() == m_times_lo.size());
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         // All data must have the same precision
         // (inferred from the first element of m_output).
@@ -382,8 +372,6 @@ void continuous_output<T>::call_impl(T t)
     }
 
 #endif
-
-#endif
     // LCOV_EXCL_STOP
 
     if (!isfinite(t)) {
@@ -391,13 +379,9 @@ void continuous_output<T>::call_impl(T t)
             fmt::format("Cannot compute the continuous output at the non-finite time {}", detail::fp_to_string(t)));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         t.prec_round(m_output[0].get_prec());
     }
-
-#endif
 
     m_f_ptr(m_output.data(), &t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
 }
@@ -492,11 +476,7 @@ template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real>;
-
-#endif
 
 namespace detail
 {
@@ -561,15 +541,11 @@ std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real128
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real> &co)
 {
     return detail::c_out_stream_impl(os, co);
 }
-
-#endif
 
 HEYOKA_END_NAMESPACE
 

@@ -25,11 +25,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -73,36 +69,26 @@ inline constexpr bool is_detected_v = is_detected<Op, Args...>::value;
 
 // Helper to detect if T is a supported floating-point type.
 template <typename>
-struct is_supported_fp : std::false_type {
-};
+struct is_supported_fp : std::false_type {};
 
 template <>
-struct is_supported_fp<float> : std::true_type {
-};
+struct is_supported_fp<float> : std::true_type {};
 
 template <>
-struct is_supported_fp<double> : std::true_type {
-};
+struct is_supported_fp<double> : std::true_type {};
 
 template <>
-struct is_supported_fp<long double> : std::true_type {
-};
+struct is_supported_fp<long double> : std::true_type {};
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-struct is_supported_fp<mppp::real128> : std::true_type {
-};
+struct is_supported_fp<mppp::real128> : std::true_type {};
 
 #endif
-
-#if defined(HEYOKA_HAVE_REAL)
 
 template <>
-struct is_supported_fp<mppp::real> : std::true_type {
-};
-
-#endif
+struct is_supported_fp<mppp::real> : std::true_type {};
 
 template <typename T>
 inline constexpr bool is_supported_fp_v = is_supported_fp<T>::value;

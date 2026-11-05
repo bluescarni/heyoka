@@ -38,7 +38,6 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_TESTS=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_BUILD_UTILS=ON \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"

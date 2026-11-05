@@ -28,11 +28,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/vsys_data.hpp>
@@ -84,8 +80,6 @@ mppp::real128 factorial<mppp::real128>(std::uint32_t n, long long)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
@@ -95,8 +89,6 @@ mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
 
     return ret;
 }
-
-#endif
 
 // Function to formulate the expressions for the evaluation of the Taylor map in a variational integrator.
 //
@@ -205,13 +197,9 @@ vsys_data_create_tm_expr(const var_ode_sys &sys, const dtens &dt, const long lon
                     prod_terms.push_back(in_pows[it->first][it->second - 1u]);
                 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
                 if constexpr (std::same_as<T, mppp::real>) {
                     assert(div.get_prec() == prec);
                 }
-
-#endif
 
                 // Compute the current term of the Taylor series and add it to terms.
                 auto prod = heyoka::prod(std::move(prod_terms));
@@ -269,19 +257,15 @@ vsys_data<T>::vsys_data(const var_ode_sys &sys, const long long prec, const llvm
     // LCOV_EXCL_STOP
 
     // Prepare m_tm_output.
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::same_as<mppp::real, T>) {
         m_tm_output.resize(boost::safe_numerics::safe<decltype(m_tm_output.size())>(sys.get_n_orig_sv()) * batch_size,
                            // NOTE: static cast is fine here, the precision value has
                            // already been validated.
                            mppp::real{mppp::real_kind::zero, static_cast<mpfr_prec_t>(prec)});
     } else {
-#endif
         m_tm_output.resize(boost::safe_numerics::safe<decltype(m_tm_output.size())>(sys.get_n_orig_sv()) * batch_size,
                            static_cast<T>(0));
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 
     // Create the Taylor map expressions.
     auto [tm_outs, tm_ins] = vsys_data_create_tm_expr<T>(sys, dt, prec);
@@ -343,11 +327,7 @@ template struct vsys_data<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template struct vsys_data<mppp::real>;
-
-#endif
 
 } // namespace detail
 

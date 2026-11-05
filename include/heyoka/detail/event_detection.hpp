@@ -23,11 +23,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -61,12 +57,8 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
-
-#endif
 
 // Helper to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,

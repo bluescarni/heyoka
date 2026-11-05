@@ -6,8 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <heyoka/config.hpp>
-
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -36,18 +34,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <mp++/real.hpp>
-
-#endif
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>

@@ -97,11 +97,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/get_dl_path.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
@@ -664,15 +660,11 @@ std::uint32_t recommended_simd_size<mppp::real128>()
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 std::uint32_t recommended_simd_size<mppp::real>()
 {
     return 1;
 }
-
-#endif
 
 // Implementation of the jit class.
 struct llvm_state::jit {
@@ -766,7 +758,7 @@ struct llvm_state::jit {
         // here would disrupt LLVM's cleanup actions?
         // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
 
-#if defined(HEYOKA_HAVE_REAL) && !defined(NDEBUG)
+#if !defined(NDEBUG)
 
         // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
         // NOTE: these checks need access to the data layout, so we put them here for convenience.
@@ -1927,7 +1919,7 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 #if LLVM_VERSION_MAJOR <= 20
                     assert(m_lljit->getTargetTriple().str() == M.getTargetTriple());
 #else
-                    assert(m_lljit->getTargetTriple() == M.getTargetTriple());
+            assert(m_lljit->getTargetTriple() == M.getTargetTriple());
 #endif
 
                     // Optimise the module.

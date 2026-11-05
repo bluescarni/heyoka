@@ -26,21 +26,17 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/logical.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -208,9 +204,8 @@ TEST_CASE("cfunc logical_and")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.logical_and.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.logical_and."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
@@ -279,9 +274,8 @@ TEST_CASE("cfunc logical_or")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.logical_or.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.logical_or."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 2u, batch_size),
@@ -317,8 +311,6 @@ TEST_CASE("cfunc logical_or")
     REQUIRE(outs[0] == 1.);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc logical_and mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -328,8 +320,7 @@ TEST_CASE("cfunc logical_and mp")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({logical_and({x, y}), logical_and({par[0], heyoka::time, y})}, {x, y},
-                                 kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};
@@ -365,8 +356,7 @@ TEST_CASE("cfunc logical_or mp")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({logical_or({x, y}), logical_or({par[0], heyoka::time, y})}, {x, y},
-                                 kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.1", prec}};
             const std::vector pars{mppp::real{"0", prec}};
@@ -392,8 +382,6 @@ TEST_CASE("cfunc logical_or mp")
 
     REQUIRE(outs[0] == 1);
 }
-
-#endif
 
 TEST_CASE("taylor_adaptive")
 {

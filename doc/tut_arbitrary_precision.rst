@@ -11,11 +11,6 @@ decide at runtime the number of bits of precision to be employed in the represen
 of floating-point numbers. The precision is limited, in principle, only by the available
 memory.
 
-As explained in the :ref:`installation instructions <installation>`, arbitrary-precision mode
-requires heyoka to be compiled with support for the `mp++ <https://bluescarni.github.io/mppp/>`__
-multiprecision library. The mp++ library, in turn, must be compiled
-with the ``MPPP_WITH_MPFR`` option enabled (see the :ref:`mp++ installation instructions <mppp:installation>`).
-
 Arbitrary-precision floating-point values are represented in heyoka via the mp++ :cpp:class:`mppp::real` class.
 We refer the reader to the :ref:`mp++ tutorial <mppp:tutorial_real>` for a quick overview of the main features
 of this class. For the purposes of this tutorial, it is sufficient to note how :cpp:class:`mppp::real` largely

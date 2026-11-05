@@ -36,11 +36,7 @@
 
 #include <fmt/core.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -199,15 +195,11 @@ std::partial_ordering cmp_abs(const T &a, const T &b)
     return std::compare_partial_order_fallback(abs(a), abs(b));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 inline std::partial_ordering cmp_abs<mppp::real>(const mppp::real &a, const mppp::real &b)
 {
     return mppp::cmpabs(a, b) <=> 0;
 }
-
-#endif
 
 // A function object that compares detected events in Taylor integrators first by the absolute value of the event
 // trigger time (so that events closer to the beginning of the timestep come first), then by the event index and finally

@@ -16,11 +16,7 @@
 #include <tuple>
 #include <utility>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
@@ -58,8 +54,6 @@ private:
     }
 };
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: we have a specialised implementation for this in order to ensure the ctors always set the components to the
 // same precision (and if they can't, they will throw).
 //
@@ -92,8 +86,6 @@ private:
         ar & lo;
     }
 };
-
-#endif
 
 template <typename F>
 inline bool isfinite(const dfloat<F> &x)

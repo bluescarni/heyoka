@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/expression.hpp>
@@ -267,8 +263,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -293,5 +287,3 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif

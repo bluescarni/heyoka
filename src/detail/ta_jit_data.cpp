@@ -16,11 +16,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
@@ -59,11 +55,7 @@ template struct ta_jit_data<mppp::real128>;
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template struct ta_jit_data<mppp::real>;
-
-#endif
 
 } // namespace detail
 

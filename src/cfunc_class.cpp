@@ -41,11 +41,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
@@ -256,14 +252,10 @@ struct cfunc<T>::impl {
             m_batch_size = recommended_simd_size<T>();
         }
 
-#if defined(HEYOKA_HAVE_REAL)
-
         // NOTE: batch size > 1u not supported for real.
         if (std::same_as<T, mppp::real> && m_batch_size > 1u) [[unlikely]] {
             throw std::invalid_argument("Batch size > 1 is not supported for mppp::real");
         }
-
-#endif
 
         if (compact_mode) {
             // Build the multi cfunc, and assign the internal members.
@@ -486,8 +478,6 @@ bool cfunc<T>::is_time_dependent() const
     return m_impl->m_is_time_dependent;
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <typename T>
 mpfr_prec_t cfunc<T>::get_prec() const
     requires std::same_as<T, mppp::real>
@@ -498,8 +488,6 @@ mpfr_prec_t cfunc<T>::get_prec() const
     // this object.
     return static_cast<mpfr_prec_t>(m_impl->m_prec);
 }
-
-#endif
 
 template <typename T>
 void cfunc<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
@@ -575,8 +563,6 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
         throw std::invalid_argument("A time value must be provided in order to evaluate a time-dependent function");
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::same_as<T, mppp::real>) {
         if (m_impl->m_check_prec) {
             const auto prec_checker = [&](const auto &x) {
@@ -607,8 +593,6 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
             }
         }
     }
-
-#endif
 
     // Invoke the compiled function.
     if (m_impl->m_compact_mode) {
@@ -935,8 +919,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
                                                 times->size(), ncols));
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     if constexpr (std::same_as<T, mppp::real>) {
         if (m_impl->m_check_prec) {
             const auto prec_checker = [&](const auto &x) {
@@ -975,8 +957,6 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
             }
         }
     }
-
-#endif
 
     // If batch_parallel was provided by the user, use it to determine whether or not to parallelise. Otherwise, decide
     // automatically based on a heuristic.
@@ -1031,13 +1011,9 @@ std::ostream &operator<<(std::ostream &os, const cfunc<T> &cf)
     os << fmt::format("C++ datatype: {}\n", boost::core::demangle(typeid(T).name()));
 
     if (cf.is_valid()) {
-#if defined(HEYOKA_HAVE_REAL)
-
         if constexpr (std::same_as<T, mppp::real>) {
             os << fmt::format("Precision: {}\n", cf.get_prec());
         }
-
-#endif
 
         os << fmt::format("Variables: {}\n", cf.get_vars());
 
@@ -1066,11 +1042,7 @@ HEYOKA_CFUNC_CLASS_EXPLICIT_INST(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_CFUNC_CLASS_EXPLICIT_INST(mppp::real)
-
-#endif
 
 #undef HEYOKA_CFUNC_CLASS_EXPLICIT_INST
 

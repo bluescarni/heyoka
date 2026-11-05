@@ -37,11 +37,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -834,11 +830,7 @@ HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real);
-
-#endif
 
 #undef HEYOKA_DEFINE_KEPE_OVERLOADS
 

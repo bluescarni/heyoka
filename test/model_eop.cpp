@@ -31,11 +31,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/eop_data.hpp>
@@ -547,8 +543,6 @@ TEST_CASE("eop cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the point of the multiprecision test is just to check we used the correct
 // llvm primitives in the implementation.
 TEST_CASE("eop eopp cfunc_mp")
@@ -580,8 +574,6 @@ TEST_CASE("eop eopp cfunc_mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("taylor scalar")
 {

@@ -23,14 +23,9 @@ Macros and definitions
    This definition expands to an integral literal corresponding to heyoka's patch version number (e.g.,
    for version 1.2.3, this macro expands to ``3``).
 
-.. c:macro:: HEYOKA_WITH_MPPP
+.. c:macro:: HEYOKA_HAVE_REAL128
 
-   This name is defined if heyoka was built with support for the mp++ library (see the :ref:`installation instructions <installation>`).
-
-.. c:macro:: HEYOKA_WITH_REAL128
-             HEYOKA_WITH_REAL
-
-    These names are defined if heyoka was built with support for, respectively, the :cpp:class:`~mppp::real128` and :cpp:class:`~mppp::real` classes from
+    This name is defined if heyoka was built with support for the :cpp:class:`~mppp::real128` class from
     the mp++ library (see the :ref:`installation instructions <installation>`).
 
 .. c:macro:: HEYOKA_WITH_SLEEF

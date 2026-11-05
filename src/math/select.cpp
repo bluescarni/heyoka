@@ -31,11 +31,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -307,11 +303,7 @@ HEYOKA_DEFINE_SELECT_OVERLOADS(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_DEFINE_SELECT_OVERLOADS(mppp::real);
-
-#endif
 
 #undef HEYOKA_DEFINE_SELECT_OVERLOADS
 

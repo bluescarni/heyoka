@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/expression.hpp>
@@ -131,16 +127,15 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf({detail::sub(expression{fp_t{-1}}, x), detail::sub(x, par[0]),
-                            detail::sub(1_dbl, par[0]), detail::sub(x, y)},
+            cfunc<fp_t> cf({detail::sub(expression{fp_t{-1}}, x), detail::sub(x, par[0]), detail::sub(1_dbl, par[0]),
+                            detail::sub(x, y)},
                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sub.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sub."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 4u, batch_size),
@@ -166,8 +161,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -178,8 +171,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({detail::sub(expression{mppp::real{-1, prec}}, x), detail::sub(x, par[0]),
                                   detail::sub(expression{mppp::real{1, prec}}, par[0]), detail::sub(x, y)},
-                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.3", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
@@ -195,5 +187,3 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif

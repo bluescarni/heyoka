@@ -18,11 +18,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/poly_root_finding/frpr_workspace_impl.hpp>
@@ -111,11 +107,7 @@ HEYOKA_FRPR_WORKSPACE_INST(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_FRPR_WORKSPACE_INST(mppp::real);
-
-#endif
 
 #undef HEYOKA_FRPR_WORKSPACE_INST
 

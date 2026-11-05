@@ -26,11 +26,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -205,11 +201,7 @@ HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(mppp::real);
-
-#endif
 
 #undef HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL
 

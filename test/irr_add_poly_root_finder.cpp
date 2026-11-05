@@ -26,11 +26,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
@@ -192,15 +188,11 @@ void check_root(const std::vector<T> &cfs, const T &lo, const T &hi, const T &x,
 template <typename T>
 T half(const T &x)
 {
-#if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         return mppp::div_2ui(x, 1u);
     } else {
-#endif
         return x / 2;
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Run the root finder rf for q_exact (with coefficients cfs) and for -q_exact (same root, opposite sign at lo), for all
@@ -246,8 +238,8 @@ void check_all(root_finder_t<T> rf, const std::vector<T> &cfs, T lo, T hi, unsig
         check_root(cfs, lo, hi, find_root(rf, cfs, lo, hi), k);
         check_root(mcfs, lo, hi, find_root(rf, mcfs, lo, hi), k);
 
-        // Coefficients widened to [nextdown(c), nextup(c)]: q encloses many polynomials, of which q_exact is one, and the
-        // two bounds of each coefficient differ.
+        // Coefficients widened to [nextdown(c), nextup(c)]: q encloses many polynomials, of which q_exact is one, and
+        // the two bounds of each coefficient differ.
         check_root(cfs, lo, hi, find_root(rf, cfs, widen_cfs(cfs), lo, hi), k_wide);
         check_root(mcfs, lo, hi, find_root(rf, mcfs, widen_cfs(mcfs), lo, hi), k_wide);
 
@@ -318,8 +310,6 @@ TEST_CASE("simple roots")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("simple roots real")
 {
     using fp_t = mppp::real;
@@ -357,8 +347,6 @@ TEST_CASE("simple roots real")
     }
 }
 
-#endif
-
 TEST_CASE("root at the midpoint")
 {
     // If the root of q_exact is exactly the midpoint of (lo, hi), the result must be exactly the root: the first point
@@ -390,8 +378,6 @@ TEST_CASE("root at the midpoint")
         REQUIRE(find_root(rf, mcfs, widen_cfs(mcfs), fp_t(0), fp_t(.5)) == fp_t(.25));
     });
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("root at the midpoint real")
 {
@@ -432,8 +418,6 @@ TEST_CASE("root at the midpoint real")
     }
 }
 
-#endif
-
 TEST_CASE("higher degrees")
 {
     tuple_for_each(fp_types, [](auto x) {
@@ -472,8 +456,6 @@ TEST_CASE("higher degrees")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("higher degrees real")
 {
     // The same polynomials and tolerances as in the "higher degrees" test, at a single precision: the coefficients are
@@ -504,17 +486,15 @@ TEST_CASE("higher degrees real")
     }
 }
 
-#endif
-
 TEST_CASE("newton step outside the bracket")
 {
     // q_exact = (3*t - 1)*(2*t - 1) = 6*t**2 - 5*t + 1 on (0.3125, 0.5): the only root in the open interval is 1/3 (the
     // second root is exactly at hi, which the root finder never evaluates). q_exact is positive at lo.
     //
-    // The first point evaluated is the midpoint 0.40625, close to the vertex 5/12 of q_exact. There q_exact = -0.041015625
-    // (negative, so the bracket becomes (0.3125, 0.40625)) and its derivative is -0.125. The Newton candidate
-    // 0.40625 - (-0.041015625)/(-0.125) = 0.078125 falls outside the bracket, and the root finder must fall back to
-    // bisection.
+    // The first point evaluated is the midpoint 0.40625, close to the vertex 5/12 of q_exact. There q_exact =
+    // -0.041015625 (negative, so the bracket becomes (0.3125, 0.40625)) and its derivative is -0.125. The Newton
+    // candidate 0.40625 - (-0.041015625)/(-0.125) = 0.078125 falls outside the bracket, and the root finder must fall
+    // back to bisection.
     //
     // NOTE: q_exact is close to zero near hi (its second root), but the search never gets there, because the first
     // point already moves the upper end of the bracket to 0.40625.
@@ -539,8 +519,6 @@ TEST_CASE("newton step outside the bracket")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("newton step outside the bracket real")
 {
     // The same polynomial, bracket and tolerances as in the "newton step outside the bracket" test. The tolerances hold
@@ -559,15 +537,13 @@ TEST_CASE("newton step outside the bracket real")
     }
 }
 
-#endif
-
 TEST_CASE("roots close to zero")
 {
-    // q_exact = t - c on (0, hi), with c a tiny normal value and with c a subnormal value. While x is a power of two much
-    // larger than c, the midpoint of the interval evaluation of q at x rounds to x, the Newton candidate is exactly
-    // 0 = lo, which does not lie strictly inside the bracket, and the root finder bisects. The search thus performs
-    // hundreds of bisection steps towards zero before Newton takes over near the root, and in the subnormal case the
-    // final iterations involve subnormal values.
+    // q_exact = t - c on (0, hi), with c a tiny normal value and with c a subnormal value. While x is a power of two
+    // much larger than c, the midpoint of the interval evaluation of q at x rounds to x, the Newton candidate is
+    // exactly 0 = lo, which does not lie strictly inside the bracket, and the root finder bisects. The search thus
+    // performs hundreds of bisection steps towards zero before Newton takes over near the root, and in the subnormal
+    // case the final iterations involve subnormal values.
     //
     // The values of c are 2**(emin/2) (tiny normal) and 2**(emin - p/2) (subnormal), where emin is the minimum exponent
     // of the normal values of fp_t and p is its number of binary digits. hi is min(1, 2**600 * c): this bounds the
@@ -601,19 +577,17 @@ TEST_CASE("roots close to zero")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("roots close to zero real")
 {
-    // The same polynomials as in the "roots close to zero" test: q_exact = t - c on (0, hi), with hi = min(1, 2**600 * c)
-    // bounding the number of bisection steps. mppp::real has no subnormal values, and a much larger exponent range than
-    // the other types: c is 2**-600 and 2**-20000, the latter being beyond the exponent range of all the other tested
-    // types. Much smaller values of c would make the exact checks with rationals slow, because the cost of the rational
-    // arithmetic grows with the size of the exponents.
+    // The same polynomials as in the "roots close to zero" test: q_exact = t - c on (0, hi), with hi = min(1, 2**600 *
+    // c) bounding the number of bisection steps. mppp::real has no subnormal values, and a much larger exponent range
+    // than the other types: c is 2**-600 and 2**-20000, the latter being beyond the exponent range of all the other
+    // tested types. Much smaller values of c would make the exact checks with rationals slow, because the cost of the
+    // rational arithmetic grows with the size of the exponents.
     //
     // NOTE: for all the tested precisions, the interval evaluation of q contains zero at most 3 floating-point values
-    // away from the root (determined by emulating the interval evaluation with exact rationals), within the tolerances 4
-    // and 16. Without subnormal values, this does not depend on the exponent of c.
+    // away from the root (determined by emulating the interval evaluation with exact rationals), within the tolerances
+    // 4 and 16. Without subnormal values, this does not depend on the exponent of c.
     using fp_t = mppp::real;
 
     for (const auto prec : {11, 53, 113, 200}) {
@@ -628,5 +602,3 @@ TEST_CASE("roots close to zero real")
         }
     }
 }
-
-#endif

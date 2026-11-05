@@ -33,11 +33,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
@@ -341,23 +337,15 @@ TEST_CASE("close roots")
     // 3): without it, all the computations in the first isolation pass would be exact for this polynomial, and the
     // first pass alone would separate the roots. Here instead, the first pass cannot separate them: the sign-change
     // count becomes inexact, and they end up in undecided intervals wider than the minimum width. The
-    // extended-precision pass (if available) separates the roots into two isolating intervals.
+    // extended-precision pass separates the roots into two isolating intervals.
     const auto delta = std::ldexp(1., -50);
     const auto ivals = run_isolation({1. + delta, -5. - 2. * delta, 3. - 3. * delta, 9.}, 1., 0.);
 
     // The derivative is negative at the smaller root and positive at the larger one.
     check_correct(ivals, {{rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(ivals.size() == 2u);
     REQUIRE(!has_undecided(ivals));
-
-#else
-
-    REQUIRE(has_wide_undecided(ivals));
-
-#endif
 }
 
 TEST_CASE("extended precision fallback")
@@ -366,7 +354,7 @@ TEST_CASE("extended precision fallback")
     // full 53-bit significand, so that the rescaling of the polynomial is inexact also in extended precision. With,
     // e.g., h = 10, all the computations would be exact for this polynomial, and the root would be bisected down to the
     // minimum width with an exact sign-change count. Here instead, the first isolation pass reports the root in
-    // undecided intervals much wider than the minimum width. The extended-precision pass (if available) exceeds its
+    // undecided intervals much wider than the minimum width. The extended-precision pass exceeds its
     // iteration cap around the root, and the results of the first pass are returned.
     const auto h = 10.1;
     const auto ivals = run_isolation({729., -1458., 1215., -540., 135., -18., 1.}, h, 0.);
@@ -383,7 +371,7 @@ TEST_CASE("extended precision double root")
 {
     // p(t) = (t - 3)**2, with a double root at t = 3, that is, tau = 3/h. h has a full 53-bit significand, so that the
     // rescaling is inexact in the first pass. A double root cannot be isolated: the first pass reports it in undecided
-    // intervals much wider than the minimum width, while the extended-precision pass (if available) bisects it down to
+    // intervals much wider than the minimum width, while the extended-precision pass bisects it down to
     // undecided intervals smaller than the minimum width.
     const auto h = 10.1;
     const auto ivals = run_isolation({9., -6., 1.}, h, 0.);
@@ -391,16 +379,8 @@ TEST_CASE("extended precision double root")
     // The derivative is zero at the root.
     check_correct(ivals, {{rat_t(3) / to_rat(h), 0}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(has_undecided(ivals));
     REQUIRE(!has_wide_undecided(ivals));
-
-#else
-
-    REQUIRE(has_wide_undecided(ivals));
-
-#endif
 }
 
 TEST_CASE("extended precision root at split point")
@@ -408,26 +388,18 @@ TEST_CASE("extended precision root at split point")
     // p(t) = (t - 5)(t - 8)(t - 9), roots at tau = 1/2 (the first bisection point), 4/5 and 9/10. The conversion to the
     // Bernstein basis is inexact for this polynomial (it divides by 3), so that in both passes the value of the
     // polynomial at tau = 1/2 is computed as an interval straddling zero. The first pass thus reports [0, 1/2) and
-    // [1/2, 1) as undecided. The extended-precision pass (if available) bisects them: the root at tau = 1/2 is left in
+    // [1/2, 1) as undecided. The extended-precision pass bisects them: the root at tau = 1/2 is left in
     // undecided intervals smaller than the minimum width, while the other two roots are isolated.
     const auto ivals = run_isolation({-360., 157., -22., 1.}, 10., 0.);
 
     // The derivative is positive at the first and last roots, negative at the middle one.
     check_correct(ivals, {{rat_t(1, 2), 1}, {rat_t(4, 5), -1}, {rat_t(9, 10), 1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(std::ranges::count_if(
                 ivals, [](const auto &iv) { return iv.type == detail::irr_interval_type::isolating && iv.lo < iv.hi; })
             == 2);
     REQUIRE(has_undecided(ivals));
     REQUIRE(!has_wide_undecided(ivals));
-
-#else
-
-    REQUIRE(has_wide_undecided(ivals));
-
-#endif
 }
 
 TEST_CASE("extended precision lower bound")
@@ -435,7 +407,7 @@ TEST_CASE("extended precision lower bound")
     // p(t) = t*(3t - 1)(3t - 1 - delta), with the two close roots of the "close roots" test and an additional root at
     // tau = 0. As in the "close roots" test, the conversion to the Bernstein basis is inexact (it divides by 3), and
     // the extended-precision pass is needed to separate the two close roots. Here we check that the extended-precision
-    // pass (if available) reports the root at tau = 0 only if it is not within [0, lb_tau).
+    // pass reports the root at tau = 0 only if it is not within [0, lb_tau).
     const auto delta = std::ldexp(1., -50);
     const std::vector cfs = {0., 1. + delta, -(6. + 3. * delta), 9.};
 
@@ -443,31 +415,23 @@ TEST_CASE("extended precision lower bound")
     auto ivals = run_isolation(cfs, 1., 0.);
     check_correct(ivals, {{rat_t(0), 1}, {rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(ivals.size() == 3u);
     REQUIRE(!has_undecided(ivals));
     REQUIRE(has_root_at(ivals, 0., 1));
-
-#endif
 
     // With a lower bound lb_tau = 0.1, the root at tau = 0 is not reported.
     ivals = run_isolation(cfs, 1., 0.1);
     check_correct(ivals, {{rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(ivals.size() == 2u);
     REQUIRE(!has_undecided(ivals));
-
-#endif
 }
 
 TEST_CASE("extended precision root at lo")
 {
     // In both polynomials below, the close roots of the "close roots" test are needed to trigger the
     // extended-precision pass, and there is an additional root at tau = 0. Here we check the sign of the root at
-    // tau = 0 in the extended-precision pass (if available).
+    // tau = 0 in the extended-precision pass.
     const auto delta = std::ldexp(1., -50);
 
     // p(t) = -t*(3t - 1)(3t - 1 - delta). The conversion to the Bernstein basis divides by 3. The derivative is
@@ -475,17 +439,9 @@ TEST_CASE("extended precision root at lo")
     auto ivals = run_isolation({0., -(1. + delta), 6. + 3. * delta, -9.}, 1., 0.);
     check_correct(ivals, {{rat_t(0), -1}, {rat_t(1, 3), 1}, {(1 + to_rat(delta)) / 3, -1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(ivals.size() == 3u);
     REQUIRE(!has_undecided(ivals));
     REQUIRE(has_root_at(ivals, 0., -1));
-
-#else
-
-    REQUIRE(has_wide_undecided(ivals));
-
-#endif
 
     // p(t) = t**2*(3t - 1)(3t - 1 - delta), with a double root at tau = 0. The conversion to the Bernstein basis
     // divides by 6. The first two Bernstein coefficients are exactly [0, 0] on all the intervals starting at tau = 0,
@@ -494,17 +450,9 @@ TEST_CASE("extended precision root at lo")
     ivals = run_isolation({0., 0., 1. + delta, -(6. + 3. * delta), 9.}, 1., 0.);
     check_correct(ivals, {{rat_t(0), 0}, {rat_t(1, 3), -1}, {(1 + to_rat(delta)) / 3, 1}});
 
-#if defined(HEYOKA_HAVE_REAL)
-
     REQUIRE(ivals.size() == 3u);
     REQUIRE(!has_undecided(ivals));
     REQUIRE(has_root_at(ivals, 0., 0));
-
-#else
-
-    REQUIRE(has_wide_undecided(ivals));
-
-#endif
 }
 
 TEST_CASE("undecided interval without real roots")
@@ -532,16 +480,10 @@ TEST_CASE("undecided interval without real roots")
         return iv.type == detail::irr_interval_type::undecided && to_rat(iv.lo) <= a && a < to_rat(iv.hi);
     }));
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // The final undecided interval is smaller than the minimum width.
     REQUIRE(ivals.size() == 1u);
     REQUIRE(!has_wide_undecided(ivals));
-
-#endif
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 // Test the extended-precision pass with mppp::real.
 TEST_CASE("extended precision real")
@@ -572,8 +514,6 @@ TEST_CASE("extended precision real")
         REQUIRE(iv.hi.get_prec() == prec);
     }
 }
-
-#endif
 
 // Test the copy/move/serialisation semantics of the workspace.
 TEST_CASE("workspace semantics")
@@ -732,8 +672,6 @@ TEST_CASE("input checks")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // Test the input checks of find_real_poly_roots() specific to mppp::real.
 TEST_CASE("input checks real")
 {
@@ -789,8 +727,6 @@ TEST_CASE("input checks real")
                            Message("The lb value passed to find_real_poly_roots() must not be NaN"));
     REQUIRE_THROWS_AS(find_real_poly_roots(ret, ws, span, h, mppp::real{-1., prec}), std::invalid_argument);
 }
-
-#endif
 
 TEST_CASE("find_real_poly_roots zero polynomial")
 {
@@ -858,8 +794,6 @@ TEST_CASE("find_real_poly_roots linear polynomials")
     REQUIRE(ret[0].t == 3);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots linear polynomials real")
 {
     using mppp::real;
@@ -882,8 +816,6 @@ TEST_CASE("find_real_poly_roots linear polynomials real")
     find_real_poly_roots(ret, ws, std::span<const real>(cfs2), h);
     REQUIRE(ret.empty());
 }
-
-#endif
 
 TEST_CASE("find_real_poly_roots simple roots")
 {
@@ -915,8 +847,6 @@ TEST_CASE("find_real_poly_roots simple roots")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots simple roots real")
 {
     using mppp::real;
@@ -945,8 +875,6 @@ TEST_CASE("find_real_poly_roots simple roots real")
         check({r(10), r(19), r(11), r(2)}, r(-3), {{rat_t(-1), 1}, {rat_t(-2), -1}, {rat_t(-5, 2), 1}});
     }
 }
-
-#endif
 
 // The polynomials in the "root at zero" tests: p(t) = t(t - 3) with h = 10, and p(t) = t(t + 3) with h = -10. In both
 // cases the rescaled polynomial is q(tau) = 100 tau**2 - 30 tau, with an exact root at tau = 0 (found by the isolation
@@ -980,8 +908,6 @@ TEST_CASE("find_real_poly_roots root at zero")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots root at zero real")
 {
     using mppp::real;
@@ -1009,8 +935,6 @@ TEST_CASE("find_real_poly_roots root at zero real")
         check({r(0), r(3), r(1)}, r(-10), 1, rat_t(-3));
     }
 }
-
-#endif
 
 // The polynomials in the "root at split point" tests are those of the "root at split point" and "multiple root at
 // split point" isolation tests, (t - 5)(t - 8), (t - 2)(t - 5) and (t - 5)**2 with h = 10, together with their mirror
@@ -1051,8 +975,6 @@ TEST_CASE("find_real_poly_roots root at split point")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots root at split point real")
 {
     using mppp::real;
@@ -1087,8 +1009,6 @@ TEST_CASE("find_real_poly_roots root at split point real")
     }
 }
 
-#endif
-
 // The polynomials in the "double root" tests: (t - 3)**2 with h = 10 (the polynomial of the "multiple root below the
 // minimum width" isolation test), and its mirror image (t + 3)**2 with h = -10, which has the same rescaled polynomial.
 // All the computations in the isolation are exact, so that the double root at tau = 3/10 ends up in a single undecided
@@ -1117,8 +1037,6 @@ TEST_CASE("find_real_poly_roots double root")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots double root real")
 {
     using mppp::real;
@@ -1142,8 +1060,6 @@ TEST_CASE("find_real_poly_roots double root real")
         check({r(9), r(6), r(1)}, r(-10), rat_t(-3));
     }
 }
-
-#endif
 
 // The polynomials in the "undecided interval straddling lb" tests: (3t - 1)**2 with h = 1, and its mirror image
 // (3t + 1)**2 with h = -1, which has the same rescaled polynomial. As in the "double root" tests, all the computations
@@ -1186,8 +1102,6 @@ TEST_CASE("find_real_poly_roots undecided interval straddling lb")
         check({fp_t(1), fp_t(6), fp_t(9)}, fp_t(-1));
     });
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("find_real_poly_roots undecided interval straddling lb real")
 {
@@ -1233,8 +1147,6 @@ TEST_CASE("find_real_poly_roots undecided interval straddling lb real")
     }
 }
 
-#endif
-
 TEST_CASE("find_real_poly_roots wide undecided interval")
 {
     using Catch::Matchers::StartsWith;
@@ -1267,8 +1179,6 @@ TEST_CASE("find_real_poly_roots wide undecided interval")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // The polynomials in the "merged undecided intervals" tests: (t - 5)(t - 8)(t - 9) with h = 10 (the polynomial of the
 // "extended precision root at split point" isolation test), and its mirror image (t + 5)(t + 8)(t + 9) with h = -10,
 // which has the same rescaled polynomial. The conversion to the Bernstein basis is inexact (it divides by 3), thus the
@@ -1276,9 +1186,6 @@ TEST_CASE("find_real_poly_roots wide undecided interval")
 // root at tau = 1/2 ends up in the two adjacent undecided intervals [1/2 - 2**-p, 1/2) and [1/2, 1/2 + 2**-p). These
 // are merged into a single undecided range whose midpoint is exactly 1/2: the root must be reported once, exactly at
 // t = 5 (t = -5 for the mirror image), with an empty direction. The other two roots are found by the root finder.
-//
-// NOTE: without mp++, the first isolation pass leaves undecided intervals wider than the minimum width, and
-// find_real_poly_roots() throws.
 //
 // NOTE: the tolerance k = 160 for the other two roots has been measured by exact emulation (the maximum distance is
 // 131 floating-point values).
@@ -1340,8 +1247,6 @@ TEST_CASE("find_real_poly_roots merged undecided intervals real")
     }
 }
 
-#endif
-
 // The polynomials in the "lb filter" tests are those of the "simple roots" tests: (t - 1)(t - 2)(2t - 5) with h = 3,
 // and its mirror image (t + 1)(t + 2)(2t + 5) with h = -3. The values of lb are far from the roots (relative to the
 // tolerance k = 40 of the "simple roots" tests):
@@ -1402,8 +1307,6 @@ TEST_CASE("find_real_poly_roots lb filter")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots lb filter real")
 {
     using mppp::real;
@@ -1456,8 +1359,6 @@ TEST_CASE("find_real_poly_roots lb filter real")
     }
 }
 
-#endif
-
 // Linear polynomials whose root enclosure [nextdown(root), nextup(root)] straddles a bound of the range fall through to
 // the general case:
 //
@@ -1486,8 +1387,6 @@ TEST_CASE("find_real_poly_roots linear fall-through")
         REQUIRE(run_find_roots({fp_t(10), fp_t(1)}, fp_t(-10), fp_t(0)).empty());
     });
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("find_real_poly_roots linear fall-through real")
 {
@@ -1521,8 +1420,6 @@ TEST_CASE("find_real_poly_roots linear fall-through real")
         REQUIRE(ret.empty());
     }
 }
-
-#endif
 
 // Workspace reuse in the general case: the results computed with a reused, copied or deserialised workspace must be
 // identical to those computed with a fresh workspace. In particular, the rescaled polynomial used by the root finder
@@ -1581,8 +1478,6 @@ TEST_CASE("find_real_poly_roots workspace reuse")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots workspace reuse real")
 {
     using mppp::real;
@@ -1632,8 +1527,6 @@ TEST_CASE("find_real_poly_roots workspace reuse real")
     }
 }
 
-#endif
-
 // The polynomials in the "undecided interval with adjacent bounds" tests: (t - 3)**2 with h = 5, and its mirror image
 // (t + 3)**2 with h = -5, which has the same rescaled polynomial. As in the "double root" tests, all the computations
 // in the isolation are exact, and the double root at tau = 3/5 ends up in a single undecided interval [lo, hi) with
@@ -1671,8 +1564,6 @@ TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds real")
 {
     using mppp::real;
@@ -1703,10 +1594,6 @@ TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds real")
         check({r(9), r(6), r(1)}, r(-5));
     }
 }
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
 
 // Precision of the roots at a working precision lower than the precision mp++ assigns to values created from an int (32
 // bits), so that any int value leaking into the computation of a root would show up in its precision. The zero and
@@ -1751,8 +1638,6 @@ TEST_CASE("find_real_poly_roots low precision real")
         }
     }
 }
-
-#endif
 
 // A test with the Taylor polynomials of an actual numerical integration. The harmonic oscillator x' = v, v' = -x is
 // integrated in double precision from random initial conditions, step by step, until a step crosses x = 0. The

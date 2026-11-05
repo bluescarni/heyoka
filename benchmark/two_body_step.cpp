@@ -24,11 +24,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/kw.hpp>
 #include <heyoka/model/nbody.hpp>
@@ -121,10 +117,8 @@ int main(int argc, char *argv[])
     } else if (fp_type == "real128") {
         run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, compact_mode, fast_math, prec);
 #endif
-#if defined(HEYOKA_HAVE_REAL)
     } else if (fp_type == "real") {
         run_bench<mppp::real>(mppp::real(tol), high_accuracy, compact_mode, fast_math, prec);
-#endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
     }

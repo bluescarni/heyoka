@@ -37,11 +37,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -111,8 +107,6 @@ TEST_CASE("sgn scalar")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("sgn scalar mp")
 {
     using detail::llvm_sgn;
@@ -163,8 +157,6 @@ TEST_CASE("sgn scalar mp")
         REQUIRE(f_ptr(&arg) == 0);
     }
 }
-
-#endif
 
 // Generic branchless sign function.
 template <typename T>
@@ -616,8 +608,6 @@ TEST_CASE("inv_kep_E_batch")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("inv_kep_E_scalar mp")
 {
     using detail::llvm_add_inv_kep_E_wrapper;
@@ -759,8 +749,6 @@ TEST_CASE("inv_kep_E_scalar mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("while_loop")
 {
@@ -1219,8 +1207,6 @@ TEST_CASE("fma batch")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("fma scalar mp")
 {
     using detail::llvm_fma;
@@ -1275,8 +1261,6 @@ TEST_CASE("fma scalar mp")
         REQUIRE(out == mppp::fma(a, b, c));
     }
 }
-
-#endif
 
 TEST_CASE("eft_product scalar")
 {
@@ -1340,7 +1324,6 @@ TEST_CASE("eft_product scalar")
 
                 REQUIRE(x == a * b);
 
-#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                 if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
@@ -1351,7 +1334,6 @@ TEST_CASE("eft_product scalar")
                     REQUIRE(mp_fp_t(x, prec) + mp_fp_t(y, prec) == mp_fp_t(a, prec) * mp_fp_t(b, prec));
 #if defined(HEYOKA_HAVE_REAL128)
                 }
-#endif
 #endif
             }
         }
@@ -1430,7 +1412,6 @@ TEST_CASE("eft_product batch")
 
                         REQUIRE(xv == a * b);
 
-#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                         if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
@@ -1440,7 +1421,6 @@ TEST_CASE("eft_product batch")
                             REQUIRE(mp_fp_t(xv, prec) + mp_fp_t(yv, prec) == mp_fp_t(a, prec) * mp_fp_t(b, prec));
 #if defined(HEYOKA_HAVE_REAL128)
                         }
-#endif
 #endif
                     }
                 }
@@ -2210,7 +2190,6 @@ TEST_CASE("dl modulus scalar")
             auto f_ptr
                 = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t, fp_t, fp_t, fp_t)>(s.jit_lookup("hey_dl_modulus"));
 
-#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
             if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
@@ -2233,7 +2212,6 @@ TEST_CASE("dl modulus scalar")
 
 #if defined(HEYOKA_HAVE_REAL128)
             }
-#endif
 #endif
         }
     };
@@ -2293,7 +2271,6 @@ TEST_CASE("dl modulus batch")
                 auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *, fp_t *, fp_t *, fp_t *)>(
                     s.jit_lookup("hey_dl_modulus"));
 
-#if defined(HEYOKA_HAVE_REAL)
 #if defined(HEYOKA_HAVE_REAL128)
                 if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
 #endif
@@ -2329,7 +2306,6 @@ TEST_CASE("dl modulus batch")
 
 #if defined(HEYOKA_HAVE_REAL128)
                 }
-#endif
 #endif
             }
         }
@@ -2497,8 +2473,6 @@ TEST_CASE("to_size_t")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("real_ext_load")
 {
     llvm_state s{kw::opt_level = 3u};
@@ -2535,8 +2509,6 @@ TEST_CASE("real_ext_load")
     REQUIRE(out == mppp::real{"1.1", 257});
     REQUIRE(out.get_prec() == 257);
 }
-
-#endif
 
 TEST_CASE("switch")
 {
@@ -2730,8 +2702,6 @@ TEST_CASE("clone type")
 
     tuple_for_each(fp_types, tester);
 
-#if defined(HEYOKA_HAVE_REAL)
-
     llvm_state source, dest;
 
     auto *tp_ext_source = detail::to_external_llvm_type<mppp::real>(source.context());
@@ -2741,8 +2711,6 @@ TEST_CASE("clone type")
     auto *tp_int_source = detail::to_internal_llvm_type<mppp::real>(source, 11);
     auto *tp_int_dest = llvm_clone_type(dest, tp_int_source);
     REQUIRE(tp_int_dest == detail::to_internal_llvm_type<mppp::real>(dest, 11));
-
-#endif
 }
 
 TEST_CASE("trunc scalar")
@@ -2846,8 +2814,6 @@ TEST_CASE("trunc batch")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("trunc scalar mp")
 {
     using detail::llvm_trunc;
@@ -2900,8 +2866,6 @@ TEST_CASE("trunc scalar mp")
         REQUIRE(out == -1);
     }
 }
-
-#endif
 
 TEST_CASE("is_finite scalar")
 {
@@ -3017,8 +2981,6 @@ TEST_CASE("is_finite batch")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("is_finite scalar mp")
 {
     using detail::llvm_is_finite;
@@ -3129,8 +3091,6 @@ TEST_CASE("fcmp one une scalar mp")
         REQUIRE(une_ptr(&nan, &nan) == 1u);
     }
 }
-
-#endif
 
 // NOTE: is_natural() appears not to be working on ppc, giving the following error:
 //
@@ -3265,8 +3225,6 @@ TEST_CASE("is_natural batch")
     tuple_for_each(fp_types, tester);
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("is_natural scalar mp")
 {
     using detail::llvm_is_natural;
@@ -3324,7 +3282,5 @@ TEST_CASE("is_natural scalar mp")
         REQUIRE(f_ptr(&arg) == 0u);
     }
 }
-
-#endif
 
 #endif

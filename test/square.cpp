@@ -28,18 +28,14 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -137,9 +133,8 @@ TEST_CASE("cfunc")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_int_2");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.pow_pos_small_int_2"); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -164,8 +159,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto x = make_vars("x");
@@ -175,19 +168,15 @@ TEST_CASE("cfunc_mp")
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])}, {x},
-                                 kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             if (compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "mpfr_sqr");
-                }));
+                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) { return boost::contains(ir, "mpfr_sqr"); }));
             } else {
                 const auto &states = std::get<0>(cf.get_llvm_states());
-                REQUIRE(std::ranges::any_of(states, [](const auto &s) {
-                    return boost::contains(s.get_ir(), "mpfr_sqr");
-                }));
+                REQUIRE(
+                    std::ranges::any_of(states, [](const auto &s) { return boost::contains(s.get_ir(), "mpfr_sqr"); }));
             }
 
             const std::vector ins{mppp::real{".7", prec}};
@@ -203,5 +192,3 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif

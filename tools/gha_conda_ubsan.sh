@@ -33,7 +33,6 @@ cmake -G Ninja ../ \
     -DCMAKE_BUILD_TYPE=Debug \
     -DHEYOKA_BUILD_TESTS=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
-    -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="-fsanitize=undefined" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og"

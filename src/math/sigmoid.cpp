@@ -39,11 +39,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -75,8 +71,6 @@ T cpp_sigmoid(const T &x)
     return 1 / (1 + exp(-x));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 mppp::real cpp_sigmoid<mppp::real>(const mppp::real &x)
 {
@@ -84,8 +78,6 @@ mppp::real cpp_sigmoid<mppp::real>(const mppp::real &x)
 
     return one / (one + exp(-x));
 }
-
-#endif
 
 } // namespace
 

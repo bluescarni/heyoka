@@ -29,23 +29,19 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/div.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -418,8 +414,7 @@ TEST_CASE("cfunc")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            cfunc<fp_t> cf({prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}),
-                            prod({expression{fp_t{5}}, x, y}),
+            cfunc<fp_t> cf({prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}), prod({expression{fp_t{5}}, x, y}),
                             // NOTE: test a couple of corner cases as well.
                             expression{func{detail::prod_impl({x})}}, expression{func{detail::prod_impl{}}}},
                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
@@ -427,12 +422,10 @@ TEST_CASE("cfunc")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.prod.");
-                }));
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.prod_neg.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.prod."); }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.prod_neg."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 5u, batch_size),
@@ -459,8 +452,6 @@ TEST_CASE("cfunc")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
@@ -471,8 +462,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             cfunc<mppp::real> cf({prod({expression{mppp::real{-1, prec}}, x}), prod({par[0], x, y}),
                                   prod({expression{mppp::real{5, prec}}, x, y})},
-                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec,
-                                 kw::opt_level = opt_level);
+                                 {x, y}, kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             const std::vector ins{mppp::real{".7", prec}, mppp::real{"-.3", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
@@ -487,8 +477,6 @@ TEST_CASE("cfunc_mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("prod split")
 {

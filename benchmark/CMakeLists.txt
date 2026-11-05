@@ -73,11 +73,7 @@ ADD_HEYOKA_BENCHMARK(ann_var_ode_sys)
 ADD_HEYOKA_BENCHMARK(geopot)
 ADD_HEYOKA_BENCHMARK(geopot_eval)
 ADD_HEYOKA_BENCHMARK(fixed_centres)
-
-if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
-  ADD_HEYOKA_BENCHMARK(pendulum_mp)
-endif()
-
-if(HEYOKA_WITH_MPPP AND mp++_WITH_QUADMATH)
+ADD_HEYOKA_BENCHMARK(pendulum_mp)
+if(mp++_WITH_QUADMATH)
   ADD_HEYOKA_BENCHMARK(pendulum_quad)
 endif()

@@ -30,11 +30,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/safe_integer.hpp>
@@ -114,10 +110,8 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
             // LCOV_EXCL_STOP
 
             return safe_uint32_t(std::numeric_limits<T>::digits);
-#if defined(HEYOKA_HAVE_REAL)
         } else if constexpr (std::same_as<T, mppp::real>) {
             return safe_uint32_t(x.get_prec());
-#endif
         } else {
             static_assert(always_false_v<T>, "Unsupported type");
         }
@@ -133,10 +127,8 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
         } else if constexpr (std::same_as<T, mppp::real128>) {
             return mppp::real128{in.str()};
 #endif
-#if defined(HEYOKA_HAVE_REAL)
         } else if constexpr (std::same_as<T, mppp::real>) {
             return mppp::real{in.str(), x.get_prec()};
-#endif
         } else {
             static_assert(always_false_v<T>, "Unsupported type");
         }
@@ -197,11 +189,7 @@ HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(mppp::real);
-
-#endif
 
 #undef HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST
 

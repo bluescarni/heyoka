@@ -27,11 +27,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -460,8 +456,6 @@ TEST_CASE("s11n")
     }
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // mp-specific tests.
 
 TEST_CASE("basic mp")
@@ -641,5 +635,3 @@ TEST_CASE("single call operator mp")
         Message("An mppp::real with an invalid precision of 15 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
 }
-
-#endif

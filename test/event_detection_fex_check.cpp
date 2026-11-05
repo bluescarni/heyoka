@@ -33,11 +33,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -1145,8 +1141,6 @@ TEST_CASE("caller rounding mode")
     });
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // NOTE: the multiprecision implementation uses MPFR with rounding toward +inf. All the values in the test cases are
 // well inside the normal range, where MPFR at precision p rounds exactly like an IEEE format with p significand bits.
 // Hence, the test cases for all precisions can be reused.
@@ -1205,5 +1199,3 @@ TEST_CASE("real")
         }
     }
 }
-
-#endif

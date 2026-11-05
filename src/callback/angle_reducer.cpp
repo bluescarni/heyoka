@@ -34,11 +34,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/callback/angle_reducer.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -220,8 +216,6 @@ mppp::real128 get_twopi_const(const taylor_adaptive_batch<mppp::real128> &)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 template <>
 mppp::real get_twopi_const(const taylor_adaptive<mppp::real> &ta)
 {
@@ -230,8 +224,6 @@ mppp::real get_twopi_const(const taylor_adaptive<mppp::real> &ta)
 
     return ret;
 } // LCOV_EXCL_LINE
-
-#endif
 
 } // namespace
 
@@ -339,11 +331,7 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_TEMPLATE_INST_BATCH(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_CALLBACK_ANGLE_REDUCER_TEMPLATE_INST_SCALAR(mppp::real)
-
-#endif
 
 #undef HEYOKA_CALLBACK_ANGLE_REDUCER_TEMPLATE_INST_SCALAR
 #undef HEYOKA_CALLBACK_ANGLE_REDUCER_TEMPLATE_INST_BATCH
@@ -367,10 +355,6 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_IMPLEMENT(mppp::real128)
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::callback::angle_reducer, mppp::real)
-
-#endif
 
 #undef HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_IMPLEMENT

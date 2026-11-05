@@ -24,11 +24,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -104,11 +100,7 @@ HEYOKA_DLL_PUBLIC expression pow(const expression &, mppp::real128);
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 HEYOKA_DLL_PUBLIC expression pow(const expression &, mppp::real);
-
-#endif
 
 HEYOKA_END_NAMESPACE
 

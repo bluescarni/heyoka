@@ -58,18 +58,13 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
 
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -803,8 +798,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         }
     }
 
-#if defined(HEYOKA_HAVE_REAL)
-
     const auto nargs = args.size();
 
     auto &builder = s.builder();
@@ -814,8 +807,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
         auto *f = real_nary_op(s, x_t, "mpfr_" + base_name, boost::numeric_cast<unsigned>(nargs));
         return builder.CreateCall(f, args);
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(
@@ -835,12 +826,8 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                             const std::string &f128_name,
 #endif
-#if defined(HEYOKA_HAVE_REAL)
                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                            const std::string &real_name,
-#endif
-
-                            const std::vector<llvm::Value *> &args)
+                            const std::string &real_name, const std::vector<llvm::Value *> &args)
 {
     assert(!args.empty());
     assert(boost::starts_with(intr_name, "llvm."));
@@ -917,15 +904,11 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     // NOTE: this handles only the scalar case.
     if (llvm_is_real(x_t) != 0) {
         auto *f = real_nary_op(s, x_t, real_name, boost::numeric_cast<unsigned>(nargs));
         return builder.CreateCall(f, args);
     }
-
-#endif
 
     // LCOV_EXCL_START
     throw std::invalid_argument(
@@ -1101,7 +1084,6 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, ll
 
     auto &builder = s.builder();
 
-#if defined(HEYOKA_HAVE_REAL)
     if (const auto real_prec = llvm_is_real(tp)) {
         // NOTE: vectors of reals are not possible in LLVM, thus we should never get to a point in which we request any
         // sort of operation on them.
@@ -1159,11 +1141,8 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, ll
 
         return ret;
     } else {
-#endif
         return load_vector_from_memory(builder, tp, ptr, vector_size);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Helper to store the content of vector vec to the pointer ptr. If vec is not a vector, a plain store will be
@@ -1221,7 +1200,6 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Val
 
     auto &builder = s.builder();
 
-#if defined(HEYOKA_HAVE_REAL)
     if (const auto real_prec = llvm_is_real(vec->getType())) {
         auto &context = s.context();
 
@@ -1269,11 +1247,8 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Val
                                 cur_limb_ptr);
         }
     } else {
-#endif
         store_vector_to_memory(builder, ptr, vec);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Gather a vector of type vec_tp from ptrs.
@@ -1317,17 +1292,13 @@ llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *const tp, 
 
     auto &builder = s.builder();
 
-#if defined(HEYOKA_HAVE_REAL)
     if (llvm_is_real(tp) != 0) {
         assert(!llvm::isa<llvm::FixedVectorType>(ptrs->getType()));
 
         return ext_load_vector_from_memory(s, tp, ptrs, 1);
     } else {
-#endif
         return gather_vector_from_memory(builder, tp, ptrs);
-#if defined(HEYOKA_HAVE_REAL)
     }
-#endif
 }
 
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
@@ -1490,10 +1461,8 @@ llvm::Constant *llvm_constantfp([[maybe_unused]] llvm_state &s, llvm::Type *fp_t
         // NOTE: if fp_t is a vector type, the constant value
         // will be splatted in the return value.
         return llvm::ConstantFP::get(fp_t, val);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, number{val}));
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(
@@ -1523,10 +1492,8 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return s.builder().CreateUIToFP(n, fp_t);
-#if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
         return llvm_real_ui_to_fp(s, n, fp_t);
-#endif
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument(

@@ -31,22 +31,18 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/sub.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -309,9 +305,8 @@ TEST_CASE("cfunc")
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.sum.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sum."); }));
             }
 
             cf(mdspan<fp_t, dextents<std::size_t, 2>>(outs.data(), 3u, batch_size),
@@ -335,8 +330,6 @@ TEST_CASE("cfunc")
         }
     }
 }
-
-#if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("cfunc mp")
 {
@@ -363,15 +356,14 @@ TEST_CASE("cfunc mp")
                 std::generate(outs.begin(), outs.end(), gen);
                 std::generate(pars.begin(), pars.end(), gen);
 
-                cfunc<fp_t> cf({sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})}, {x, y},
-                               kw::prec = prec, kw::high_accuracy = high_accuracy,
-                               kw::compact_mode = compact_mode, kw::opt_level = opt_level);
+                cfunc<fp_t> cf({sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})}, {x, y}, kw::prec = prec,
+                               kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
+                               kw::opt_level = opt_level);
 
                 if (opt_level == 0u && compact_mode) {
                     const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                    REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                        return boost::contains(ir, "heyoka.llvm_c_eval.sum.");
-                    }));
+                    REQUIRE(std::ranges::any_of(
+                        irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.sum."); }));
                 }
 
                 cf(outs, ins, kw::pars = pars);
@@ -383,8 +375,6 @@ TEST_CASE("cfunc mp")
         }
     }
 }
-
-#endif
 
 TEST_CASE("sum split")
 {

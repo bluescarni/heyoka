@@ -29,21 +29,17 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/mdspan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepDE.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -240,11 +236,7 @@ TEST_CASE("kepDE overloads")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
     HEYOKA_TEST_KEPDE_OVERLOAD(mppp::real);
-
-#endif
 }
 
 #undef HEYOKA_TEST_KEPDE_OVERLOAD
@@ -316,15 +308,14 @@ TEST_CASE("cfunc")
             ins.resize(batch_size * 3u);
             pars.resize(batch_size * 2u);
 
-            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
-                           {h, k, lam}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)}, {h, k, lam},
+                           kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                            kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.kepDE.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.kepDE."); }));
             }
 
             for (auto niter = 0; niter < 100; ++niter) {
@@ -419,8 +410,6 @@ TEST_CASE("cfunc")
     REQUIRE(isnan(outs[0]));
 }
 
-#if defined(HEYOKA_HAVE_REAL)
-
 TEST_CASE("cfunc mp")
 {
     using fp_t = mppp::real;
@@ -456,15 +445,13 @@ TEST_CASE("cfunc mp")
 
     for (auto compact_mode : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
-            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)},
-                           {h, k, lam}, kw::compact_mode = compact_mode, kw::prec = prec,
-                           kw::opt_level = opt_level);
+            cfunc<fp_t> cf({kepDE(h, k, lam), kepDE(par[0], par[1], lam), kepDE(.5_dbl, .3_dbl, lam)}, {h, k, lam},
+                           kw::compact_mode = compact_mode, kw::prec = prec, kw::opt_level = opt_level);
 
             if (opt_level == 0u && compact_mode) {
                 const auto irs = std::get<1>(cf.get_llvm_states()).get_ir();
-                REQUIRE(std::ranges::any_of(irs, [](const auto &ir) {
-                    return boost::contains(ir, "heyoka.llvm_c_eval.kepDE.");
-                }));
+                REQUIRE(std::ranges::any_of(
+                    irs, [](const auto &ir) { return boost::contains(ir, "heyoka.llvm_c_eval.kepDE."); }));
             }
 
             // Generate the hs and ks.
@@ -515,5 +502,3 @@ TEST_CASE("cfunc mp")
         }
     }
 }
-
-#endif

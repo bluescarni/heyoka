@@ -29,11 +29,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 #include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -174,8 +170,6 @@ TEST_CASE("sincos fusion real128")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // Test that combined_sin/combined_cos on the same argument are fused into a single mpfr sincos wrapper call via CSE for
 // mppp::real.
 TEST_CASE("sincos fusion real")
@@ -209,8 +203,6 @@ TEST_CASE("sincos fusion real")
     REQUIRE(outs[0] == approximately(sin(mppp::real{"1.23", prec})));
     REQUIRE(outs[1] == approximately(cos(mppp::real{"1.23", prec})));
 }
-
-#endif
 
 #if defined(HEYOKA_WITH_SLEEF)
 
@@ -288,8 +280,6 @@ TEST_CASE("kepE sincos fusion real128")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
 // Test that kepE's sincos calls are fused via CSE for mppp::real.
 TEST_CASE("kepE sincos fusion real")
 {
@@ -314,8 +304,6 @@ TEST_CASE("kepE sincos fusion real")
     // definition.
     REQUIRE(call_count == 4u);
 }
-
-#endif
 
 // Test that the sincos combine pass correctly modifies cfunc and Taylor decompositions.
 TEST_CASE("sincos combine pass")
