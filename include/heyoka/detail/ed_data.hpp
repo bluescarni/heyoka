@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/find_real_poly_roots.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -33,33 +34,15 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// A RAII helper to extract polys from a cache and return them to the cache upon destruction. Used during event
-// detection.
-template <typename>
-class taylor_pwrap;
-
-// Polynomial cache type. Each entry is a polynomial represented as a vector of coefficients, in ascending order. Used
-// during event detection.
-//
-// NOTE: a cache must not contain empty coefficient vectors and all polynomials in the cache must have the same order.
-template <typename T>
-using taylor_poly_cache = std::vector<std::vector<T>>;
-
 // The JIT bits for ed_data. Used both in scalar and batch variants.
 template <typename T>
 struct ed_jit_data {
-    // Polynomial translation function type.
-    using pt_t = void (*)(T *, const T *) noexcept;
-    // rtscc function type.
-    using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
     // fex_check function type.
     using fex_check_t = void (*)(const T *, const T *, std::uint32_t *, T *) noexcept;
 
     // The LLVM state.
     llvm_state m_state;
-    // The JIT compiled functions used during root finding.
-    pt_t m_pt = nullptr;
-    rtscc_t m_rtscc = nullptr;
+    // The JIT-compiled fast exclusion check used during event detection.
     fex_check_t m_fex_check = nullptr;
 
     void save(boost::archive::binary_oarchive &, unsigned) const;
@@ -69,11 +52,6 @@ struct ed_jit_data {
 
 template <typename T>
 struct ed_data {
-    // The working list type used during real root isolation.
-    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
-    // The type used to store the list of isolating intervals.
-    using isol_t = std::vector<std::tuple<T, T>>;
-
     // Recover the event typedefs.
     using t_event_t = taylor_adaptive<T>::t_event_t;
     using nt_event_t = taylor_adaptive<T>::nt_event_t;
@@ -82,35 +60,27 @@ struct ed_data {
     std::vector<t_event_t> m_tes;
     // The vector of non-terminal events.
     std::vector<nt_event_t> m_ntes;
-    // The jet of derivatives for the state variables
-    // and the events.
+    // The jet of derivatives for the state variables and the events.
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
     std::vector<std::tuple<std::uint32_t, T, int, T>> m_d_tes;
     // The vector of cooldowns for the terminal events.
-    // If an event is on cooldown, the corresponding optional
-    // in this vector will contain the total time elapsed
-    // since the cooldown started and the absolute value
-    // of the cooldown duration.
+    //
+    // If an event is on cooldown, the corresponding optional in this vector will contain the total time elapsed since
+    // the cooldown started and the absolute value of the cooldown duration.
     std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
     // The JIT data.
     std::shared_ptr<ed_jit_data<T>> m_jit_data;
-    // The polynomial cache.
-    // NOTE: it is *really* important that this is declared
-    // *before* m_wlist, because m_wlist will contain references
-    // to and interact with m_poly_cache during destruction,
-    // and we must be sure that m_wlist is destroyed *before*
-    // m_poly_cache.
-    taylor_poly_cache<T> m_poly_cache;
-    // The working list.
-    wlist_t m_wlist;
-    // The list of isolating intervals.
-    isol_t m_isol;
+    // The workspace for poly root finding.
+    frpr_workspace<T> m_frpr_ws;
+    // The output for poly root finding.
+    std::vector<real_poly_root<T>> m_poly_roots;
 
     // Constructors.
-    ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, const T &);
+    ed_data(const llvm_state &, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
+            const T &);
     ed_data(const ed_data &);
     ~ed_data();
 
@@ -124,8 +94,8 @@ struct ed_data {
 
 private:
     // Serialisation.
-    // NOTE: the def ctor is used only during deserialisation
-    // via pointer.
+    //
+    // NOTE: the def ctor is used only during deserialisation via pointer.
     ed_data();
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &, unsigned) const;
@@ -135,11 +105,6 @@ private:
 
 template <typename T>
 struct ed_data_batch {
-    // The working list type used during real root isolation.
-    using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
-    // The type used to store the list of isolating intervals.
-    using isol_t = std::vector<std::tuple<T, T>>;
-
     // Recover the event typedefs.
     using t_event_t = taylor_adaptive_batch<T>::t_event_t;
     using nt_event_t = taylor_adaptive_batch<T>::nt_event_t;
@@ -148,27 +113,23 @@ struct ed_data_batch {
     std::vector<t_event_t> m_tes;
     // The vector of non-terminal events.
     std::vector<nt_event_t> m_ntes;
-    // The jet of derivatives for the state variables
-    // and the events.
+    // The jet of derivatives for the state variables and the events.
     std::vector<T> m_ev_jet;
     // Vector of boolean flags signalling, for each batch lane, whether all input data for event detection is finite or
     // not.
     //
     // NOTE: we use int instead of bool in order to avoid the usual std::vector<bool> pitfalls.
     std::vector<int> m_ed_finite;
-    // The vector to store the norm infinity of the state
-    // vector when using the stepper with events.
+    // The vector to store the norm infinity of the state vector when using the stepper with events.
     std::vector<T> m_max_abs_state;
-    // The vector to store the the maximum absolute error
-    // on the Taylor series of the event equations.
+    // The vector to store the maximum absolute error on the Taylor series of the event equations.
     std::vector<T> m_g_eps;
     // Vector of detected terminal events.
     std::vector<std::vector<std::tuple<std::uint32_t, T, int, T>>> m_d_tes;
     // The vector of cooldowns for the terminal events.
-    // If an event is on cooldown, the corresponding optional
-    // in this vector will contain the total time elapsed
-    // since the cooldown started and the absolute value
-    // of the cooldown duration.
+    //
+    // If an event is on cooldown, the corresponding optional in this vector will contain the total time elapsed since
+    // the cooldown started and the absolute value of the cooldown duration.
     std::vector<std::vector<std::optional<std::pair<T, T>>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
     std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
@@ -179,20 +140,18 @@ struct ed_data_batch {
     std::vector<T> m_fex_check_enc;
     // Vector in which exceptions raised by the event callbacks will be temporarily stored.
     std::vector<std::pair<std::uint32_t, std::exception_ptr>> m_cb_eptrs;
-    // The polynomial cache.
-    // NOTE: it is *really* important that this is declared
-    // *before* m_wlist, because m_wlist will contain references
-    // to and interact with m_poly_cache during destruction,
-    // and we must be sure that m_wlist is destroyed *before*
-    // m_poly_cache.
-    taylor_poly_cache<T> m_poly_cache;
-    // The working list.
-    wlist_t m_wlist;
-    // The list of isolating intervals.
-    isol_t m_isol;
+    // Vector to store the polynomial on which real root detection operates.
+    //
+    // While the fast exclusion check is run on the batched polynomials, real root finding operates on scalar
+    // polynomials.
+    std::vector<T> m_scal_poly;
+    // The workspace for poly root finding.
+    frpr_workspace<T> m_frpr_ws;
+    // The output for poly root finding.
+    std::vector<real_poly_root<T>> m_poly_roots;
 
     // Constructors.
-    ed_data_batch(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
+    ed_data_batch(const llvm_state &, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
                   std::uint32_t);
     ed_data_batch(const ed_data_batch &);
     ~ed_data_batch();

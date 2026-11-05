@@ -120,9 +120,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_codegen(llvm_state &, llvm::Type *, const nu
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
+HEYOKA_DLL_PUBLIC number number_like(llvm_state &, const llvm::Type *, double);
 
-std::pair<number, number> dl_twopi_like(llvm_state &, llvm::Type *);
+std::pair<number, number> dl_twopi_like(llvm_state &, const llvm::Type *);
 
 } // namespace detail
 

@@ -451,7 +451,8 @@ Badly-conditioned event equations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Because heyoka's event detection system is based on polynomial root finding techniques, it will experience
-issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
+issues when the Taylor series of the event equations have roots of multiplicity greater than 1 (or, more generally,
+roots too close to each other to be separated at the working precision). This is usually
 not a problem in practice, unless the event equations are written in such a way to always generate polynomials
 with multiple roots.
 
@@ -463,15 +464,21 @@ For instance, an event equation such as
 
 will be troublesome, because both the event equation *and* its time derivative will be zero
 when the event triggers. This will translate to a Taylor series with a double root in correspondence
-of the event trigger time, which will lead to a breakdown of the root finding algorithm.
-This, at best, will result in reduced performance and, at worst, in missing events altogether.
+of the event trigger time. Roots which cannot be separated at the working precision are reported as a single
+event, whose direction may not be determined reliably (and which may also be spurious, e.g., if the event
+equation comes within rounding error of zero without actually crossing it). In more extreme cases (e.g., roots
+of high multiplicity), the event detection system may be unable to locate the roots altogether, in which case
+an exception will be raised.
 Additionally, in case of terminal events the automatically-deduced cooldown value in correspondence of
 a double root will tend to infinity.
 
 As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.
 
-Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka's logging system.
+.. versionchanged:: 7.14.0
+
+   Roots which cannot be separated at the working precision are now reported as single events, and an
+   exception is raised if the roots cannot be located. Previously, such events could be missed.
 
 Event equations and timestepping
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

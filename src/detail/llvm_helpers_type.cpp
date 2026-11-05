@@ -205,7 +205,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 }
 
 // Helper to determine the vector size of a type. If the type is not llvm::FixedVectorType, 1 will be returned.
-std::uint32_t get_vector_size(llvm::Type *const tp)
+std::uint32_t get_vector_size(const llvm::Type *const tp)
 {
     assert(tp != nullptr);
 
@@ -447,7 +447,7 @@ llvm::Type *llvm_clone_type(llvm_state &s, llvm::Type *tp)
 
     // Construct the scalar type first, then we will convert
     // to a vector if needed.
-    auto *tp_scal = tp->getScalarType();
+    const auto *const tp_scal = tp->getScalarType();
     llvm::Type *ret_scal_t = nullptr;
 
 #define HEYOKA_LLVM_CLONE_TYPE_IMPL(tid)                                                                               \

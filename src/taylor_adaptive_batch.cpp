@@ -411,8 +411,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     // NOTE: in principle this can be done in parallel with the rest of the constructor, once we have
     // m_order/m_dim/m_batch_size and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<detail::ed_data_batch<T>>(m_tplt_state.make_similar(), std::move(tes),
-                                                               std::move(ntes), m_order, m_dim, m_batch_size);
+        m_ed_data = std::make_unique<detail::ed_data_batch<T>>(m_tplt_state, std::move(tes), std::move(ntes), m_order,
+                                                               m_dim, m_batch_size);
     }
 
     if (auto_ic_setup) {
@@ -663,6 +663,8 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 //   detected events are guaranteed to trigger within the [0, h) range). Thus, if the timestep ends up being zero
 //   (either because max_delta_ts[i] == 0 or the inferred timestep is zero), then event detection is skipped altogether
 //   for the batch element;
+// - if event detection fails for any batch element, an exception is thrown and the integrator is left unchanged (that
+//   is, no batch element is updated);
 // - for each batch element, the execution of the events' callbacks is guaranteed to proceed in chronological order. The
 //   batch elements are processed in increasing order of index;
 // - a timestep h == 0 will still result in the last timestep of the batch element being updated (to zero) and the
@@ -871,11 +873,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // detection for a batch lane when any input data for event detection in that lane is not finite.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // For terminal events, we are interested only in the first event triggering in chronological order. It will
-            // be placed at the first position of edd.m_d_tes[i]. Duplicates are irrelevant here, as only the first
+            // be placed at the first position of edd.m_d_tes[i]. Duplicates need not be removed here, as only the first
             // event is used.
             //
-            // NOTE: in case of separate events triggering at exactly the same time, the event with the lowest index
-            // takes precedence.
+            // NOTE: in case of separate events triggering at exactly the same time, the implementation of taylor_ev_cmp
+            // guarantees that the event with the lowest index takes precedence.
             if (!edd.m_d_tes[i].empty()) {
                 const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], detail::taylor_ev_cmp);
                 std::iter_swap(earliest_it, edd.m_d_tes[i].begin());
@@ -883,8 +885,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
             // For non-terminal events, we want to sort the detected events and remove duplicates.
             if (!edd.m_d_ntes[i].empty()) {
-                // NOTE: the sort is fully deterministic because detected events comparing equivalent (i.e., same index
-                // and same absolute time) are identical tuples by construction (see add_d_event() in detect_events()).
+                // NOTE: the sort is deterministic, since equivalent tuples are identical (the comparator uses abs(t),
+                // but the nonzero times all have the same sign, and the zero times are all +0).
                 std::ranges::sort(edd.m_d_ntes[i], detail::taylor_ev_cmp);
 
                 // Remove duplicates.
@@ -1029,8 +1031,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     // Deduce the cooldown automatically.
                     //
                     // NOTE: if m_g_eps[i] is not finite, we skipped event detection altogether for the current batch
-                    // lane via the finiteness checks and thus we never end up here. If the derivative of the event
-                    // equation is not finite, the event is also skipped.
+                    // lane via the finiteness checks and thus we never end up here. The derivative of the event
+                    // equation must also be finite, otherwise event detection would have thrown.
                     edd.m_te_cooldowns[i][te_idx].emplace(
                         0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<3>(edd.m_d_tes[i][0])));
                 }

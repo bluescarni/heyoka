@@ -44,6 +44,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS nt_event_impl;
 template <typename, bool>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl;
 
+class HEYOKA_DLL_PUBLIC [[nodiscard]] llvm_ival_guard;
+
 } // namespace detail
 
 template <typename>

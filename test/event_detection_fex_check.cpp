@@ -903,7 +903,7 @@ using fex_check_t = void (*)(const T *, const T *, std::uint32_t *, T *);
 template <typename T>
 fex_check_t<T> add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    detail::llvm_ed_add_fex_check(s, "fex_check", detail::to_external_llvm_type<T>(s.context()), n, batch_size);
+    detail::llvm_ed_add_fex_check(s, "fex_check", detail::to_internal_llvm_type<T>(s), n, batch_size);
 
     s.compile();
 
@@ -922,44 +922,14 @@ void check_output(const test_case &tc, T lo, T hi, std::uint32_t out)
     REQUIRE(out == static_cast<std::uint32_t>(lo > 0 || hi < 0));
 }
 
-// Multiply a and b.
-template <typename T>
-T test_mul(T a, T b)
-{
-    return a * b;
-}
-
-// Check whether multiplication in the type T honours the rounding mode set via std::fesetround(). This is not the case
-// for the software-emulated quadruple precision of LLVM's compiler-rt (used, e.g., on FreeBSD), whose multiplication
-// always rounds to nearest.
-template <typename T>
-bool mul_honours_rounding()
-{
-    // NOTE: call through a volatile function pointer, so that the compiler can neither evaluate the multiplication at
-    // compile time nor move it across the changes of rounding mode.
-    T (*volatile f)(T, T) = &test_mul<T>;
-
-    const T eps = std::numeric_limits<T>::epsilon();
-    const T x = 1 + eps;
-
-    REQUIRE(std::fesetround(FE_UPWARD) == 0);
-    const T res = f(x, x);
-    REQUIRE(std::fesetround(FE_TONEAREST) == 0);
-
-    // The exact product is 1 + 2 * eps + eps * eps: rounding up gives 1 + 3 * eps, rounding to nearest 1 + 2 * eps.
-    return res > 1 + 2 * eps;
-}
-
 TEST_CASE("scalar")
 {
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {
@@ -987,11 +957,9 @@ TEST_CASE("batch")
     tuple_for_each(fp_types, [](auto x) {
         using fp_t = decltype(x);
 
-        if constexpr (detail::is_ieee754_binary128<fp_t>) {
-            if (!mul_honours_rounding<fp_t>()) {
-                WARN("Skipping the test: multiplication does not honour the rounding mode on this platform");
-                return;
-            }
+        if (!ival_arith_supported<fp_t>()) {
+            WARN("Skipping the test: the arithmetic does not honour the rounding mode on this platform");
+            return;
         }
 
         for (const auto n : degrees) {

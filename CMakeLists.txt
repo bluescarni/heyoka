@@ -132,13 +132,6 @@ if(YACMA_COMPILER_IS_MSVC)
   endif()
 endif()
 
-# Check the presence of the thread-safe variant of strerror() called strerror_r().
-#
-# This function is available both in the POSIX standard and as a GNU extension. Here we check only
-# the presence of the symbol, we will detect and choose the correct variant from within the code.
-include(CheckCXXSymbolExists)
-check_cxx_symbol_exists("strerror_r" "cstring" _HEYOKA_HAVE_STRERROR_R)
-
 # Mandatory dependency on LLVM.
 #
 # NOTE: do it early so that we can set up
@@ -186,16 +179,22 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_fex_check.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_poly_shift_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_poly_rescale.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_binomial_cf.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_poly_bernstein.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_count_sign_changes_ival.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection_de_casteljau_half.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_arith.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_cmp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_dl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_math.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_flow.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_ed.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_algo.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_type.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_celmec.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_ival.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/dfloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_identity.cpp"
@@ -220,6 +219,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/eop_sw_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_cache.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/frpr_workspace_impl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/isolate_real_roots.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/vector_cache.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/poly_root_finding/irr_add_poly_root_finder.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/frpr_workspace.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/find_real_poly_roots.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -419,11 +424,6 @@ else()
     set_property(TARGET heyoka PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
-endif()
-
-if(_HEYOKA_HAVE_STRERROR_R)
-    # strerror_r() is available, signal its presence when compiling the library.
-    target_compile_definitions(heyoka PRIVATE HEYOKA_HAVE_STRERROR_R)
 endif()
 
 # Setup common to both the shared and static variants.
@@ -705,7 +705,6 @@ unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
 unset(_HEYOKA_MIN_SUPPORTED_FMT_VERSION)
 unset(_HEYOKA_MAX_SUPPORTED_FMT_VERSION)
-unset(_HEYOKA_HAVE_STRERROR_R)
 if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
 endif()

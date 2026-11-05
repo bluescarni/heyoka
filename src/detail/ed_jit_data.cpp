@@ -41,8 +41,6 @@ void ed_jit_data<T>::load(boost::archive::binary_iarchive &ia, unsigned)
     ia >> m_state;
 
     // Fetch the function pointers from the LLVM state.
-    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
-    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
     m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
 }
 

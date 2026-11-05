@@ -759,10 +759,6 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
     assert(std::ranges::all_of(args.begin() + 1, args.end(),
                                [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
 
-    const auto nargs = args.size();
-
-    auto &builder = s.builder();
-
     // Determine the type and scalar type of the arguments.
     auto *x_t = args[0]->getType();
     auto *scal_t = x_t->getScalarType();
@@ -808,6 +804,10 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, const 
     }
 
 #if defined(HEYOKA_HAVE_REAL)
+
+    const auto nargs = args.size();
+
+    auto &builder = s.builder();
 
     // NOTE: this handles only the scalar case.
     if (llvm_is_real(x_t) != 0) {
@@ -1634,6 +1634,25 @@ ip_restorer::ip_restorer(ir_builder &bld) : m_bld(bld), m_orig_bb(m_bld.GetInser
 ip_restorer::~ip_restorer()
 {
     m_bld.SetInsertPoint(m_orig_bb);
+}
+
+// Create an alloca for a value of type tp at the beginning of the entry block of the function currently being built.
+//
+// NOTE: LLVM treats allocas outside the entry block as dynamic stack allocations, which are not promoted to registers
+// and force a frame pointer and runtime stack adjustments.
+llvm::Value *llvm_entry_alloca(llvm_state &s, llvm::Type *const tp)
+{
+    assert(tp != nullptr);
+
+    auto &builder = s.builder();
+    assert(builder.GetInsertBlock() != nullptr);
+
+    auto &entry = builder.GetInsertBlock()->getParent()->getEntryBlock();
+
+    const llvm::IRBuilderBase::InsertPointGuard ipg(builder);
+    builder.SetInsertPoint(&entry, entry.begin());
+
+    return builder.CreateAlloca(tp);
 }
 
 } // namespace detail

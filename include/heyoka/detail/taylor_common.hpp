@@ -210,8 +210,8 @@ inline std::partial_ordering cmp_abs<mppp::real>(const mppp::real &a, const mppp
 #endif
 
 // A function object that compares detected events in Taylor integrators first by the absolute value of the event
-// trigger time (so that events closer to the beginning of the timestep come first) and then, as a tie breaker, by the
-// event index.
+// trigger time (so that events closer to the beginning of the timestep come first), then by the event index and finally
+// by the event direction.
 //
 // NOTE: the time coordinates in the vectors of detected events are relative to the beginning of the timestep. They will
 // be negative for backward integration, hence the use of abs(). The checks inside the event detection function ensure
@@ -222,7 +222,11 @@ inline constexpr auto taylor_ev_cmp = [](const auto &ev0, const auto &ev1) {
         return c < 0;
     }
 
-    return std::get<0>(ev0) < std::get<0>(ev1);
+    if (std::get<0>(ev0) != std::get<0>(ev1)) {
+        return std::get<0>(ev0) < std::get<0>(ev1);
+    }
+
+    return std::get<2>(ev0) < std::get<2>(ev1);
 };
 
 // A function object that compares for equality detected events in Taylor integrators.
