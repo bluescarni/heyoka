@@ -354,7 +354,7 @@ TEST_CASE("extended precision fallback")
     // full 53-bit significand, so that the rescaling of the polynomial is inexact also in extended precision. With,
     // e.g., h = 10, all the computations would be exact for this polynomial, and the root would be bisected down to the
     // minimum width with an exact sign-change count. Here instead, the first isolation pass reports the root in
-    // undecided intervals much wider than the minimum width. The extended-precision pass (if available) exceeds its
+    // undecided intervals much wider than the minimum width. The extended-precision pass exceeds its
     // iteration cap around the root, and the results of the first pass are returned.
     const auto h = 10.1;
     const auto ivals = run_isolation({729., -1458., 1215., -540., 135., -18., 1.}, h, 0.);

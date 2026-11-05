@@ -603,8 +603,7 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         //   info on the roots in (lo, hi)), or
         // - b_0 straddles 0 (meaning that we don't know if a root occurs exactly at lo).
         //
-        // We will attempt to remove the undecidedness on these intervals with a second bisection pass (if mp++ is
-        // available).
+        // We will attempt to remove the undecidedness on these intervals with a second bisection pass.
         if (V_min != V_max || b_0_sz) {
             isol_ivals.emplace_back(lo, hi, irr_interval_type::undecided, std::nullopt);
 
