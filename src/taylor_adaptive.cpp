@@ -44,13 +44,13 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
-#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
+#include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/detail/vsys_data.hpp>
@@ -160,7 +160,8 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 } // namespace detail
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std::make_unique<i_data>(std::move(s)))
+taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s)
+    : m_i_data(std::make_unique<detail::taylor_adaptive_i_data<T>>(std::move(s)))
 {
 }
 
@@ -552,7 +553,8 @@ taylor_adaptive<T>::taylor_adaptive() noexcept = default;
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
-    : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data))
+    : base_t(static_cast<const base_t &>(other)),
+      m_i_data(std::make_unique<detail::taylor_adaptive_i_data<T>>(*other.m_i_data))
 {
 }
 
