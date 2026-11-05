@@ -121,13 +121,11 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     out_ptr->setName("out_ptr");
     llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *const enc_ptr = f->args().begin() + 3;
     enc_ptr->setName("enc_ptr");
     llvm_add_no_capture_argattr(s, enc_ptr);
     enc_ptr->addAttr(llvm::Attribute::NoAlias);
-    enc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     // Create a new basic block to start insertion into.
     auto *const bb = llvm::BasicBlock::Create(context, "entry", f);

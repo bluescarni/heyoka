@@ -397,7 +397,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         f->addFnAttr(llvm::Attribute::Speculatable);
         f->addFnAttr(llvm::Attribute::WillReturn);
         // NOTE: we are reading from memory in this function, but only from a local alloca and this is allowed by the
-        // semantics of memory(none).
+        // semantics of memory(none). Strictly speaking, memory(none) is not accurate, because mpfr_sin_cos() also
+        // writes MPFR's global exception flags. We accept this because heyoka never reads these flags, and memory(none)
+        // is what allows the optimizer to merge identical calls to this function (CSE).
         f->setMemoryEffects(llvm::MemoryEffects::none());
         // NOTE: it is important that we prevent inlining - if the function is inlined, the information about its
         // pureness is lost and CSE won't work. This is a minor pessimisation but it should hopefully have a very small

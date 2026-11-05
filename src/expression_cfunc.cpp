@@ -1445,7 +1445,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     out_ptr->setName("out_ptr");
     llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *in_ptr = out_ptr + 1;
     in_ptr->setName("in_ptr");
@@ -2309,7 +2308,6 @@ make_multi_cfunc_impl(llvm::Type *fp_t, const llvm_state &tplt, const std::strin
         out_ptr->setName("out_ptr");
         llvm_add_no_capture_argattr(s, out_ptr);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
-        out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
         auto *in_ptr = out_ptr + 1;
         in_ptr->setName("in_ptr");

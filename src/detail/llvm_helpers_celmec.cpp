@@ -491,7 +491,6 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     out_ptr->setName("out_ptr");
     llvm_add_no_capture_argattr(s, out_ptr);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto *ecc_ptr = f->args().begin() + 1;
     ecc_ptr->setName("ecc_ptr");
