@@ -357,6 +357,10 @@ auto taylor_adaptive_build_llvm_state(const KwArgs &...kw_args)
     return igor::filter_invoke<llvm_state::kw_cfg>([](const auto &...args) { return llvm_state(args...); }, kw_args...);
 }
 
+// Forward declaration of the internal data class for taylor_adaptive.
+template <typename>
+struct taylor_adaptive_i_data;
+
 } // namespace detail
 
 template <typename T>
@@ -364,6 +368,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_ada
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
+    friend struct detail::taylor_adaptive_i_data<T>;
     using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
 
 public:
@@ -373,13 +378,8 @@ public:
     using t_event_t = t_event<T>;
 
 private:
-    // Struct storing the integrator data.
-    //
-    // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
-    struct HEYOKA_DLL_PUBLIC i_data;
-
     // Pimpl.
-    std::unique_ptr<i_data> m_i_data;
+    std::unique_ptr<detail::taylor_adaptive_i_data<T>> m_i_data;
 
     // Serialization.
     template <typename Archive>
@@ -780,12 +780,17 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
     }
 }
 
+// Forward declaration of the internal data class for taylor_adaptive_batch.
+template <typename>
+struct taylor_adaptive_batch_i_data;
+
 } // namespace detail
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
+    friend struct detail::taylor_adaptive_batch_i_data<T>;
 
 public:
     using value_type = T;
@@ -794,11 +799,8 @@ public:
     using t_event_t = t_event_batch<T>;
 
 private:
-    // Struct storing the integrator data.
-    struct HEYOKA_DLL_PUBLIC i_data;
-
     // Pimpl.
-    std::unique_ptr<i_data> m_i_data;
+    std::unique_ptr<detail::taylor_adaptive_batch_i_data<T>> m_i_data;
 
     // Serialization.
     template <typename Archive>

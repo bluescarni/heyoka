@@ -49,12 +49,12 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
-#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
+#include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/detail/vsys_data.hpp>
@@ -75,7 +75,7 @@ HEYOKA_BEGIN_NAMESPACE
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
-    : m_i_data(std::make_unique<i_data>(std::move(s)))
+    : m_i_data(std::make_unique<detail::taylor_adaptive_batch_i_data<T>>(std::move(s)))
 {
 }
 
@@ -436,7 +436,7 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch() noexcept = default;
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
-    : m_i_data(std::make_unique<i_data>(*other.m_i_data))
+    : m_i_data(std::make_unique<detail::taylor_adaptive_batch_i_data<T>>(*other.m_i_data))
 {
 }
 

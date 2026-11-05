@@ -28,8 +28,8 @@
 
 #include <heyoka/detail/aligned_vector.hpp>
 #include <heyoka/detail/ed_data.hpp>
-#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
+#include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -111,7 +111,7 @@ void init_cm_tape(IData &idata)
         assert(sz != 0u); // LCOV_EXCL_LINE
         assert(al != 0u); // LCOV_EXCL_LINE
 
-        idata.m_cm_tape = detail::aligned_vector<std::byte>(detail::aligned_allocator<std::byte>(al));
+        idata.m_cm_tape = aligned_vector<std::byte>(aligned_allocator<std::byte>(al));
         idata.m_cm_tape.resize(boost::numeric_cast<decltype(idata.m_cm_tape.size())>(sz));
     } else {
         assert(sz == 0u); // LCOV_EXCL_LINE
@@ -121,10 +121,8 @@ void init_cm_tape(IData &idata)
 
 } // namespace
 
-} // namespace detail
-
 template <typename T>
-void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+void taylor_adaptive_i_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     // NOTE: the m_busy flag is not saved to the archive, otherwise an integrator which is saved while propagating would
     // be eternally stuck in busy status.
@@ -149,7 +147,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
 }
 
 template <typename T>
-void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsigned)
+void taylor_adaptive_i_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     // NOTE: we disallow loading into an integrator if it is busy (see the check in the integrator's load_impl()).
     assert(!m_busy);
@@ -174,7 +172,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
 
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();
-    detail::init_cm_tape(*this);
+    init_cm_tape(*this);
 }
 
 // NOTE: this ctor provides only partial initialisation of the data members. The rest of the initialisation is performed
@@ -183,15 +181,14 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
 // NOTE: m_ta_jit_data->m_llvm_state is inited as a single llvm_state regardless of the use of compact mode. It will be
 // converted into a multi state if needed at a later stage.
 template <typename T>
-taylor_adaptive<T>::i_data::i_data(llvm_state s)
-    : m_ta_jit_data(std::make_shared<typename detail::ta_jit_data<T>>(
-          typename detail::ta_jit_data<T>{.m_llvm_state = std::move(s)})),
+taylor_adaptive_i_data<T>::taylor_adaptive_i_data(llvm_state s)
+    : m_ta_jit_data(std::make_shared<ta_jit_data<T>>(ta_jit_data<T>{.m_llvm_state = std::move(s)})),
       m_tplt_state(std::get<0>(m_ta_jit_data->m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
-taylor_adaptive<T>::i_data::i_data(const i_data &other)
+taylor_adaptive_i_data<T>::taylor_adaptive_i_data(const taylor_adaptive_i_data &other)
     : // NOTE: the busy flag is not copied, otherwise an integrator which is copied while propagating would be eternally
       // stuck in busy status.
       m_state(other.m_state), m_time(other.m_time),
@@ -200,38 +197,43 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_tape_sa(other.m_tape_sa), m_pars(other.m_pars), m_tc(other.m_tc),
       m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_vsys(other.m_vsys),
-      m_vsys_data(other.m_vsys_data ? std::make_unique<detail::vsys_data<T>>(*other.m_vsys_data) : nullptr),
-      m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data<T>>(*other.m_ed_data) : nullptr)
+      m_vsys_data(other.m_vsys_data ? std::make_unique<vsys_data<T>>(*other.m_vsys_data) : nullptr),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data<T>>(*other.m_ed_data) : nullptr)
 {
     // Init the compact mode tape, if necessary.
-    detail::init_cm_tape(*this);
+    init_cm_tape(*this);
 }
 
 template <typename T>
-taylor_adaptive<T>::i_data::i_data() = default;
+taylor_adaptive_i_data<T>::taylor_adaptive_i_data() = default;
 
 template <typename T>
-taylor_adaptive<T>::i_data::~i_data() = default;
+taylor_adaptive_i_data<T>::~taylor_adaptive_i_data() = default;
 
 // Explicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(F) template struct taylor_adaptive<F>::i_data;
+#define HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(F) template struct taylor_adaptive_i_data<F>;
 
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(float)
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(double)
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real128)
 
 #endif
 
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(mppp::real)
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST
 
 template <typename T>
-void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+void taylor_adaptive_batch_i_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     // NOTE: the m_busy flag is not saved to the archive, otherwise an integrator which is saved while propagating would
     // be eternally stuck in busy status.
@@ -274,7 +276,7 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
 }
 
 template <typename T>
-void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar, unsigned)
+void taylor_adaptive_batch_i_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     // NOTE: we disallow loading into an integrator if it is busy (see the check in the integrator's load_impl()).
     assert(!m_busy);
@@ -317,7 +319,7 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
 
     // Reconstruct the compact mode tape, if necessary.
     m_cm_tape.clear();
-    detail::init_cm_tape(*this);
+    init_cm_tape(*this);
 }
 
 // NOTE: this ctor provides only partial initialisation of the data members. The rest of the initialisation is performed
@@ -326,15 +328,14 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
 // NOTE: m_ta_jit_data->m_llvm_state is inited as a single llvm_state regardless of the use of compact mode.
 // It will be converted into a multi state if needed at a later stage.
 template <typename T>
-taylor_adaptive_batch<T>::i_data::i_data(llvm_state s)
-    : m_ta_jit_data(std::make_shared<typename detail::ta_jit_data<T>>(
-          typename detail::ta_jit_data<T>{.m_llvm_state = std::move(s)})),
+taylor_adaptive_batch_i_data<T>::taylor_adaptive_batch_i_data(llvm_state s)
+    : m_ta_jit_data(std::make_shared<ta_jit_data<T>>(ta_jit_data<T>{.m_llvm_state = std::move(s)})),
       m_tplt_state(std::get<0>(m_ta_jit_data->m_llvm_state).make_similar())
 {
 }
 
 template <typename T>
-taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
+taylor_adaptive_batch_i_data<T>::taylor_adaptive_batch_i_data(const taylor_adaptive_batch_i_data &other)
     : // NOTE: the busy flag is not copied, otherwise an integrator which is copied while propagating would be eternally
       // stuck in busy status.
       m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
@@ -348,21 +349,21 @@ taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time), m_vsys(other.m_vsys),
-      m_vsys_data(other.m_vsys_data ? std::make_unique<detail::vsys_data<T>>(*other.m_vsys_data) : nullptr),
-      m_ed_data(other.m_ed_data ? std::make_unique<detail::ed_data_batch<T>>(*other.m_ed_data) : nullptr)
+      m_vsys_data(other.m_vsys_data ? std::make_unique<vsys_data<T>>(*other.m_vsys_data) : nullptr),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data_batch<T>>(*other.m_ed_data) : nullptr)
 {
     // Init the compact mode tape, if necessary.
-    detail::init_cm_tape(*this);
+    init_cm_tape(*this);
 }
 
 template <typename T>
-taylor_adaptive_batch<T>::i_data::i_data() = default;
+taylor_adaptive_batch_i_data<T>::taylor_adaptive_batch_i_data() = default;
 
 template <typename T>
-taylor_adaptive_batch<T>::i_data::~i_data() = default;
+taylor_adaptive_batch_i_data<T>::~taylor_adaptive_batch_i_data() = default;
 
 // Explicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(F) template struct taylor_adaptive_batch<F>::i_data;
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(F) template struct taylor_adaptive_batch_i_data<F>;
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(double)
@@ -375,5 +376,7 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(mppp::real128)
 #endif
 
 #undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
