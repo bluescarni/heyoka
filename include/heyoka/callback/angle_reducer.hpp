@@ -111,28 +111,6 @@ public:
     bool operator()(taylor_adaptive_batch<T> &);
 };
 
-// Prevent implicit instantiations of the member functions.
-#define HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(F)                                                                   \
-    extern template bool angle_reducer::operator()<F>(taylor_adaptive<F> &);                                           \
-    extern template void angle_reducer::pre_hook<F>(taylor_adaptive<F> &);                                             \
-    extern template bool angle_reducer::operator()<F>(taylor_adaptive_batch<F> &);                                     \
-    extern template void angle_reducer::pre_hook<F>(taylor_adaptive_batch<F> &);
-
-HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(float)
-HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(double)
-HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(mppp::real128)
-
-#endif
-
-extern template bool angle_reducer::operator()<mppp::real>(taylor_adaptive<mppp::real> &);
-extern template void angle_reducer::pre_hook<mppp::real>(taylor_adaptive<mppp::real> &);
-
-#undef HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST
-
 } // namespace callback
 
 HEYOKA_END_NAMESPACE
@@ -144,7 +122,12 @@ HEYOKA_END_NAMESPACE
 
 HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_KEY(float)
 HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_KEY(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_KEY(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

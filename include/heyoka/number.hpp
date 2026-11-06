@@ -39,7 +39,11 @@ class HEYOKA_DLL_PUBLIC number
     friend HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
 
 public:
-    using value_type = std::variant<float, double, long double
+    using value_type = std::variant<float, double
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+                                    ,
+                                    long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                     ,
                                     mppp::real128
@@ -60,7 +64,9 @@ public:
     number() noexcept;
     explicit number(float) noexcept;
     explicit number(double) noexcept;
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     explicit number(long double) noexcept;
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     explicit number(mppp::real128) noexcept;
 #endif

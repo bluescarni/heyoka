@@ -100,16 +100,24 @@ expression operator/(const expression &e1, const expression &e2)
 
 HEYOKA_EX_BINARY_OP_R(+, float)
 HEYOKA_EX_BINARY_OP_R(+, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_R(+, long double)
+#endif
 HEYOKA_EX_BINARY_OP_R(-, float)
 HEYOKA_EX_BINARY_OP_R(-, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_R(-, long double)
+#endif
 HEYOKA_EX_BINARY_OP_R(*, float)
 HEYOKA_EX_BINARY_OP_R(*, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_R(*, long double)
+#endif
 HEYOKA_EX_BINARY_OP_R(/, float)
 HEYOKA_EX_BINARY_OP_R(/, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_R(/, long double)
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -127,16 +135,24 @@ HEYOKA_EX_BINARY_OP_R(/, mppp::real)
 
 HEYOKA_EX_BINARY_OP_L(+, float)
 HEYOKA_EX_BINARY_OP_L(+, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_L(+, long double)
+#endif
 HEYOKA_EX_BINARY_OP_L(-, float)
 HEYOKA_EX_BINARY_OP_L(-, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_L(-, long double)
+#endif
 HEYOKA_EX_BINARY_OP_L(*, float)
 HEYOKA_EX_BINARY_OP_L(*, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_L(*, long double)
+#endif
 HEYOKA_EX_BINARY_OP_L(/, float)
 HEYOKA_EX_BINARY_OP_L(/, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_BINARY_OP_L(/, long double)
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -190,16 +206,24 @@ expression &operator/=(expression &x, const expression &e)
 
 HEYOKA_EX_COMPOUND_OP(+=, float)
 HEYOKA_EX_COMPOUND_OP(+=, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_COMPOUND_OP(+=, long double)
+#endif
 HEYOKA_EX_COMPOUND_OP(-=, float)
 HEYOKA_EX_COMPOUND_OP(-=, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_COMPOUND_OP(-=, long double)
+#endif
 HEYOKA_EX_COMPOUND_OP(*=, float)
 HEYOKA_EX_COMPOUND_OP(*=, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_COMPOUND_OP(*=, long double)
+#endif
 HEYOKA_EX_COMPOUND_OP(/=, float)
 HEYOKA_EX_COMPOUND_OP(/=, double)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_EX_COMPOUND_OP(/=, long double)
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

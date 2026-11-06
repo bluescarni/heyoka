@@ -28,6 +28,7 @@
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 // NOTE: the step callback needs its own class because we want to
 // give the ability to (optionally) define additional member
@@ -114,10 +115,10 @@ using step_cb_wrap_t = tanuki::wrap<step_cb_iface<TA>, step_cb_wrap_config<TA>>;
 // the explicit instantiation only on clang (where this seems to work without
 // issues) and MSVC.
 // NOTE: this issue seems now to be fixed for GCC >= 13.3.
-template <typename T>
+template <supported_fp_type T>
 using step_callback = detail::step_cb_wrap_t<taylor_adaptive<T>>;
 
-template <typename T>
+template <supported_batch_fp_type T>
 using step_callback_batch = detail::step_cb_wrap_t<taylor_adaptive_batch<T>>;
 
 namespace detail
@@ -129,6 +130,17 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl;
 template <typename T, bool Batch>
 void swap(step_callback_set_impl<T, Batch> &, step_callback_set_impl<T, Batch> &) noexcept;
 
+// Metaprogramming for selecting the step callback type in step_callback_set_impl.
+template <typename T, bool Batch>
+struct step_callback_set_impl_step_cb_t {
+    using type = step_callback_batch<T>;
+};
+
+template <typename T>
+struct step_callback_set_impl_step_cb_t<T, false> {
+    using type = step_callback<T>;
+};
+
 template <typename T, bool Batch>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl
 {
@@ -136,7 +148,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl
     friend void swap(step_callback_set_impl<T2, Batch2> &, step_callback_set_impl<T2, Batch2> &) noexcept;
 
 public:
-    using step_cb_t = std::conditional_t<Batch, step_callback_batch<T>, step_callback<T>>;
+    using step_cb_t = step_callback_set_impl_step_cb_t<T, Batch>::type;
     using ta_t = step_cb_t::ta_t;
     using size_type = std::vector<step_cb_t>::size_type;
 
@@ -169,33 +181,12 @@ public:
     void pre_hook(ta_t &);
 };
 
-// Prevent implicit instantiations.
-#define HEYOKA_SCS_EXTERN_TEMPLATE(T)                                                                                  \
-    extern template class step_callback_set_impl<T, true>;                                                             \
-    extern template class step_callback_set_impl<T, false>;                                                            \
-    extern template void swap(step_callback_set_impl<T, true> &, step_callback_set_impl<T, true> &) noexcept;          \
-    extern template void swap(step_callback_set_impl<T, false> &, step_callback_set_impl<T, false> &) noexcept;
-
-HEYOKA_SCS_EXTERN_TEMPLATE(float)
-HEYOKA_SCS_EXTERN_TEMPLATE(double)
-HEYOKA_SCS_EXTERN_TEMPLATE(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real128)
-
-#endif
-
-HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real)
-
-#undef HEYOKA_SCS_EXTERN_TEMPLATE
-
 } // namespace detail
 
-template <typename T>
+template <supported_fp_type T>
 using step_callback_set = detail::step_callback_set_impl<T, false>;
 
-template <typename T>
+template <supported_batch_fp_type T>
 using step_callback_batch_set = detail::step_callback_set_impl<T, true>;
 
 HEYOKA_END_NAMESPACE
@@ -243,10 +234,15 @@ HEYOKA_END_NAMESPACE
 // Enable serialisation support for step_callback_set.
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<float>, float)
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<double>, double)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<long double>, long double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<float>, float)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<double>, double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<long double>, long double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<long double>, long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

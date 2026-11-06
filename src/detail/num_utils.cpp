@@ -41,7 +41,11 @@ template float num_zero_like(const float &);
 
 template double num_zero_like(const double &);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template long double num_zero_like(const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -65,7 +69,11 @@ template float num_one_like(const float &);
 
 template double num_one_like(const double &);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template long double num_one_like(const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -89,7 +97,11 @@ template float num_eps_like(const float &);
 
 template double num_eps_like(const double &);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template long double num_eps_like(const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -113,7 +125,11 @@ template float num_inf_like(const float &);
 
 template double num_inf_like(const double &);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template long double num_inf_like(const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -34,7 +34,7 @@ inline auto binomial(std::uint32_t i, std::uint32_t j)
 
 // NOTE: if Boost does not support long double, we provide
 // our own implementation.
-#if defined(BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE) && defined(BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS)
 
 // LCOV_EXCL_START
 

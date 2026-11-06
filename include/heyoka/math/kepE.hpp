@@ -70,7 +70,12 @@ HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
 
 HEYOKA_DECLARE_KEPE_OVERLOADS(float);
 HEYOKA_DECLARE_KEPE_OVERLOADS(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DECLARE_KEPE_OVERLOADS(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

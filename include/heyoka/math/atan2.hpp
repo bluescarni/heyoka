@@ -66,7 +66,12 @@ HEYOKA_DLL_PUBLIC expression atan2(expression, expression);
 
 HEYOKA_DLL_PUBLIC expression atan2(expression, float);
 HEYOKA_DLL_PUBLIC expression atan2(expression, double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DLL_PUBLIC expression atan2(expression, long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -78,7 +83,12 @@ HEYOKA_DLL_PUBLIC expression atan2(expression, mppp::real);
 
 HEYOKA_DLL_PUBLIC expression atan2(float, expression);
 HEYOKA_DLL_PUBLIC expression atan2(double, expression);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DLL_PUBLIC expression atan2(long double, expression);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

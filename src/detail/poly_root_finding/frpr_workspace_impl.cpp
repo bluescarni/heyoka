@@ -311,7 +311,12 @@ frpr_workspace_jit_data<T>::~frpr_workspace_jit_data() = default;
 
 HEYOKA_DETAIL_FRPR_WORKSPACE_JIT_DATA_INST(float);
 HEYOKA_DETAIL_FRPR_WORKSPACE_JIT_DATA_INST(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DETAIL_FRPR_WORKSPACE_JIT_DATA_INST(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -490,7 +495,12 @@ std::uint32_t frpr_workspace_impl<T>::get_degree() const noexcept
 
 HEYOKA_DETAIL_FRPR_WORKSPACE_IMPL_INST(float);
 HEYOKA_DETAIL_FRPR_WORKSPACE_IMPL_INST(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DETAIL_FRPR_WORKSPACE_IMPL_INST(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -520,7 +530,12 @@ long long frpr_workspace_impl_get_prec_3n([[maybe_unused]] const long long prec)
 // Explicit instantiations.
 template long long frpr_workspace_impl_get_prec_3n<float>(long long);
 template long long frpr_workspace_impl_get_prec_3n<double>(long long);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template long long frpr_workspace_impl_get_prec_3n<long double>(long long);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -58,13 +58,13 @@
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/detail/vsys_data.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/mdspan.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/taylor.hpp>
 
 // NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
@@ -73,13 +73,13 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
     : m_i_data(std::make_unique<detail::taylor_adaptive_batch_i_data<T>>(std::move(s)))
 {
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, const std::uint32_t batch_size,
                                                   std::vector<T> time, std::optional<T> tol, const bool high_accuracy,
                                                   const bool compact_mode, std::vector<T> pars,
@@ -89,12 +89,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
     assert(!tol || *tol != 0);
-
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::is_same_v<T, long double>) {
-        throw not_implemented_error("'long double' computations are not supported on PowerPC");
-    }
-#endif
 
     using std::isfinite;
 
@@ -431,19 +425,19 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     m_vsys = std::move(vsys);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch() noexcept = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
     : m_i_data(std::make_unique<detail::taylor_adaptive_batch_i_data<T>>(*other.m_i_data))
 {
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(taylor_adaptive_batch &&) noexcept = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(const taylor_adaptive_batch &other)
 {
     if (this != &other) [[likely]] {
@@ -458,19 +452,19 @@ taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(const taylor_adapt
     return *this;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(taylor_adaptive_batch &&) noexcept = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 taylor_adaptive_batch<T>::~taylor_adaptive_batch() = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 bool taylor_adaptive_batch<T>::is_variational() const noexcept
 {
     return m_i_data->m_vsys.index() == 1u;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::uint32_t taylor_adaptive_batch<T>::get_n_orig_sv() const noexcept
 {
@@ -478,14 +472,14 @@ std::uint32_t taylor_adaptive_batch<T>::get_n_orig_sv() const noexcept
 }
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
-template <typename T>
+template <supported_batch_fp_type T>
 template <typename Archive>
 void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
 {
     ar << m_i_data;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 template <typename Archive>
 void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 {
@@ -525,19 +519,19 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
 {
     save_impl(ar, v);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 detail::busy_guard taylor_adaptive_batch<T>::make_busy_guard(const std::string_view name)
 {
     assert(m_i_data);
@@ -549,7 +543,7 @@ detail::busy_guard taylor_adaptive_batch<T>::make_busy_guard(const std::string_v
     return detail::busy_guard(m_i_data->m_busy);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -574,7 +568,7 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
     std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_time(T new_time)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -586,7 +580,7 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
     std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -617,7 +611,7 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -670,7 +664,7 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 // - a timestep h == 0 will still result in the last timestep of the batch element being updated (to zero) and the
 //   Taylor coefficients being recorded in the internal array (if wtc == true, or always in the presence of events).
 //   That is, h == 0 is not treated in any special way.
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
     using std::abs;
@@ -1123,7 +1117,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::step(bool wtc)
 {
     const auto bg = make_busy_guard("step");
@@ -1133,7 +1127,7 @@ void taylor_adaptive_batch<T>::step(bool wtc)
     step_impl(m_pinf, wtc);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::step_backward(bool wtc)
 {
     const auto bg = make_busy_guard("step_backward");
@@ -1143,7 +1137,7 @@ void taylor_adaptive_batch<T>::step_backward(bool wtc)
     step_impl(m_minf, wtc);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
     const auto bg = make_busy_guard("step");
@@ -1171,7 +1165,7 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc
     step_impl(max_delta_ts, wtc);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
 taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::size_t max_steps,
                                              const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
@@ -1226,7 +1220,7 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
 // The callback is always executed at the end of each timestep, unless a non-finite state was detected in any batch
 // element. The continuous output is always updated at the end of each timestep, unless a non-finite state was detected
 // in any batch element.
-template <typename T>
+template <supported_batch_fp_type T>
 std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
 taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const std::size_t max_steps,
                                                const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb,
@@ -1686,7 +1680,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
 //
 // The callback is executed at the end of each timestep taken after the initial propagation up to the first grid points,
 // unless a non-finite state was detected in any batch element.
-template <typename T>
+template <supported_batch_fp_type T>
 std::tuple<step_callback_batch<T>, std::vector<T>>
 taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const std::size_t max_steps,
                                               const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb)
@@ -2265,151 +2259,151 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
     return make_retval();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::variant<llvm_state, llvm_multi_state> &taylor_adaptive_batch<T>::get_llvm_state() const
 {
     return m_i_data->m_ta_jit_data->m_llvm_state;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const taylor_dc_t &taylor_adaptive_batch<T>::get_decomposition() const
 {
     return m_i_data->m_dc;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::uint32_t taylor_adaptive_batch<T>::get_order() const
 {
     return m_i_data->m_order;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 T taylor_adaptive_batch<T>::get_tol() const
 {
     return m_i_data->m_tol;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 bool taylor_adaptive_batch<T>::get_high_accuracy() const
 {
     return m_i_data->m_high_accuracy;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 bool taylor_adaptive_batch<T>::get_compact_mode() const
 {
     return m_i_data->m_compact_mode;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::uint32_t taylor_adaptive_batch<T>::get_batch_size() const
 {
     return m_i_data->m_batch_size;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 {
     return m_i_data->m_dim;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_time() const
 {
     return m_i_data->m_time_hi;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const T *taylor_adaptive_batch<T>::get_time_data() const
 {
     return m_i_data->m_time_hi.data();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::pair<const std::vector<T> &, const std::vector<T> &> taylor_adaptive_batch<T>::get_dtime() const
 {
     return std::make_pair(std::cref(m_i_data->m_time_hi), std::cref(m_i_data->m_time_lo));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::pair<const T *, const T *> taylor_adaptive_batch<T>::get_dtime_data() const
 {
     return std::make_pair(m_i_data->m_time_hi.data(), m_i_data->m_time_lo.data());
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_state() const
 {
     return m_i_data->m_state;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const T *taylor_adaptive_batch<T>::get_state_data() const
 {
     return m_i_data->m_state.data();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_state_range()
 {
     return std::ranges::subrange(m_i_data->m_state.begin(), m_i_data->m_state.end());
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 T *taylor_adaptive_batch<T>::get_state_data()
 {
     return m_i_data->m_state.data();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_pars() const
 {
     return m_i_data->m_pars;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const T *taylor_adaptive_batch<T>::get_pars_data() const
 {
     return m_i_data->m_pars.data();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_pars_range()
 {
     return std::ranges::subrange(m_i_data->m_pars.begin(), m_i_data->m_pars.end());
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 T *taylor_adaptive_batch<T>::get_pars_data()
 {
     return m_i_data->m_pars.data();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_tc() const
 {
     return m_i_data->m_tc;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_last_h() const
 {
     return m_i_data->m_last_h;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_d_output() const
 {
     return m_i_data->m_d_out;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 bool taylor_adaptive_batch<T>::with_events() const
 {
     return static_cast<bool>(m_i_data->m_ed_data);
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<typename taylor_adaptive_batch<T>::t_event_t> &taylor_adaptive_batch<T>::get_t_events() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -2419,7 +2413,7 @@ const std::vector<typename taylor_adaptive_batch<T>::t_event_t> &taylor_adaptive
     return m_i_data->m_ed_data->m_tes;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<std::vector<std::optional<std::pair<T, T>>>> &taylor_adaptive_batch<T>::get_te_cooldowns() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -2429,7 +2423,7 @@ const std::vector<std::vector<std::optional<std::pair<T, T>>>> &taylor_adaptive_
     return m_i_data->m_ed_data->m_te_cooldowns;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptive_batch<T>::get_nt_events() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -2439,26 +2433,26 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
     return m_i_data->m_ed_data->m_ntes;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 // NOLINTNEXTLINE(bugprone-exception-escape)
 const std::vector<std::pair<expression, expression>> &taylor_adaptive_batch<T>::get_sys() const noexcept
 {
     return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch<T>::get_step_res() const
 {
     return m_i_data->m_step_res;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &taylor_adaptive_batch<T>::get_propagate_res() const
 {
     return m_i_data->m_prop_res;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -2502,7 +2496,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vecto
 }
 
 // NOTE: there's some overlap with the code from the other overload here.
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel_time)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -2537,7 +2531,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel
     return m_d_out;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::reset_cooldowns()
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -2547,7 +2541,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns()
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 {
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
@@ -2567,7 +2561,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::check_variational(const char *fname) const
 {
     if (!is_variational()) [[unlikely]] {
@@ -2579,7 +2573,7 @@ void taylor_adaptive_batch<T>::check_variational(const char *fname) const
 // Helper to fetch the stepper function from m_llvm_state.
 // NOTE: this is exactly identical to the scalar integrator code.
 // Should we write a separate common helper for this at one point?
-template <typename T>
+template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 {
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
@@ -2606,7 +2600,7 @@ void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<expression> &taylor_adaptive_batch<T>::get_vargs() const
 {
     check_variational(__func__);
@@ -2614,7 +2608,7 @@ const std::vector<expression> &taylor_adaptive_batch<T>::get_vargs() const
     return std::get<1>(m_i_data->m_vsys).get_vargs();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::uint32_t taylor_adaptive_batch<T>::get_vorder() const
 {
     check_variational(__func__);
@@ -2622,7 +2616,7 @@ std::uint32_t taylor_adaptive_batch<T>::get_vorder() const
     return std::get<1>(m_i_data->m_vsys).get_order();
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t s)
 {
     check_variational("eval_taylor_map");
@@ -2681,13 +2675,13 @@ const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t 
     return vsys_data.m_tm_output;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map(std::initializer_list<T> il)
 {
     return eval_taylor_map(std::ranges::subrange(il.begin(), il.end()));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
 {
     check_variational(__func__);
@@ -2696,7 +2690,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
     return m_i_data->m_vsys_data->m_tm_output;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t order) const
 {
     check_variational(__func__);
@@ -2711,7 +2705,7 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std
     };
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t component,
                                                                              std::uint32_t order) const
 {
@@ -2727,7 +2721,7 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std
     };
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const dtens::sv_idx_t &taylor_adaptive_batch<T>::get_mindex(std::uint32_t i) const
 {
     check_variational(__func__);
@@ -2748,7 +2742,12 @@ const dtens::sv_idx_t &taylor_adaptive_batch<T>::get_mindex(std::uint32_t i) con
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

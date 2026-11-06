@@ -50,6 +50,12 @@ The :cpp:class:`expression` class
                      explicit expression(mppp::real128 x) noexcept
                      explicit expression(mppp::real x)
 
+      .. note::
+
+         The ``long double`` and :cpp:class:`mppp::real128` overloads are available only on some platforms (see
+         :c:macro:`HEYOKA_HAVE_LONG_DOUBLE`, :c:macro:`HEYOKA_HAVE_REAL128` and the
+         :ref:`installation instructions <ep_support>`).
+
       Constructors from floating-point objects.
 
       These constructors initialise the expression to a floating-point :ref:`number <api_number>` with the input value *x*.
@@ -178,3 +184,9 @@ User-defined literals
                   expression literals::operator""_ldbl(long double)
                   expression literals::operator""_ldbl(unsigned long long)
                   template <char... Chars> expression literals::operator""_f128()
+
+   .. note::
+
+      The ``_ldbl`` and ``_f128`` literals are available only on some platforms (see
+      :c:macro:`HEYOKA_HAVE_LONG_DOUBLE`, :c:macro:`HEYOKA_HAVE_REAL128` and the
+      :ref:`installation instructions <ep_support>`).

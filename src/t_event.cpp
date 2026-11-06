@@ -128,92 +128,41 @@ T t_event_impl<T, B>::get_cooldown() const
     return cooldown;
 }
 
-namespace
-{
-
 // Implementation of stream insertion for the terminal event class.
-template <typename C, typename T>
-std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
-                                       const T &cooldown)
+template <typename T, bool B>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &ev)
 {
     os << "C++ datatype   : " << boost::core::demangle(typeid(T).name()) << '\n';
     os << "Event type     : terminal\n";
-    os << "Event equation : " << eq << '\n';
-    os << "Event direction: " << dir << '\n';
-    os << "With callback  : " << (callback ? "yes" : "no") << '\n';
-    os << "Cooldown       : " << (cooldown < 0 ? "auto" : fp_to_string(cooldown)) << '\n';
+    os << "Event equation : " << ev.get_expression() << '\n';
+    os << "Event direction: " << ev.get_direction() << '\n';
+    os << "With callback  : " << (ev.get_callback() ? "yes" : "no") << '\n';
+    os << "Cooldown       : " << (ev.get_cooldown() < 0 ? "auto" : fp_to_string(ev.get_cooldown())) << '\n';
 
     return os;
 }
 
-} // namespace
+// Explicit instantiations.
+#define HEYOKA_T_EVENT_INST_SCALAR(F)                                                                                  \
+    template class HEYOKA_DLL_PUBLIC t_event_impl<F, false>;                                                           \
+    template HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<F, false> &);
 
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<float, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<float, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<double, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-#endif
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-// Explicit instantiation.
-#define HEYOKA_T_EVENT_INST(F)                                                                                         \
+#define HEYOKA_T_EVENT_INST_BATCH(F)                                                                                   \
     template class HEYOKA_DLL_PUBLIC t_event_impl<F, true>;                                                            \
-    template class HEYOKA_DLL_PUBLIC t_event_impl<F, false>;
+    template HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<F, true> &);
+
+#define HEYOKA_T_EVENT_INST(F)                                                                                         \
+    HEYOKA_T_EVENT_INST_SCALAR(F)                                                                                      \
+    HEYOKA_T_EVENT_INST_BATCH(F)
 
 HEYOKA_T_EVENT_INST(float)
 HEYOKA_T_EVENT_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_T_EVENT_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -221,8 +170,10 @@ HEYOKA_T_EVENT_INST(mppp::real128)
 
 #endif
 
-template class HEYOKA_DLL_PUBLIC t_event_impl<mppp::real, false>;
+HEYOKA_T_EVENT_INST_SCALAR(mppp::real)
 
+#undef HEYOKA_T_EVENT_INST_SCALAR
+#undef HEYOKA_T_EVENT_INST_BATCH
 #undef HEYOKA_T_EVENT_INST
 
 } // namespace detail

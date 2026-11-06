@@ -466,7 +466,12 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
 
 HEYOKA_FIND_REAL_POLY_ROOTS_INST(float);
 HEYOKA_FIND_REAL_POLY_ROOTS_INST(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_FIND_REAL_POLY_ROOTS_INST(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

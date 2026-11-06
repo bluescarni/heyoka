@@ -43,7 +43,12 @@ void ed_jit_data<T>::load(boost::archive::binary_iarchive &ia, unsigned)
 // Explicit instantiations.
 template struct ed_jit_data<float>;
 template struct ed_jit_data<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template struct ed_jit_data<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

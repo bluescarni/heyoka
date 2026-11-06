@@ -81,7 +81,12 @@ vector_cache<T>::~vector_cache() = default;
 // Explicit instantiations.
 template class vector_cache<float>;
 template class vector_cache<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template class vector_cache<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -183,7 +188,12 @@ std::span<T> cached_vector<T>::get_span()
 // Explicit instantiations.
 template class cached_vector<float>;
 template class cached_vector<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template class cached_vector<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

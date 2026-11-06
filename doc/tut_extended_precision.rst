@@ -15,6 +15,9 @@ computations are supported either via the ``long double`` type (e.g., on 64-bit 
 (provided that the platform supports the nonstandard ``__float128`` floating-point type and that the mp++ library was compiled
 with support for :cpp:class:`mppp::real128` - see the :ref:`installation instructions <ep_support>`).
 
+Whether ``long double`` and :cpp:class:`mppp::real128` are supported on the current platform can be checked at
+compile time via the :c:macro:`HEYOKA_HAVE_LONG_DOUBLE` and :c:macro:`HEYOKA_HAVE_REAL128` definitions.
+
 A simple example
 ----------------
 

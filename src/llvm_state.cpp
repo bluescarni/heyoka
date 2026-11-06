@@ -45,6 +45,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/predef/architecture/arm.h>
+#include <boost/predef/architecture/ppc.h>
 #include <boost/predef/architecture/x86.h>
 #include <boost/predef/os/macos.h>
 #include <boost/predef/os/windows.h>
@@ -328,7 +329,7 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
         code_model::tiny,
 #endif
         code_model::small, code_model::large
-#elif defined(HEYOKA_ARCH_PPC)
+#elif BOOST_ARCH_PPC
         code_model::small, code_model::medium, code_model::large
 #else
         // NOTE: by default we assume only small and large are supported.
@@ -647,11 +648,15 @@ std::uint32_t recommended_simd_size<double>()
     return detail::get_target_features().simd_size_dbl;
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 std::uint32_t recommended_simd_size<long double>()
 {
     return detail::get_target_features().simd_size_ldbl;
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

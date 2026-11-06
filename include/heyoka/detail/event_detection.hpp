@@ -47,8 +47,12 @@ float taylor_deduce_cooldown(float, float);
 template <>
 double taylor_deduce_cooldown(double, double);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 long double taylor_deduce_cooldown(long double, long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

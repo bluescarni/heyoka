@@ -686,7 +686,12 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
 
 HEYOKA_ISOLATE_REAL_ROOTS_INST(float);
 HEYOKA_ISOLATE_REAL_ROOTS_INST(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_ISOLATE_REAL_ROOTS_INST(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

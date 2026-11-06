@@ -95,7 +95,12 @@ HEYOKA_DLL_PUBLIC expression gte(expression, expression);
 
 HEYOKA_DECLARE_REL_OVERLOADS(float);
 HEYOKA_DECLARE_REL_OVERLOADS(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DECLARE_REL_OVERLOADS(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

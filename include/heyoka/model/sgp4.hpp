@@ -26,7 +26,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -131,8 +130,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
 
         return std::make_tuple(std::move(sat_buffer), std::move(cf_init), std::move(cf_prop), std::move(funcs.dt));
     }
-    struct ptag {
-    };
+    struct ptag {};
     explicit sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, cfunc<T>, std::optional<dtens>>);
 
     HEYOKA_DLL_LOCAL void check_with_diff(const char *) const;
@@ -214,10 +212,6 @@ public:
     void operator()(out_3d, in_2d<T>) const;
     void operator()(out_3d, in_2d<date>) const;
 };
-
-// Prevent implicit instantiations.
-extern template class sgp4_propagator<float>;
-extern template class sgp4_propagator<double>;
 
 // Helpers to convert between UTC and TAI Julian dates.
 HEYOKA_DLL_PUBLIC std::pair<double, double> jd_utc_to_tai(double, double);

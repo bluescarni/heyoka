@@ -20,6 +20,8 @@
 #cmakedefine HEYOKA_WITH_SLEEF
 #cmakedefine HEYOKA_BUILD_STATIC_LIBRARY
 
+#include <cfloat>
+
 #include <boost/predef/compiler/clang.h>
 #include <boost/predef/compiler/gcc.h>
 #include <boost/predef/compiler/visualc.h>
@@ -51,21 +53,7 @@
 
 #endif
 
-// NOTE: handy Boost library for this since 1.73:
-// https://www.boost.org/doc/libs/1_73_0/libs/predef/doc/index.html
-//
-// NOTE: it makes sense here to handle only the GCC/MSVC macros here
-// (on the assumption that clang is identical to GCC in this respect).
-// No point in using macros provided by compilers we do not test on.
-#if defined(_ARCH_PPC) || defined(_M_PPC)
-
-#define HEYOKA_ARCH_PPC
-
-#endif
-
-// Setup of the ABI versioning and tagging
-// machinery.
-
+// Setup of the ABI versioning and tagging machinery.
 #if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #define HEYOKA_ABI_TAG_ATTR __attribute__((abi_tag))
@@ -89,7 +77,9 @@
 // clang-format on
 
 // C++20 constinit.
+//
 // NOTE: this seems to be buggy currently on MSVC:
+//
 // https://github.com/bluescarni/mppp/issues/291
 #if !BOOST_COMP_MSVC
 
@@ -112,6 +102,20 @@
 #else
 
 #define HEYOKA_NO_DANGLING
+
+#endif
+
+// Detect if long double is supported in heyoka. The current approach is a whitelist where we are trying to detect if
+// long double is either:
+//
+// - IEEE double-precision (e.g., on MSVC), or
+// - x86 80-bit extended precision, or
+// - IEEE quadruple-precision (e.g., aarch64 linux).
+//
+// In particular, the IBM double-double format (PowerPC) is excluded.
+#if FLT_RADIX == 2 && (LDBL_MANT_DIG == 53 || LDBL_MANT_DIG == 64 || LDBL_MANT_DIG == 113)
+
+#define HEYOKA_HAVE_LONG_DOUBLE
 
 #endif
 

@@ -193,7 +193,12 @@ template <typename T>
 
 HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(float);
 HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

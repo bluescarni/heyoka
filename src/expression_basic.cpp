@@ -70,7 +70,11 @@ expression::expression(float x) noexcept : expression(number{x}) {}
 
 expression::expression(double x) noexcept : expression(number{x}) {}
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 expression::expression(long double x) noexcept : expression(number{x}) {}
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -205,6 +209,8 @@ expression operator""_dbl(unsigned long long n)
     return expression{static_cast<double>(n)};
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 expression operator""_ldbl(long double x)
 {
     return expression{x};
@@ -214,6 +220,8 @@ expression operator""_ldbl(unsigned long long n)
 {
     return expression{static_cast<long double>(n)};
 }
+
+#endif
 
 expression operator""_var(const char *s, std::size_t n)
 {

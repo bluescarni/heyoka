@@ -60,7 +60,11 @@ std::uint32_t uname_to_index(const std::string &s)
 template <typename T>
 std::string fp_to_string(const T &x)
 {
-    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+                  || std::is_same_v<T, long double>
+#endif
+    ) {
         return fmt::format("{}", x);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
@@ -76,7 +80,12 @@ std::string fp_to_string(const T &x)
 // Explicit instantiations.
 template HEYOKA_DLL_PUBLIC std::string fp_to_string<float>(const float &);
 template HEYOKA_DLL_PUBLIC std::string fp_to_string<double>(const double &);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template HEYOKA_DLL_PUBLIC std::string fp_to_string<long double>(const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

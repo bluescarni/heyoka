@@ -23,10 +23,17 @@ Macros and definitions
    This definition expands to an integral literal corresponding to heyoka's patch version number (e.g.,
    for version 1.2.3, this macro expands to ``3``).
 
+.. c:macro:: HEYOKA_HAVE_LONG_DOUBLE
+
+   .. versionadded:: 7.14.0
+
+   This name is defined if heyoka supports the C++ builtin ``long double`` type (see the
+   :ref:`installation instructions <ep_support>`).
+
 .. c:macro:: HEYOKA_HAVE_REAL128
 
-    This name is defined if heyoka was built with support for the :cpp:class:`~mppp::real128` class from
-    the mp++ library (see the :ref:`installation instructions <installation>`).
+   This name is defined if heyoka was built with support for the :cpp:class:`~mppp::real128` class from
+   the mp++ library (see the :ref:`installation instructions <installation>`).
 
 .. c:macro:: HEYOKA_WITH_SLEEF
 

@@ -822,7 +822,12 @@ expression kepE(expression e, expression M)
 
 HEYOKA_DEFINE_KEPE_OVERLOADS(float)
 HEYOKA_DEFINE_KEPE_OVERLOADS(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DEFINE_KEPE_OVERLOADS(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

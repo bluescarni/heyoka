@@ -1442,7 +1442,11 @@ template HEYOKA_DLL_PUBLIC float taylor_default_max_delta_t<float>();
 
 template HEYOKA_DLL_PUBLIC double taylor_default_max_delta_t<double>();
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template HEYOKA_DLL_PUBLIC long double taylor_default_max_delta_t<long double>();
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

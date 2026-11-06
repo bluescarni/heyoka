@@ -55,6 +55,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/taylor.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -64,7 +65,7 @@ HEYOKA_BEGIN_NAMESPACE
 // of continuous output. We now have the llvm_state cache ameliorating the issue,
 // but maybe we could consider another cache specific to the continuous output
 // to further improve performance especially for short-term integrations.
-template <typename T>
+template <supported_fp_type T>
 void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -299,15 +300,15 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
 }
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T>::continuous_output() = default;
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T>::continuous_output(llvm_state &&s) : m_llvm_state(std::move(s))
 {
 }
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T>::continuous_output(const continuous_output &o)
     : m_llvm_state(o.m_llvm_state), m_tcs(o.m_tcs), m_times_hi(o.m_times_hi), m_times_lo(o.m_times_lo),
       m_output(o.m_output)
@@ -319,13 +320,13 @@ continuous_output<T>::continuous_output(const continuous_output &o)
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T>::continuous_output(continuous_output &&) noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T>::~continuous_output() = default;
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T> &continuous_output<T>::operator=(const continuous_output &o)
 {
     if (this != &o) {
@@ -335,12 +336,12 @@ continuous_output<T> &continuous_output<T>::operator=(const continuous_output &o
     return *this;
 }
 
-template <typename T>
+template <supported_fp_type T>
 continuous_output<T> &continuous_output<T>::operator=(continuous_output &&) noexcept = default;
 
 // NOTE: pass by copy so that we are sure t does not
 // alias other data.
-template <typename T>
+template <supported_fp_type T>
 void continuous_output<T>::call_impl(T t)
 {
     using std::isfinite;
@@ -390,38 +391,38 @@ void continuous_output<T>::call_impl(T t)
     m_f_ptr(m_output.data(), &t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
 }
 
-template <typename T>
+template <supported_fp_type T>
 const llvm_state &continuous_output<T>::get_llvm_state() const
 {
     return m_llvm_state;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &continuous_output<T>::operator()(T tm)
 {
     call_impl(std::move(tm));
     return m_output;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &continuous_output<T>::get_output() const
 {
     return m_output;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &continuous_output<T>::get_times() const
 {
     return m_times_hi;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &continuous_output<T>::get_tcs() const
 {
     return m_tcs;
 }
 
-template <typename T>
+template <supported_fp_type T>
 void continuous_output<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_llvm_state;
@@ -431,7 +432,7 @@ void continuous_output<T>::save(boost::archive::binary_oarchive &ar, unsigned) c
     ar << m_output;
 }
 
-template <typename T>
+template <supported_fp_type T>
 void continuous_output<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_llvm_state;
@@ -449,7 +450,7 @@ void continuous_output<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::pair<T, T> continuous_output<T>::get_bounds() const
 {
     if (m_f_ptr == nullptr) {
@@ -459,7 +460,7 @@ std::pair<T, T> continuous_output<T>::get_bounds() const
     return {m_times_hi[0], m_times_hi.back()};
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::size_t continuous_output<T>::get_n_steps() const
 {
     if (m_f_ptr == nullptr) {
@@ -469,24 +470,8 @@ std::size_t continuous_output<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() - 1u);
 }
 
-// Explicit instantiations.
-template class HEYOKA_DLL_PUBLIC continuous_output<float>;
-template class HEYOKA_DLL_PUBLIC continuous_output<double>;
-template class HEYOKA_DLL_PUBLIC continuous_output<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real128>;
-
-#endif
-
-template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real>;
-
-namespace detail
-{
-
 template <typename T>
-std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co)
+std::ostream &operator<<(std::ostream &os, const continuous_output<T> &co)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -506,8 +491,10 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
         const auto dir = df_t_start <= df_t_end;
         oss << "Direction   : " << (dir ? "forward" : "backward") << '\n';
         oss << "Time range  : "
-            << (dir ? fmt::format("[{}, {})", fp_to_string(co.m_times_hi[0]), fp_to_string(co.m_times_hi.back()))
-                    : fmt::format("({}, {}]", fp_to_string(co.m_times_hi.back()), fp_to_string(co.m_times_hi[0])))
+            << (dir ? fmt::format("[{}, {})", detail::fp_to_string(co.m_times_hi[0]),
+                                  detail::fp_to_string(co.m_times_hi.back()))
+                    : fmt::format("({}, {}]", detail::fp_to_string(co.m_times_hi.back()),
+                                  detail::fp_to_string(co.m_times_hi[0])))
             << '\n';
         oss << "N of steps  : " << (co.m_times_hi.size() - 1u) << '\n';
     }
@@ -515,41 +502,29 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
     return os << oss.str();
 }
 
-} // namespace detail
+// Explicit instantiations.
+#define HEYOKA_C_OUTPUT_INST(F)                                                                                        \
+    template class HEYOKA_DLL_PUBLIC continuous_output<F>;                                                             \
+    template HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<F> &);
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output<float> &co)
-{
-    return detail::c_out_stream_impl(os, co);
-}
+HEYOKA_C_OUTPUT_INST(float)
+HEYOKA_C_OUTPUT_INST(double)
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output<double> &co)
-{
-    return detail::c_out_stream_impl(os, co);
-}
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output<long double> &co)
-{
-    return detail::c_out_stream_impl(os, co);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real128> &co)
-{
-    return detail::c_out_stream_impl(os, co);
-}
+HEYOKA_C_OUTPUT_INST(long double)
 
 #endif
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real> &co)
-{
-    return detail::c_out_stream_impl(os, co);
-}
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_C_OUTPUT_INST(mppp::real128)
+
+#endif
+
+HEYOKA_C_OUTPUT_INST(mppp::real)
+
+#undef HEYOKA_C_OUTPUT_INST
 
 HEYOKA_END_NAMESPACE
 
@@ -580,7 +555,7 @@ HEYOKA_DLL_PUBLIC void heyoka_continuous_output_batch_tc_idx_debug(const std::ui
 HEYOKA_BEGIN_NAMESPACE
 
 // Continuous output for the batch integrator.
-template <typename T>
+template <supported_batch_fp_type T>
 void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
     // Overflow check: we want to be able to index into the arrays of
@@ -973,15 +948,15 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T>::continuous_output_batch() = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T>::continuous_output_batch(llvm_state &&s) : m_llvm_state(std::move(s))
 {
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T>::continuous_output_batch(const continuous_output_batch &o)
     : m_batch_size(o.m_batch_size), m_llvm_state(o.m_llvm_state), m_tcs(o.m_tcs), m_times_hi(o.m_times_hi),
       m_times_lo(o.m_times_lo), m_output(o.m_output), m_tmp_tm(o.m_tmp_tm)
@@ -993,13 +968,13 @@ continuous_output_batch<T>::continuous_output_batch(const continuous_output_batc
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T>::continuous_output_batch(continuous_output_batch &&) noexcept = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T>::~continuous_output_batch() = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T> &continuous_output_batch<T>::operator=(const continuous_output_batch &o)
 {
     if (this != &o) {
@@ -1009,10 +984,10 @@ continuous_output_batch<T> &continuous_output_batch<T>::operator=(const continuo
     return *this;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 continuous_output_batch<T> &continuous_output_batch<T>::operator=(continuous_output_batch &&) noexcept = default;
 
-template <typename T>
+template <supported_batch_fp_type T>
 void continuous_output_batch<T>::call_impl(const T *t)
 {
     using std::isfinite;
@@ -1058,7 +1033,7 @@ void continuous_output_batch<T>::call_impl(const T *t)
     m_f_ptr(m_output.data(), m_tmp_tm.data(), m_tcs.data(), m_times_hi.data(), m_times_lo.data());
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T> &tm)
 {
     if (m_f_ptr == nullptr) {
@@ -1076,7 +1051,7 @@ const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T
 }
 
 // NOTE: there's some overlap with the call_impl() code here.
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
 {
     using std::isfinite;
@@ -1120,20 +1095,20 @@ const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
     return m_output;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const llvm_state &continuous_output_batch<T>::get_llvm_state() const
 {
     return m_llvm_state;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::operator()(const T *tm)
 {
     call_impl(tm);
     return m_output;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::get_output() const
 {
     return m_output;
@@ -1141,25 +1116,25 @@ const std::vector<T> &continuous_output_batch<T>::get_output() const
 
 // NOTE: when documenting this function,
 // we need to warn about the padding.
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::get_times() const
 {
     return m_times_hi;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 const std::vector<T> &continuous_output_batch<T>::get_tcs() const
 {
     return m_tcs;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::uint32_t continuous_output_batch<T>::get_batch_size() const
 {
     return m_batch_size;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void continuous_output_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_batch_size;
@@ -1171,7 +1146,7 @@ void continuous_output_batch<T>::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_tmp_tm;
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 void continuous_output_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_batch_size;
@@ -1191,7 +1166,7 @@ void continuous_output_batch<T>::load(boost::archive::binary_iarchive &ar, unsig
     }
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::pair<std::vector<T>, std::vector<T>> continuous_output_batch<T>::get_bounds() const
 {
     if (m_f_ptr == nullptr) {
@@ -1211,7 +1186,7 @@ std::pair<std::vector<T>, std::vector<T>> continuous_output_batch<T>::get_bounds
     return std::make_pair(std::move(lb), std::move(ub));
 }
 
-template <typename T>
+template <supported_batch_fp_type T>
 std::size_t continuous_output_batch<T>::get_n_steps() const
 {
     if (m_f_ptr == nullptr) {
@@ -1222,22 +1197,8 @@ std::size_t continuous_output_batch<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() / m_batch_size - 2u);
 }
 
-// Explicit instantiations.
-template class HEYOKA_DLL_PUBLIC continuous_output_batch<float>;
-template class HEYOKA_DLL_PUBLIC continuous_output_batch<double>;
-template class HEYOKA_DLL_PUBLIC continuous_output_batch<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template class HEYOKA_DLL_PUBLIC continuous_output_batch<mppp::real128>;
-
-#endif
-
-namespace detail
-{
-
 template <typename T>
-std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_batch<T> &co)
+std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &co)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -1275,8 +1236,10 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
             const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
                          co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
-            oss << (dir ? fmt::format("[{}, {})", fp_to_string(df_t_start.hi), fp_to_string(df_t_end.hi))
-                        : fmt::format("({}, {}]", fp_to_string(df_t_end.hi), fp_to_string(df_t_start.hi)));
+            oss << (dir ? fmt::format("[{}, {})", detail::fp_to_string(df_t_start.hi),
+                                      detail::fp_to_string(df_t_end.hi))
+                        : fmt::format("({}, {}]", detail::fp_to_string(df_t_end.hi),
+                                      detail::fp_to_string(df_t_start.hi)));
 
             if (i != batch_size - 1u) {
                 oss << ", ";
@@ -1290,34 +1253,26 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
     return os << oss.str();
 }
 
-} // namespace detail
+// Explicit instantiations.
+#define HEYOKA_C_OUTPUT_BATCH_INST(F)                                                                                  \
+    template class HEYOKA_DLL_PUBLIC continuous_output_batch<F>;                                                       \
+    template HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<F> &);
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output_batch<float> &co)
-{
-    return detail::c_out_batch_stream_impl(os, co);
-}
+HEYOKA_C_OUTPUT_BATCH_INST(float)
+HEYOKA_C_OUTPUT_BATCH_INST(double)
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output_batch<double> &co)
-{
-    return detail::c_out_batch_stream_impl(os, co);
-}
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output_batch<long double> &co)
-{
-    return detail::c_out_batch_stream_impl(os, co);
-}
+HEYOKA_C_OUTPUT_BATCH_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template <>
-std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::real128> &co)
-{
-    return detail::c_out_batch_stream_impl(os, co);
-}
+HEYOKA_C_OUTPUT_BATCH_INST(mppp::real128)
 
 #endif
+
+#undef HEYOKA_C_OUTPUT_BATCH_INST
 
 HEYOKA_END_NAMESPACE

@@ -99,7 +99,12 @@ frpr_workspace<T>::~frpr_workspace() = default;
 
 HEYOKA_FRPR_WORKSPACE_INST(float);
 HEYOKA_FRPR_WORKSPACE_INST(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_FRPR_WORKSPACE_INST(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

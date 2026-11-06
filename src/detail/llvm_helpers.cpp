@@ -116,7 +116,10 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, const llvm::Type *const t
     // (which I don't think is currently possible) then the
     // comparison to tp will fail as tp is not null.
     return tp == to_external_llvm_type<float>(context, false) || tp == to_external_llvm_type<double>(context, false)
-           || tp == to_external_llvm_type<long double>(context, false);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+           || tp == to_external_llvm_type<long double>(context, false)
+#endif
+        ;
 }
 
 // Helper to lookup/insert the declaration of an LLVM intrinsic into a module.
@@ -513,9 +516,13 @@ std::optional<std::string> get_cmath_func_suffix(llvm_state &s, const llvm::Type
         return "";
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     if (scal_t == to_external_llvm_type<long double>(context, false)) {
         return "l";
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

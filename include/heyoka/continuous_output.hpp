@@ -9,47 +9,29 @@
 #ifndef HEYOKA_CONTINUOUS_OUTPUT_HPP
 #define HEYOKA_CONTINUOUS_OUTPUT_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
 #include <utility>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
-#include <mp++/real.hpp>
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace detail
-{
-
 template <typename T>
-std::ostream &c_out_stream_impl(std::ostream &, const continuous_output<T> &);
+std::ostream &operator<<(std::ostream &, const continuous_output<T> &);
 
-} // namespace detail
-
-template <typename T>
+template <supported_fp_type T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output
 {
-    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
-
-    template <typename>
-    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
-
-    friend std::ostream &detail::c_out_stream_impl<T>(std::ostream &, const continuous_output<T> &);
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive<T>;
+    friend std::ostream &operator<< <T>(std::ostream &, const continuous_output<T> &);
 
     llvm_state m_llvm_state;
     std::vector<T> m_tcs;
@@ -88,63 +70,14 @@ public:
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
-// Prevent implicit instantiations.
-extern template class continuous_output<float>;
-extern template class continuous_output<double>;
-extern template class continuous_output<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-extern template class continuous_output<mppp::real128>;
-
-#endif
-
-extern template class continuous_output<mppp::real>;
-
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const continuous_output<T> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
+std::ostream &operator<<(std::ostream &, const continuous_output_batch<T> &);
 
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<float> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<double> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real128> &);
-
-#endif
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real> &);
-
-namespace detail
-{
-
-template <typename T>
-std::ostream &c_out_batch_stream_impl(std::ostream &, const continuous_output_batch<T> &);
-
-} // namespace detail
-
-template <typename T>
+template <supported_batch_fp_type T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch
 {
-    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
-
-    template <typename>
-    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
-
-    friend std::ostream &detail::c_out_batch_stream_impl<T>(std::ostream &, const continuous_output_batch<T> &);
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch<T>;
+    friend std::ostream &operator<< <T>(std::ostream &, const continuous_output_batch<T> &);
 
     std::uint32_t m_batch_size = 0;
     llvm_state m_llvm_state;
@@ -181,8 +114,7 @@ public:
     const std::vector<T> &operator()(T);
 
     [[nodiscard]] const std::vector<T> &get_output() const;
-    // NOTE: when documenting this function,
-    // we need to warn about the padding.
+    // NOTE: when documenting this function, we need to warn about the padding.
     [[nodiscard]] const std::vector<T> &get_times() const;
     [[nodiscard]] const std::vector<T> &get_tcs() const;
     [[nodiscard]] std::uint32_t get_batch_size() const;
@@ -190,43 +122,6 @@ public:
     [[nodiscard]] std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
-
-// Prevent implicit instantiations.
-extern template class continuous_output_batch<float>;
-extern template class continuous_output_batch<double>;
-extern template class continuous_output_batch<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-extern template class continuous_output_batch<mppp::real128>;
-
-#endif
-
-extern template class continuous_output_batch<mppp::real>;
-
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<float> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<double> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<mppp::real128> &);
-
-#endif
 
 HEYOKA_END_NAMESPACE
 

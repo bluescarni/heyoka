@@ -22,6 +22,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -36,10 +37,10 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
     template <typename>
     friend struct detail::vsys_data;
 
-    template <typename>
+    template <supported_fp_type>
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
 
-    template <typename>
+    template <supported_batch_fp_type>
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
 
     struct impl;

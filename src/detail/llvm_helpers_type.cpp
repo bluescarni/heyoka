@@ -59,8 +59,7 @@ namespace detail
 namespace
 {
 
-// Helper to associate a C++ integral type
-// to an LLVM integral type.
+// Helper to associate a C++ integral type to an LLVM integral type.
 template <typename T>
 llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 {
@@ -73,6 +72,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 }
 
 // The global type map to associate a C++ type to an LLVM type.
+//
 // NOLINTNEXTLINE(cert-err58-cpp,bugprone-throwing-static-initialization)
 const auto type_map = [] {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
@@ -86,6 +86,8 @@ const auto type_map = [] {
     if (is_ieee754_binary64<double>) {
         retval[typeid(double)] = [](llvm::LLVMContext &c) { return llvm::Type::getDoubleTy(c); };
     }
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
     // Try to associate C++ long double to an LLVM fp type.
     if (is_ieee754_binary64<long double>) {
@@ -105,10 +107,11 @@ const auto type_map = [] {
         };
     }
 
+#endif
+
 #if defined(HEYOKA_HAVE_REAL128)
 
     // Associate mppp::real128 to fp128.
-    static_assert(is_ieee754_binary128<mppp::real128>);
     retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) { return llvm::Type::getFP128Ty(c); };
 
 #endif
@@ -347,7 +350,11 @@ template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<float>(llvm_state &
 
 template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<double>(llvm_state &, long long);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template HEYOKA_DLL_PUBLIC llvm::Type *to_internal_llvm_type<long double>(llvm_state &, long long);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -376,7 +383,11 @@ template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<float>(llvm_state
 
 template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<double>(llvm_state &, const double &);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template HEYOKA_DLL_PUBLIC llvm::Type *internal_llvm_type_like<long double>(llvm_state &, const long double &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
