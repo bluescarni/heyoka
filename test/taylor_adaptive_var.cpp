@@ -15,6 +15,12 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <mp++/real.hpp>
 
 #include <heyoka/expression.hpp>
@@ -271,6 +277,60 @@ TEST_CASE("auto ic setup")
         REQUIRE(std::ranges::all_of(ta.get_state(), [prec](const auto &r) { return r.get_prec() == prec; }));
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+// NOTE: this exercises the real128 specialisation of the factorial in vsys_data, which is used in the construction of
+// the Taylor map.
+TEST_CASE("real128 variational")
+{
+    using mppp::real128;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    // IC test.
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 2);
+
+        auto ta = taylor_adaptive{vsys, {real128{.2}, real128{.3}}, kw::tol = real128{1e-3}};
+
+        REQUIRE(ta.get_vargs() == std::vector{x, v});
+        REQUIRE(ta.get_state()[0] == real128{.2});
+        REQUIRE(ta.get_state()[1] == real128{.3});
+        REQUIRE(ta.get_state()[2] == 1);
+        REQUIRE(ta.get_state()[3] == 0);
+        REQUIRE(ta.get_state()[4] == 0);
+        REQUIRE(ta.get_state()[5] == 1);
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
+        REQUIRE(ta.get_vorder() == 2u);
+    }
+
+    // Check the Taylor map against a non-variational integration from perturbed initial conditions.
+    //
+    // NOTE: with deltas of order 1e-9 and a third-order Taylor map, the truncation error (~1e-36) is below the real128
+    // epsilon, while the second- and third-order terms (~1e-18 and ~1e-27) are not. Thus, an incorrect factorial
+    // in the denominators of these terms would be detected.
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 3);
+        auto ta = taylor_adaptive{vsys, {real128{.2}, real128{.3}}, kw::compact_mode = true};
+
+        const auto dx = real128{"1e-9"}, dv = real128{"2e-9"};
+        auto ta_nv = taylor_adaptive{orig_sys, {real128{.2} + dx, real128{.3} + dv}, kw::compact_mode = true};
+
+        ta.propagate_until(real128{3});
+        ta_nv.propagate_until(real128{3});
+
+        ta.eval_taylor_map({dx, dv});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+    }
+}
+
+#endif
 
 TEST_CASE("auto ic setup batch")
 {
