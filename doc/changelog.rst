@@ -48,6 +48,8 @@ Changes
 Fix
 ~~~
 
+- Fix incorrect indexing into memory buffers with :math:`2^{31}` or more elements in JIT-compiled code
+  (`#565 <https://github.com/bluescarni/heyoka/pull/565>`__).
 - Fix the relational ``neq()`` operator evaluating to false when one or both operands are NaN
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - Fix NaN values in the Taylor coefficients being silently ignored in the computation of the adaptive timestep
