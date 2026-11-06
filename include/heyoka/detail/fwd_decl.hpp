@@ -15,6 +15,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -29,10 +30,10 @@ class HEYOKA_DLL_PUBLIC param;
 class HEYOKA_DLL_PUBLIC llvm_state;
 class HEYOKA_DLL_PUBLIC llvm_multi_state;
 
-template <typename>
+template <supported_fp_type>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
 
-template <typename>
+template <supported_batch_fp_type>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
 
 namespace detail
@@ -48,10 +49,10 @@ class HEYOKA_DLL_PUBLIC [[nodiscard]] llvm_ival_guard;
 
 } // namespace detail
 
-template <typename>
+template <supported_fp_type>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output;
 
-template <typename>
+template <supported_batch_fp_type>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch;
 
 // Enum to represent the direction of an event.

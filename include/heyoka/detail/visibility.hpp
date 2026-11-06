@@ -9,10 +9,15 @@
 #ifndef HEYOKA_DETAIL_VISIBILITY_HPP
 #define HEYOKA_DETAIL_VISIBILITY_HPP
 
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/compiler/intel.h>
+#include <boost/predef/os/cygwin.h>
+#include <boost/predef/os/windows.h>
+
 #include <heyoka/config.hpp>
 
-// The visibility setup makes sense only for shared
-// library builds.
+// The visibility setup makes sense only for shared library builds.
 #if defined(HEYOKA_BUILD_STATIC_LIBRARY)
 
 #define HEYOKA_DLL_PUBLIC
@@ -21,14 +26,13 @@
 
 #else
 
-// Convenience macros for setting the visibility of entities
-// when building/using the shared library. Mostly inspired by:
+// Convenience macros for setting the visibility of entities when building/using the shared library. Mostly inspired by:
+//
 // https://gcc.gnu.org/wiki/Visibility
-// We check first for Windows, where we assume every compiler
-// knows dllexport/dllimport. On other platforms, we use the GCC-like
-// syntax for GCC, clang and ICC. Otherwise, we leave the definitions
-// empty.
-#if defined(_WIN32) || defined(__CYGWIN__)
+//
+// We check first for Windows, where we assume every compiler knows dllexport/dllimport. On other platforms, we use the
+// GCC-like syntax for GCC, clang and ICC. Otherwise, we leave the definitions empty.
+#if BOOST_OS_WINDOWS || BOOST_OS_CYGWIN
 
 #if defined(heyoka_EXPORTS)
 
@@ -42,7 +46,7 @@
 
 #define HEYOKA_DLL_LOCAL
 
-#elif defined(__clang__) || defined(__GNUC__) || defined(__INTEL_COMPILER)
+#elif BOOST_COMP_CLANG || BOOST_COMP_GNUC || BOOST_COMP_INTEL
 
 #define HEYOKA_DLL_PUBLIC __attribute__((visibility("default")))
 #define HEYOKA_DLL_LOCAL __attribute__((visibility("hidden")))
@@ -61,7 +65,7 @@
 // https://devblogs.microsoft.com/oldnewthing/20140109-00/?p=2123
 // Setting the visibility attribute on GCC-like compilers for inline classes, however, seems to be ok.
 // Thus, we use a specialised definition for marking "public"ly visible inline classes.
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if BOOST_OS_WINDOWS || BOOST_OS_CYGWIN
 
 #define HEYOKA_DLL_PUBLIC_INLINE_CLASS
 

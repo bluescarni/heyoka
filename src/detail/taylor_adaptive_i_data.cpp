@@ -217,8 +217,13 @@ taylor_adaptive_i_data<T>::~taylor_adaptive_i_data() = default;
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(float)
 // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -367,7 +372,12 @@ taylor_adaptive_batch_i_data<T>::~taylor_adaptive_batch_i_data() = default;
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

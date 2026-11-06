@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -75,7 +77,11 @@ TEST_CASE("basics")
 
     // Concept checking tests.
     REQUIRE(can_sh_gravity_pot<std::vector<std::array<double, 2>>>);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(can_sh_gravity_pot<std::vector<std::array<long double, 2>>>);
+#else
+    REQUIRE(!can_sh_gravity_pot<std::vector<std::array<long double, 2>>>);
+#endif
     REQUIRE(can_sh_gravity_pot<std::vector<std::array<float, 2>>>);
     REQUIRE(can_sh_gravity_pot<std::vector<std::array<const char *, 2>>>);
     REQUIRE(can_sh_gravity_pot<std::vector<std::array<std::string, 2>>>);

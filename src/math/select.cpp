@@ -295,7 +295,12 @@ expression select(expression cond, expression t, expression f)
 
 HEYOKA_DEFINE_SELECT_OVERLOADS(float)
 HEYOKA_DEFINE_SELECT_OVERLOADS(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DEFINE_SELECT_OVERLOADS(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

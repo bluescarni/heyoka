@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <array>
 #include <cassert>
 #include <concepts>
@@ -32,6 +31,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/compiler/visualc.h>
 
 #include <fmt/core.h>
 #include <fmt/ostream.h>
@@ -62,6 +62,7 @@
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/var_ode_sys.hpp>
 #include <heyoka/variable.hpp>
 
@@ -244,7 +245,7 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 
 // Small helper to construct a default value for the max_delta_t keyword argument.
 template <typename T>
-HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
+T taylor_default_max_delta_t();
 
 // Logic for parsing a step callback argument in a propagate_*() function.
 //
@@ -363,10 +364,9 @@ struct taylor_adaptive_i_data;
 
 } // namespace detail
 
-template <typename T>
+template <supported_fp_type T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
 {
-    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
     friend struct detail::taylor_adaptive_i_data<T>;
     using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
@@ -486,7 +486,7 @@ public:
     // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
     // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
@@ -497,7 +497,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -506,7 +506,7 @@ public:
     {
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -516,7 +516,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -679,38 +679,20 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, KwArgs &&...)
     -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, KwArgs &&...) -> taylor_adaptive<T>;
 
-// Prevent implicit instantiations.
-// NOLINTBEGIN
-#define HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(F)                                                                          \
-    extern template class detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                                         \
-    extern template class taylor_adaptive<F>;
-// NOLINTEND
-
-HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(float)
-HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(double)
-HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real128)
-
-#endif
-
-HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real)
-
-#undef HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST
+template <typename T>
+std::ostream &operator<<(std::ostream &, const taylor_adaptive<T> &);
 
 namespace detail
 {
@@ -786,10 +768,9 @@ struct taylor_adaptive_batch_i_data;
 
 } // namespace detail
 
-template <typename T>
+template <supported_batch_fp_type T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
 {
-    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend struct detail::taylor_adaptive_batch_i_data<T>;
 
 public:
@@ -907,7 +888,7 @@ public:
     // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
     // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
@@ -918,7 +899,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::uint32_t batch_size,
@@ -928,7 +909,7 @@ public:
     {
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
@@ -939,7 +920,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -1140,86 +1121,21 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, std::uint32_t,
                                KwArgs &&...) -> taylor_adaptive_batch<T>;
 
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, KwArgs &&...)
     -> taylor_adaptive_batch<T>;
 
-// Prevent implicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F) extern template class taylor_adaptive_batch<F>;
-
-HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(float)
-HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(double)
-HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real128)
-
-#endif
-
-HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real)
-
-#undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST
-
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<float> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<double> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real128> &);
-
-#endif
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real> &);
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<float> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<double> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<mppp::real128> &);
-
-#endif
+std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<T> &);
 
 namespace detail
 {
@@ -1258,11 +1174,17 @@ HEYOKA_END_NAMESPACE
 // Set the Boost s11n class version for taylor_adaptive and taylor_adaptive_batch.
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<float>, heyoka::detail::taylor_adaptive_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);
-BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
 
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<float>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
+
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<long double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1273,9 +1195,5 @@ BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real128>, heyoka::detail
 #endif
 
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_adaptive_s11n_version);
-
-// NOTE: this is not really necessary as the batch integrator cannot be used with real, but let's
-// just leave it for consistency.
-BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
 #endif

@@ -57,6 +57,18 @@ Whereas in heyoka single-precision and double-precision computations are always 
 ``float`` and ``double`` types respectively, support for extended-precision
 computations varies depending on the software/hardware platform.
 
+heyoka supports the C++ ``long double`` type only if it implements one of the following
+floating-point formats:
+
+* IEEE double precision (e.g., on MSVC, where ``long double`` thus provides no extra precision),
+* the 80-bit x86 extended-precision format,
+* IEEE quadruple precision.
+
+On platforms where ``long double`` uses a different format, heyoka disables ``long double``
+support altogether: :c:macro:`HEYOKA_HAVE_LONG_DOUBLE` is not defined, and the
+``long double`` versions of heyoka's classes and functions are not available (that is, using
+them results in a compilation error).
+
 80-bit precision
 ^^^^^^^^^^^^^^^^
 
@@ -86,7 +98,8 @@ via the :cpp:class:`mppp::real128` type.
 
    The non-IEEE ``long double`` type available on some PowerPC platforms
    (which implements a double-length floating-point representation with 106
-   significant bits) is **not** supported by heyoka at this time.
+   significant bits) is **not** supported by heyoka. On such platforms,
+   ``long double`` support is disabled (see above).
 
 Arbitrary-precision
 ^^^^^^^^^^^^^^^^^^^

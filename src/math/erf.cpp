@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -22,7 +21,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -127,8 +126,10 @@ number sqrt_pi_2_like(llvm_state &s, const llvm::Type *const tp)
         return number{std::sqrt(boost::math::constants::pi<float>()) / 2};
     } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{std::sqrt(boost::math::constants::pi<double>()) / 2};
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{std::sqrt(boost::math::constants::pi<long double>()) / 2};
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::sqrt(mppp::pi_128) / 2};

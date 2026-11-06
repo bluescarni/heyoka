@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cmath>
 
 #include <heyoka/expression.hpp>
@@ -37,6 +39,8 @@ TEST_CASE("basic")
         REQUIRE(E == .5 * pow("v"_var, 2_dbl) + (1. - cos("x"_var)));
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto dyn = model::pendulum(kw::gconst = .1l, kw::length = .3);
 
@@ -53,7 +57,10 @@ TEST_CASE("basic")
         REQUIRE(E == (.5 * .3 * .3) * pow("v"_var, 2_dbl) + (.1l * .3) * (1. - cos("x"_var)));
     }
 
+#endif
+
     {
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
         auto dyn = model::pendulum(kw::gconst = .1l, kw::length = par[0]);
 
         REQUIRE(dyn.size() == 2u);
@@ -63,6 +70,7 @@ TEST_CASE("basic")
 
         REQUIRE(dyn[1].first == "v"_var);
         REQUIRE(dyn[1].second == (-.1l / par[0]) * sin("x"_var));
+#endif
 
         auto E = model::pendulum_energy(kw::gconst = par[0], kw::length = .3);
 

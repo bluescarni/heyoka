@@ -73,7 +73,12 @@ HEYOKA_DLL_PUBLIC expression select(expression, expression, expression);
 
 HEYOKA_DECLARE_SELECT_OVERLOADS(float);
 HEYOKA_DECLARE_SELECT_OVERLOADS(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DECLARE_SELECT_OVERLOADS(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

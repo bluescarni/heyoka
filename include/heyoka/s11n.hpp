@@ -11,11 +11,14 @@
 
 #include <optional>
 
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/version_number.h>
+
 // NOTE: workaround for a GCC bug when including the Boost.Serialization
 // support for std::shared_ptr:
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84075
 
-#if defined(__GNUC__) && __GNUC__ >= 7
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(7, 0, 0)
 
 namespace boost::serialization
 {

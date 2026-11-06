@@ -219,7 +219,12 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
 
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(float)
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_INST_SETUP_VARIATIONAL_ICS(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

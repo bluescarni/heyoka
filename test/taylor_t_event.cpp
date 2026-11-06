@@ -43,17 +43,6 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // Test for an event triggering exactly at the end of a timestep.
 TEST_CASE("linear box")
 {
@@ -222,7 +211,7 @@ TEST_CASE("taylor te")
         tuple_for_each(btup, inner);
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("taylor te basic")
@@ -356,10 +345,10 @@ TEST_CASE("taylor te basic")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -415,10 +404,10 @@ TEST_CASE("taylor te identical")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -487,10 +476,10 @@ TEST_CASE("taylor te close")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -540,10 +529,10 @@ TEST_CASE("taylor te retrigger")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -644,10 +633,10 @@ TEST_CASE("taylor te dir")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -685,10 +674,10 @@ TEST_CASE("taylor te custom cooldown")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -736,10 +725,10 @@ TEST_CASE("taylor te propagate_for")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -801,10 +790,10 @@ TEST_CASE("taylor te propagate_grid")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -1007,10 +996,10 @@ TEST_CASE("taylor te boolean callback")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }
@@ -1056,7 +1045,12 @@ private:
 
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<float> &, int)
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<double> &, int)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, false, bool, taylor_adaptive<long double> &, int)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1124,7 +1118,7 @@ TEST_CASE("t s11n")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("te def ctor")
@@ -1192,5 +1186,5 @@ TEST_CASE("te open range")
         REQUIRE(h > 0);
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }

@@ -51,7 +51,6 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/ranges_to.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
@@ -60,6 +59,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -87,7 +87,9 @@ public:
 
     explicit expression(float) noexcept;
     explicit expression(double) noexcept;
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     explicit expression(long double) noexcept;
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     explicit expression(mppp::real128) noexcept;
 #endif
@@ -122,8 +124,10 @@ HEYOKA_DLL_PUBLIC expression operator""_flt(unsigned long long);
 HEYOKA_DLL_PUBLIC expression operator""_dbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -222,14 +226,18 @@ HEYOKA_DLL_PUBLIC expression operator-(const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real128);
 #endif
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression operator+(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(double, const expression &);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator+(long double, const expression &);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, const expression &);
 #endif
@@ -238,14 +246,18 @@ HEYOKA_DLL_PUBLIC expression operator+(mppp::real, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, double);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, float);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real128);
 #endif
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression operator-(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(double, const expression &);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator-(long double, const expression &);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, const expression &);
 #endif
@@ -254,14 +266,18 @@ HEYOKA_DLL_PUBLIC expression operator-(mppp::real, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, double);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, float);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real128);
 #endif
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression operator*(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(double, const expression &);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator*(long double, const expression &);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, const expression &);
 #endif
@@ -270,14 +286,18 @@ HEYOKA_DLL_PUBLIC expression operator*(mppp::real, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real128);
 #endif
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression operator/(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(double, const expression &);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression operator/(long double, const expression &);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, const expression &);
 #endif
@@ -286,7 +306,9 @@ HEYOKA_DLL_PUBLIC expression operator/(mppp::real, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
 #endif
@@ -295,7 +317,9 @@ HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
 #endif
@@ -304,7 +328,9 @@ HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
 #endif
@@ -313,7 +339,9 @@ HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 #endif
@@ -584,26 +612,6 @@ template <typename>
 std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
                                   const std::vector<expression> &, std::uint32_t, bool, long long, bool);
 
-// Prevent implicit instantiations.
-#define HEYOKA_CFUNC_EXTERN_INST(T)                                                                                    \
-    extern template std::vector<expression> add_cfunc<T>(                                                              \
-        llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
-        std::uint32_t, bool, long long, bool);
-
-HEYOKA_CFUNC_EXTERN_INST(float)
-HEYOKA_CFUNC_EXTERN_INST(double)
-HEYOKA_CFUNC_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_CFUNC_EXTERN_INST(mppp::real128)
-
-#endif
-
-HEYOKA_CFUNC_EXTERN_INST(mppp::real)
-
-#undef HEYOKA_CFUNC_EXTERN_INST
-
 // kwargs configuration for the common options of cfunc.
 //
 // NOTE: here we are making sure that we accept only builtin types for the kw_args. This makes the set of kw_args
@@ -645,7 +653,7 @@ inline constexpr auto add_cfunc_kw_cfg
 
 } // namespace detail
 
-template <typename T, typename... KwArgs>
+template <supported_fp_type T, typename... KwArgs>
     requires igor::validate<detail::add_cfunc_kw_cfg, KwArgs...>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
                                   const std::vector<expression> &vars, const KwArgs &...kw_args)
@@ -691,7 +699,7 @@ concept cfunc_in_range_1d = requires(R &r) {
 
 } // namespace detail
 
-template <typename T>
+template <supported_fp_type T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 {
     struct impl;
@@ -923,25 +931,6 @@ public:
 template <typename T>
 std::ostream &operator<<(std::ostream &, const cfunc<T> &);
 
-// Prevent implicit instantiations.
-#define HEYOKA_CFUNC_CLASS_EXTERN_INST(T)                                                                              \
-    extern template class cfunc<T>;                                                                                    \
-    extern template std::ostream &operator<<(std::ostream &, const cfunc<T> &);
-
-HEYOKA_CFUNC_CLASS_EXTERN_INST(float)
-HEYOKA_CFUNC_CLASS_EXTERN_INST(double)
-HEYOKA_CFUNC_CLASS_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real128)
-
-#endif
-
-HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
-
-#undef HEYOKA_CFUNC_CLASS_EXTERN_INST
-
 namespace detail
 {
 
@@ -959,7 +948,12 @@ HEYOKA_END_NAMESPACE
 // Set the Boost s11n class version for the cfunc class.
 BOOST_CLASS_VERSION(heyoka::cfunc<float>, heyoka::detail::cfunc_s11n_version);
 BOOST_CLASS_VERSION(heyoka::cfunc<double>, heyoka::detail::cfunc_s11n_version);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 BOOST_CLASS_VERSION(heyoka::cfunc<long double>, heyoka::detail::cfunc_s11n_version);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

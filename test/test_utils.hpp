@@ -33,6 +33,12 @@
 #include <xtensor/containers/xfixed.hpp>
 #include <xtensor/core/xshape.hpp>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <mp++/real.hpp>
 
 #include <heyoka/expression.hpp>
@@ -112,6 +118,18 @@ void tuple_for_each(Tuple &&tup, F &&f)
         },
         std::forward<Tuple>(tup));
 }
+
+// The fixed-precision floating-point types supported by heyoka.
+inline const auto fixed_fp_types = std::tuple<float, double
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+                                              ,
+                                              long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                              ,
+                                              mppp::real128
+#endif
+                                              >{};
 
 template <typename T>
 std::array<T, 3> cross(std::array<T, 3> a, std::array<T, 3> b)

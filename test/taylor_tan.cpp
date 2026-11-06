@@ -36,19 +36,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 TEST_CASE("ode test")
 {
     using std::abs;
@@ -156,7 +143,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(expression{number{fp_t{2}}}), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                                                   2,
@@ -182,7 +169,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(par[1]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                                                   2,
@@ -229,7 +216,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(expression{number{fp_t{2}}}), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                                                   2,
@@ -261,7 +248,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[5] + jet[7])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(expression{number{fp_t{2}}}), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
                                                   3,
@@ -307,7 +294,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(par[0]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
                                                   3,
@@ -354,7 +341,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = tan(expression{number{fp_t{2}}}), prime(y) = x + y}, opt_level,
                                        high_accuracy, compact_mode, rng, -10.f, 10.f);
@@ -379,7 +366,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[3] == approximately(tan(jet[0])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(y), prime(y) = tan(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
                                                   2,
@@ -425,7 +412,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * ((1 + jet[3] * jet[3]) * jet[2])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(y), prime(y) = tan(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
                                                   2,
@@ -457,7 +444,7 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (1 + jet[7] * jet[7]) * jet[5]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = tan(y), prime(y) = tan(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}},
                                                   3,
@@ -521,7 +508,7 @@ TEST_CASE("taylor tan")
                                         + (1 + jet[11] * jet[11]) * 2 * jet[14])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = tan(y), prime(y) = tan(x)}, opt_level, high_accuracy, compact_mode,
                                        rng, -10.f, 10.f);
@@ -530,10 +517,10 @@ TEST_CASE("taylor tan")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }

@@ -54,12 +54,12 @@
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/detail/vsys_data.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/taylor.hpp>
 
 // NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
@@ -159,13 +159,13 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
 } // namespace detail
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s)
     : m_i_data(std::make_unique<detail::taylor_adaptive_i_data<T>>(std::move(s)))
 {
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                             std::optional<T> time, std::optional<T> tol, const bool high_accuracy,
@@ -198,12 +198,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
     assert(!tol || *tol != 0);
-
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::is_same_v<T, long double>) {
-        throw not_implemented_error("'long double' computations are not supported on PowerPC");
-    }
-#endif
 
     using std::isfinite;
 
@@ -548,20 +542,20 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     m_vsys = std::move(vsys);
 }
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T>::taylor_adaptive() noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : base_t(static_cast<const base_t &>(other)),
       m_i_data(std::make_unique<detail::taylor_adaptive_i_data<T>>(*other.m_i_data))
 {
 }
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T>::taylor_adaptive(taylor_adaptive &&) noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T> &taylor_adaptive<T>::operator=(const taylor_adaptive &other)
 {
     if (this != &other) [[likely]] {
@@ -576,19 +570,19 @@ taylor_adaptive<T> &taylor_adaptive<T>::operator=(const taylor_adaptive &other)
     return *this;
 }
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T> &taylor_adaptive<T>::operator=(taylor_adaptive &&) noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 taylor_adaptive<T>::~taylor_adaptive() = default;
 
-template <typename T>
+template <supported_fp_type T>
 bool taylor_adaptive<T>::is_variational() const noexcept
 {
     return m_i_data->m_vsys.index() == 1u;
 }
 
-template <typename T>
+template <supported_fp_type T>
 // NOLINTNEXTLINE(bugprone-exception-escape)
 std::uint32_t taylor_adaptive<T>::get_n_orig_sv() const noexcept
 {
@@ -596,7 +590,7 @@ std::uint32_t taylor_adaptive<T>::get_n_orig_sv() const noexcept
 }
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
-template <typename T>
+template <supported_fp_type T>
 template <typename Archive>
 void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
@@ -604,7 +598,7 @@ void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
     ar << m_i_data;
 }
 
-template <typename T>
+template <supported_fp_type T>
 template <typename Archive>
 void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
 {
@@ -644,19 +638,19 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
 {
     save_impl(ar, v);
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
 
-template <typename T>
+template <supported_fp_type T>
 detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view name)
 {
     assert(m_i_data);
@@ -697,7 +691,7 @@ detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view na
 // - a timestep h == 0 will still result in m_last_h being updated (to zero) and the Taylor coefficients being recorded
 //   in the internal array (if wtc == true, or always in the presence of events). That is, h == 0 is not treated in any
 //   special way.
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
 {
     using std::abs;
@@ -1005,7 +999,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
     const auto bg = make_busy_guard("step");
@@ -1019,7 +1013,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
     const auto bg = make_busy_guard("step_backward");
@@ -1031,7 +1025,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 {
     using std::isnan;
@@ -1051,7 +1045,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 }
 
 // Reset all cooldowns for the terminal events.
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::reset_cooldowns()
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -1073,7 +1067,7 @@ void taylor_adaptive<T>::reset_cooldowns()
 //
 // The callback is always executed at the end of each timestep, unless a non-finite state was detected. The continuous
 // output is always updated at the end of each timestep, unless a non-finite state was detected.
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
 taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t max_steps, T max_delta_t,
                                          step_callback<T> cb, const bool wtc_, const bool with_c_out)
@@ -1367,7 +1361,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
 taylor_adaptive<T>::propagate_for_impl(T delta_t, std::size_t max_steps, T max_delta_t, step_callback<T> cb, bool wtc,
                                        bool with_c_out)
@@ -1394,7 +1388,7 @@ taylor_adaptive<T>::propagate_for_impl(T delta_t, std::size_t max_steps, T max_d
 //
 // The callback is executed at the end of each timestep taken after the initial propagation up to grid[0], unless a
 // non-finite state was detected.
-template <typename T>
+template <supported_fp_type T>
 std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
 taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps, T max_delta_t, step_callback<T> cb)
 {
@@ -1749,133 +1743,133 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     return make_retval(interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt);
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::variant<llvm_state, llvm_multi_state> &taylor_adaptive<T>::get_llvm_state() const
 {
     return m_i_data->m_ta_jit_data->m_llvm_state;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const taylor_dc_t &taylor_adaptive<T>::get_decomposition() const
 {
     return m_i_data->m_dc;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t taylor_adaptive<T>::get_order() const
 {
     return m_i_data->m_order;
 }
 
-template <typename T>
+template <supported_fp_type T>
 T taylor_adaptive<T>::get_tol() const
 {
     return m_i_data->m_tol;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool taylor_adaptive<T>::get_high_accuracy() const
 {
     return m_i_data->m_high_accuracy;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool taylor_adaptive<T>::get_compact_mode() const
 {
     return m_i_data->m_compact_mode;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t taylor_adaptive<T>::get_dim() const
 {
     return m_i_data->m_dim;
 }
 
-template <typename T>
+template <supported_fp_type T>
 T taylor_adaptive<T>::get_time() const
 {
     return static_cast<T>(m_i_data->m_time);
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::pair<T, T> taylor_adaptive<T>::get_dtime() const
 {
     return {m_i_data->m_time.hi, m_i_data->m_time.lo};
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::get_state() const
 {
     return m_i_data->m_state;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const T *taylor_adaptive<T>::get_state_data() const
 {
     return m_i_data->m_state.data();
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive<T>::get_state_range()
 {
     return std::ranges::subrange(m_i_data->m_state.begin(), m_i_data->m_state.end());
 }
 
-template <typename T>
+template <supported_fp_type T>
 T *taylor_adaptive<T>::get_state_data()
 {
     return m_i_data->m_state.data();
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::get_pars() const
 {
     return m_i_data->m_pars;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const T *taylor_adaptive<T>::get_pars_data() const
 {
     return m_i_data->m_pars.data();
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive<T>::get_pars_range()
 {
     return std::ranges::subrange(m_i_data->m_pars.begin(), m_i_data->m_pars.end());
 }
 
-template <typename T>
+template <supported_fp_type T>
 T *taylor_adaptive<T>::get_pars_data()
 {
     return m_i_data->m_pars.data();
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::get_tc() const
 {
     return m_i_data->m_tc;
 }
 
-template <typename T>
+template <supported_fp_type T>
 T taylor_adaptive<T>::get_last_h() const
 {
     return m_i_data->m_last_h;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::get_d_output() const
 {
     return m_i_data->m_d_out;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool taylor_adaptive<T>::with_events() const
 {
     return static_cast<bool>(m_i_data->m_ed_data);
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<typename taylor_adaptive<T>::t_event_t> &taylor_adaptive<T>::get_t_events() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -1885,7 +1879,7 @@ const std::vector<typename taylor_adaptive<T>::t_event_t> &taylor_adaptive<T>::g
     return m_i_data->m_ed_data->m_tes;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<std::optional<std::pair<T, T>>> &taylor_adaptive<T>::get_te_cooldowns() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -1895,7 +1889,7 @@ const std::vector<std::optional<std::pair<T, T>>> &taylor_adaptive<T>::get_te_co
     return m_i_data->m_ed_data->m_te_cooldowns;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::get_nt_events() const
 {
     if (!m_i_data->m_ed_data) [[unlikely]] {
@@ -1905,14 +1899,14 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
     return m_i_data->m_ed_data->m_ntes;
 }
 
-template <typename T>
+template <supported_fp_type T>
 // NOLINTNEXTLINE(bugprone-exception-escape)
 const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sys() const noexcept
 {
     return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::set_time(T t)
 {
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -1922,7 +1916,7 @@ void taylor_adaptive<T>::set_time(T t)
     m_i_data->m_time = detail::dfloat<T>(std::move(t));
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -1936,7 +1930,7 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
     m_i_data->m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: here it is not necessary to run the precision
@@ -1966,7 +1960,7 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     return m_i_data->m_d_out;
 }
 
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::check_variational(const char *fname) const
 {
     if (!is_variational()) [[unlikely]] {
@@ -1976,7 +1970,7 @@ void taylor_adaptive<T>::check_variational(const char *fname) const
 }
 
 // Helper to fetch the stepper function from m_llvm_state.
-template <typename T>
+template <supported_fp_type T>
 void taylor_adaptive<T>::assign_stepper(bool with_events)
 {
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
@@ -2003,7 +1997,7 @@ void taylor_adaptive<T>::assign_stepper(bool with_events)
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<expression> &taylor_adaptive<T>::get_vargs() const
 {
     check_variational(__func__);
@@ -2011,7 +2005,7 @@ const std::vector<expression> &taylor_adaptive<T>::get_vargs() const
     return std::get<1>(m_i_data->m_vsys).get_vargs();
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t taylor_adaptive<T>::get_vorder() const
 {
     check_variational(__func__);
@@ -2019,7 +2013,7 @@ std::uint32_t taylor_adaptive<T>::get_vorder() const
     return std::get<1>(m_i_data->m_vsys).get_order();
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 {
     check_variational("eval_taylor_map");
@@ -2058,13 +2052,13 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
     return vsys_data.m_tm_output;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::eval_taylor_map(std::initializer_list<T> il)
 {
     return eval_taylor_map(std::ranges::subrange(il.begin(), il.end()));
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<T> &taylor_adaptive<T>::get_tstate() const
 {
     check_variational(__func__);
@@ -2073,7 +2067,7 @@ const std::vector<T> &taylor_adaptive<T>::get_tstate() const
     return m_i_data->m_vsys_data->m_tm_output;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint32_t order) const
 {
     check_variational(__func__);
@@ -2088,7 +2082,7 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint
     };
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint32_t component,
                                                                        std::uint32_t order) const
 {
@@ -2104,7 +2098,7 @@ std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint
     };
 }
 
-template <typename T>
+template <supported_fp_type T>
 const dtens::sv_idx_t &taylor_adaptive<T>::get_mindex(std::uint32_t i) const
 {
     check_variational(__func__);
@@ -2129,7 +2123,12 @@ const dtens::sv_idx_t &taylor_adaptive<T>::get_mindex(std::uint32_t i) const
 
 HEYOKA_TAYLOR_ADAPTIVE_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_TAYLOR_ADAPTIVE_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

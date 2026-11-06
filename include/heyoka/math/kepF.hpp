@@ -71,7 +71,12 @@ HEYOKA_DLL_PUBLIC expression kepF(expression, expression, expression);
 
 HEYOKA_DECLARE_KEPF_OVERLOADS(float);
 HEYOKA_DECLARE_KEPF_OVERLOADS(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DECLARE_KEPF_OVERLOADS(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

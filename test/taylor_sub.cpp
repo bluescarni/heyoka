@@ -36,17 +36,6 @@ auto sub_wrapper(expression a, expression b)
     return detail::sub(std::move(a), std::move(b));
 }
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // Test issue when two different c_diff functions would end up mangled with the same name.
 TEST_CASE("multimangle")
 {
@@ -908,10 +897,10 @@ TEST_CASE("taylor sub")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }

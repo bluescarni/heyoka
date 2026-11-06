@@ -64,7 +64,12 @@ TEST_CASE("number basic")
     REQUIRE(std::holds_alternative<double>(number{}.value()));
     REQUIRE(std::holds_alternative<double>(number{1.1}.value()));
     REQUIRE(std::holds_alternative<float>(number{1.1f}.value()));
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(std::holds_alternative<long double>(number{1.1l}.value()));
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -84,7 +89,12 @@ TEST_CASE("number lt")
     REQUIRE(!(number{std::numeric_limits<double>::quiet_NaN()} < number{std::numeric_limits<double>::quiet_NaN()}));
     REQUIRE(!(number{std::numeric_limits<double>::quiet_NaN()} < number{1.1}));
     REQUIRE(number{3.1f} < number{2.});
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(!(number{1.1l} < number{2.}));
+
+#endif
 }
 
 TEST_CASE("number hash eq")
@@ -94,12 +104,17 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1.1} == number{1.1});
     REQUIRE(number{1.1} != number{1.2});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(number{1.} != number{1.l});
     REQUIRE(number{1.l} != number{1.});
     REQUIRE(number{0.} != number{-0.l});
     REQUIRE(number{0.l} != number{-0.});
     REQUIRE(number{1.1} != number{1.2l});
     REQUIRE(number{1.2l} != number{1.1});
+
+#endif
+
     REQUIRE(number{1.} != number{1.f});
     REQUIRE(number{1.f} != number{1.});
     REQUIRE(number{0.} != number{-0.f});
@@ -109,30 +124,38 @@ TEST_CASE("number hash eq")
 
     REQUIRE(hash_number(number{1.1f}) == std::hash<float>{}(1.1f));
     REQUIRE(hash_number(number{1.1}) == std::hash<double>{}(1.1));
-    REQUIRE(hash_number(number{1.1l}) == std::hash<long double>{}(1.1l));
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
+
+    REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
+            != hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
+    REQUIRE(number{0.f} != number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-0.f});
+    REQUIRE(number{-0.f} != number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-1.23f});
+    REQUIRE(number{1.23f} != number{std::numeric_limits<double>::quiet_NaN()});
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+    REQUIRE(hash_number(number{1.1l}) == std::hash<long double>{}(1.1l));
+
     REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()}
             == number{std::numeric_limits<long double>::quiet_NaN()});
 
     REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
             != hash_number(number{std::numeric_limits<long double>::quiet_NaN()}));
-    REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
-            != hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.l});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
     REQUIRE(number{0.l} != number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{0.f} != number{std::numeric_limits<double>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-0.l});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-0.f});
     REQUIRE(number{-0.l} != number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{-0.f} != number{std::numeric_limits<double>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-1.23l});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{-1.23f});
     REQUIRE(number{1.23l} != number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{1.23f} != number{std::numeric_limits<double>::quiet_NaN()});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -179,12 +202,16 @@ TEST_CASE("number hash eq")
 
     auto [x, y] = make_vars("x", "y");
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto ta = taylor_adaptive<double>{
             {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, {0., 0.}, kw::opt_level = 0u, kw::tol = 1.};
 
         REQUIRE(ta.get_decomposition().size() == 7u);
     }
+
+#endif
 
     {
         auto ta = taylor_adaptive<double>{{prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
@@ -200,7 +227,11 @@ TEST_CASE("number s11n")
 {
     std::stringstream ss;
 
-    number n{4.5l};
+    number n;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+    n = number{4.5l};
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -220,6 +251,8 @@ TEST_CASE("number s11n")
 
     ss.str("");
 
+#endif
+
     n = number{1.2};
 
     {
@@ -228,7 +261,7 @@ TEST_CASE("number s11n")
         oa << n;
     }
 
-    n = number{0.l};
+    n = number{0.f};
 
     {
         boost::archive::binary_iarchive ia(ss);
@@ -248,7 +281,7 @@ TEST_CASE("number s11n")
         oa << n;
     }
 
-    n = number{0.l};
+    n = number{0.};
 
     {
         boost::archive::binary_iarchive ia(ss);
@@ -407,7 +440,7 @@ TEST_CASE("llvm_codegen")
         REQUIRE(isnan(f_ptr()));
     }
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
     // Pi long double.
     {
@@ -701,6 +734,8 @@ TEST_CASE("number_like")
     REQUIRE(num == number{42.});
     REQUIRE(std::holds_alternative<double>(num.value()));
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     if (std::numeric_limits<long double>::is_iec559 && std::numeric_limits<long double>::radix == 2) {
         if (std::numeric_limits<long double>::digits == 53) {
             // NOTE: here we are on Windows + MSVC, where long double == double
@@ -721,6 +756,8 @@ TEST_CASE("number_like")
             REQUIRE(std::holds_alternative<long double>(num.value()));
         }
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -758,7 +795,7 @@ TEST_CASE("binomial")
     REQUIRE(n == number(6.));
     REQUIRE(std::holds_alternative<double>(n.value()));
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
     n = binomial(number(4.l), number(2.l));
     REQUIRE(n == number(6.l));
@@ -809,7 +846,9 @@ TEST_CASE("nextafter")
 
     REQUIRE(nextafter(number(1.f), number(0.f)) == number(nextafter(1.f, 0.f)));
     REQUIRE(nextafter(number(1.), number(0.)) == number(nextafter(1., 0.)));
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(nextafter(number(1.l), number(0.l)) == number(nextafter(1.l, 0.l)));
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE(nextafter(number(1._rq), number(0._rq)) == number(nextafter(1._rq, 0._rq)));

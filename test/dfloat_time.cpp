@@ -37,17 +37,6 @@ const int ntrials = 100;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // NOTE: these tests are designed to check the increased time accuracy
 // after the representation of the time coordinate was switched to
 // double-length arithmetic.
@@ -162,7 +151,7 @@ TEST_CASE("scalar test")
         REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
+    tuple_for_each(fixed_fp_types, [&tester](auto x) { tester(x); });
 }
 
 TEST_CASE("batch test")
@@ -303,7 +292,7 @@ TEST_CASE("batch test")
         REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
+    tuple_for_each(fixed_fp_types, [&tester](auto x) { tester(x); });
 }
 
 TEST_CASE("dfloat s11n")

@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include <boost/predef/architecture.h>
+#include <boost/predef/os.h>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -48,7 +51,9 @@ TEST_CASE("simd size")
 {
     REQUIRE(recommended_simd_size<float>() > 0u);
     REQUIRE(recommended_simd_size<double>() > 0u);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(recommended_simd_size<long double>() > 0u);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
@@ -58,7 +63,8 @@ TEST_CASE("simd size")
 
 #if defined(__GNUC__)
 
-#if defined(__amd64__) || defined(__aarch64__)
+    // NOTE: Boost.Predef does not offer a specific check macro for 64-bit arm, thus we keep on using __aarch64__ here.
+#if BOOST_ARCH_X86_64 || defined(__aarch64__)
     REQUIRE(recommended_simd_size<float>() >= 4u);
     REQUIRE(recommended_simd_size<double>() >= 2u);
 #endif
@@ -439,8 +445,8 @@ TEST_CASE("code model")
         REQUIRE(oss.str() == "small");
     }
 
-    // code_model::tiny not supported on x86 or ppc or OSX
-#if defined(HEYOKA_ARCH_X86) || defined(HEYOKA_ARCH_PPC) || defined(__APPLE__)
+    // code_model::tiny not supported on x86 or ppc or OSX.
+#if BOOST_ARCH_X86 || BOOST_ARCH_PPC || BOOST_OS_MACOS
 
     {
         std::ostringstream oss;
@@ -475,7 +481,7 @@ TEST_CASE("code model")
     }
 
     // code_model::kernel not supported on arm or ppc.
-#if defined(HEYOKA_ARCH_ARM) || defined(HEYOKA_ARCH_PPC)
+#if BOOST_ARCH_ARM || BOOST_ARCH_PPC
 
     {
         std::ostringstream oss;
@@ -500,7 +506,7 @@ TEST_CASE("code model")
 #endif
 
     // code_model::medium not supported on arm.
-#if defined(HEYOKA_ARCH_ARM)
+#if BOOST_ARCH_ARM
 
     {
         std::ostringstream oss;

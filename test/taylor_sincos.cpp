@@ -37,17 +37,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // Wrappers to make the combined versions of sin/cos.
 expression csin(expression x, const bool combined)
 {
@@ -531,7 +520,7 @@ TEST_CASE("taylor sincos")
                 //
                 // UPDATE: this seems to be fixed as of LLVM 22.
                 constexpr bool enable_fm_test =
-#if defined(HEYOKA_ARCH_PPC) || LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 22
                     true
 #else
                     std::numeric_limits<long double>::digits != 64
@@ -539,13 +528,13 @@ TEST_CASE("taylor sincos")
                     ;
 
                 for (auto fm : {false, enable_fm_test}) {
-                    tuple_for_each(fp_types,
+                    tuple_for_each(fixed_fp_types,
                                    [&tester, f, cm, fm, combined](auto x) { tester(x, 0, f, cm, fm, combined); });
-                    tuple_for_each(fp_types,
+                    tuple_for_each(fixed_fp_types,
                                    [&tester, f, cm, fm, combined](auto x) { tester(x, 1, f, cm, fm, combined); });
-                    tuple_for_each(fp_types,
+                    tuple_for_each(fixed_fp_types,
                                    [&tester, f, cm, fm, combined](auto x) { tester(x, 2, f, cm, fm, combined); });
-                    tuple_for_each(fp_types,
+                    tuple_for_each(fixed_fp_types,
                                    [&tester, f, cm, fm, combined](auto x) { tester(x, 3, f, cm, fm, combined); });
                 }
             }

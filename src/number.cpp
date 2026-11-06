@@ -74,7 +74,11 @@ number::number(float x) noexcept : m_value(x) {}
 
 number::number(double x) noexcept : m_value(x) {}
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 number::number(long double x) noexcept : m_value(x) {}
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -627,8 +631,10 @@ number number_like(llvm_state &s, const llvm::Type *const tp, double val)
         return number{static_cast<float>(val)};
     } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{val};
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{static_cast<long double>(val)};
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{static_cast<mppp::real128>(val)};
@@ -689,6 +695,8 @@ auto make_dl_twopi_dict()
         impl(6.2831853071795862, 2.4492935982947059e-16);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     // Handle long double.
     if (is_ieee754_binary64<long double>) {
         impl(6.2831853071795862l, 2.4492935982947059e-16l);
@@ -697,6 +705,8 @@ auto make_dl_twopi_dict()
     } else if (is_ieee754_binary128<long double>) {
         impl(6.28318530717958647692528676655900559l, 1.73436202602475620495940880520867045e-34l);
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -748,8 +758,10 @@ std::pair<number, number> dl_twopi_like(llvm_state &s, const llvm::Type *const f
             return impl(0.f);
         } else if (fp_t == to_external_llvm_type<double>(context, false)) {
             return impl(0.);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
         } else if (fp_t == to_external_llvm_type<long double>(context, false)) {
             return impl(0.l);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
         } else if (fp_t == to_external_llvm_type<mppp::real128>(context, false)) {
             return impl(mppp::real128(0));

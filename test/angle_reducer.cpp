@@ -40,17 +40,6 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 TEST_CASE("basics")
 {
     using Catch::Matchers::Message;
@@ -152,7 +141,7 @@ TEST_CASE("s11n")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 
     std::stringstream ss;
 
@@ -225,7 +214,7 @@ TEST_CASE("scalar")
                     "value of 1, but the number of state variables is only 1"));
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 
     {
         using fp_t = mppp::real;
@@ -308,7 +297,7 @@ TEST_CASE("batch")
                     "value of 1, but the number of state variables is only 1"));
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("stream operator")

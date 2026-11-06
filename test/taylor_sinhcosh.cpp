@@ -35,19 +35,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 // Potential issue in the decomposition when x = 0 (not
 // currently the case).
 TEST_CASE("taylor sinhcosh decompose bug 00")
@@ -138,7 +125,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
@@ -165,7 +152,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sinh(par[0]) + cosh(par[1]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
                                                   2,
@@ -213,7 +200,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
@@ -246,7 +233,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[5] + jet[7])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), prime(y) = x + y},
                 {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
@@ -293,7 +280,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sinh(par[0]) + cosh(par[1]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
                                                   3,
@@ -340,7 +327,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), prime(y) = x + y},
@@ -366,7 +353,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[3] == approximately(cosh(jet[0])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sinh(y), prime(y) = cosh(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
                                                   2,
@@ -412,7 +399,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] * sinh(jet[0])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sinh(y), prime(y) = cosh(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
                                                   2,
@@ -444,7 +431,7 @@ TEST_CASE("taylor sinhcosh")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] * sinh(jet[1])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sinh(y), prime(y) = cosh(x)},
                                                   {fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}},
                                                   3,
@@ -496,7 +483,7 @@ TEST_CASE("taylor sinhcosh")
                     == approximately(fp_t{1} / 6 * (2 * jet[14] * sinh(jet[2]) + jet[8] * jet[8] * cosh(jet[2]))));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = sinh(y), prime(y) = cosh(x)}, opt_level, high_accuracy, compact_mode,
                                        rng, -10.f, 10.f, fp_t(10000));
@@ -505,10 +492,10 @@ TEST_CASE("taylor sinhcosh")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }

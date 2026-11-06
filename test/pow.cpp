@@ -60,19 +60,6 @@ auto square_wrapper(const expression &x)
 
 using namespace mppp::literals;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 TEST_CASE("pow stream")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
@@ -123,7 +110,9 @@ TEST_CASE("pow expo 0")
     auto x = "x"_var;
 
     REQUIRE(heyoka::pow(x, 0.) == 1_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, 0.l) == 1_dbl);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -132,7 +121,9 @@ TEST_CASE("pow expo 0")
 #endif
 
     REQUIRE(heyoka::pow(x, 1.) != 1_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, 1.l) != 1_dbl);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -141,7 +132,9 @@ TEST_CASE("pow expo 0")
 #endif
 
     REQUIRE(heyoka::pow(x, expression{0.}) == 1_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, expression{0.l}) == 1_dbl);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -150,7 +143,9 @@ TEST_CASE("pow expo 0")
 #endif
 
     REQUIRE(heyoka::pow(x, expression{1.}) != 1_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, expression{1.l}) != 1_dbl);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -164,7 +159,9 @@ TEST_CASE("pow expo 1")
     auto x = "x"_var;
 
     REQUIRE(heyoka::pow(x, 1.) == x);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, 1.l) == x);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -173,7 +170,9 @@ TEST_CASE("pow expo 1")
 #endif
 
     REQUIRE(heyoka::pow(x, 1.1) != x);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(heyoka::pow(x, 1.1l) != x);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -237,10 +236,6 @@ TEST_CASE("cfunc")
         std::vector<fp_t> outs, ins, pars;
 
         for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size * 3u);
             ins.resize(batch_size * 2u);
             pars.resize(batch_size);
@@ -316,10 +311,10 @@ TEST_CASE("cfunc")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 
@@ -381,9 +376,11 @@ TEST_CASE("pow overloads")
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     k = pow("x"_var, 1.1l);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1l});
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     k = pow("x"_var, mppp::real128{"1.1"});

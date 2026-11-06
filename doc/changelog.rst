@@ -7,6 +7,12 @@ Changelog
 New
 ~~~
 
+- The new :c:macro:`HEYOKA_HAVE_LONG_DOUBLE` definition signals whether heyoka supports the C++ ``long double``
+  type, which is now the case only if ``long double`` is in IEEE double-precision, x86 extended-precision or
+  IEEE quadruple-precision format. On platforms where this is not the case (e.g., PowerPC with the IBM
+  double-double format), the ``long double`` versions of heyoka's classes and functions are not available,
+  and using them results in a compilation error rather than in a runtime error
+  (`#566 <https://github.com/bluescarni/heyoka/pull/566>`__).
 - Event detection now uses a rigorous real root isolation algorithm based on interval arithmetic
   (`#561 <https://github.com/bluescarni/heyoka/pull/561>`__).
 - The ``propagate_grid()`` function of the batch integrator now supports

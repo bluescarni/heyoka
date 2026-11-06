@@ -35,6 +35,8 @@
 #include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/version_number.h>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -92,7 +94,7 @@
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -1375,12 +1377,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
         throw std::invalid_argument("The batch size of a compiled function cannot be zero");
     }
 
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::is_same_v<T, long double>) {
-        throw not_implemented_error("'long double' computations are not supported on PowerPC");
-    }
-#endif
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
 
@@ -1507,7 +1503,12 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
 
 HEYOKA_ADD_CFUNC_INST(float)
 HEYOKA_ADD_CFUNC_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_ADD_CFUNC_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -2426,12 +2427,6 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
                  const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode,
                  long long prec, bool parjit)
 {
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::is_same_v<T, long double>) {
-        throw not_implemented_error("'long double' computations are not supported on PowerPC");
-    }
-#endif
-
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
 
@@ -2459,7 +2454,12 @@ make_multi_cfunc(llvm_state tplt, const std::string &name, const std::vector<exp
 
 HEYOKA_MAKE_MULTI_CFUNC_INST(float)
 HEYOKA_MAKE_MULTI_CFUNC_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_MAKE_MULTI_CFUNC_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -2475,7 +2475,7 @@ HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real)
 
 HEYOKA_END_NAMESPACE
 
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic pop
 

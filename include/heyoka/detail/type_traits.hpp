@@ -19,13 +19,7 @@
 #include <string_view>
 #include <type_traits>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
-#include <mp++/real.hpp>
+#include <mp++/fwd.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -68,6 +62,11 @@ template <template <class...> class Op, class... Args>
 inline constexpr bool is_detected_v = is_detected<Op, Args...>::value;
 
 // Helper to detect if T is a supported floating-point type.
+//
+// float and double are always supported, and are asserted to be IEEE single and double precision respectively. long
+// double is supported if HEYOKA_HAVE_LONG_DOUBLE is defined, in which case it is asserted to be IEEE double precision,
+// x86 extended precision or IEEE quadruple precision. mppp::real is always supported. mppp::real128 is supported if
+// available.
 template <typename>
 struct is_supported_fp : std::false_type {};
 
@@ -77,8 +76,12 @@ struct is_supported_fp<float> : std::true_type {};
 template <>
 struct is_supported_fp<double> : std::true_type {};
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 struct is_supported_fp<long double> : std::true_type {};
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -90,12 +93,12 @@ struct is_supported_fp<mppp::real128> : std::true_type {};
 template <>
 struct is_supported_fp<mppp::real> : std::true_type {};
 
-template <typename T>
-inline constexpr bool is_supported_fp_v = is_supported_fp<T>::value;
-
-// Detection of IEEE-style floating-point types.
+// Machinery for the detection of IEEE floating-point types.
+//
+// This function will check radix, IEC 559 conformance and number of digits. Further checks on the exponents are
+// implemented below.
 template <typename T, int N>
-constexpr bool is_ieee754_binaryN()
+consteval bool is_ieee754_binaryN()
 {
     if constexpr (std::is_floating_point_v<T> && std::numeric_limits<T>::is_specialized) {
         return std::numeric_limits<T>::radix == 2 && std::numeric_limits<T>::is_iec559
@@ -105,27 +108,29 @@ constexpr bool is_ieee754_binaryN()
     }
 }
 
+template <typename T>
+inline constexpr bool is_ieee754_binary32 = is_ieee754_binaryN<T, 24>() && std::numeric_limits<T>::max_exponent == 128
+                                            && std::numeric_limits<T>::min_exponent == -125;
+
+template <typename T>
+inline constexpr bool is_ieee754_binary64 = is_ieee754_binaryN<T, 53>() && std::numeric_limits<T>::max_exponent == 1024
+                                            && std::numeric_limits<T>::min_exponent == -1021;
+
+template <typename T>
+inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>() && std::numeric_limits<T>::max_exponent == 16384
+                                    && std::numeric_limits<T>::min_exponent == -16381;
+
+template <typename T>
+inline constexpr bool is_ieee754_binary128
+    = is_ieee754_binaryN<T, 113>() && std::numeric_limits<T>::max_exponent == 16384
+      && std::numeric_limits<T>::min_exponent == -16381;
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-constexpr bool is_ieee754_binaryN<mppp::real128, 113>()
-{
-    return true;
-}
+inline constexpr bool is_ieee754_binary128<mppp::real128> = true;
 
 #endif
-
-template <typename T>
-inline constexpr bool is_ieee754_binary32 = is_ieee754_binaryN<T, 24>();
-
-template <typename T>
-inline constexpr bool is_ieee754_binary64 = is_ieee754_binaryN<T, 53>();
-
-template <typename T>
-inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>();
-
-template <typename T>
-inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
 
 template <typename T>
 double get_fp_unit_cost();

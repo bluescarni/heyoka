@@ -274,11 +274,15 @@ double taylor_deduce_cooldown(double g_eps, double abs_der)
     return taylor_deduce_cooldown_impl(g_eps, abs_der);
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 long double taylor_deduce_cooldown(long double g_eps, long double abs_der)
 {
     return taylor_deduce_cooldown_impl(g_eps, abs_der);
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -492,7 +496,12 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
 // Explicit instantiation of the book-keeping structures for event detection in the scalar integrator.
 template struct ed_data<float>;
 template struct ed_data<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template struct ed_data<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -799,7 +808,12 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
 // Explicit instantiation of the book-keeping structures for event detection in the batch integrator.
 template struct ed_data_batch<float>;
 template struct ed_data_batch<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template struct ed_data_batch<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

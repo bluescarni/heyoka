@@ -1083,10 +1083,14 @@ expression pow(const expression &b, double e)
     return pow(b, expression{e});
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 expression pow(const expression &b, long double e)
 {
     return pow(b, expression{e});
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

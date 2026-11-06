@@ -169,7 +169,12 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
 
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(float)
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -315,7 +320,12 @@ ensemble_propagate_grid_batch_impl(
 
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(float)
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

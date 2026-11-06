@@ -51,29 +51,17 @@ vsys_data<T>::vsys_data() = default;
 namespace
 {
 
-// LCOV_EXCL_START
-
 // Factorial implementations.
 template <typename F>
-F factorial([[maybe_unused]] std::uint32_t n, long long)
+F factorial(const std::uint32_t n, long long)
 {
-#if defined(HEYOKA_ARCH_PPC)
-    if constexpr (std::same_as<F, long double>) {
-        throw std::invalid_argument("'long double' computations are not supported on this platform");
-    } else {
-#endif
-        return boost::math::factorial<F>(boost::numeric_cast<unsigned>(n));
-#if defined(HEYOKA_ARCH_PPC)
-    }
-#endif
+    return boost::math::factorial<F>(boost::numeric_cast<unsigned>(n));
 }
-
-// LCOV_EXCL_STOP
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-mppp::real128 factorial<mppp::real128>(std::uint32_t n, long long)
+mppp::real128 factorial<mppp::real128>(const std::uint32_t n, long long)
 {
     return mppp::tgamma(mppp::real128(n) + 1);
 }
@@ -82,7 +70,7 @@ mppp::real128 factorial<mppp::real128>(std::uint32_t n, long long)
 
 template <>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
+mppp::real factorial<mppp::real>(const std::uint32_t n, const long long prec)
 {
     mppp::real ret{mppp::real_kind::zero, boost::numeric_cast<mpfr_prec_t>(prec)};
     ::mpfr_fac_ui(ret._get_mpfr_t(), boost::numeric_cast<unsigned long>(n), MPFR_RNDN);
@@ -319,7 +307,12 @@ void vsys_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 // Explicit instantiations.
 template struct vsys_data<float>;
 template struct vsys_data<double>;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template struct vsys_data<long double>;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

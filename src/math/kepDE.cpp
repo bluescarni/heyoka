@@ -17,8 +17,6 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/format.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -39,7 +37,6 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -146,7 +143,12 @@ expression kepDE(expression s0, expression c0, expression DM)
 
 HEYOKA_DEFINE_KEPDE_OVERLOADS(float)
 HEYOKA_DEFINE_KEPDE_OVERLOADS(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DEFINE_KEPDE_OVERLOADS(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

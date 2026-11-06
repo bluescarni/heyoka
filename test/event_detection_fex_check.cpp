@@ -58,17 +58,6 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 // The floating-point types tested.
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // A test case: the timestep h, the polynomial coefficients cf (from degree 0 upwards), and the bounds of the exact
 // enclosure rounded outward. All values are hexadecimal floating-point strings, exactly representable in the
 // floating-point type.
@@ -920,7 +909,7 @@ void check_output(const test_case &tc, T lo, T hi, std::uint32_t out)
 
 TEST_CASE("scalar")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -950,7 +939,7 @@ TEST_CASE("scalar")
 
 TEST_CASE("batch")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -1080,7 +1069,7 @@ void set_rounding_down()
 
 TEST_CASE("caller rounding mode")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         const std::uint32_t n = 20;

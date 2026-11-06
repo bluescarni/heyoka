@@ -49,7 +49,7 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 const auto fp_types = std::tuple<double
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
                                  ,
                                  long double
 #endif
@@ -58,8 +58,6 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
-
-constexpr bool skip_batch_ld = false;
 
 TEST_CASE("basic")
 {
@@ -74,7 +72,9 @@ TEST_CASE("basic")
 
     // Test a couple of numerical overloads too.
     REQUIRE(eq(x, 1.) == eq(x, 1_dbl));
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(lte(1.l, par[0]) == lte(1_ldbl, par[0]));
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -174,10 +174,6 @@ TEST_CASE("cfunc")
         std::vector<fp_t> outs, ins, pars, time;
 
         for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size * 8u);
             ins.resize(batch_size * 2u);
             pars.resize(batch_size);
@@ -251,10 +247,6 @@ TEST_CASE("cfunc nan")
         const std::vector<std::pair<fp_t, fp_t>> cases{{nan, one}, {one, nan}, {nan, nan}};
 
         for (auto batch_size : {1u, 3u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             cfunc<fp_t> cf({eq(x, y), neq(x, y), lt(x, y), gt(x, y), lte(x, y), gte(x, y)}, {x, y},
                            kw::batch_size = batch_size, kw::compact_mode = compact_mode, kw::opt_level = opt_level);
 

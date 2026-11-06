@@ -13,6 +13,10 @@
 
 #include <cstddef>
 
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/version_number.h>
+
 // NOTE: forcefully enable both the square and round brackets versions of the indexing operator. We are assuming C++23
 // in any case. Setting these explicitly allows us to both support older code which may still be using the round
 // brackets operator and to work around any compiler feature detection issue that might appear in Kokkos' mdspan
@@ -25,13 +29,13 @@
 #define MDSPAN_DEBUG
 #endif
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wshadow"
 
-#if __GNUC__ >= 15
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(15, 0, 0)
 
 #pragma GCC diagnostic ignored "-Wtrailing-whitespace="
 
@@ -41,7 +45,7 @@
 
 #include <heyoka/detail/mdspan/mdspan/mdspan.hpp>
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic pop
 

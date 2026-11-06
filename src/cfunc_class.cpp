@@ -52,6 +52,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -131,7 +132,7 @@ struct tape_handle {
 
 } // namespace detail
 
-template <typename T>
+template <supported_fp_type T>
 struct cfunc<T>::impl {
     // The compiled function types.
     // Non-compact mode.
@@ -333,10 +334,10 @@ struct cfunc<T>::impl {
     ~impl() = default;
 };
 
-template <typename T>
+template <supported_fp_type T>
 cfunc<T>::cfunc() noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
                 // NOLINTNEXTLINE(performance-unnecessary-value-param)
@@ -352,14 +353,14 @@ cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
                                           compact_mode, parallel_mode, prec, check_prec, parjit);
 }
 
-template <typename T>
+template <supported_fp_type T>
 cfunc<T>::cfunc(const cfunc &) noexcept = default;
 
 // NOTE: document that other is left into the def-cted state afterwards.
-template <typename T>
+template <supported_fp_type T>
 cfunc<T>::cfunc(cfunc &&) noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 cfunc<T> &cfunc<T>::operator=(const cfunc &other) noexcept
 {
     if (this != &other) {
@@ -370,19 +371,19 @@ cfunc<T> &cfunc<T>::operator=(const cfunc &other) noexcept
 }
 
 // NOTE: document that other is left into the def-cted state afterwards.
-template <typename T>
+template <supported_fp_type T>
 cfunc<T> &cfunc<T>::operator=(cfunc &&) noexcept = default;
 
-template <typename T>
+template <supported_fp_type T>
 cfunc<T>::~cfunc() = default;
 
-template <typename T>
+template <supported_fp_type T>
 bool cfunc<T>::is_valid() const noexcept
 {
     return static_cast<bool>(m_impl);
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<expression> &cfunc<T>::get_fn() const
 {
     check_valid(__func__);
@@ -390,7 +391,7 @@ const std::vector<expression> &cfunc<T>::get_fn() const
     return m_impl->m_fn;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<expression> &cfunc<T>::get_vars() const
 {
     check_valid(__func__);
@@ -398,7 +399,7 @@ const std::vector<expression> &cfunc<T>::get_vars() const
     return m_impl->m_vars;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::vector<expression> &cfunc<T>::get_dc() const
 {
     check_valid(__func__);
@@ -406,7 +407,7 @@ const std::vector<expression> &cfunc<T>::get_dc() const
     return m_impl->m_dc;
 }
 
-template <typename T>
+template <supported_fp_type T>
 const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &cfunc<T>::get_llvm_states() const
 {
     check_valid(__func__);
@@ -414,7 +415,7 @@ const std::variant<std::array<llvm_state, 3>, llvm_multi_state> &cfunc<T>::get_l
     return m_impl->m_states;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool cfunc<T>::get_high_accuracy() const
 {
     check_valid(__func__);
@@ -422,7 +423,7 @@ bool cfunc<T>::get_high_accuracy() const
     return m_impl->m_high_accuracy;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool cfunc<T>::get_compact_mode() const
 {
     check_valid(__func__);
@@ -430,7 +431,7 @@ bool cfunc<T>::get_compact_mode() const
     return m_impl->m_compact_mode;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool cfunc<T>::get_parallel_mode() const
 {
     check_valid(__func__);
@@ -438,7 +439,7 @@ bool cfunc<T>::get_parallel_mode() const
     return m_impl->m_parallel_mode;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t cfunc<T>::get_batch_size() const
 {
     check_valid(__func__);
@@ -446,7 +447,7 @@ std::uint32_t cfunc<T>::get_batch_size() const
     return m_impl->m_batch_size;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t cfunc<T>::get_nparams() const
 {
     check_valid(__func__);
@@ -454,7 +455,7 @@ std::uint32_t cfunc<T>::get_nparams() const
     return m_impl->m_nparams;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t cfunc<T>::get_nvars() const
 {
     check_valid(__func__);
@@ -462,7 +463,7 @@ std::uint32_t cfunc<T>::get_nvars() const
     return m_impl->m_nvars;
 }
 
-template <typename T>
+template <supported_fp_type T>
 std::uint32_t cfunc<T>::get_nouts() const
 {
     check_valid(__func__);
@@ -470,7 +471,7 @@ std::uint32_t cfunc<T>::get_nouts() const
     return m_impl->m_nouts;
 }
 
-template <typename T>
+template <supported_fp_type T>
 bool cfunc<T>::is_time_dependent() const
 {
     check_valid(__func__);
@@ -478,7 +479,7 @@ bool cfunc<T>::is_time_dependent() const
     return m_impl->m_is_time_dependent;
 }
 
-template <typename T>
+template <supported_fp_type T>
 mpfr_prec_t cfunc<T>::get_prec() const
     requires std::same_as<T, mppp::real>
 {
@@ -489,13 +490,13 @@ mpfr_prec_t cfunc<T>::get_prec() const
     return static_cast<mpfr_prec_t>(m_impl->m_prec);
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_impl;
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
     // LCOV_EXCL_START
@@ -520,7 +521,7 @@ void cfunc<T>::load(boost::archive::binary_iarchive &ar, const unsigned version)
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::check_valid(const char *name) const
 {
     if (!m_impl) [[unlikely]] {
@@ -529,7 +530,7 @@ void cfunc<T>::check_valid(const char *name) const
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time) const
 {
     check_valid(__func__);
@@ -609,7 +610,7 @@ void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pa
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
 {
     // Cache the number of evals.
@@ -706,7 +707,7 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times) const
 {
     // Cache the number of evals.
@@ -855,7 +856,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     }
 }
 
-template <typename T>
+template <supported_fp_type T>
 void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times,
                           const std::optional<bool> batch_parallel) const
 {
@@ -1034,7 +1035,12 @@ std::ostream &operator<<(std::ostream &os, const cfunc<T> &cf)
 
 HEYOKA_CFUNC_CLASS_EXPLICIT_INST(float)
 HEYOKA_CFUNC_CLASS_EXPLICIT_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_CFUNC_CLASS_EXPLICIT_INST(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

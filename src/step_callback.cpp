@@ -142,12 +142,16 @@ template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<double, true> &,
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<double, false> &,
                                      step_callback_set_impl<double, false> &) noexcept;
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template class HEYOKA_DLL_PUBLIC step_callback_set_impl<long double, true>;
 template class HEYOKA_DLL_PUBLIC step_callback_set_impl<long double, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<long double, true> &,
                                      step_callback_set_impl<long double, true> &) noexcept;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<long double, false> &,
                                      step_callback_set_impl<long double, false> &) noexcept;
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -171,10 +175,15 @@ HEYOKA_END_NAMESPACE
 // Implementation of s11n support for step_callback_set.
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::step_callback_set<float>, float)
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::step_callback_set<double>, double)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::step_callback_set<long double>, long double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(heyoka::step_callback_batch_set<float>, float)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(heyoka::step_callback_batch_set<double>, double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::step_callback_set<long double>, long double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(heyoka::step_callback_batch_set<long double>, long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -92,7 +92,12 @@ pow_eval_algo get_pow_eval_algo(const std::vector<expression> &args);
 HEYOKA_DLL_PUBLIC expression pow(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression pow(const expression &, float);
 HEYOKA_DLL_PUBLIC expression pow(const expression &, double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DLL_PUBLIC expression pow(const expression &, long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

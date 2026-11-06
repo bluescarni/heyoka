@@ -44,6 +44,11 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/architecture/arm.h>
+#include <boost/predef/architecture/ppc.h>
+#include <boost/predef/architecture/x86.h>
+#include <boost/predef/os/macos.h>
+#include <boost/predef/os/windows.h>
 #include <boost/regex.hpp>
 
 #include <fmt/format.h>
@@ -313,19 +318,18 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
             jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
     }
 
-    // NOTE: not all code models are supported on all archs. We make an effort
-    // here to prevent unsupported code models to be requested, as that will
-    // result in the termination of the program.
+    // NOTE: not all code models are supported on all archs. We make an effort here to prevent unsupported code models
+    // to be requested, as that will result in the termination of the program.
     constexpr code_model supported_code_models[] = {
-#if defined(HEYOKA_ARCH_X86)
+#if BOOST_ARCH_X86
         code_model::small, code_model::kernel, code_model::medium, code_model::large
-#elif defined(HEYOKA_ARCH_ARM)
-    // NOTE: tiny code model not supported on OSX.
-#if !defined(__APPLE__)
+#elif BOOST_ARCH_ARM
+    // NOTE: the tiny code model is supported only for ELF (not on macOS, which uses Mach-O).
+#if !BOOST_OS_MACOS
         code_model::tiny,
 #endif
         code_model::small, code_model::large
-#elif defined(HEYOKA_ARCH_PPC)
+#elif BOOST_ARCH_PPC
         code_model::small, code_model::medium, code_model::large
 #else
         // NOTE: by default we assume only small and large are supported.
@@ -343,7 +347,7 @@ llvm::orc::JITTargetMachineBuilder create_jit_tmb(const unsigned opt_level, cons
     // NOTE: there are indications from our CI that attempting to set the code model on Windows might just be buggy, as
     // we see widespread ASAN failures all over the place. Thus, for the time being, let us disable code model setting
     // on Windows altogether. We can revisit this at a later stage if needed.
-#if !defined(_WIN32)
+#if !BOOST_OS_WINDOWS
 
     // Setup the code model.
     switch (c_model) {
@@ -644,11 +648,15 @@ std::uint32_t recommended_simd_size<double>()
     return detail::get_target_features().simd_size_dbl;
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 std::uint32_t recommended_simd_size<long double>()
 {
     return detail::get_target_features().simd_size_ldbl;
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -68,7 +68,9 @@ struct target_features {
     // Recommended SIMD sizes.
     std::uint32_t simd_size_flt = 1;
     std::uint32_t simd_size_dbl = 1;
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     std::uint32_t simd_size_ldbl = 1;
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     std::uint32_t simd_size_f128 = 1;
 #endif
@@ -95,8 +97,12 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<float>();
 template <>
 HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<double>();
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template <>
 HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

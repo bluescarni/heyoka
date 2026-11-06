@@ -1741,7 +1741,12 @@ expression kepF(expression h, expression k, expression lam)
 
 HEYOKA_DEFINE_KEPF_OVERLOADS(float)
 HEYOKA_DEFINE_KEPF_OVERLOADS(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 HEYOKA_DEFINE_KEPF_OVERLOADS(long double)
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

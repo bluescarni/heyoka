@@ -82,6 +82,8 @@ std::string pi_constant_func::operator()(unsigned prec) const
         return fmt::format("{:.{}}", boost::math::constants::pi<double>(), std::numeric_limits<double>::max_digits10);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     // Try with long double.
     if (std::numeric_limits<long double>::is_iec559 && std::numeric_limits<long double>::radix == 2
         && prec <= static_cast<unsigned>(std::numeric_limits<long double>::digits)) {
@@ -97,6 +99,8 @@ std::string pi_constant_func::operator()(unsigned prec) const
 
         return oss.str();
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

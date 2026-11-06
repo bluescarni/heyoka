@@ -55,17 +55,6 @@ using ivals_t = std::vector<detail::irr_interval<T>>;
 using rat_t = boost::multiprecision::cpp_rational;
 
 // The floating-point types tested in the find_real_poly_roots() tests.
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // Check whether the exact value r lies within k floating-point values of x.
 template <typename T>
 bool within_steps(const T &x, const rat_t &r, unsigned k)
@@ -819,7 +808,7 @@ TEST_CASE("find_real_poly_roots linear polynomials real")
 
 TEST_CASE("find_real_poly_roots simple roots")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check that the roots of the polynomial with coefficients cfs are, in order, within k
@@ -886,7 +875,7 @@ TEST_CASE("find_real_poly_roots simple roots real")
 
 TEST_CASE("find_real_poly_roots root at zero")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check that the polynomial with coefficients cfs has a root at +0 with direction dir0, followed by
@@ -947,7 +936,7 @@ TEST_CASE("find_real_poly_roots root at zero real")
 
 TEST_CASE("find_real_poly_roots root at split point")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check the roots of the polynomial with coefficients cfs. Each element of roots contains the exact
@@ -1020,7 +1009,7 @@ TEST_CASE("find_real_poly_roots root at split point real")
 
 TEST_CASE("find_real_poly_roots double root")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check that the polynomial with coefficients cfs has a single root within 4 floating-point values of
@@ -1072,7 +1061,7 @@ TEST_CASE("find_real_poly_roots double root real")
 
 TEST_CASE("find_real_poly_roots undecided interval straddling lb")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         const auto check = [](const std::vector<fp_t> &cfs, fp_t h) {
@@ -1192,7 +1181,7 @@ TEST_CASE("find_real_poly_roots wide undecided interval")
 
 TEST_CASE("find_real_poly_roots merged undecided intervals")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check that the polynomial with coefficients cfs has a root exactly at root0 with an empty
@@ -1261,7 +1250,7 @@ TEST_CASE("find_real_poly_roots merged undecided intervals real")
 
 TEST_CASE("find_real_poly_roots lb filter")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         // Helper to check that the roots of the polynomial with coefficients cfs are, in order, within 40
@@ -1369,7 +1358,7 @@ TEST_CASE("find_real_poly_roots lb filter real")
 
 TEST_CASE("find_real_poly_roots linear fall-through")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
         using std::signbit;
 
@@ -1430,7 +1419,7 @@ TEST_CASE("find_real_poly_roots linear fall-through real")
 
 TEST_CASE("find_real_poly_roots workspace reuse")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         const std::vector cfs1 = {fp_t(-10), fp_t(19), fp_t(-11), fp_t(2)};
@@ -1538,7 +1527,7 @@ TEST_CASE("find_real_poly_roots workspace reuse real")
 
 TEST_CASE("find_real_poly_roots undecided interval with adjacent bounds")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         const auto check = [](const std::vector<fp_t> &cfs, fp_t h) {

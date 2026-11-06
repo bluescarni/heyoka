@@ -790,10 +790,14 @@ expression atan2(expression y, double x)
     return atan2(std::move(y), expression(x));
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 expression atan2(expression y, long double x)
 {
     return atan2(std::move(y), expression(x));
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -819,10 +823,14 @@ expression atan2(double y, expression x)
     return atan2(expression(y), std::move(x));
 }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 expression atan2(long double y, expression x)
 {
     return atan2(expression(y), std::move(x));
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -66,8 +66,10 @@ number inv_kep_E_pi_like(llvm_state &s, const llvm::Type *const tp)
         return number{boost::math::constants::pi<float>()};
     } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{boost::math::constants::pi<double>()};
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{boost::math::constants::pi<long double>()};
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::pi_128};
@@ -96,8 +98,10 @@ number inv_kep_E_eps_like(llvm_state &s, const llvm::Type *const tp)
         return number{std::numeric_limits<float>::epsilon()};
     } else if (tp == to_external_llvm_type<double>(context, false)) {
         return number{std::numeric_limits<double>::epsilon()};
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (tp == to_external_llvm_type<long double>(context, false)) {
         return number{std::numeric_limits<long double>::epsilon()};
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_external_llvm_type<mppp::real128>(context, false)) {
         return number{std::numeric_limits<mppp::real128>::epsilon()};
