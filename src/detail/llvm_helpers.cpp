@@ -1243,8 +1243,8 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Val
 
         // Store the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
-            auto *cur_limb_ptr
-                = llvm_unsigned_gep(builder, limb_t, out_limb_ptr, builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+            auto *cur_limb_ptr = llvm_unsigned_gep(builder, limb_t, out_limb_ptr,
+                                                   builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
             builder.CreateStore(builder.CreateExtractValue(vec, {2u, boost::numeric_cast<std::uint32_t>(i)}),
                                 cur_limb_ptr);
         }
@@ -1689,7 +1689,11 @@ llvm::Value *llvm_unsigned_gep(ir_builder &bld, llvm::Type *const tp, llvm::Valu
         new_idxs.push_back(new_idx);
     }
 
-    return bld.CreateInBoundsGEP(tp, ptr, new_idxs);
+    // NOTE: need to use the explicit constructor here, implicit construction from Boost's small_vector does not work on
+    // earlier LLVM versions.
+    const llvm::ArrayRef<llvm::Value *> new_idxs_ref(new_idxs.data(), new_idxs.data() + new_idxs.size());
+
+    return bld.CreateInBoundsGEP(tp, ptr, new_idxs_ref);
 }
 
 } // namespace detail
