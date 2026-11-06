@@ -172,12 +172,12 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
                 auto *idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
 
                 // Load the date values.
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx})), t0_alloc);
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1})), t1_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, hd::llvm_unsigned_gep(bld, fp_t, date_ptr, {idx})), t0_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, hd::llvm_unsigned_gep(bld, fp_t, date_ptr, {idxp1})), t1_alloc);
 
                 // Load the eop values.
-                auto *eop0 = bld.CreateLoad(eop_t, bld.CreateInBoundsGEP(eop_t, eop_ptr, {idx}));
-                auto *eop1 = bld.CreateLoad(eop_t, bld.CreateInBoundsGEP(eop_t, eop_ptr, {idxp1}));
+                auto *eop0 = bld.CreateLoad(eop_t, hd::llvm_unsigned_gep(bld, eop_t, eop_ptr, {idx}));
+                auto *eop1 = bld.CreateLoad(eop_t, hd::llvm_unsigned_gep(bld, eop_t, eop_ptr, {idxp1}));
 
                 // Decompose into hi/lo parts.
                 bld.CreateStore(bld.CreateExtractValue(eop0, {0}), eop0_hi_alloc);
@@ -212,10 +212,10 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
         auto *idxp1 = bld.CreateAdd(idx, mask32);
 
         // Load the date values, using nans as passhtru.
-        t0 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx}), llvm::Align(align), mask,
+        t0 = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, date_ptr, {idx}), llvm::Align(align), mask,
                                     nan_const);
-        t1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1}), llvm::Align(align), mask,
-                                    nan_const);
+        t1 = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, date_ptr, {idxp1}), llvm::Align(align),
+                                    mask, nan_const);
 
         // NOTE: we are now going to do a bit of type punning. The eop data is originally an array of size-2 arrays, but
         // we will be accessing it as a flat 1D array, which allows us to perform vector gathers more easily. This would
@@ -235,14 +235,14 @@ llvm::Function *llvm_get_eop_angle_func_dl(llvm_state &s, llvm::Type *fp_t, std:
         auto *idxp1_lo = bld.CreateAdd(idxp1_hi, mask32);
 
         // Load the hi/lo eop values.
-        eop0_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idx_hi}), llvm::Align(align),
+        eop0_hi = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, eop_ptr, {idx_hi}), llvm::Align(align),
                                          mask, nan_const);
-        eop0_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idx_lo}), llvm::Align(align),
+        eop0_lo = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, eop_ptr, {idx_lo}), llvm::Align(align),
                                          mask, nan_const);
-        eop1_hi = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idxp1_hi}), llvm::Align(align),
-                                         mask, nan_const);
-        eop1_lo = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_ptr, {idxp1_lo}), llvm::Align(align),
-                                         mask, nan_const);
+        eop1_hi = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, eop_ptr, {idxp1_hi}),
+                                         llvm::Align(align), mask, nan_const);
+        eop1_lo = bld.CreateMaskedGather(val_t, hd::llvm_unsigned_gep(bld, fp_t, eop_ptr, {idxp1_lo}),
+                                         llvm::Align(align), mask, nan_const);
     }
 
     // We can now proceed to perform linear interpolation in double-length arithmetic.

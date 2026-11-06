@@ -149,7 +149,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // NOTE: i * batch_size cannot overflow, as checked at the beginning of the function.
     auto *const ext_fp_t = make_external_llvm_type(fp_t);
     const auto load_cf = [&](const std::uint32_t i) {
-        auto *const ptr = builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.getInt32(i * batch_size));
+        auto *const ptr = llvm_unsigned_gep(builder, ext_fp_t, cf_ptr, builder.getInt32(i * batch_size));
         return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
     };
 
@@ -208,7 +208,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Store the enclosure.
     const auto [acc_mlo, acc_hi] = ivg.ival_extract(acc);
     ext_store_vector_to_memory(s, enc_ptr, ivg.val_neg(acc_mlo));
-    auto *const enc_hi_ptr = builder.CreateInBoundsGEP(ext_fp_t, enc_ptr, builder.getInt32(batch_size));
+    auto *const enc_hi_ptr = llvm_unsigned_gep(builder, ext_fp_t, enc_ptr, builder.getInt32(batch_size));
     ext_store_vector_to_memory(s, enc_hi_ptr, acc_hi);
 
     // Finalise the guard before emitting the return statement.

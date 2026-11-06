@@ -63,6 +63,9 @@ llvm::Type *to_external_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
     return to_external_llvm_type_impl(c, typeid(T), err_throw);
 }
 
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *llvm_unsigned_gep(ir_builder &, llvm::Type *, llvm::Value *,
+                                                               llvm::ArrayRef<llvm::Value *>);
+
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t);
 

@@ -125,25 +125,25 @@ llvm_ed_ival_de_casteljau_half_loop(const llvm_ival_guard &ivg, const std::vecto
 
     // Helper to set a value into the left result: left_res[idx] = x.
     const auto set_left = [&bld, array_t, left_res_alloca, val_0](llvm::Value *const idx, llvm::Value *const x) {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, left_res_alloca, {val_0, idx});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, left_res_alloca, {val_0, idx});
         bld.CreateStore(x, ptr);
     };
 
     // Helper to get a value from the left result: return left_res[idx].
     const auto get_left = [&bld, array_t, left_res_alloca, val_0, ival_t](llvm::Value *const idx) -> llvm::Value * {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, left_res_alloca, {val_0, idx});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, left_res_alloca, {val_0, idx});
         return bld.CreateLoad(ival_t, ptr);
     };
 
     // Helper to set a value into the running row: row[idx] = x.
     const auto set_row = [&bld, array_t, row_arr_alloca, val_0](llvm::Value *const idx, llvm::Value *const x) {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, row_arr_alloca, {val_0, idx});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, row_arr_alloca, {val_0, idx});
         bld.CreateStore(x, ptr);
     };
 
     // Helper to get a value from the running row: return row[idx].
     const auto get_row = [&bld, array_t, row_arr_alloca, val_0, ival_t](llvm::Value *const idx) -> llvm::Value * {
-        auto *const ptr = bld.CreateInBoundsGEP(array_t, row_arr_alloca, {val_0, idx});
+        auto *const ptr = llvm_unsigned_gep(bld, array_t, row_arr_alloca, {val_0, idx});
         return bld.CreateLoad(ival_t, ptr);
     };
 

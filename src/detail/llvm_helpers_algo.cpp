@@ -103,7 +103,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
     // Validate the input array.
     llvm_loop_u32(s, bld.getInt32(0), arr_size, [&bld, &s, scal_t, ptr, arr_size](llvm::Value *cur_idx) {
         // Load the current value.
-        auto *cur_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {cur_idx}));
+        auto *cur_val = bld.CreateLoad(scal_t, llvm_unsigned_gep(bld, scal_t, ptr, {cur_idx}));
 
         // Check that it is not NaN.
         llvm_assert(s, llvm_fcmp_ord(s, cur_val, cur_val));
@@ -113,7 +113,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
         llvm_if_then_else(
             s, bld.CreateICmpEQ(next_idx, arr_size), [] {},
             [&bld, &s, cur_val, scal_t, ptr, next_idx] {
-                auto *next_val = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, ptr, {next_idx}));
+                auto *next_val = bld.CreateLoad(scal_t, llvm_unsigned_gep(bld, scal_t, ptr, {next_idx}));
 
                 llvm_assert(s, llvm_fcmp_ole(s, cur_val, next_val));
             });
@@ -183,7 +183,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
             if (batch_size == 1u) {
                 // Normal scalar load.
                 HEYOKA_LLVM_ASSERT(s, bld.CreateICmpULT(it, arr_size_splat));
-                cur_value = bld.CreateLoad(scal_t, bld.CreateInBoundsGEP(scal_t, arr_ptr, {it}));
+                cur_value = bld.CreateLoad(scal_t, llvm_unsigned_gep(bld, scal_t, arr_ptr, {it}));
             } else {
                 // NOTE: as explained above, in vector mode we must take care to avoid loading from 'it'
                 // if it points one past the end. We accomplish this with a masked gather.
@@ -199,7 +199,7 @@ llvm::Value *llvm_upper_bound(llvm_state &s, llvm::Value *ptr, llvm::Value *arr_
                 auto *passthru = v;
 
                 // Masked gather with passthru.
-                cur_value = bld.CreateMaskedGather(fp_vec_t, bld.CreateInBoundsGEP(scal_t, arr_ptr, {it}),
+                cur_value = bld.CreateMaskedGather(fp_vec_t, llvm_unsigned_gep(bld, scal_t, arr_ptr, {it}),
                                                    llvm::Align(align), mask, passthru);
             }
 

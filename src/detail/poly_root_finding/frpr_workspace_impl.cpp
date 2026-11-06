@@ -137,7 +137,7 @@ void frpr_workspace_add_bernstein(const std::string &name, llvm_state &s, llvm::
     std::vector<llvm::Value *> cfs;
     cfs.reserve(n + 1u);
     for (std::uint32_t i = 0; i <= n; ++i) {
-        auto *const ptr = bld.CreateInBoundsGEP(ext_fp_t, cfs_ptr, bld.getInt32(i));
+        auto *const ptr = llvm_unsigned_gep(bld, ext_fp_t, cfs_ptr, bld.getInt32(i));
         cfs.push_back(ext_load_vector_from_memory(s, fp_t, ptr, 1));
     }
 
@@ -147,15 +147,15 @@ void frpr_workspace_add_bernstein(const std::string &name, llvm_state &s, llvm::
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {
         // Bernstein first.
-        auto *out_ptr_mlo = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_bernstein, bld.getInt32(2u * i));
-        auto *out_ptr_hi = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_bernstein, bld.getInt32((2u * i) + 1u));
+        auto *out_ptr_mlo = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_bernstein, bld.getInt32(2u * i));
+        auto *out_ptr_hi = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_bernstein, bld.getInt32((2u * i) + 1u));
         auto [mlo, hi] = ivg.ival_extract(bern_cfs[i]);
         ext_store_vector_to_memory(s, out_ptr_mlo, mlo);
         ext_store_vector_to_memory(s, out_ptr_hi, hi);
 
         // Rescaled second.
-        out_ptr_mlo = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_rescaled, bld.getInt32(2u * i));
-        out_ptr_hi = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_rescaled, bld.getInt32((2u * i) + 1u));
+        out_ptr_mlo = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_rescaled, bld.getInt32(2u * i));
+        out_ptr_hi = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_rescaled, bld.getInt32((2u * i) + 1u));
         std::tie(mlo, hi) = ivg.ival_extract(rescaled_cfs[i]);
         ext_store_vector_to_memory(s, out_ptr_mlo, mlo);
         ext_store_vector_to_memory(s, out_ptr_hi, hi);
@@ -240,8 +240,8 @@ void frpr_workspace_add_de_casteljau(const std::string &name, llvm_state &s, llv
     std::vector<llvm::Value *> cfs;
     cfs.reserve(n + 1u);
     for (std::uint32_t i = 0; i <= n; ++i) {
-        auto *const ptr_mlo = bld.CreateInBoundsGEP(ext_fp_t, cfs_ptr, bld.getInt32(2u * i));
-        auto *const ptr_hi = bld.CreateInBoundsGEP(ext_fp_t, cfs_ptr, bld.getInt32((2u * i) + 1u));
+        auto *const ptr_mlo = llvm_unsigned_gep(bld, ext_fp_t, cfs_ptr, bld.getInt32(2u * i));
+        auto *const ptr_hi = llvm_unsigned_gep(bld, ext_fp_t, cfs_ptr, bld.getInt32((2u * i) + 1u));
 
         cfs.push_back(ivg.ival_construct(ext_load_vector_from_memory(s, fp_t, ptr_mlo, 1),
                                          ext_load_vector_from_memory(s, fp_t, ptr_hi, 1)));
@@ -253,15 +253,15 @@ void frpr_workspace_add_de_casteljau(const std::string &name, llvm_state &s, llv
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {
         // Left.
-        auto *out_ptr_mlo = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_left, bld.getInt32(2u * i));
-        auto *out_ptr_hi = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_left, bld.getInt32((2u * i) + 1u));
+        auto *out_ptr_mlo = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_left, bld.getInt32(2u * i));
+        auto *out_ptr_hi = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_left, bld.getInt32((2u * i) + 1u));
         auto [mlo, hi] = ivg.ival_extract(left_cfs[i]);
         ext_store_vector_to_memory(s, out_ptr_mlo, mlo);
         ext_store_vector_to_memory(s, out_ptr_hi, hi);
 
         // Right.
-        out_ptr_mlo = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_right, bld.getInt32(2u * i));
-        out_ptr_hi = bld.CreateInBoundsGEP(ext_fp_t, out_ptr_right, bld.getInt32((2u * i) + 1u));
+        out_ptr_mlo = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_right, bld.getInt32(2u * i));
+        out_ptr_hi = llvm_unsigned_gep(bld, ext_fp_t, out_ptr_right, bld.getInt32((2u * i) + 1u));
         std::tie(mlo, hi) = ivg.ival_extract(right_cfs[i]);
         ext_store_vector_to_memory(s, out_ptr_mlo, mlo);
         ext_store_vector_to_memory(s, out_ptr_hi, hi);

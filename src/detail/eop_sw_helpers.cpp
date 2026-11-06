@@ -109,7 +109,7 @@ llvm::Value *llvm_get_eop_sw_data(llvm_state &s, const Data &data, llvm::Type *v
 
     // Helper to return a pointer to the first element of the array.
     const auto fetch_ptr = [&bld = s.builder()](llvm::GlobalVariable *g_arr) {
-        return bld.CreateInBoundsGEP(g_arr->getValueType(), g_arr, {bld.getInt32(0), bld.getInt32(0)});
+        return llvm_unsigned_gep(bld, g_arr->getValueType(), g_arr, {bld.getInt32(0), bld.getInt32(0)});
     };
 
     // Check if we already codegenned the array.
@@ -479,12 +479,12 @@ llvm::Function *llvm_get_eop_sw_func(llvm_state &s, const char *descr, llvm::Typ
                 auto *const idxp1 = bld.CreateAdd(idx, bld.getInt32(1));
 
                 // Load the date values.
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx})), t0_alloc);
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1})), t1_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, llvm_unsigned_gep(bld, fp_t, date_ptr, {idx})), t0_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, llvm_unsigned_gep(bld, fp_t, date_ptr, {idxp1})), t1_alloc);
 
                 // Load the EOP/SW values.
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idx})), eop_sw0_alloc);
-                bld.CreateStore(bld.CreateLoad(fp_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idxp1})), eop_sw1_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, llvm_unsigned_gep(bld, fp_t, eop_sw_ptr, {idx})), eop_sw0_alloc);
+                bld.CreateStore(bld.CreateLoad(fp_t, llvm_unsigned_gep(bld, fp_t, eop_sw_ptr, {idxp1})), eop_sw1_alloc);
             });
 
         // Fetch the values that we have stored in the allocs.
@@ -509,15 +509,15 @@ llvm::Function *llvm_get_eop_sw_func(llvm_state &s, const char *descr, llvm::Typ
         auto *const idxp1 = bld.CreateAdd(idx, mask32);
 
         // Load the date values, using nans as passhtru.
-        t0 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idx}), llvm::Align(align), mask,
+        t0 = bld.CreateMaskedGather(val_t, llvm_unsigned_gep(bld, fp_t, date_ptr, {idx}), llvm::Align(align), mask,
                                     nan_const);
-        t1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, date_ptr, {idxp1}), llvm::Align(align), mask,
+        t1 = bld.CreateMaskedGather(val_t, llvm_unsigned_gep(bld, fp_t, date_ptr, {idxp1}), llvm::Align(align), mask,
                                     nan_const);
 
         // Load the EOP/SW values, using nans as passhtru.
-        eop_sw0 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idx}), llvm::Align(align),
+        eop_sw0 = bld.CreateMaskedGather(val_t, llvm_unsigned_gep(bld, fp_t, eop_sw_ptr, {idx}), llvm::Align(align),
                                          mask, nan_const);
-        eop_sw1 = bld.CreateMaskedGather(val_t, bld.CreateInBoundsGEP(fp_t, eop_sw_ptr, {idxp1}), llvm::Align(align),
+        eop_sw1 = bld.CreateMaskedGather(val_t, llvm_unsigned_gep(bld, fp_t, eop_sw_ptr, {idxp1}), llvm::Align(align),
                                          mask, nan_const);
     }
 

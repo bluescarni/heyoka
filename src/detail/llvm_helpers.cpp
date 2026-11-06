@@ -22,12 +22,14 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/container/small_vector.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/predef/architecture.h>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/Analysis/VectorUtils.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Argument.h>
@@ -1065,7 +1067,7 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *const tp, 
         // The portable approach.
         llvm::Value *ret = llvm::PoisonValue::get(vector_t);
         for (std::uint32_t i = 0; i < vector_size; ++i) {
-            auto *p = builder.CreateInBoundsGEP(tp, ptr, builder.getInt32(i));
+            auto *p = llvm_unsigned_gep(builder, tp, ptr, builder.getInt32(i));
             ret = builder.CreateInsertElement(ret, builder.CreateLoad(tp, p), i);
         }
 
@@ -1107,7 +1109,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, ll
 
         // Load the precision from the external value.
         auto *prec_t = to_external_llvm_type<mpfr_prec_t>(context);
-        auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec_ptr = builder.CreateStructGEP(real_t, ptr, 0);
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
         llvm_assert(s, builder.CreateICmpEQ(
@@ -1118,23 +1120,23 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *const tp, ll
         llvm::Value *ret = llvm::PoisonValue::get(tp);
 
         // Read and insert the sign.
-        auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
+        auto *sign_ptr = builder.CreateStructGEP(real_t, ptr, 1);
         auto *sign = builder.CreateLoad(to_external_llvm_type<mpfr_sign_t>(context), sign_ptr);
         ret = builder.CreateInsertValue(ret, sign, {0u});
 
         // Read and insert the exponent.
-        auto *exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
+        auto *exp_ptr = builder.CreateStructGEP(real_t, ptr, 2);
         auto *exp = builder.CreateLoad(to_external_llvm_type<mpfr_exp_t>(context), exp_ptr);
         ret = builder.CreateInsertValue(ret, exp, {1u});
 
         // Load in a local variable the input pointer to the limbs.
-        auto *limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
+        auto *limb_ptr_ptr = builder.CreateStructGEP(real_t, ptr, 3);
         auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), limb_ptr_ptr);
 
         // Load and insert the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
             auto *cur_limb_ptr
-                = builder.CreateInBoundsGEP(limb_t, limb_ptr, builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+                = llvm_unsigned_gep(builder, limb_t, limb_ptr, builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
             auto *limb = builder.CreateLoad(limb_t, cur_limb_ptr);
             ret = builder.CreateInsertValue(ret, limb, {2u, boost::numeric_cast<std::uint32_t>(i)});
         }
@@ -1180,7 +1182,7 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *const ptr, llvm::V
         // NOTE: this is the mirror image of the portable load performed in load_vector_from_memory(), i.e., we unpack
         // the vector and store the scalars one by one.
         for (std::uint32_t i = 0; i < vector_size; ++i) {
-            auto *p = builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i));
+            auto *p = llvm_unsigned_gep(builder, scal_t, ptr, builder.getInt32(i));
             builder.CreateStore(builder.CreateExtractElement(vec, i), p);
         }
     } else {
@@ -1219,7 +1221,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Val
 
         // Load the precision from the external value.
         auto *prec_t = to_external_llvm_type<mpfr_prec_t>(context);
-        auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *out_prec_ptr = builder.CreateStructGEP(real_t, ptr, 0);
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
         llvm_assert(s, builder.CreateICmpEQ(
@@ -1228,21 +1230,21 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *const ptr, llvm::Val
 #endif
 
         // Store the sign.
-        auto *out_sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
+        auto *out_sign_ptr = builder.CreateStructGEP(real_t, ptr, 1);
         builder.CreateStore(builder.CreateExtractValue(vec, {0u}), out_sign_ptr);
 
         // Store the exponent.
-        auto *out_exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
+        auto *out_exp_ptr = builder.CreateStructGEP(real_t, ptr, 2);
         builder.CreateStore(builder.CreateExtractValue(vec, {1u}), out_exp_ptr);
 
         // Load in a local variable the output pointer to the limbs.
-        auto *out_limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
+        auto *out_limb_ptr_ptr = builder.CreateStructGEP(real_t, ptr, 3);
         auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(context), out_limb_ptr_ptr);
 
         // Store the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
-            auto *cur_limb_ptr = builder.CreateInBoundsGEP(limb_t, out_limb_ptr,
-                                                           builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+            auto *cur_limb_ptr = llvm_unsigned_gep(builder, limb_t, out_limb_ptr,
+                                                   builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
             builder.CreateStore(builder.CreateExtractValue(vec, {2u, boost::numeric_cast<std::uint32_t>(i)}),
                                 cur_limb_ptr);
         }
@@ -1518,7 +1520,7 @@ llvm::Value *llvm_create_global_string_ptr(llvm_state &s, const char *str)
     auto *gv = bld.CreateGlobalString(str);
 
     // Fetch and return a pointer to the first element of the array.
-    return bld.CreateInBoundsGEP(gv->getValueType(), gv, {bld.getInt32(0), bld.getInt32(0)});
+    return llvm_unsigned_gep(bld, gv->getValueType(), gv, {bld.getInt32(0), bld.getInt32(0)});
 }
 
 } // namespace
@@ -1620,6 +1622,78 @@ llvm::Value *llvm_entry_alloca(llvm_state &s, llvm::Type *const tp)
     builder.SetInsertPoint(&entry, entry.begin());
 
     return builder.CreateAlloca(tp);
+}
+
+// Create an inbounds GEP instruction, interpreting the indices as unsigned integers.
+//
+// LLVM treats GEP indices as signed: an index narrower than the pointer index type (e.g., a 32-bit index on a 64-bit
+// platform) is sign-extended, so that a 32-bit index >= 2**31 becomes a negative offset. This function instead converts
+// all the indices (element-wise for vector indices) to the pointer index type as unsigned integers: narrower indices
+// are zero-extended, wider ones are truncated.
+//
+// tp is the type the GEP indexes into, ptr the base pointer (or vector of pointers) and idxs the indices. The indices
+// after the first must not index into structs, because struct field indices must remain 32-bit integer constants.
+//
+// NOTE: we need this helper because in C++ we are measuring the sizes of memory buffers via unsigned types which are
+// often narrower than the native bit size (e.g., 32-bit uints on 64-bit architectures). On the C++ side, we carefully
+// check that indexing through these narrow types does not result in overflow/wraparound. This helper makes sure that
+// when we move into the LLVM world these checks remain valid, in the sense that we are not silently treating unsigned
+// ints as signed ints for the purposes of address computation.
+llvm::Value *llvm_unsigned_gep(ir_builder &bld, llvm::Type *const tp, llvm::Value *const ptr,
+                               const llvm::ArrayRef<llvm::Value *> idxs)
+{
+    assert(tp != nullptr);
+    assert(ptr != nullptr);
+    assert(ptr->getType()->isPtrOrPtrVectorTy());
+    assert(!idxs.empty());
+    assert(std::ranges::all_of(
+        idxs, [](const auto *x) { return x != nullptr && x->getType()->getScalarType()->isIntegerTy(); }));
+
+#if !defined(NDEBUG)
+
+    // The indices after the first must not index into structs.
+    {
+        auto *cur_t = tp;
+        for (decltype(idxs.size()) i = 1; i < idxs.size(); ++i) {
+            assert(!cur_t->isStructTy());
+            cur_t = llvm::GetElementPtrInst::getTypeAtIndex(cur_t, idxs[i]);
+            // NOTE: this checks that the set of indices is valid for tp.
+            assert(cur_t != nullptr);
+        }
+    }
+
+#endif
+
+    assert(bld.GetInsertBlock() != nullptr);
+
+    // Fetch the data layout.
+    const auto &dl = bld.GetInsertBlock()->getModule()->getDataLayout();
+
+    // Fetch the type of a scalar GEP index.
+    auto *const scalar_new_idx_tp = dl.getIndexType(ptr->getType()->getScalarType());
+
+    // Zero-extend the indices to the pointer index type.
+    boost::container::small_vector<llvm::Value *, 8> new_idxs;
+    for (auto *const orig_idx : idxs) {
+        llvm::Value *new_idx{};
+
+        if (const auto *const orig_vec_t = llvm::dyn_cast<llvm::VectorType>(orig_idx->getType())) {
+            // The current index is a vector, we need the vector version of scalar_new_idx_tp.
+            auto *const new_vector_t = llvm::VectorType::get(scalar_new_idx_tp, orig_vec_t->getElementCount());
+            new_idx = bld.CreateIntCast(orig_idx, new_vector_t, false);
+        } else {
+            // The current index is a scalar, we can directly convert it to scalar_new_idx_tp.
+            new_idx = bld.CreateIntCast(orig_idx, scalar_new_idx_tp, false);
+        }
+
+        new_idxs.push_back(new_idx);
+    }
+
+    // NOTE: need to use the explicit constructor here, implicit construction from Boost's small_vector does not work on
+    // earlier LLVM versions.
+    const llvm::ArrayRef<llvm::Value *> new_idxs_ref(new_idxs.data(), new_idxs.data() + new_idxs.size());
+
+    return bld.CreateInBoundsGEP(tp, ptr, new_idxs_ref);
 }
 
 } // namespace detail

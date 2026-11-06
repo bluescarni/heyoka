@@ -185,10 +185,10 @@ llvm::Function *irr_add_poly_root_finder(const std::string &name, llvm_state &s,
     cfs_prime.reserve(n);
     for (std::uint32_t i = 0; i <= n; ++i) {
         // Construct the current coefficient for q.
-        auto *ptr = bld.CreateInBoundsGEP(ext_fp_t, cfs_ptr, bld.getInt32(i * 2u));
+        auto *ptr = llvm_unsigned_gep(bld, ext_fp_t, cfs_ptr, bld.getInt32(i * 2u));
         auto *const cur_cf_mlo = ext_load_vector_from_memory(s, fp_t, ptr, 1);
 
-        ptr = bld.CreateInBoundsGEP(ext_fp_t, cfs_ptr, bld.getInt32((i * 2u) + 1u));
+        ptr = llvm_unsigned_gep(bld, ext_fp_t, cfs_ptr, bld.getInt32((i * 2u) + 1u));
         auto *const cur_cf_hi = ext_load_vector_from_memory(s, fp_t, ptr, 1);
 
         cfs.push_back(ivg.ival_construct(cur_cf_mlo, cur_cf_hi));
@@ -211,7 +211,7 @@ llvm::Function *irr_add_poly_root_finder(const std::string &name, llvm_state &s,
     // Load the (lo, hi) bounds.
     auto *const orig_lo = ext_load_vector_from_memory(s, fp_t, bounds_ptr, 1);
     auto *const orig_hi
-        = ext_load_vector_from_memory(s, fp_t, bld.CreateInBoundsGEP(ext_fp_t, bounds_ptr, bld.getInt32(1)), 1);
+        = ext_load_vector_from_memory(s, fp_t, llvm_unsigned_gep(bld, ext_fp_t, bounds_ptr, bld.getInt32(1)), 1);
 
     // Load the sign of the polynomial at lo (1 or -1 following the preconditions).
     auto *const sign_lo = bld.CreateLoad(bld.getInt32Ty(), sign_ptr);

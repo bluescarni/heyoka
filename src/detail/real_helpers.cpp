@@ -193,22 +193,22 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_to_mpfr_view(llvm_state &s, ll
 
     // Store the precision.
     builder.CreateStore(
-        prec_const, builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)}));
+        prec_const, builder.CreateStructGEP(real_t, mpfr_struct_inst, 0));
 
     // Store the sign.
     builder.CreateStore(
         builder.CreateExtractValue(r, {0u}),
-        builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(1)}));
+        builder.CreateStructGEP(real_t, mpfr_struct_inst, 1));
 
     // Store the exponent.
     builder.CreateStore(
         builder.CreateExtractValue(r, {1u}),
-        builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(2)}));
+        builder.CreateStructGEP(real_t, mpfr_struct_inst, 2));
 
     // Store the pointer to the limb array.
     builder.CreateStore(
-        builder.CreateInBoundsGEP(limb_arr_t, limb_arr, {builder.getInt32(0), builder.getInt32(0)}),
-        builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(3)}));
+        llvm_unsigned_gep(builder, limb_arr_t, limb_arr, {builder.getInt32(0), builder.getInt32(0)}),
+        builder.CreateStructGEP(real_t, mpfr_struct_inst, 3));
 
     return {mpfr_struct_inst, limb_arr};
 }
@@ -247,12 +247,12 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
 
     // Store the precision.
     builder.CreateStore(
-        prec_const, builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)}));
+        prec_const, builder.CreateStructGEP(real_t, mpfr_struct_inst, 0));
 
     // Store the pointer to the limb array.
     builder.CreateStore(
-        builder.CreateInBoundsGEP(limb_arr_t, limb_arr, {builder.getInt32(0), builder.getInt32(0)}),
-        builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(3)}));
+        llvm_unsigned_gep(builder, limb_arr_t, limb_arr, {builder.getInt32(0), builder.getInt32(0)}),
+        builder.CreateStructGEP(real_t, mpfr_struct_inst, 3));
 
     return {mpfr_struct_inst, limb_arr};
 }
@@ -281,7 +281,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     auto *prec_t = to_external_llvm_type<mpfr_prec_t>(s.context());
 
     // Load the precision value from the view.
-    auto *prec_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)});
+    auto *prec_ptr = builder.CreateStructGEP(real_t, mpfr_struct_inst, 0);
     auto *prec_value = builder.CreateLoad(prec_t, prec_ptr);
 
     // Check that it matches the precision of fp_t.
@@ -289,10 +289,10 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
 #endif
 
-    auto *sign_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(1)});
+    auto *sign_ptr = builder.CreateStructGEP(real_t, mpfr_struct_inst, 1);
     res = builder.CreateInsertValue(res, builder.CreateLoad(struct_fp_t->getElementType(0u), sign_ptr), {0});
 
-    auto *exp_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(2)});
+    auto *exp_ptr = builder.CreateStructGEP(real_t, mpfr_struct_inst, 2);
     res = builder.CreateInsertValue(res, builder.CreateLoad(struct_fp_t->getElementType(1u), exp_ptr), {1});
 
     res = builder.CreateInsertValue(res, builder.CreateLoad(limb_arr_t, limb_arr), {2});

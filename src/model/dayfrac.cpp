@@ -264,7 +264,7 @@ llvm::Value *dayfrac_llvm_eval_impl(llvm_state &s, llvm::Value *x)
     auto *inout_arr = bld.CreateAlloca(inout_arr_t);
 
     // Fetch a pointer to the beginning of the array.
-    auto *arr_begin_ptr = bld.CreateInBoundsGEP(inout_arr_t, inout_arr, {bld.getInt32(0), bld.getInt32(0)});
+    auto *arr_begin_ptr = hd::llvm_unsigned_gep(bld, inout_arr_t, inout_arr, {bld.getInt32(0), bld.getInt32(0)});
 
     // Build the attributes for the invocation of the external function.
     const auto attr_list = llvm::AttributeList::get(ctx, llvm::AttributeList::FunctionIndex,
@@ -278,7 +278,8 @@ llvm::Value *dayfrac_llvm_eval_impl(llvm_state &s, llvm::Value *x)
 
         // Convert the scalars to double and store them into the array.
         for (std::uint32_t i = 0; i < vector_size; ++i) {
-            bld.CreateStore(fp_to_dbl(s, scalars[i]), bld.CreateInBoundsGEP(dbl_t, arr_begin_ptr, {bld.getInt32(i)}));
+            bld.CreateStore(fp_to_dbl(s, scalars[i]),
+                            hd::llvm_unsigned_gep(bld, dbl_t, arr_begin_ptr, {bld.getInt32(i)}));
         }
 
         // Invoke the external function.
@@ -287,7 +288,7 @@ llvm::Value *dayfrac_llvm_eval_impl(llvm_state &s, llvm::Value *x)
 
         // Load the return values from the array and convert them to the scalar counterpart of x_t.
         for (std::uint32_t i = 0; i < vector_size; ++i) {
-            auto *dbl_ret = bld.CreateLoad(dbl_t, bld.CreateInBoundsGEP(dbl_t, arr_begin_ptr, {bld.getInt32(i)}));
+            auto *dbl_ret = bld.CreateLoad(dbl_t, hd::llvm_unsigned_gep(bld, dbl_t, arr_begin_ptr, {bld.getInt32(i)}));
             scalars[i] = dbl_to_fp(s, dbl_ret, x_t->getScalarType());
         }
 

@@ -592,7 +592,7 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
     auto *arr_idx = builder.CreateMul(stride, to_size_t(s, builder.getInt32(p.idx())));
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, arr_idx);
+    auto *ptr = llvm_unsigned_gep(builder, ext_fp_t, par_ptr, arr_idx);
 
     // Load and return.
     return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
