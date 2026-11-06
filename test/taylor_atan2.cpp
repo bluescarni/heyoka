@@ -38,19 +38,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 TEST_CASE("taylor atan2 decompose bug 00")
 {
 
@@ -140,7 +127,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == 5);
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
                 {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
@@ -167,7 +154,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == 4);
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(expression{number{a}}, par[1]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
                                                   2,
@@ -215,7 +202,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == fp_t{1} / 2 * (jet[2] + jet[3]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
                 {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
@@ -248,7 +235,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == fp_t{1} / 2 * (jet[5] + jet[7]));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(par[0], par[1]), prime(y) = x + y},
                                                   {fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}},
                                                   3,
@@ -296,7 +283,7 @@ TEST_CASE("taylor atan2")
         }
 
         // Do the batch/scalar comparison.
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y}, opt_level,
                 high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
@@ -345,7 +332,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(jet[0], b)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
                 {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -372,7 +359,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == approximately(atan2(jet[1], b)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta
                 = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, par[1])},
                                               {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -421,7 +408,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * b * jet[2] / (jet[0] * jet[0] + b * b)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
                 {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -454,7 +441,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * b * jet[5] / (jet[1] * jet[1] + b * b)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
                 {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
@@ -519,7 +506,7 @@ TEST_CASE("taylor atan2")
                                      / ((jet[2] * jet[2] + b * b) * (jet[2] * jet[2] + b * b))));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})}, opt_level,
@@ -569,7 +556,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(c, jet[0])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
                 {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -596,7 +583,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == approximately(atan2(c, jet[1])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta
                 = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(par[1], x)},
                                               {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -645,7 +632,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == approximately(-fp_t{1} / 2 * c * jet[2] / (jet[0] * jet[0] + c * c)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
                 {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
@@ -678,7 +665,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == approximately(-fp_t{1} / 2 * c * jet[5] / (jet[1] * jet[1] + c * c)));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{
                 {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
                 {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
@@ -745,7 +732,7 @@ TEST_CASE("taylor atan2")
                                      / ((jet[2] * jet[2] + c * c) * (jet[2] * jet[2] + c * c))));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)}, opt_level,
@@ -775,7 +762,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(jet[1], jet[0])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
                                                   {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
                                                   2,
@@ -825,7 +812,7 @@ TEST_CASE("taylor atan2")
                                      / (jet[0] * jet[0] + jet[1] * jet[1])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
                                                   {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
                                                   2,
@@ -865,7 +852,7 @@ TEST_CASE("taylor atan2")
                                      / (jet[1] * jet[1] + jet[3] * jet[3])));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
                                                   {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
                                                   3,
@@ -951,7 +938,7 @@ TEST_CASE("taylor atan2")
                                  / ((jet[2] * jet[2] + jet[5] * jet[5]) * (jet[2] * jet[2] + jet[5] * jet[5]))));
         }
 
-        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+        {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = atan2(x, y), prime(y) = atan2(y, x)}, opt_level, high_accuracy,
                                        compact_mode, rng, -10.f, 10.f, fp_t(10000));
@@ -960,10 +947,10 @@ TEST_CASE("taylor atan2")
 
     for (auto cm : {true, false}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }

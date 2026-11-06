@@ -48,19 +48,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 // Wrappers to make the combined versions of sin/cos.
 expression sin(expression x, const bool combined)
 {
@@ -129,7 +116,9 @@ TEST_CASE("sin number simpl")
         REQUIRE(sin(x * 0., combined) == 0_dbl);
         REQUIRE(sin(0.123_flt, combined) == expression{std::sin(0.123f)});
         REQUIRE(sin(0.123_dbl, combined) == expression{std::sin(0.123)});
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
         REQUIRE(sin(-0.123_ldbl, combined) == expression{std::sin(-0.123l)});
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
         using namespace mppp::literals;
@@ -154,10 +143,6 @@ TEST_CASE("cfunc")
 
         for (const auto combined : {true, false}) {
             for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                    continue;
-                }
-
                 outs.resize(batch_size * 3u);
                 ins.resize(batch_size);
                 pars.resize(batch_size);
@@ -194,10 +179,10 @@ TEST_CASE("cfunc")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 }

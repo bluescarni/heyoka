@@ -35,7 +35,7 @@ using namespace heyoka_test;
 
 const auto fp_types = std::tuple<float, double
 #if !defined(__FreeBSD__)
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
                                  ,
                                  long double
 #endif

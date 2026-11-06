@@ -133,8 +133,10 @@ int main(int argc, char *argv[])
 
     if (fp_type == "double") {
         run_bench<double>(tol, high_accuracy, batch_size, compact_mode, fast_math);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (fp_type == "long double") {
         run_bench<long double>(tol, high_accuracy, batch_size, compact_mode, fast_math);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
         run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, batch_size, compact_mode, fast_math);

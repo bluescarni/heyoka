@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <chrono>
 #include <cmath>
 #include <initializer_list>
@@ -156,10 +158,14 @@ int main(int argc, char *argv[])
     if (fp_type == "double") {
         run_benchmark<double>(tol, high_accuracy, ntrials);
     } else {
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
         if (fp_type != "long double") {
             throw std::invalid_argument(R"(Only the "double" and "long double" floating-point types are supported)");
         }
 
         run_benchmark<long double>(tol, high_accuracy, ntrials);
+#else
+        throw std::invalid_argument(R"(Only the "double" floating-point type is supported)");
+#endif
     }
 }

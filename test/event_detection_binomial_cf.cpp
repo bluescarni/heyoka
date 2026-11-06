@@ -51,17 +51,6 @@ using boost::multiprecision::cpp_int;
 using Catch::Matchers::Message;
 
 // The floating-point types tested.
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // The largest n tested.
 constexpr std::uint32_t n_max = 140;
 
@@ -124,7 +113,7 @@ void check_binomial(std::uint32_t n, std::uint32_t k, const T &x, std::uint32_t 
 
 TEST_CASE("fixed precision")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         const auto p = static_cast<std::uint32_t>(std::numeric_limits<fp_t>::digits);

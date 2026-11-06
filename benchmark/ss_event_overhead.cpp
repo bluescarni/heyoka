@@ -357,8 +357,10 @@ int main(int argc, char *argv[])
 
     if (fp_type == "double") {
         run_integration<double>(filename, final_time, perturb, compact_mode, tol);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (fp_type == "long double") {
         run_integration<long double>(filename, final_time, perturb, compact_mode, tol);
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
         run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb, compact_mode, mppp::real128{tol});

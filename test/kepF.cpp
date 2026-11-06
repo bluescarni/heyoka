@@ -51,19 +51,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 TEST_CASE("kepF def ctor")
 {
     detail::kepF_impl k;
@@ -80,7 +67,9 @@ TEST_CASE("kepF zero h k")
 
     REQUIRE(kepF(0., 0., x) == x);
     REQUIRE(kepF(0.f, 0.f, x) == x);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(kepF(0.l, 0.l, x) == x);
+#endif
 
     REQUIRE(kepF(0., x, x) != x);
     REQUIRE(kepF(x, 0., x) != x);
@@ -229,7 +218,12 @@ TEST_CASE("kepF overloads")
 {
     HEYOKA_TEST_KEPF_OVERLOAD(float);
     HEYOKA_TEST_KEPF_OVERLOAD(double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     HEYOKA_TEST_KEPF_OVERLOAD(long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -310,10 +304,6 @@ TEST_CASE("cfunc")
         std::vector<fp_t> outs, ins, pars;
 
         for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size * 3u);
             ins.resize(batch_size * 3u);
             pars.resize(batch_size * 2u);
@@ -386,10 +376,10 @@ TEST_CASE("cfunc")
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
 

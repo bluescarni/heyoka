@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -123,9 +125,11 @@ int main(int argc, char *argv[])
             case 0:
                 run_integration<double>();
                 break;
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
             case 1:
                 run_integration<long double>();
                 break;
+#endif
             default:
                 throw std::invalid_argument("Invalid floating point type selected (" + std::string(argv[1]) + ")");
                 break;

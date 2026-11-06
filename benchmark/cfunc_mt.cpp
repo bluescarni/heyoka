@@ -123,8 +123,10 @@ int main(int argc, char *argv[])
         run_benchmark<double>(nevals, batch_size, compact_mode);
     } else if (fp_type == "float") {
         run_benchmark<float>(nevals, batch_size, compact_mode);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     } else if (fp_type == "long double") {
         run_benchmark<long double>(nevals, batch_size, compact_mode);
+#endif
     } else {
         throw std::invalid_argument(fmt::format("Invalid fp type '{}'", fp_type));
     }

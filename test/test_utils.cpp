@@ -114,11 +114,16 @@ std::vector<T> tc_to_jet(const heyoka::taylor_adaptive_batch<T> &ta)
 
 template std::vector<float> tc_to_jet(const heyoka::taylor_adaptive<float> &);
 template std::vector<double> tc_to_jet(const heyoka::taylor_adaptive<double> &);
-template std::vector<long double> tc_to_jet(const heyoka::taylor_adaptive<long double> &);
 
 template std::vector<float> tc_to_jet(const heyoka::taylor_adaptive_batch<float> &);
 template std::vector<double> tc_to_jet(const heyoka::taylor_adaptive_batch<double> &);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+template std::vector<long double> tc_to_jet(const heyoka::taylor_adaptive<long double> &);
 template std::vector<long double> tc_to_jet(const heyoka::taylor_adaptive_batch<long double> &);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -192,8 +197,13 @@ template void compare_batch_scalar<float>(const std::vector<std::pair<heyoka::ex
                                           unsigned, bool, bool, std::mt19937 &, float, float, float);
 template void compare_batch_scalar<double>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &,
                                            unsigned, bool, bool, std::mt19937 &, float, float, double);
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
 template void compare_batch_scalar<long double>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &,
                                                 unsigned, bool, bool, std::mt19937 &, float, float, long double);
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

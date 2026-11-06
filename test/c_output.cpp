@@ -40,17 +40,6 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 static std::mt19937 rng;
 
 TEST_CASE("scalar")
@@ -281,7 +270,7 @@ TEST_CASE("scalar")
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto ha : {false, true}) {
-            tuple_for_each(fp_types, [&tester, opt_level, ha](auto x) { tester(x, opt_level, ha); });
+            tuple_for_each(fixed_fp_types, [&tester, opt_level, ha](auto x) { tester(x, opt_level, ha); });
         }
     }
 }
@@ -705,7 +694,7 @@ TEST_CASE("batch")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto ha : {false, true}) {
             for (auto batch_size : {1u, 2u, 4u, 5u}) {
-                tuple_for_each(fp_types,
+                tuple_for_each(fixed_fp_types,
                                [&tester, opt_level, ha, batch_size](auto x) { tester(x, opt_level, ha, batch_size); });
             }
         }

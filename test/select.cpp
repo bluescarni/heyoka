@@ -50,7 +50,7 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 const auto fp_types = std::tuple<double
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
                                  ,
                                  long double
 #endif
@@ -59,8 +59,6 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
-
-constexpr bool skip_batch_ld = false;
 
 TEST_CASE("basic")
 {
@@ -146,10 +144,6 @@ TEST_CASE("cfunc")
         std::vector<fp_t> outs, ins, pars, time;
 
         for (auto batch_size : {1u, 2u, 4u, 5u}) {
-            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size * 2u);
             ins.resize(batch_size * 2u);
             pars.resize(batch_size);

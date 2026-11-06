@@ -29,7 +29,12 @@ TEST_CASE("number ctors")
 {
     REQUIRE(std::get<number>(expression{1.1f}.value()) == number{1.1f});
     REQUIRE(std::get<number>(expression{1.1}.value()) == number{1.1});
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(std::get<number>(expression{1.1l}.value()) == number{1.1l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -48,8 +53,12 @@ TEST_CASE("literals")
     REQUIRE(1.1_dbl == expression{1.1});
     REQUIRE(1111111111111111111_dbl == expression{1111111111111111111.});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(1.1_ldbl == expression{1.1l});
     REQUIRE(1111111111111111111_ldbl == expression{1111111111111111111.l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -70,8 +79,12 @@ TEST_CASE("number binary ops")
     REQUIRE(1_dbl + 1.1 == expression{1. + 1.1});
     REQUIRE(1.1 + 1_dbl == expression{1. + 1.1});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(1_ldbl + 1.1l == expression{1.l + 1.1l});
     REQUIRE(1.1l + 1_ldbl == expression{1.l + 1.1l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -91,8 +104,12 @@ TEST_CASE("number binary ops")
     REQUIRE(1_dbl - 1.1 == expression{1. - 1.1});
     REQUIRE(1.1 - 1_dbl == expression{1.1 - 1.});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(1_ldbl - 1.1l == expression{1.l - 1.1l});
     REQUIRE(1.1l - 1_ldbl == expression{1.1l - 1.l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -110,8 +127,12 @@ TEST_CASE("number binary ops")
     REQUIRE(1_dbl * 1.1 == expression{1. * 1.1});
     REQUIRE(1.1 * 1_dbl == expression{1.1 * 1.});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(1_ldbl * 1.1l == expression{1.l * 1.1l});
     REQUIRE(1.1l * 1_ldbl == expression{1.1l * 1.l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -129,8 +150,12 @@ TEST_CASE("number binary ops")
     REQUIRE(1_dbl / 1.1 == expression{1. / 1.1});
     REQUIRE(1.1 / 1_dbl == expression{1.1 / 1.});
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     REQUIRE(1_ldbl / 1.1l == expression{1.l / 1.1l});
     REQUIRE(1.1l / 1_ldbl == expression{1.1l / 1.l});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -157,11 +182,15 @@ TEST_CASE("number compound ops")
         REQUIRE(ex == 1_dbl + 1.1);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto ex = 1_ldbl;
         ex += 1.1l;
         REQUIRE(ex == 1_ldbl + 1.1l);
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -193,11 +222,15 @@ TEST_CASE("number compound ops")
         REQUIRE(ex == 1_dbl - 1.1);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto ex = 1_ldbl;
         ex -= 1.1l;
         REQUIRE(ex == 1_ldbl - 1.1l);
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -229,11 +262,15 @@ TEST_CASE("number compound ops")
         REQUIRE(ex == 1_dbl * 1.1);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto ex = 1_ldbl;
         ex *= 1.1l;
         REQUIRE(ex == 1_ldbl * 1.1l);
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -265,11 +302,15 @@ TEST_CASE("number compound ops")
         REQUIRE(ex == 1_dbl / 1.1);
     }
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     {
         auto ex = 1_ldbl;
         ex /= 1.1l;
         REQUIRE(ex == 1_ldbl / 1.1l);
     }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

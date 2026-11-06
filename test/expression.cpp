@@ -113,7 +113,9 @@ TEST_CASE("diff var")
 
     REQUIRE(diff(1_dbl, "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(1_dbl, "x").value()).value()));
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(std::holds_alternative<long double>(std::get<number>(diff(1_ldbl, "x").value()).value()));
+#endif
 
     REQUIRE(diff(par[42], "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
@@ -143,7 +145,9 @@ TEST_CASE("diff par")
 
     REQUIRE(diff(1_dbl, par[0]) == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(1_dbl, par[0]).value()).value()));
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(std::holds_alternative<long double>(std::get<number>(diff(1_ldbl, par[0]).value()).value()));
+#endif
 
     REQUIRE(diff("x"_var, par[42]) == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff("x"_var, par[42]).value()).value()));
@@ -312,7 +316,9 @@ TEST_CASE("add simpls")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(1_dbl + 2_dbl == 3_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(1_ldbl + 2_dbl == 3_ldbl);
+#endif
 
     REQUIRE(0_dbl + (x + y) == x + y);
 
@@ -325,7 +331,9 @@ TEST_CASE("sub simpls")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(1_dbl - 2_dbl == -1_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(1_ldbl - 3_dbl == -2_ldbl);
+#endif
 
     REQUIRE(0_dbl - x == -x);
 
@@ -340,7 +348,9 @@ TEST_CASE("mul simpls")
     REQUIRE(2_dbl * 2_dbl == 4_dbl);
 
     REQUIRE(1_dbl * 2_dbl == 2_dbl);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(3_ldbl * 2_dbl == 6_ldbl);
+#endif
 
     REQUIRE(0_dbl * x == 0_dbl);
     REQUIRE(1_dbl * (x + y) == x + y);
@@ -380,10 +390,15 @@ TEST_CASE("div simpls")
 TEST_CASE("compound ops")
 {
     auto x = 1.1_dbl;
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     x *= 1.1_ldbl;
 
     REQUIRE(std::holds_alternative<long double>(std::get<number>(x.value()).value()));
     REQUIRE(x == expression(1.1l * 1.1));
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -537,6 +552,8 @@ TEST_CASE("s11n")
 
     ss.str("");
 
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
     x = 0.1_ldbl;
 
     {
@@ -556,6 +573,8 @@ TEST_CASE("s11n")
     REQUIRE(x == 0.1_ldbl);
 
     ss.str("");
+
+#endif
 
     x = "x"_var;
 
@@ -1722,15 +1741,6 @@ TEST_CASE("cfunc failure modes")
         REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = 0u),
                                std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
     }
-
-#if defined(HEYOKA_ARCH_PPC)
-    {
-        llvm_state s;
-
-        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}, {}), not_implemented_error,
-                               Message("'long double' computations are not supported on PowerPC"));
-    }
-#endif
 
     {
         llvm_state s;

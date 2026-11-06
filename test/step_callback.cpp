@@ -38,17 +38,6 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 template <typename TA>
 bool cb0(TA &)
 {
@@ -224,7 +213,7 @@ TEST_CASE("step_callback basics")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 struct cb2 {
@@ -246,7 +235,7 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, float)
 HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, double)
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
 HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, long double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, long double)
@@ -360,7 +349,7 @@ TEST_CASE("step_callback s11n")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 struct pend_cb {
@@ -719,7 +708,7 @@ TEST_CASE("step_callback_set")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("step_callback range")
@@ -792,5 +781,5 @@ TEST_CASE("step_callback range")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }

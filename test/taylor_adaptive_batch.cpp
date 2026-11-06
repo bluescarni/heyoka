@@ -62,17 +62,6 @@ using namespace heyoka;
 namespace hy = heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 TEST_CASE("dc copy")
 {
     auto [x, v] = make_vars("x", "v");
@@ -1278,7 +1267,7 @@ TEST_CASE("def ctor")
         taylor_adaptive_batch<fp_t> ta;
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("stream output")
@@ -1364,23 +1353,8 @@ TEST_CASE("stream output")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
-
-#if defined(HEYOKA_ARCH_PPC)
-
-TEST_CASE("ppc long double")
-{
-    using Catch::Matchers::Message;
-
-    auto [x, v] = make_vars("x", "v");
-
-    REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<long double>{
-                               {prime(x) = v, prime(v) = -9.8l * sin(x)}, {0.05l, 0.06l, 0.025l, 0.026l}, 2u}),
-                           not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
-}
-
-#endif
 
 // A test to check that vector data passed to the constructor
 // is moved into the integrator (and not just copied)
@@ -1995,7 +1969,7 @@ TEST_CASE("callback ste")
         REQUIRE(n_invoked == 1);
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 // Test for an issue arising when propagate_grid()
@@ -2081,7 +2055,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[1] == 1);
     }
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     {
         auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector{0.l, 1.l}, 1u);
 
@@ -2124,7 +2098,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[1] == 1);
     }
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     {
         auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, {0.l, 1.l}, 1u);
 

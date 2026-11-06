@@ -52,17 +52,6 @@ using namespace heyoka_test;
 using rat = boost::multiprecision::cpp_rational;
 
 // The floating-point types tested.
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
 
@@ -155,7 +144,7 @@ std::mt19937 rng(42);
 
 TEST_CASE("random")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -204,7 +193,7 @@ TEST_CASE("random")
 
 TEST_CASE("rounding direction")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {

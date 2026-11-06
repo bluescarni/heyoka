@@ -15,7 +15,7 @@ using namespace heyoka;
 int main()
 {
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
     // Create the symbolic variables x and v.
     auto [x, v] = make_vars("x", "v");

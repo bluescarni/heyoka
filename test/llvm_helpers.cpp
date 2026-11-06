@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/predef/architecture/ppc.h>
 #include <boost/predef/os.h>
 
 #include <fmt/format.h>
@@ -50,17 +51,6 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
-
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
 
 std::mt19937 rng;
 
@@ -105,7 +95,7 @@ TEST_CASE("sgn scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("sgn scalar mp")
@@ -227,7 +217,7 @@ TEST_CASE("sgn batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("inv_kep_E_scalar")
@@ -370,7 +360,7 @@ TEST_CASE("inv_kep_E_scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("inv_kep_E_batch")
@@ -606,7 +596,7 @@ TEST_CASE("inv_kep_E_batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("inv_kep_E_scalar mp")
@@ -1090,7 +1080,7 @@ TEST_CASE("minmax")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("fma scalar")
@@ -1137,7 +1127,7 @@ TEST_CASE("fma scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("fma batch")
@@ -1205,7 +1195,7 @@ TEST_CASE("fma batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("fma scalar mp")
@@ -1340,7 +1330,7 @@ TEST_CASE("eft_product scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("eft_product batch")
@@ -1429,7 +1419,7 @@ TEST_CASE("eft_product batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl mul scalar")
@@ -1532,7 +1522,7 @@ TEST_CASE("dl mul scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl mul batch")
@@ -1648,7 +1638,7 @@ TEST_CASE("dl mul batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl div scalar")
@@ -1747,7 +1737,7 @@ TEST_CASE("dl div scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl div batch")
@@ -1858,7 +1848,7 @@ TEST_CASE("dl div batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("floor scalar")
@@ -1901,7 +1891,7 @@ TEST_CASE("floor scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("floor batch")
@@ -1959,7 +1949,7 @@ TEST_CASE("floor batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl floor scalar")
@@ -2041,7 +2031,7 @@ TEST_CASE("dl floor scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl floor batch")
@@ -2136,7 +2126,7 @@ TEST_CASE("dl floor batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl modulus scalar")
@@ -2217,7 +2207,7 @@ TEST_CASE("dl modulus scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("dl modulus batch")
@@ -2312,7 +2302,7 @@ TEST_CASE("dl modulus batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("get_alignment")
@@ -2329,7 +2319,7 @@ TEST_CASE("get_alignment")
     tp = detail::to_external_llvm_type<double>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(double));
 
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     tp = detail::to_external_llvm_type<long double>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(long double));
 #endif
@@ -2701,7 +2691,7 @@ TEST_CASE("clone type")
         REQUIRE(vec_tp_dest == detail::make_vector_type(tp_dest, 4));
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 
     llvm_state source, dest;
 
@@ -2754,7 +2744,7 @@ TEST_CASE("trunc scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("trunc batch")
@@ -2812,7 +2802,7 @@ TEST_CASE("trunc batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("trunc scalar mp")
@@ -2909,7 +2899,7 @@ TEST_CASE("is_finite scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("is_finite batch")
@@ -2979,7 +2969,7 @@ TEST_CASE("is_finite batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("is_finite scalar mp")
@@ -3105,7 +3095,7 @@ TEST_CASE("fcmp one une scalar mp")
 // In function: hey_is_natural
 //
 // This seems like an instruction selection problem specific to the ppc backend.
-#if !defined(HEYOKA_ARCH_PPC)
+#if !BOOST_ARCH_PPC
 
 TEST_CASE("is_natural scalar")
 {
@@ -3149,7 +3139,7 @@ TEST_CASE("is_natural scalar")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("is_natural batch")
@@ -3223,7 +3213,7 @@ TEST_CASE("is_natural batch")
         }
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fixed_fp_types, tester);
 }
 
 TEST_CASE("is_natural scalar mp")

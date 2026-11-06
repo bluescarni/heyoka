@@ -45,19 +45,6 @@ extern "C" void heyoka_tt_to_dayfrac(double *, std::uint32_t) noexcept;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
-constexpr bool skip_batch_ld = false;
-
 TEST_CASE("impl")
 {
     // J2000 test.
@@ -161,10 +148,6 @@ TEST_CASE("dayfrac cfunc")
         std::vector<fp_t> outs, ins;
 
         for (auto batch_size : {1u, 2u, 3u, 8u}) {
-            if (batch_size != 1u && std::same_as<fp_t, long double> && skip_batch_ld) {
-                continue;
-            }
-
             outs.resize(batch_size);
             ins.resize(batch_size);
 
@@ -190,8 +173,8 @@ TEST_CASE("dayfrac cfunc")
     };
 
     for (auto cm : {false, true}) {
-        tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 0, cm); });
-        tuple_for_each(fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
+        tuple_for_each(fixed_fp_types, [&tester, cm](auto x) { tester(x, 0, cm); });
+        tuple_for_each(fixed_fp_types, [&tester, cm](auto x) { tester(x, 3, cm); });
     }
 }
 
@@ -260,7 +243,7 @@ TEST_CASE("dayfrac taylor scalar")
     };
 
     for (auto cm : {false, true}) {
-        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 0, cm); });
-        tuple_for_each(fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
+        tuple_for_each(fixed_fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 0, cm); });
+        tuple_for_each(fixed_fp_types, [&scalar_tester, cm](auto x) { scalar_tester(x, 3, cm); });
     }
 }

@@ -51,7 +51,9 @@ TEST_CASE("simd size")
 {
     REQUIRE(recommended_simd_size<float>() > 0u);
     REQUIRE(recommended_simd_size<double>() > 0u);
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
     REQUIRE(recommended_simd_size<long double>() > 0u);
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
@@ -444,7 +446,7 @@ TEST_CASE("code model")
     }
 
     // code_model::tiny not supported on x86 or ppc or OSX.
-#if BOOST_ARCH_X86 || defined(HEYOKA_ARCH_PPC) || BOOST_OS_MACOS
+#if BOOST_ARCH_X86 || BOOST_ARCH_PPC || BOOST_OS_MACOS
 
     {
         std::ostringstream oss;
@@ -479,7 +481,7 @@ TEST_CASE("code model")
     }
 
     // code_model::kernel not supported on arm or ppc.
-#if BOOST_ARCH_ARM || defined(HEYOKA_ARCH_PPC)
+#if BOOST_ARCH_ARM || BOOST_ARCH_PPC
 
     {
         std::ostringstream oss;

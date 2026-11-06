@@ -33,17 +33,6 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 TEST_CASE("taylor const sys")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -200,10 +189,10 @@ TEST_CASE("taylor const sys")
 
     for (auto cm : {true, false}) {
         for (auto ha : {true, false}) {
-            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 0, ha, cm); });
-            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 1, ha, cm); });
-            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 2, ha, cm); });
-            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 3, ha, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, ha, cm](auto x) { tester(x, 0, ha, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, ha, cm](auto x) { tester(x, 1, ha, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, ha, cm](auto x) { tester(x, 2, ha, cm); });
+            tuple_for_each(fixed_fp_types, [&tester, ha, cm](auto x) { tester(x, 3, ha, cm); });
         }
     }
 }

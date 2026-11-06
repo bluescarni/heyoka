@@ -65,17 +65,6 @@ using rat = boost::multiprecision::cpp_rational;
 using boost::multiprecision::cpp_int;
 
 // The floating-point types tested.
-const auto fp_types = std::tuple<float, double
-#if !defined(HEYOKA_ARCH_PPC)
-                                 ,
-                                 long double
-#endif
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // The polynomial degrees tested.
 //
 // NOTE: in single and double precision, the degrees up to 23 use the unrolled implementation of
@@ -247,7 +236,7 @@ void check_split(const std::vector<T> &in, const std::vector<T> &out_left, const
 // Random interval coefficients.
 TEST_CASE("random")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -295,7 +284,7 @@ TEST_CASE("exact")
 {
     std::uniform_int_distribution<int> b_dist(-10, 10);
 
-    tuple_for_each(fp_types, [&b_dist](auto x_) {
+    tuple_for_each(fixed_fp_types, [&b_dist](auto x_) {
         using fp_t = decltype(x_);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -358,7 +347,7 @@ TEST_CASE("exact")
 // rounded outward.
 TEST_CASE("rounding direction")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {
@@ -390,7 +379,7 @@ TEST_CASE("rounding direction")
 // Inputs with overflowing sums and infinite bounds: the output must be the expected valid intervals.
 TEST_CASE("overflow")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         if (!ival_arith_supported<fp_t>()) {

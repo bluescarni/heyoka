@@ -32,7 +32,7 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 const auto fp_types = std::tuple<double
-#if !defined(HEYOKA_ARCH_PPC)
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
                                  ,
                                  long double
 #endif

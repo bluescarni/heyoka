@@ -41,14 +41,6 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-// The floating-point types tested.
-const auto fp_types = std::tuple<float, double, long double
-#if defined(HEYOKA_HAVE_REAL128)
-                                 ,
-                                 mppp::real128
-#endif
-                                 >{};
-
 // The integer representation of the '?' sign. The other signs are represented as +1 ('+'), -1 ('-') and 0 ('0').
 constexpr int und = 2;
 
@@ -175,7 +167,7 @@ void run_exhaustive_test(const std::uint32_t max_len, const auto &make_fp)
 
 TEST_CASE("exhaustive")
 {
-    tuple_for_each(fp_types, [](auto x) {
+    tuple_for_each(fixed_fp_types, [](auto x) {
         using fp_t = decltype(x);
 
         run_exhaustive_test<fp_t>(8, [](double v) { return static_cast<fp_t>(v); });
