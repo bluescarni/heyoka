@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/predef/os.h>
 
 #include <fmt/format.h>
 
@@ -802,7 +803,7 @@ TEST_CASE("while_loop")
     // this is an LLVM issue or some compiler/toolchain bug.
     // Perhaps re-check this with later LLVM versions, different
     // build types (e.g., Release) or different compiler flags.
-#if !defined(__APPLE__)
+#if !BOOST_OS_MACOS
 
     // Error handling.
     {
@@ -2613,7 +2614,7 @@ TEST_CASE("switch")
     // this is an LLVM issue or some compiler/toolchain bug.
     // Perhaps re-check this with later LLVM versions, different
     // build types (e.g., Release) or different compiler flags.
-#if !defined(__APPLE__)
+#if !BOOST_OS_MACOS
 
     // Test exception cleanup for the default case.
     {

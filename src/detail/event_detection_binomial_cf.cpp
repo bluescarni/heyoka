@@ -20,7 +20,7 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
-#include <boost/predef/architecture.h>
+#include <boost/predef/architecture/ppc.h>
 
 #include <fmt/core.h>
 

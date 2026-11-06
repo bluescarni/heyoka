@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/compiler/visualc.h>
 
 #include <fmt/core.h>
 #include <fmt/ostream.h>
@@ -486,7 +487,7 @@ public:
     // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
     // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
@@ -497,7 +498,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -506,7 +507,7 @@ public:
     {
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -516,7 +517,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -679,14 +680,14 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, KwArgs &&...)
     -> taylor_adaptive<T>;
 
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive(var_ode_sys, std::initializer_list<T>, KwArgs &&...) -> taylor_adaptive<T>;
@@ -907,7 +908,7 @@ public:
     // constraint is not satisfied. My suspicion is that this happens because the concept involves the type T that is
     // being deduced. Let us just disable concept checking on MSVC for now.
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
@@ -918,7 +919,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::uint32_t batch_size,
@@ -928,7 +929,7 @@ public:
     {
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
@@ -939,7 +940,7 @@ public:
         finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
         requires igor::validate<ctor_kw_cfg, KwArgs...>
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
@@ -1140,14 +1141,14 @@ public:
 
 // Deduction guides to enable CTAD when the initial state is passed via std::initializer_list.
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>>, std::initializer_list<T>, std::uint32_t,
                                KwArgs &&...) -> taylor_adaptive_batch<T>;
 
 template <typename T, typename... KwArgs>
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
     requires igor::validate<taylor_adaptive_batch<T>::ctor_kw_cfg, KwArgs...>
 #endif
 explicit taylor_adaptive_batch(var_ode_sys, std::initializer_list<T>, std::uint32_t, KwArgs &&...)

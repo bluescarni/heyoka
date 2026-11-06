@@ -19,6 +19,9 @@
 #include <utility>
 #include <vector>
 
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
+
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
@@ -318,7 +321,7 @@ class HEYOKA_DLL_PUBLIC func
     friend HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
     friend taylor_dc_t::size_type detail::func_taylor_decompose_impl(func &&, taylor_dc_t &);
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -328,7 +331,7 @@ class HEYOKA_DLL_PUBLIC func
     using func_wrap_t = tanuki::wrap<detail::func_iface,
                                      tanuki::config<detail::null_func>{.semantics = tanuki::wrap_semantics::reference}>;
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic pop
 

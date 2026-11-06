@@ -18,7 +18,7 @@
 
 #include <fmt/core.h>
 
-#include <boost/predef/architecture.h>
+#include <boost/predef/architecture/x86/64.h>
 #include <boost/scope/scope_exit.hpp>
 
 #include <llvm/ADT/FloatingPointMode.h>

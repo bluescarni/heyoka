@@ -24,7 +24,11 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/predef/architecture.h>
+#include <boost/predef/architecture/arm.h>
+#include <boost/predef/architecture/ppc.h>
+#include <boost/predef/architecture/x86.h>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/version_number.h>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -80,7 +84,7 @@
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -1719,7 +1723,7 @@ extern "C" HEYOKA_DLL_PUBLIC [[noreturn]] void heyoka_llvm_assertion_failure(con
 
 #endif
 
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic pop
 

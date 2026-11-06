@@ -20,6 +20,11 @@
 #cmakedefine HEYOKA_WITH_SLEEF
 #cmakedefine HEYOKA_BUILD_STATIC_LIBRARY
 
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/compiler/visualc.h>
+#include <boost/predef/version_number.h>
+
 #include <mp++/config.hpp>
 
 #if !defined(MPPP_WITH_BOOST_S11N)
@@ -58,22 +63,10 @@
 
 #endif
 
-#if defined(__arm__) || defined(_M_ARM) || defined(_M_ARMT) || defined(__aarch64__) || defined(_M_ARM64)
-
-#define HEYOKA_ARCH_ARM
-
-#endif
-
-#if defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86)
-
-#define HEYOKA_ARCH_X86
-
-#endif
-
 // Setup of the ABI versioning and tagging
 // machinery.
 
-#if defined(__GNUC__) || defined(__clang__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #define HEYOKA_ABI_TAG_ATTR __attribute__((abi_tag))
 
@@ -98,7 +91,7 @@
 // C++20 constinit.
 // NOTE: this seems to be buggy currently on MSVC:
 // https://github.com/bluescarni/mppp/issues/291
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !BOOST_COMP_MSVC
 
 #define HEYOKA_CONSTINIT constinit
 
@@ -112,7 +105,7 @@
 //
 // https://gcc.gnu.org/onlinedocs/gcc-14.1.0/gcc/C_002b_002b-Attributes.html#index-no_005fdangling-type-attribute
 
-#if __GNUC__ >= 14
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(14, 0, 0)
 
 #define HEYOKA_NO_DANGLING [[gnu::no_dangling]]
 

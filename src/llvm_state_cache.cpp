@@ -28,6 +28,9 @@
 
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/os/macos.h>
+#include <boost/predef/os/windows.h>
+#include <boost/predef/platform/mingw.h>
 #include <boost/scope/scope_exit.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -90,7 +93,7 @@ constexpr std::int64_t default_diskcache_size = default_memcache_size * 10;
 // NOTE: std::mutex constructor not constexpr on MinGW:
 //
 // https://github.com/bluescarni/heyoka/issues/403
-#if !defined(__MINGW32__)
+#if !BOOST_PLAT_MINGW
 HEYOKA_CONSTINIT
 #endif
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
@@ -313,7 +316,7 @@ constexpr int diskcache_schema_version = 0;
 // Helper to determine the default on-disk cache dir.
 std::filesystem::path get_default_diskcache_dir()
 {
-#ifdef _WIN32
+#if BOOST_OS_WINDOWS
     // NOTE: in principle for max reliability we could use something like:
     //
     // SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path_tmp)
@@ -322,7 +325,7 @@ std::filesystem::path get_default_diskcache_dir()
     if (const auto *const p = std::getenv("LOCALAPPDATA"); p != nullptr && *p != '\0') {
         return std::filesystem::path(p) / "heyoka" / "cache";
     }
-#elif defined(__APPLE__)
+#elif BOOST_OS_MACOS
     if (const auto *const p = std::getenv("HOME"); p != nullptr && *p != '\0') {
         return std::filesystem::path(p) / "Library" / "Caches" / "heyoka";
     }

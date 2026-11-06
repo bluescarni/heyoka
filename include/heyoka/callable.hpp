@@ -14,13 +14,16 @@
 #include <type_traits>
 #include <utility>
 
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -221,7 +224,7 @@ using callable = detail::callable_impl_selector<T>::type;
 
 HEYOKA_END_NAMESPACE
 
-#if defined(__GNUC__)
+#if BOOST_COMP_GNUC || BOOST_COMP_CLANG
 
 #pragma GCC diagnostic pop
 

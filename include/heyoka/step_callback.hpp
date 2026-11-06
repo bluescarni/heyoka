@@ -79,19 +79,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<false, bool
     };
 };
 
-#if defined(__GNUC__) && !defined(__clang__)
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-final-methods"
-
-#endif
-
-#if defined(__GNUC__) && !defined(__clang__)
-
-#pragma GCC diagnostic pop
-
-#endif
-
 // Implementation of the reference interface.
 template <typename TA>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface : callable_ref_iface<bool, TA &> {

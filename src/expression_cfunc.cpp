@@ -35,6 +35,8 @@
 #include <boost/container/deque.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/predef/compiler/gcc.h>
+#include <boost/predef/version_number.h>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -92,7 +94,7 @@
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -2475,7 +2477,7 @@ HEYOKA_MAKE_MULTI_CFUNC_INST(mppp::real)
 
 HEYOKA_END_NAMESPACE
 
-#if defined(__GNUC__) && (__GNUC__ >= 11)
+#if BOOST_COMP_GNUC >= BOOST_VERSION_NUMBER(11, 0, 0)
 
 #pragma GCC diagnostic pop
 
