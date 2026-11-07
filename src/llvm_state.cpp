@@ -922,11 +922,13 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
         return llvm::Error::success();
     }
 
+    // NOTE: this block of code triggers only very rarely, keep it out of code coverage.
+    //
+    // LCOV_EXCL_START
+
     // Propagate errors other than DuplicateDefinition.
     if (auto other = llvm::handleErrors(std::move(err), [](const llvm::orc::DuplicateDefinition &) {})) [[unlikely]] {
-        // LCOV_EXCL_START
         return other;
-        // LCOV_EXCL_STOP
     }
 
     // NOTE: define() is all-or-nothing, so nothing was added above. Define the symbols one at a time, skipping the
@@ -935,14 +937,14 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
         if (auto e = jd.define(llvm::orc::absoluteSymbols(llvm::orc::SymbolMap{{name, def}}))) {
             if (auto other = llvm::handleErrors(std::move(e), [](const llvm::orc::DuplicateDefinition &) {}))
                 [[unlikely]] {
-                // LCOV_EXCL_START
                 return other;
-                // LCOV_EXCL_STOP
             }
         }
     }
 
     return llvm::Error::success();
+
+    // LCOV_EXCL_STOP
 }
 
 // NOTE: this is a helper that sets up the dynamic library search generators for an lljit instance.
@@ -1870,10 +1872,15 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
     // NOTE: parallel compilation used to result in occasional compilation failures due to multiply-defined symbols,
     // caused by a race in LLVM's ORC (LLVM >= 18). This is worked around in setup_dynlib_search_generators() via
     // define_abs_symbols_tolerant().
+    //
+    // NOTE: LLVM 19 results in widespread segfaults on the CI, this is likely a parallel compilation bug that was fixed
+    // for LLVM 20.
+#if LLVM_VERSION_MAJOR >= 20
     if (m_parjit) {
         // Set the number of compilation threads.
         lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
     }
+#endif
 
 #endif
 
