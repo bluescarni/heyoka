@@ -28,14 +28,16 @@ New
 Changes
 ~~~~~~~
 
+- Invoking the stepping/propagation functions or the ``set_time()``/``set_dtime()`` functions of an integrator,
+  copy-assigning to it or deserialising into it from within one of its own event or step callbacks now raises
+  an exception
+  (`#567 <https://github.com/bluescarni/heyoka/pull/567>`__,
+  `#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - The mp++ library (with support for MPFR) is now a mandatory dependency, and the ``HEYOKA_WITH_MPPP``
   build option has been removed. Arbitrary-precision computations via :cpp:class:`mppp::real`
   are now always supported. The ``HEYOKA_WITH_MPPP`` and ``HEYOKA_HAVE_REAL`` macros and the
   ``heyoka_WITH_MPPP`` and ``heyoka_WITH_REAL`` CMake variables have been removed
   (`#562 <https://github.com/bluescarni/heyoka/pull/562>`__).
-- Invoking the stepping/propagation functions of an integrator, copy-assigning to it or deserialising into it
-  from within one of its own event or step callbacks now raises an exception
-  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - The integrators now return the ``err_nf_state`` outcome if non-finite values are detected in the input data
   of event detection (e.g., in the Taylor coefficients of the event equations)
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
@@ -59,9 +61,6 @@ Fix
 - Fix the relational ``neq()`` operator evaluating to false when one or both operands are NaN
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - Fix NaN values in the Taylor coefficients being silently ignored in the computation of the adaptive timestep
-  (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
-- Fix the batch integrator not detecting, in some cases, the alteration of the time coordinate from within
-  an event callback
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).
 - Fix compilation warnings with GCC 15 in the bundled copy of mdspan
   (`#560 <https://github.com/bluescarni/heyoka/pull/560>`__).

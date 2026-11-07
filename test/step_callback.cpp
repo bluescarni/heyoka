@@ -410,10 +410,10 @@ TEST_CASE("step_callback pre_hook")
 
         REQUIRE_THROWS_MATCHES(
             ta0.propagate_until(6., kw::callback = tm_cb{}), std::runtime_error,
-            Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
-        REQUIRE(ta0.get_time() == 4);
+        // The time coordinate must not have been changed.
+        REQUIRE(ta0.get_time() == 3);
 
         ta0.set_time(0.);
         ta0.get_pars_data()[0] = 0.1;
@@ -430,8 +430,10 @@ TEST_CASE("step_callback pre_hook")
 
         REQUIRE_THROWS_MATCHES(
             ta0.propagate_grid({ta0.get_time(), ta0.get_time() + 1}, kw::callback = tm_cb{}), std::runtime_error,
-            Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
+
+        // The time coordinate must not have been changed.
+        REQUIRE(ta0.get_time() == 2);
     }
 
     {
@@ -451,10 +453,10 @@ TEST_CASE("step_callback pre_hook")
 
         REQUIRE_THROWS_MATCHES(
             ta0.propagate_until(6., kw::callback = tm_cb{}), std::runtime_error,
-            Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
-        REQUIRE(ta0.get_time() == std::vector{4., 4.});
+        // The time coordinate must not have been changed.
+        REQUIRE(ta0.get_time() == std::vector{3., 3.});
 
         ta0.set_time(0.);
         ta0.get_pars_data()[0] = 0.1;
@@ -474,8 +476,10 @@ TEST_CASE("step_callback pre_hook")
         REQUIRE_THROWS_MATCHES(
             ta0.propagate_grid({ta0.get_time()[0], ta0.get_time()[1], 4., 4.}, kw::callback = tm_cb{}),
             std::runtime_error,
-            Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
+
+        // The time coordinate must not have been changed.
+        REQUIRE(ta0.get_time() == std::vector{2., 2.});
     }
 }
 

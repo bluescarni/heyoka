@@ -228,22 +228,6 @@ inline constexpr auto taylor_ev_eq = [](const auto &ev0, const auto &ev1) {
     return (std::get<0>(ev0) == std::get<0>(ev1)) && (std::get<1>(ev0) == std::get<1>(ev1));
 };
 
-// Custom equality comparison that considers all NaN values equal.
-template <typename T>
-bool cmp_nan_eq(const T &a, const T &b)
-{
-    using std::isnan;
-
-    const auto nan_a = isnan(a);
-    const auto nan_b = isnan(b);
-
-    if (!nan_a && !nan_b) {
-        return a == b;
-    } else {
-        return nan_a && nan_b;
-    }
-}
-
 // NOTE: double-length normalisation assumes abs(hi) >= abs(lo), we need to enforce this
 // when setting the time coordinate in double-length format.
 template <typename T>

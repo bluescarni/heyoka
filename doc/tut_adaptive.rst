@@ -260,9 +260,9 @@ can be invoked with additional optional keyword arguments:
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
 
-  From within a step callback, invoking the stepping/propagation functions on the integrator,
-  copy-assigning another integrator to it or deserialising into it will raise an exception, while
-  moving into or from the integrator will result in undefined behaviour.
+  From within a step callback, invoking the stepping/propagation functions or the ``set_time()``/``set_dtime()``
+  functions on the integrator, copy-assigning another integrator to it or deserialising into it will raise an
+  exception, while moving into or from the integrator will result in undefined behaviour.
 
   .. versionadded:: 1.0.0
 
@@ -357,9 +357,9 @@ can be invoked with additional optional keyword arguments:
   returns ``true`` then the integration will continue after the invocation of the
   callback, otherwise the integration will be interrupted.
 
-  From within a step callback, invoking the stepping/propagation functions on the integrator,
-  copy-assigning another integrator to it or deserialising into it will raise an exception, while
-  moving into or from the integrator will result in undefined behaviour.
+  From within a step callback, invoking the stepping/propagation functions or the ``set_time()``/``set_dtime()``
+  functions on the integrator, copy-assigning another integrator to it or deserialising into it will raise an
+  exception, while moving into or from the integrator will result in undefined behaviour.
 
   .. versionadded:: 1.0.0
 

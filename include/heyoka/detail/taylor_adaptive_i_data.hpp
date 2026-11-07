@@ -181,7 +181,6 @@ struct taylor_adaptive_batch_i_data {
     std::vector<dfloat<T>> m_pfor_ts;
     std::vector<int> m_t_dir;
     std::vector<dfloat<T>> m_rem_time;
-    std::vector<T> m_time_copy_hi, m_time_copy_lo;
     std::vector<int> m_nf_detected;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;

@@ -650,14 +650,31 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
     load_impl(ar, v);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Small shared helper to check the busy flag and throw if necessary.
+void taylor_adaptive_check_busy(const bool busy, const std::string_view name)
+{
+    if (busy) [[unlikely]] {
+        throw std::runtime_error(
+            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
 template <supported_fp_type T>
 detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view name)
 {
     assert(m_i_data);
-    if (m_i_data->m_busy) [[unlikely]] {
-        throw std::runtime_error(
-            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
-    }
+
+    detail::taylor_adaptive_check_busy(m_i_data->m_busy, name);
 
     return detail::busy_guard(m_i_data->m_busy);
 }
@@ -921,11 +938,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                         return detail::cmp_abs(std::get<1>(ev), t) < 0;
                     });
 
-        // Store the time coordinate before invoking the callbacks.
-        const auto new_time = m_time;
-
-        // Invoke the callbacks of the non-terminal events, which are guaranteed to happen before the first terminal
-        // event.
+        // Invoke the callbacks of the non-terminal events guaranteed to happen before the first terminal event.
         for (auto it = edd.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
@@ -933,11 +946,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
             // Compute the time coordinate to pass to the callback.
             //
-            // NOTE: use new_time, instead of m_time, in order to prevent passing the wrong time coordinate to the
-            // callback if an earlier callback changed it.
-            //
             // NOLINTNEXTLINE(misc-const-correctness)
-            auto cb_tm = static_cast<T>(new_time - m_last_h + std::get<1>(t));
+            auto cb_tm = static_cast<T>(m_time - m_last_h + std::get<1>(t));
 
             if constexpr (std::same_as<T, mppp::real>) {
                 // NOTE: for mppp::real the event detection machinery is expected to keep the correct working precision.
@@ -975,13 +985,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
         }
 
-        // NOTE: event callbacks - terminal or not - cannot modify the time variable, as this is going to mess up the
-        // internal time keeping logic in the propagate_*() functions.
-        if (m_time != new_time) [[unlikely]] {
-            throw std::runtime_error("The invocation of one or more event callbacks resulted in the alteration of the "
-                                     "time coordinate of the integrator - this is not supported");
-        }
-
         if (edd.m_d_tes.empty()) {
             // No terminal events detected, return success or time limit.
             return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
@@ -1000,7 +1003,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 }
 
 template <supported_fp_type T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(const bool wtc)
 {
     const auto bg = make_busy_guard("step");
 
@@ -1014,7 +1017,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 }
 
 template <supported_fp_type T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(const bool wtc)
 {
     const auto bg = make_busy_guard("step_backward");
 
@@ -1026,7 +1029,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 }
 
 template <supported_fp_type T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, const bool wtc)
 {
     using std::isnan;
 
@@ -1213,24 +1216,9 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
 
-    // Error message for when the callback modifies the time coordinate.
-    constexpr auto cb_time_errmsg
-        = "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-          "time coordinate of the integrator - this is not supported";
-
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
-        // operator, as shown later).
-        //
-        // NOTE: orig_time is guaranteed to be finite due to the checks done earlier on m_time.
-        const auto orig_time = m_time;
-
         cb.pre_hook(*this);
-
-        if (m_time != orig_time) [[unlikely]] {
-            throw std::runtime_error(cb_time_errmsg);
-        }
     }
 
     // Small helper to construct the return value.
@@ -1318,19 +1306,8 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
 
         // Execute the propagate() callback, if applicable.
         if (with_cb) {
-            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
-            // time coordinate.
-            //
-            // NOTE: orig_time is guaranteed to be finite because the outcome of the step is not err_nf_state.
-            const auto orig_time = m_time;
-
             // Execute the cb.
             const auto ret_cb = cb(*this);
-
-            // Check that the callback did not change the time coordinate.
-            if (m_time != orig_time) [[unlikely]] {
-                throw std::runtime_error(cb_time_errmsg);
-            }
 
             if (!ret_cb) {
                 // Interruption via callback.
@@ -1557,24 +1534,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
 
-    // Error message for when the callback modifies the time coordinate.
-    constexpr auto cb_time_errmsg
-        = "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-          "time coordinate of the integrator - this is not supported";
-
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
-        // operator, as shown later).
-        //
-        // NOTE: orig_time is guaranteed to be finite because propagate_until() did not return err_nf_state.
-        const auto orig_time = m_time;
-
         cb.pre_hook(*this);
-
-        if (m_time != orig_time) [[unlikely]] {
-            throw std::runtime_error(cb_time_errmsg);
-        }
     }
 
     // Iterate over the remaining grid points.
@@ -1699,35 +1661,13 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             rem_time = dl_zero;
         }
 
-        // Small helper to wrap the invocation of the callback while checking that the callback does not change the time
-        // coordinate.
-        const auto wrap_cb_call = [&] {
-            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
-            // time coordinate.
-            //
-            // NOTE: orig_time is guaranteed to contain a finite value because the outcome of the step
-            // was not err_nf_state.
-            const auto orig_time = m_time;
-
-            // Execute the cb.
-            assert(cb);
-            const auto ret_cb = cb(*this);
-
-            // Check the time coordinate.
-            if (m_time != orig_time) [[unlikely]] {
-                throw std::runtime_error(cb_time_errmsg);
-            }
-
-            return ret_cb;
-        };
-
         // Check the interruption conditions.
         //
         // NOTE: only one of them must be set.
         //
         // NOTE: in case of interruption, we don't exit immediately: the grid points falling within the most recent step
         // are processed first, at the beginning of the next loop iteration.
-        if (with_cb && !wrap_cb_call()) {
+        if (with_cb && !cb(*this)) {
             // Interruption via callback.
             interrupt = taylor_outcome::cb_stop;
         } else if (ste_detected) {
@@ -1909,6 +1849,10 @@ const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sy
 template <supported_fp_type T>
 void taylor_adaptive<T>::set_time(T t)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_check_busy(m_i_data->m_busy, "set_time");
+
     if constexpr (std::is_same_v<T, mppp::real>) {
         t.prec_round(this->get_prec());
     }
@@ -1919,6 +1863,10 @@ void taylor_adaptive<T>::set_time(T t)
 template <supported_fp_type T>
 void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_check_busy(m_i_data->m_busy, "set_dtime");
+
     if constexpr (std::is_same_v<T, mppp::real>) {
         hi.prec_round(this->get_prec());
         lo.prec_round(this->get_prec());

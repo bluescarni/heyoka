@@ -271,8 +271,6 @@ void taylor_adaptive_batch_i_data<T>::save(boost::archive::binary_oarchive &ar, 
     ar << m_pfor_ts;
     ar << m_t_dir;
     ar << m_rem_time;
-    ar << m_time_copy_hi;
-    ar << m_time_copy_lo;
     ar << m_nf_detected;
     ar << m_d_out_time;
     ar << m_vsys;
@@ -314,8 +312,6 @@ void taylor_adaptive_batch_i_data<T>::load(boost::archive::binary_iarchive &ar, 
     ar >> m_pfor_ts;
     ar >> m_t_dir;
     ar >> m_rem_time;
-    ar >> m_time_copy_hi;
-    ar >> m_time_copy_lo;
     ar >> m_nf_detected;
     ar >> m_d_out_time;
     ar >> m_vsys;
@@ -352,8 +348,8 @@ taylor_adaptive_batch_i_data<T>::taylor_adaptive_batch_i_data(const taylor_adapt
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
-      m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
-      m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time), m_vsys(other.m_vsys),
+      m_rem_time(other.m_rem_time), m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
+      m_vsys(other.m_vsys),
       m_vsys_data(other.m_vsys_data ? std::make_unique<vsys_data<T>>(*other.m_vsys_data) : nullptr),
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data_batch<T>>(*other.m_ed_data) : nullptr)
 {
