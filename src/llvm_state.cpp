@@ -70,6 +70,7 @@
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/ObjectTransformLayer.h>
+#include <llvm/ExecutionEngine/Orc/Shared/OrcError.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -95,6 +96,12 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Triple.h>
+
+#if LLVM_VERSION_MAJOR >= 20
+
+#include <llvm/ExecutionEngine/Orc/AbsoluteSymbols.h>
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -891,6 +898,53 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
     return std::move(ret.get());
 }
 
+// NOTE: this is a helper used by the dynamic library search generators to add the symbols they found to a JITDylib. It
+// is a workaround for a race in LLVM's ORC (LLVM >= 18, introduced in commit e0b3f45d87a6): with parallel compilation,
+// a definition generator can be invoked with symbols that another lookup has just defined through the same generator,
+// and the default JD.define() then fails with a DuplicateDefinition error. Both definitions come from the same dlsym()
+// on the same handle, thus they are identical and the duplicate can be safely ignored.
+//
+// NOTE: by default LLJIT also sets up its own "<Process Symbols>" JITDylib (searched after the main JITDylib), whose
+// EPCDynamicLibrarySearchGenerator does not use this helper and is thus not protected against the race. This is
+// intentional: that generator searches exactly the same scope as the process generator we set up in
+// setup_dynlib_search_generators() (both use sys::DynamicLibrary::getPermanentLibrary(nullptr)), and it is consulted
+// only for symbols that the generators in the main JITDylib could not find. In practice it thus finds, and defines,
+// nothing. The only exception would be a library becoming globally visible in the middle of a compilation (e.g., via
+// dlopen() with RTLD_GLOBAL from another thread). If this ever becomes a concern, the "<Process Symbols>" JITDylib can
+// be set up with this helper via LLJITBuilder::setProcessSymbolsJITDylibSetup() (note that the signature of
+// EPCDynamicLibrarySearchGenerator::GetForTargetProcess() changed in LLVM 23), or it can be disabled altogether via
+// LLJITBuilder::setLinkProcessSymbolsByDefault(false).
+[[nodiscard]] llvm::Error define_abs_symbols_tolerant(llvm::orc::JITDylib &jd, llvm::orc::SymbolMap syms)
+{
+    // Fast path: no overlap with existing definitions.
+    auto err = jd.define(llvm::orc::absoluteSymbols(syms));
+    if (!err) [[likely]] {
+        return llvm::Error::success();
+    }
+
+    // Propagate errors other than DuplicateDefinition.
+    if (auto other = llvm::handleErrors(std::move(err), [](const llvm::orc::DuplicateDefinition &) {})) [[unlikely]] {
+        // LCOV_EXCL_START
+        return other;
+        // LCOV_EXCL_STOP
+    }
+
+    // NOTE: define() is all-or-nothing, so nothing was added above. Define the symbols one at a time, skipping the
+    // duplicates.
+    for (auto &[name, def] : syms) {
+        if (auto e = jd.define(llvm::orc::absoluteSymbols(llvm::orc::SymbolMap{{name, def}}))) {
+            if (auto other = llvm::handleErrors(std::move(e), [](const llvm::orc::DuplicateDefinition &) {}))
+                [[unlikely]] {
+                // LCOV_EXCL_START
+                return other;
+                // LCOV_EXCL_STOP
+            }
+        }
+    }
+
+    return llvm::Error::success();
+}
+
 // NOTE: this is a helper that sets up the dynamic library search generators for an lljit instance.
 //
 // These are necessary in order to allow access to C/C++ functions from within the LLVM IR.
@@ -899,8 +953,8 @@ auto bc_to_module(const std::string &module_name, const std::string &bc, llvm::L
 void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
 {
     // Setup the jit so that it can look up symbols from the current process.
-    auto dlsg
-        = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(lljit->getDataLayout().getGlobalPrefix());
+    auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(lljit->getDataLayout().getGlobalPrefix(),
+                                                                               nullptr, define_abs_symbols_tolerant);
     if (!dlsg) [[unlikely]] {
         // LCOV_EXCL_START
         throw_llvm_error("Could not create the dynamic library search generator.", dlsg.takeError());
@@ -930,12 +984,13 @@ void setup_dynlib_search_generators(std::unique_ptr<llvm::orc::LLJIT> &lljit)
         }
 
         lljit->getMainJITDylib().addGenerator(std::make_unique<llvm::orc::DynamicLibrarySearchGenerator>(
-            llvm::sys::DynamicLibrary(handle), lljit->getDataLayout().getGlobalPrefix()));
+            llvm::sys::DynamicLibrary(handle), lljit->getDataLayout().getGlobalPrefix(), nullptr,
+            define_abs_symbols_tolerant));
 
 #else
 
-        auto new_dlsg
-            = llvm::orc::DynamicLibrarySearchGenerator::Load(dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix());
+        auto new_dlsg = llvm::orc::DynamicLibrarySearchGenerator::Load(
+            dl_path.c_str(), lljit->getDataLayout().getGlobalPrefix(), nullptr, define_abs_symbols_tolerant);
         if (!new_dlsg) [[unlikely]] {
             // LCOV_EXCL_START
             throw_llvm_error("Could not create the dynamic library search generator for the heyoka library.",
@@ -1812,18 +1867,13 @@ multi_jit::multi_jit(const unsigned n_modules, const unsigned opt_level, const c
 
 #else
 
-// NOTE: this results in occasional compilation failures due to multiply-defined symbols. We will have to either wait
-// for an LLVM fix (if this is truly an LLVM bug) or implement our own version of parallel compilation.
-//
-// NOLINTNEXTLINE
-#if 0
-
+    // NOTE: parallel compilation used to result in occasional compilation failures due to multiply-defined symbols,
+    // caused by a race in LLVM's ORC (LLVM >= 18). This is worked around in setup_dynlib_search_generators() via
+    // define_abs_symbols_tolerant().
     if (m_parjit) {
         // Set the number of compilation threads.
         lljit_builder.setNumCompileThreads(std::thread::hardware_concurrency());
     }
-
-#endif
 
 #endif
 
