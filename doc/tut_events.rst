@@ -104,14 +104,16 @@ zero derivative).
     The ``taylor_adaptive`` object is passed as a non-const reference only so that it is possible to call
     non-const functions on it (such as ``update_d_output()``). From within the callback:
 
-    - invoking the ``step()``, ``step_backward()`` and ``propagate_*()`` functions on the integrator,
-      copy-assigning another integrator to it or deserialising into it will raise an exception;
+    - invoking the ``step()``, ``step_backward()``, ``propagate_*()``, ``set_time()`` and ``set_dtime()``
+      functions on the integrator, copy-assigning another integrator to it or deserialising into it will raise
+      an exception;
     - moving into or from the integrator (e.g., via move assignment) will result in undefined behaviour.
 
 .. versionchanged:: 7.14.0
 
    Invoking the stepping/propagation functions, copy-assigning and deserialising into the integrator
-   from within a callback now raise an exception.
+   from within a callback now raise an exception. Invoking the ``set_time()`` and ``set_dtime()`` functions
+   now raises an exception immediately, instead of after the callback returns.
 
 Because non-terminal event detection is performed at the end of an integration step,
 when the callback is invoked the state and time of the integrator object are those **at the end** of the integration

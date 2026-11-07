@@ -416,8 +416,7 @@ TEST_CASE("propagate grid")
                                                                                       return true;
                                                                                   }),
             std::runtime_error,
-            Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
         // Try also with a single time coord.
         ta = taylor_adaptive_batch<double>{
@@ -432,8 +431,7 @@ TEST_CASE("propagate grid")
                         return true;
                     }),
             std::runtime_error,
-            Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported"));
+            Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
     }
 }
 
@@ -1548,11 +1546,13 @@ TEST_CASE("ev exception callback")
     }
 }
 
-// Test to check that event callbacks which alter the time coordinate
+// Test to check that event callbacks which try to change the time coordinate
 // result in an exception being thrown.
 TEST_CASE("event cb time")
 {
+    using Catch::Matchers::Contains;
     using Catch::Matchers::Message;
+    using Catch::Matchers::StartsWith;
 
     auto [x, v] = make_vars("x", "v");
 
@@ -1561,81 +1561,69 @@ TEST_CASE("event cb time")
 
     auto tcount0 = 0u, tcount1 = 0u;
 
-    // With non-terminal event first.
+    // With non-terminal event first. The events trigger only in the batch element 0.
+    //
+    // NOTE: the exception is raised as soon as a callback tries to change the time coordinate, so that the callback of
+    // the later event is not executed. The two events trigger at different times, so that the order of invocation of
+    // the callbacks is known.
     auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
                                     kw::nt_events = {nt_ev_t(x - 1e-5,
-                                                             [&](auto &tint, auto t, auto, auto) {
-                                                                 // NOTE: check also that the time coordinate passed to
-                                                                 // the callback is the correct one, not the one that
-                                                                 // might be set by another callback.
-                                                                 REQUIRE(std::isfinite(t));
-
+                                                             [&](auto &tint, auto, auto, auto) {
                                                                  ++tcount0;
 
                                                                  tint.set_time({-10., tint.get_time()[1]});
                                                              }),
-                                                     nt_ev_t(x - 1e-5, [&](auto &tint, auto t, auto, auto) {
-                                                         // NOTE: check also that the time coordinate passed to
-                                                         // the callback is the correct one, not the one that
-                                                         // might be set by another callback.
-                                                         REQUIRE(std::isfinite(t));
+                                                     nt_ev_t(x - 2e-5, [&](auto &, auto, auto, auto) { ++tcount1; })});
 
-                                                         ++tcount1;
-
-                                                         tint.set_time({-10., tint.get_time()[1]});
-                                                     })});
-
-    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
-                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
-                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+    REQUIRE_THROWS_MATCHES(
+        ta.step(), std::runtime_error,
+        Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
     REQUIRE(tcount0 == 1u);
-    REQUIRE(tcount1 == 1u);
+    REQUIRE(tcount1 == 0u);
 
-    // Same test, but now we make both batch elements trigger.
+    // The time coordinate must not have been changed.
+    REQUIRE(ta.get_time()[0] > 0);
+
+    // Same test with set_dtime().
+    ta = taylor_adaptive_batch(
+        {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
+        kw::nt_events = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto, auto) { tint.set_dtime(-10., 0.); })});
+
+    REQUIRE_THROWS_MATCHES(
+        ta.step(), std::runtime_error,
+        Message("Cannot invoke the function 'set_dtime()' while the integrator is stepping/propagating"));
+
+    // Same test, but now we make both batch elements trigger. The exceptions raised in the two batch elements are
+    // combined into a single exception.
     ta = taylor_adaptive_batch(
         {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
         kw::nt_events = {nt_ev_t(x - 1e-5,
-                                 [&](auto &tint, auto t, auto, auto) {
-                                     // NOTE: check also that the time coordinate passed to
-                                     // the callback is the correct one, not the one that
-                                     // might be set by another callback.
-                                     REQUIRE(std::isfinite(t));
-
+                                 [&](auto &tint, auto, auto, auto) {
                                      ++tcount0;
 
                                      tint.set_time({-std::numeric_limits<double>::infinity(), tint.get_time()[1]});
                                  }),
-                         nt_ev_t(x - 1e-5, [&](auto &tint, auto t, auto, auto) {
-                             // NOTE: check also that the time coordinate passed to
-                             // the callback is the correct one, not the one that
-                             // might be set by another callback.
-                             REQUIRE(std::isfinite(t));
-
-                             ++tcount1;
-
-                             tint.set_time({std::numeric_limits<double>::quiet_NaN(), tint.get_time()[1]});
-                         })});
-
-    // Make also a copy to test copy semantics of the internal time copy members.
-    auto ta2(ta);
+                         nt_ev_t(x - 2e-5, [&](auto &, auto, auto, auto) { ++tcount1; })});
 
     tcount0 = 0;
     tcount1 = 0;
 
-    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
-                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
-                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+    // NOTE: the message of the combined exception contains the demangled names of the exception types, which are
+    // platform-dependent, hence we check only parts of the message.
+    REQUIRE_THROWS_WITH(
+        ta.step(),
+        StartsWith("Two or more exceptions were raised during the execution of event callbacks in a batch integrator")
+            && Contains("Batch index #0") && Contains("Batch index #1")
+            && Contains("Exception message: Cannot invoke the function 'set_time()' while the integrator is "
+                        "stepping/propagating"));
 
     REQUIRE(tcount0 == 2u);
-    REQUIRE(tcount1 == 2u);
+    REQUIRE(tcount1 == 0u);
 
-    REQUIRE_THROWS_MATCHES(ta2.step(), std::runtime_error,
-                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
-                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
-
-    REQUIRE(tcount0 == 4u);
-    REQUIRE(tcount1 == 4u);
+    // The time coordinates must not have been changed.
+    REQUIRE(ta.get_time()[0] > 0);
+    REQUIRE(ta.get_time()[1] > 0);
 
     // Ensure that the non-finiteness check on the state vector is run before executing the callbacks.
     ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
@@ -1662,38 +1650,31 @@ TEST_CASE("event cb time")
     REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::err_nf_state);
     REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::err_nf_state);
 
-    // Check the same for terminal events.
-    ta = taylor_adaptive_batch(
-        {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
-        kw::nt_events = {nt_ev_t(x - 1e-5,
-                                 [&](auto &tint, auto t, auto, auto) {
-                                     // NOTE: check also that the time coordinate passed to
-                                     // the callback is the correct one, not the one that
-                                     // might be set by another callback.
-                                     REQUIRE(std::isfinite(t));
+    // Check the same for terminal events: the callback of the non-terminal event is executed before the callback of
+    // the terminal event, which then tries to change the time coordinate.
+    ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
+                               kw::nt_events = {nt_ev_t(x - 1e-5, [&](auto &, auto, auto, auto) { ++tcount0; })},
+                               kw::t_events = {t_ev_t(
+                                   x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
+                                       ++tcount1;
 
-                                     ++tcount0;
+                                       tint.set_time({-10., tint.get_time()[1]});
 
-                                     tint.set_time({-std::numeric_limits<double>::infinity(), tint.get_time()[1]});
-                                 })},
-        kw::t_events = {t_ev_t(
-            x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
-                ++tcount1;
-
-                tint.set_time({-10., tint.get_time()[1]});
-
-                return true;
-            })});
+                                       return true;
+                                   })});
 
     tcount0 = 0;
     tcount1 = 0;
 
-    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
-                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
-                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+    REQUIRE_THROWS_MATCHES(
+        ta.step(), std::runtime_error,
+        Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
     REQUIRE(tcount0 == 1u);
     REQUIRE(tcount1 == 1u);
+
+    // The time coordinate must not have been changed.
+    REQUIRE(ta.get_time()[0] > 0);
 
     ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
                                kw::t_events = {t_ev_t(
@@ -2148,8 +2129,7 @@ TEST_CASE("bug prop_cb time")
                          return true;
                      }),
         std::runtime_error,
-        Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                "time coordinate of the integrator - this is not supported"));
+        Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 
     // Change only one component.
     ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector{0., 0.1, 1., 1.1}, 2u);
@@ -2163,8 +2143,7 @@ TEST_CASE("bug prop_cb time")
                          return true;
                      }),
         std::runtime_error,
-        Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                "time coordinate of the integrator - this is not supported"));
+        Message("Cannot invoke the function 'set_time()' while the integrator is stepping/propagating"));
 }
 
 // Test that non-finite values in the Taylor coefficients of the event equations of a batch element result in
@@ -2484,8 +2463,7 @@ TEST_CASE("moved-from")
 }
 
 // Test that, when the event callbacks of a batch element are invoked, the time, the last timestep and the cooldowns of
-// *all* batch elements have already been updated, and that the alteration of the time coordinate of any batch element
-// from within an event callback is detected.
+// *all* batch elements have already been updated.
 TEST_CASE("event callbacks lane consistency")
 {
     using Catch::Matchers::Message;
@@ -2494,14 +2472,14 @@ TEST_CASE("event callbacks lane consistency")
 
     auto [x, v] = make_vars("x", "v");
 
-    // Alteration of the time coordinate of the batch element 1 from within an event callback of the batch element 0.
+    // Attempt to change the time coordinate of the batch element 1 from within an event callback of the batch element 0.
     {
         // NOTE: in both batch elements, v starts from a small positive value and decreases. The event v - par[0]
         // triggers early in the first step only in the batch element 0 (where par[0] is zero).
         auto ta = ta_t({prime(x) = v, prime(v) = -sin(x)}, {0.05, 0.05, 1e-3, 1e-3}, 2u,
                        kw::pars = std::vector<double>{0., 10.},
                        kw::nt_events = {ta_t::nt_event_t(v - par[0], [](ta_t &t, double, int, std::uint32_t) {
-                           // Alter only the time coordinate of the batch element 1.
+                           // Try to change only the time coordinate of the batch element 1.
                            auto hi = t.get_dtime().first;
                            const auto lo = t.get_dtime().second;
                            hi[1] += 1.;
@@ -2510,8 +2488,11 @@ TEST_CASE("event callbacks lane consistency")
 
         REQUIRE_THROWS_MATCHES(
             ta.step(), std::runtime_error,
-            Message("The invocation of one or more event callbacks resulted in the alteration of the time coordinate "
-                    "of the integrator at the batch index 1 - this is not supported"));
+            Message("Cannot invoke the function 'set_dtime()' while the integrator is stepping/propagating"));
+
+        // The time coordinate of the batch element 1 must not have been changed: it started from zero, hence it must
+        // be equal to the last timestep.
+        REQUIRE(ta.get_time()[1] == ta.get_last_h()[1]);
     }
 
     // Copy of the integrator from within an event callback of the batch element 0.

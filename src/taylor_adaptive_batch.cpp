@@ -135,8 +135,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
@@ -394,8 +392,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     m_pfor_ts.resize(boost::numeric_cast<decltype(m_pfor_ts.size())>(m_batch_size));
     m_t_dir.resize(boost::numeric_cast<decltype(m_t_dir.size())>(m_batch_size));
     m_rem_time.resize(m_batch_size);
-    m_time_copy_hi.resize(m_batch_size);
-    m_time_copy_lo.resize(m_batch_size);
     m_nf_detected.resize(m_batch_size);
 
     m_d_out_time.resize(m_batch_size);
@@ -531,14 +527,31 @@ void taylor_adaptive_batch<T>::load(boost::archive::binary_iarchive &ar, unsigne
     load_impl(ar, v);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Small shared helper to check the busy flag and throw if necessary.
+void taylor_adaptive_batch_check_busy(const bool busy, const std::string_view name)
+{
+    if (busy) [[unlikely]] {
+        throw std::runtime_error(
+            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
 template <supported_batch_fp_type T>
 detail::busy_guard taylor_adaptive_batch<T>::make_busy_guard(const std::string_view name)
 {
     assert(m_i_data);
-    if (m_i_data->m_busy) [[unlikely]] {
-        throw std::runtime_error(
-            fmt::format("Cannot invoke the function '{}()' while the integrator is stepping/propagating", name));
-    }
+
+    detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, name);
 
     return detail::busy_guard(m_i_data->m_busy);
 }
@@ -546,6 +559,10 @@ detail::busy_guard taylor_adaptive_batch<T>::make_busy_guard(const std::string_v
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_time");
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
@@ -571,6 +588,10 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_time(T new_time)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_time");
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
 
@@ -583,6 +604,10 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_dtime");
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
@@ -614,6 +639,10 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 {
+    // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
+    // time keeping logic in the propagate_*() functions.
+    detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_dtime");
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
 
@@ -688,8 +717,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_delta_ts);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
@@ -944,12 +971,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             }
         }
 
-        // Make a copy of the times before invoking the callbacks. The copy is used to compute the time coordinates
-        // passed to the callbacks (so that they are not affected by callbacks altering the time), and to detect if the
-        // callbacks (incorrectly) change the time.
-        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
         // For the lanes which did *not* end up in err_nf_state, execute the event callbacks.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // Check if the current lane was flagged in the finiteness checks.
@@ -975,12 +996,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Flag to signal that the callback of a non-terminal event threw an exception.
             bool nt_cb_exception = false;
 
-            // Construct the current (updated) time for the batch element as a dfloat from m_time_copy_hi and
-            // m_time_copy_lo, so that modifications to m_time_hi/m_time_lo from event callbacks are ignored.
-            const auto cur_new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]);
-
-            // Invoke the callbacks of the non-terminal events, which are guaranteed to happen before the first terminal
-            // event.
+            // Invoke the callbacks of the non-terminal events guaranteed to happen before the first terminal event.
             //
             // NOTE: the loop will be exited as soon as an exception is raised by a callback. This is intended to match
             // the behaviour of the scalar integrator (i.e., do not process any more events for the current batch
@@ -989,8 +1005,13 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 const auto &t = *it;
                 auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
                 assert(cb);
+
+                // Compute the time coordinate to pass to the callback.
+                const auto cb_tm
+                    = static_cast<T>(detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i] + std::get<1>(t));
+
                 try {
-                    cb(*this, static_cast<T>(cur_new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
+                    cb(*this, cb_tm, std::get<2>(t), i);
                 } catch (...) {
                     // NOTE: in case of exception, remember it, set nt_cb_exception to true and break out, so that we do
                     // not process additional events.
@@ -1097,28 +1118,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
             throw std::runtime_error(exc_msg);
         }
-
-        // NOTE: event callbacks - terminal or not - cannot modify the time variable, as this is going to mess up the
-        // internal time keeping logic in the propagate_*() functions.
-        //
-        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates. This is necessary in case
-        // something goes wrong in the integration step and the time coordinate goes NaN - in such a case, the standard
-        // equality operator would trigger (because NaN != NaN) even if the time coordinate was not changed by the
-        // callback.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            if (!detail::cmp_nan_eq(m_time_hi[i], m_time_copy_hi[i])
-                || !detail::cmp_nan_eq(m_time_lo[i], m_time_copy_lo[i])) [[unlikely]] {
-                throw std::runtime_error(
-                    fmt::format("The invocation of one or more event callbacks resulted in the alteration of the "
-                                "time coordinate of the integrator at the batch index {} - this is not supported",
-                                i));
-            }
-        }
     }
 }
 
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::step(bool wtc)
+void taylor_adaptive_batch<T>::step(const bool wtc)
 {
     const auto bg = make_busy_guard("step");
 
@@ -1128,7 +1132,7 @@ void taylor_adaptive_batch<T>::step(bool wtc)
 }
 
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::step_backward(bool wtc)
+void taylor_adaptive_batch<T>::step_backward(const bool wtc)
 {
     const auto bg = make_busy_guard("step_backward");
 
@@ -1138,7 +1142,7 @@ void taylor_adaptive_batch<T>::step_backward(bool wtc)
 }
 
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, const bool wtc)
 {
     const auto bg = make_busy_guard("step");
 
@@ -1255,8 +1259,6 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
 
     assert(m_pfor_ts.size() == m_batch_size);
 
@@ -1445,25 +1447,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
 
-    // Error message for when the callback modifies the time coordinate.
-    constexpr auto cb_time_errmsg
-        = "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-          "time coordinate of the integrator - this is not supported";
-
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
-        // operator, as shown later).
-        //
-        // NOTE: the hi/lo copies are guaranteed to be finite due to the checks performed earlier.
-        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
         cb.pre_hook(*this);
-
-        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
-            throw std::runtime_error(cb_time_errmsg);
-        }
     }
 
     // Small helper to create the return value. It will consume c_out_tcs, c_out_times_hi and c_out_times_lo via
@@ -1612,21 +1598,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
 
         // Execute the propagate() callback, if applicable.
         if (with_cb) {
-            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
-            // time coordinate.
-            //
-            // NOTE: the hi/lo copies are guaranteed to be finite because no non-finite outcomes were detected in the
-            // step.
-            std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-            std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
             // Execute the cb.
             const auto ret_cb = cb(*this);
-
-            // Check the time coordinate.
-            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
-                throw std::runtime_error(cb_time_errmsg);
-            }
 
             if (!ret_cb) {
                 // Change m_prop_res before exiting by setting all outcomes to cb_stop regardless of the timestep
@@ -1706,8 +1679,6 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_max_abs_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
 
     // Helper to detect if an input value is nonfinite.
     constexpr auto is_nf = [](const auto &t) {
@@ -1927,26 +1898,9 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
 
-    // Error message for when the callback modifies the time coordinate.
-    constexpr auto cb_time_errmsg
-        = "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-          "time coordinate of the integrator - this is not supported";
-
     // Run the callback's pre_hook() function, if needed.
     if (with_cb) {
-        // NOTE: the callback is not allowed to change the time coordinate (either via pre_hook() or via its call
-        // operator, as shown later).
-        //
-        // NOTE: the hi/lo copies are guaranteed to contain finite values because propagate_until() did not return
-        // err_nf_state.
-        std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-        std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
         cb.pre_hook(*this);
-
-        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
-            throw std::runtime_error(cb_time_errmsg);
-        }
     }
 
     // NOTE: in general, an integration timestep will cover a different number of grid points for each batch element. We
@@ -2206,35 +2160,12 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
         // Update the number of iterations.
         ++iter_counter;
 
-        // Small helper to wrap the invocation of the callback while checking that the callback does not change the time
-        // coordinate.
-        const auto wrap_cb_call = [&] {
-            // Store the current time coordinate before executing the cb, so that we can check if the cb changes the
-            // time coordinate.
-            //
-            // NOTE: the hi/lo copies are guaranteed to contain finite values because no err_nf_state outcome was
-            // detected in the step.
-            std::ranges::copy(m_time_hi, m_time_copy_hi.begin());
-            std::ranges::copy(m_time_lo, m_time_copy_lo.begin());
-
-            // Execute the cb.
-            assert(cb);
-            const auto ret_cb = cb(*this);
-
-            // Check the time coordinate.
-            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) [[unlikely]] {
-                throw std::runtime_error(cb_time_errmsg);
-            }
-
-            return ret_cb;
-        };
-
         // Check the early interruption conditions.
         //
         // NOTE: in case of interruption, we don't exit immediately: the grid points falling within the most recent
         // step are processed first, at the beginning of the next loop iteration. After that, the loop exit is
         // guaranteed either because we processed all grid points or because of the interruption condition check.
-        if (with_cb && !wrap_cb_call()) {
+        if (with_cb && !cb(*this)) {
             // Interruption via callback.
             for (auto &t : m_prop_res) {
                 std::get<0>(t) = taylor_outcome::cb_stop;
