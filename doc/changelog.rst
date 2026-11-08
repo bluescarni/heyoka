@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Parallel JIT compilation is now available and enabled by default on LLVM >= 20
+  (`#568 <https://github.com/bluescarni/heyoka/pull/568>`__).
 - The new :c:macro:`HEYOKA_HAVE_LONG_DOUBLE` definition signals whether heyoka supports the C++ ``long double``
   type, which is now the case only if ``long double`` is in IEEE double-precision, x86 extended-precision or
   IEEE quadruple-precision format. On platforms where this is not the case (e.g., PowerPC with the IBM
