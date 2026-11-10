@@ -709,7 +709,7 @@ detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view na
 //   in the internal array (if wtc == true, or always in the presence of events). That is, h == 0 is not treated in any
 //   special way.
 template <supported_fp_type T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t, const bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -846,7 +846,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
         // functions.
         //
-        // NOTE: this is the index in m_ev_jet where the Taylor coefficients for the event functions begin.
+        // NOTE: ev_begin is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. It
+        // is computed in at least 32-bit unsigned arithmetic. edd.m_ev_jet's size is guaranteed to fit in 32-bit
+        // unsigned ints, hence no overflow/wraparound is possible.
         const auto ev_begin = m_dim * (m_order + 1u);
         const auto ed_finite = is_finite(h) && is_finite(g_eps)
                                && std::ranges::all_of(edd.m_ev_jet.data() + ev_begin,
