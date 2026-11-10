@@ -13,6 +13,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -95,7 +96,7 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     // LCOV_EXCL_START
     assert(isfinite(g_eps));
     assert(isfinite(abs_der));
-    assert(g_eps >= 0);
+    assert(g_eps > 0);
     assert(abs_der >= 0);
     // LCOV_EXCL_STOP
 
@@ -117,8 +118,12 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     } else {
         // LCOV_EXCL_START
 
-        // The heuristic produced a non-finite value, fall back to a cooldown of zero.
-        return 0;
+        // The heuristic produced a non-finite value. Since we are assuming that g_eps is strictly positive, the only
+        // non-finite result for ret can be +infinity. Replace it with a large number in order to keep the spirit of a
+        // very large cooldown without the headache of making it non-finite.
+        using std::nextafter;
+        assert(ret == std::numeric_limits<float>::infinity());
+        return nextafter(std::move(ret), static_cast<T>(0));
 
         // LCOV_EXCL_STOP
     }
@@ -312,13 +317,13 @@ ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
 
-    // NOTE: the numeric cast will also ensure that we can index into the events using 32-bit ints.
-    const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
-    const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
+    const auto n_tes = m_tes.size();
+    const auto n_ntes = m_ntes.size();
 
     // Setup m_ev_jet.
     //
     // NOTE: check that we can represent the requested size for m_ev_jet using both its size type and std::uint32_t.
+    // This also indirectly checks that n_tes and n_ntes are representable as 32-bit unsigned ints.
     const auto ev_jet_size = [&] {
         try {
             using safe_ev_jet_size_t = boost::safe_numerics::safe<decltype(m_ev_jet.size())>;
@@ -468,10 +473,11 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
     // Helper to run event detection on a vector of events (terminal or not). 'out' is the vector of detected events,
     // 'ev_vec' the input vector of events to detect.
     const auto run_detection = [&]<typename Event>(auto &out, const std::vector<Event> &ev_vec) {
+        const auto offset = is_terminal_event_v<Event> ? 0u : m_tes.size();
+
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the current event.
-            const auto *const ptr
-                = m_ev_jet.data() + (i + dim + (is_terminal_event_v<Event> ? 0u : m_tes.size())) * (order + 1u);
+            const auto *const ptr = m_ev_jet.data() + (i + dim + offset) * (order + 1u);
 
             // Run the fast exclusion check.
             //
@@ -480,6 +486,7 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
             std::uint32_t fex_check_result{};
             m_fex_check(ptr, &h, &fex_check_result, enc);
             if (fex_check_result) {
+                // The fast exclusion check returned true, we can move to the next event.
                 continue;
             }
 
@@ -524,13 +531,13 @@ ed_data_batch<T>::ed_data_batch(const llvm_state &s, std::vector<t_event_t> tes,
     assert(!m_tes.empty() || !m_ntes.empty());
     assert(batch_size != 0u);
 
-    // NOTE: the numeric cast will also ensure that we can index into the events using 32-bit ints.
-    const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
-    const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
+    const auto n_tes = m_tes.size();
+    const auto n_ntes = m_ntes.size();
 
     // Setup m_ev_jet.
     //
     // NOTE: check that we can represent the requested size for m_ev_jet using both its size type and std::uint32_t.
+    // This also indirectly checks that n_tes and n_ntes are representable as 32-bit unsigned ints.
     const auto ev_jet_size = [&] {
         try {
             using safe_ev_jet_size_t = boost::safe_numerics::safe<decltype(m_ev_jet.size())>;
@@ -720,7 +727,7 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 
     // Clear and reserve the capacity in m_cb_eptrs.
     m_cb_eptrs.clear();
-    m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
+    m_cb_eptrs.reserve(batch_size);
 
     // Clear out m_poly_roots.
     m_poly_roots.clear();
@@ -750,11 +757,11 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
     // Helper to run event detection on a vector of events (terminal or not). 'out_vec' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
     const auto run_detection = [&]<typename Event>(auto &out_vec, const std::vector<Event> &ev_vec) {
+        const auto offset = is_terminal_event_v<Event> ? 0u : m_tes.size();
+
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the current event.
-            const auto *const batch_ptr
-                = m_ev_jet.data()
-                  + (i + dim + (is_terminal_event_v<Event> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
+            const auto *const batch_ptr = m_ev_jet.data() + (i + dim + offset) * (order + 1u) * batch_size;
 
             // Run the fast exclusion check.
             //

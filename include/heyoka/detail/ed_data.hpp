@@ -135,7 +135,7 @@ struct ed_data_batch {
     std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
     // The JIT data.
     std::shared_ptr<ed_jit_data<T>> m_jit_data;
-    // Outputs of the fast exclusion check.
+    // Outputs of the fast exclusion check for a single event.
     std::vector<std::uint32_t> m_fex_check_res;
     std::vector<T> m_fex_check_enc;
     // Vector in which exceptions raised by the event callbacks will be temporarily stored.
