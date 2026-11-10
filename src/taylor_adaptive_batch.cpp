@@ -901,7 +901,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // guarantees that the event with the lowest index takes precedence.
             if (!edd.m_d_tes[i].empty()) {
                 const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], detail::taylor_ev_cmp);
-                std::iter_swap(earliest_it, edd.m_d_tes[i].begin());
+                std::ranges::iter_swap(earliest_it, edd.m_d_tes[i].begin());
             }
 
             // For non-terminal events, we want to sort the detected events and remove duplicates.

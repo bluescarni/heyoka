@@ -870,7 +870,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // guarantees that the event with the lowest index takes precedence.
             if (!edd.m_d_tes.empty()) {
                 const auto earliest_it = std::ranges::min_element(edd.m_d_tes, detail::taylor_ev_cmp);
-                std::iter_swap(earliest_it, edd.m_d_tes.begin());
+                std::ranges::iter_swap(earliest_it, edd.m_d_tes.begin());
             }
 
             // For non-terminal events, we want to sort the detected events and remove duplicates.
