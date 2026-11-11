@@ -44,21 +44,6 @@ namespace detail
 namespace
 {
 
-// Small helper to divide an input value by 2, with mppp::real specialisation.
-template <typename T>
-T isolate_real_roots_div_2(T x)
-{
-    return x / 2;
-}
-
-// NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It also uses
-// a specialised division primitive for performance.
-template <>
-mppp::real isolate_real_roots_div_2<mppp::real>(mppp::real x)
-{
-    return mppp::div_2ui(std::move(x), 1u);
-}
-
 // Extended-precision pass for real root isolation.
 //
 // This pass is run only if the initial pass in isolate_real_roots() produced undecided intervals which are not smaller
@@ -283,7 +268,7 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
         // - the width check above (2**-d >= eps = 2**(1-p)) gives d+1 <= p.
         //
         // lo/2 and hi/2 are exact, and so is their sum, since its exact value is representable.
-        const auto mid = isolate_real_roots_div_2(lo) + isolate_real_roots_div_2(hi);
+        const auto mid = num_div_2(lo) + num_div_2(hi);
         assert(lo < mid && mid < hi);
 
         // NOTE: add the right before the left, so that the left is consumed first and isol_ivals will be sorted in tau
@@ -644,7 +629,7 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         // - the width check above (2**-d >= eps = 2**(1-p)) gives d+1 <= p.
         //
         // lo/2 and hi/2 are exact, and so is their sum, since its exact value is representable.
-        const auto mid = isolate_real_roots_div_2(lo) + isolate_real_roots_div_2(hi);
+        const auto mid = num_div_2(lo) + num_div_2(hi);
         assert(lo < mid && mid < hi);
 
         // NOTE: add the right before the left, so that the left is consumed first and isol_ivals will be sorted in tau

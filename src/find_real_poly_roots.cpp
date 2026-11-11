@@ -15,7 +15,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -38,49 +37,6 @@
 #include <heyoka/find_real_poly_roots.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
-
-namespace
-{
-
-// NOTE: helpers to compute the next/previous representable floating-point numbers.
-template <typename T>
-T frpr_nextup(T x)
-{
-    using std::nextafter;
-    // NOTE: for mppp::real, the second argument will be an infinity in single precision. This is ok, as
-    // mppp::nextafter() ignores the precision of the second argument and outputs a value with the same precision as the
-    // first argument.
-    return nextafter(std::move(x), static_cast<T>(std::numeric_limits<float>::infinity()));
-}
-
-template <typename T>
-T frpr_nextdown(T x)
-{
-    using std::nextafter;
-    return nextafter(std::move(x), static_cast<T>(-std::numeric_limits<float>::infinity()));
-}
-
-// Small helper to divide an input value by 2, with mppp::real specialisation.
-template <typename T>
-T find_real_poly_roots_div_2(T x)
-{
-    return x / 2;
-}
-
-// NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It also uses
-// a specialised division primitive for performance.
-template <>
-mppp::real find_real_poly_roots_div_2<mppp::real>(mppp::real x)
-{
-    return mppp::div_2ui(std::move(x), 1u);
-}
-
-} // namespace
-
-} // namespace detail
 
 // Find the real roots of a polynomial within an interval.
 //
@@ -237,8 +193,8 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
         const auto root = -cfs[0] / cfs[1];
         // Compute a rigorous enclosure for the root. The division is correctly rounded, so the exact root differs from
         // root by less than one ulp, and it lies within [nextdown(root), nextup(root)].
-        const auto root_lo = detail::frpr_nextdown(root);
-        const auto root_hi = detail::frpr_nextup(root);
+        const auto root_lo = detail::num_nextdown(root);
+        const auto root_hi = detail::num_nextup(root);
 
         // The direction of the root, that is, the sign of the derivative dp/dt = c1 (which is nonzero here, by
         // definition of last_nz_idx).
@@ -318,7 +274,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
                 // LCOV_EXCL_START
                 // NOTE: unreachable in practice: since root_tau < 1, root_tau * h can round to h only if |h| is at the
                 // bottom of the exponent range (e.g., subnormal).
-                root = detail::frpr_nextdown(h);
+                root = detail::num_nextdown(h);
                 // LCOV_EXCL_STOP
             }
 
@@ -330,7 +286,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
             if (root <= h) {
                 // LCOV_EXCL_START
                 // NOTE: see above.
-                root = detail::frpr_nextup(h);
+                root = detail::num_nextup(h);
                 // LCOV_EXCL_STOP
             }
 
@@ -451,7 +407,7 @@ void find_real_poly_roots(std::vector<real_poly_root<T>> &ret, frpr_workspace<T>
 
         // At this point [cur_lo, *eff_hi) is either a single small undecided interval, or it is a larger merged
         // undecided interval. We report it as a single root at its midpoint.
-        auto candidate = detail::find_real_poly_roots_div_2(cur_lo) + detail::find_real_poly_roots_div_2(*eff_hi);
+        auto candidate = detail::num_div_2(cur_lo) + detail::num_div_2(*eff_hi);
         if (cur_lo > candidate || candidate >= *eff_hi) {
             // If rounding places the midpoint outside the range, report the root at cur_lo.
             candidate = cur_lo;
