@@ -802,17 +802,15 @@ void taylor_adaptive_detect_cross_step_events(const bool forward, const auto &h,
 // bonus, this also guarantees that the result of in-step detection remains consistent with the result of cross-step
 // detection.
 //
-// 'forward' is true for an integration forward in time, false otherwise. 'h' is the (signed) timestep size (positive
-// for forward integration, negative for backward integration). 'edd' is the ed_data instance for the integrator.
-// 'ev_begin' is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. 'order' is the
-// order of the Taylor series.
+// 'h' is the (signed) timestep size (positive for forward integration, negative for backward integration). 'edd' is the
+// ed_data instance for the integrator. 'ev_begin' is the index in edd.m_ev_jet where the Taylor coefficients for the
+// event functions begin. 'order' is the order of the Taylor series.
 //
 // This function will update the m_ev_signs_end_step member in edd with the signs of the Taylor series of the event
 // functions at the end of the step. For h == 0, the signs are left unchanged. The function must be called after event
 // detection ran on finite inputs, and after h was possibly clamped by a terminal event.
 template <typename T>
-void taylor_adaptive_update_ev_signs_end_step(const bool forward, const T &h, auto &edd, const auto ev_begin,
-                                              const auto order)
+void taylor_adaptive_update_ev_signs_end_step(const T &h, auto &edd, const auto ev_begin, const auto order)
 {
     if (h == 0) {
         // h == 0 means we took a zero step (either because the user or the automatic timestep deduction produced a
@@ -820,8 +818,6 @@ void taylor_adaptive_update_ev_signs_end_step(const bool forward, const T &h, au
         // the signs of the event functions remain unchanged.
         return;
     }
-
-    assert((h > 0) == forward);
 
     auto &ev_signs_end_step = edd.m_ev_signs_end_step;
     const auto &ev_fex_check_res = edd.m_ev_fex_check_res;
@@ -1157,7 +1153,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
         }
 
         // Update the signs of the event functions at the end of the step.
-        detail::taylor_adaptive_update_ev_signs_end_step(forward, h, edd, ev_begin, m_order);
+        detail::taylor_adaptive_update_ev_signs_end_step(h, edd, ev_begin, m_order);
 
         // If we don't have terminal events, we will invoke the callbacks of *all* the non-terminal events. Otherwise,
         // we need to figure out which non-terminal events do not happen because their time coordinate is at or after
