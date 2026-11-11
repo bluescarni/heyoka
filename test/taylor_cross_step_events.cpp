@@ -616,3 +616,59 @@ TEST_CASE("sign update exact nonzero")
         }
     }
 }
+
+// Sign update in case of overflow: if the interval evaluation of the event function at the end of the step overflows,
+// the exact evaluation stores the correct sign.
+TEST_CASE("sign update overflow")
+{
+    using nt_ev_t = taylor_adaptive<double>::nt_event_t;
+
+    for (const auto backward : {false, true}) {
+        // NOTE: the backward setup is the time reversal of the forward one: the event times flip sign, the directions
+        // are unchanged.
+        const auto s = backward ? -1. : 1.;
+
+        // NOTE: the sign stored at the end of the first step must be the sign of s. Without a jump, no event must be
+        // reported at the beginning of the second step. With a jump of x to -s, an event must be reported. Both
+        // behaviours can happen only if the stored sign is the sign of s.
+        for (const auto jump : {false, true}) {
+            auto x = make_vars("x");
+
+            // The (time, direction) records of the non-terminal event.
+            std::vector<std::pair<double, int>> g_records;
+
+            // NOTE: the event function is g = 1e308 * x, whose Taylor coefficients are -1e308 * s and 1e308.
+            auto ta = taylor_adaptive<double>{
+                {prime(x) = 1_dbl},
+                {-s},
+                kw::nt_events = {nt_ev_t(1e308 * x, [&g_records](taylor_adaptive<double> &, double tm, int d_sgn) {
+                    g_records.emplace_back(tm, d_sgn);
+                })}};
+
+            // First step: g triggers at t = s. At the end of the step, g = 1e308 * s, but the interval evaluation
+            // overflows (1e308 * 2 > DBL_MAX) and the sign is computed by the exact evaluation.
+            REQUIRE(std::get<0>(ta.step(2. * s)) == taylor_outcome::time_limit);
+            REQUIRE(g_records.size() == 1u);
+            REQUIRE(g_records[0].first == s);
+            REQUIRE(g_records[0].second == 1);
+            REQUIRE(ta.get_state()[0] == s);
+
+            if (jump) {
+                // Jump of x (and thus of g) through zero.
+                ta.get_state_data()[0] = -s;
+            }
+
+            // Second step: g does not cross zero within the step.
+            REQUIRE(std::get<0>(ta.step(.25 * s)) == taylor_outcome::time_limit);
+
+            if (jump) {
+                // The jump is reported at the beginning of the step.
+                REQUIRE(g_records.size() == 2u);
+                REQUIRE(g_records[1].first == 2. * s);
+                REQUIRE(g_records[1].second == -1);
+            } else {
+                REQUIRE(g_records.size() == 1u);
+            }
+        }
+    }
+}
