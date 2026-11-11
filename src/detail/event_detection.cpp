@@ -88,10 +88,13 @@ constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 // Helper to automatically deduce the cooldown for a terminal event. g_eps is the maximum absolute error on the Taylor
 // series of the event equation (which depends on the integrator tolerance and the infinity norm of the state
 // vector/event equations), abs_der is the absolute value of the time derivative of the event equation at the zero.
+//
+// The result is always finite and strictly positive.
 template <typename T>
 T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 {
     using std::isfinite;
+    using std::nextafter;
 
     // LCOV_EXCL_START
     assert(isfinite(g_eps));
@@ -114,6 +117,15 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     auto ret = std::move(g_eps) / std::move(abs_der) * 10;
 
     if (isfinite(ret)) [[likely]] {
+        if (ret == 0) [[unlikely]] {
+            // LCOV_EXCL_START
+
+            // ret can come out zero in case of underflow. In such case, we want to avoid an exactly zero cooldown.
+            ret = nextafter(std::move(ret), static_cast<T>(1));
+
+            // LCOV_EXCL_STOP
+        }
+
         return ret;
     } else {
         // LCOV_EXCL_START
@@ -121,7 +133,6 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
         // The heuristic produced a non-finite value. Since we are assuming that g_eps is strictly positive, the only
         // non-finite result for ret can be +infinity. Replace it with a large number in order to keep the spirit of a
         // very large cooldown without the headache of making it non-finite.
-        using std::nextafter;
         assert(ret == std::numeric_limits<float>::infinity());
         return nextafter(std::move(ret), static_cast<T>(0));
 
