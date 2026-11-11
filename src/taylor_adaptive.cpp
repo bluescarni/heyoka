@@ -753,11 +753,10 @@ void taylor_adaptive_detect_cross_step_events(const bool forward, const auto &h,
             // ed_data).
             if (idx < n_tes) {
                 // Terminal event.
-                if (edd.m_te_cooldowns[idx]) {
+                if (const auto &cd = edd.m_te_cooldowns[idx]) {
                     // The terminal event is on cooldown. Compute the absolute value of the remaining cooldown time at
                     // the trigger time (i.e., beginning of the step).
-                    const auto lb = forward ? (edd.m_te_cooldowns[idx]->second - edd.m_te_cooldowns[idx]->first)
-                                            : (edd.m_te_cooldowns[idx]->second + edd.m_te_cooldowns[idx]->first);
+                    const auto lb = forward ? (cd->second - cd->first) : (cd->second + cd->first);
 
                     // NOTE: the event is meant to be added at the beginning of the step, if there's cooldown time
                     // remaining we must skip it. This mirrors the [0, lb) exclusion applied to roots by

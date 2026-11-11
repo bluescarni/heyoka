@@ -347,8 +347,11 @@ template <typename T>
         const auto &cf = cfs[i - 1u];
 
         // Multiply the enclosure by x. The bounds swap if x is negative.
+        //
+        // NOLINTBEGIN(misc-const-correctness)
         auto prod_lo = x_is_neg ? hi * x : lo * x;
         auto prod_hi = x_is_neg ? lo * x : hi * x;
+        // NOLINTEND(misc-const-correctness)
 
         // Widen the products, add the coefficient and widen again.
         lo = num_nextdown(num_nextdown(std::move(prod_lo)) + cf);
