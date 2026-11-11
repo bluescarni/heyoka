@@ -1932,8 +1932,10 @@ TEST_CASE("no events error")
                                Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(), std::invalid_argument,
-                               Message("No events were defined for this integrator"));
+
+        // The reset functions are no-ops.
+        REQUIRE_NOTHROW(tad.reset_cooldowns());
+        REQUIRE_NOTHROW(tad.reset_event_signs());
     }
 }
 

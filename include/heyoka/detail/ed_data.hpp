@@ -23,6 +23,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/container/vector.hpp>
+
 #include <heyoka/config.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -48,6 +50,16 @@ struct ed_jit_data {
     void save(boost::archive::binary_oarchive &, unsigned) const;
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
+};
+
+// Enum to describe the sign of the Taylor polynomial of an event function at the end of an integration step.
+//
+// This is used in the implementation of cross step event detection.
+enum class event_sign_end_step : std::int8_t {
+    zero = 0,
+    positive = 1,
+    negative = -1,
+    unknown = 2,
 };
 
 template <typename T>
@@ -77,6 +89,14 @@ struct ed_data {
     frpr_workspace<T> m_frpr_ws;
     // The output for poly root finding.
     std::vector<real_poly_root<T>> m_poly_roots;
+    // Vector to store the results of the fast exclusion check for all events (terminal and non-terminal). This is
+    // guaranteed to be filled in after a successful invocation of detect_events(), except for a zero timestep (in which
+    // case, nothing will be written to m_ev_fex_check_res).
+    //
+    // NOTE: use Boost's vector in order to avoid the bool specialisation trap.
+    boost::container::vector<bool> m_ev_fex_check_res;
+    // Vector to track the sign of all event functions (terminal and non-terminal) at the end of a step.
+    std::vector<event_sign_end_step> m_ev_signs_end_step;
 
     // Constructors.
     ed_data(const llvm_state &, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
@@ -149,6 +169,14 @@ struct ed_data_batch {
     frpr_workspace<T> m_frpr_ws;
     // The output for poly root finding.
     std::vector<real_poly_root<T>> m_poly_roots;
+    // Vector to store the results of the fast exclusion check for all events (terminal and non-terminal). This is
+    // guaranteed to be filled in after a successful invocation of detect_events(), except for batch lanes in which the
+    // timestep h is 0 or which contain non-finite data. Such lanes will be untouched.
+    //
+    // NOTE: use Boost's vector in order to avoid the bool specialisation trap.
+    boost::container::vector<bool> m_ev_fex_check_res;
+    // Vector to track the sign of all event functions (terminal and non-terminal) at the end of a step.
+    std::vector<event_sign_end_step> m_ev_signs_end_step;
 
     // Constructors.
     ed_data_batch(const llvm_state &, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,

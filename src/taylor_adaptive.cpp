@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -37,6 +38,7 @@
 
 #endif
 
+#include <mp++/rational.hpp>
 #include <mp++/real.hpp>
 
 #include <heyoka/continuous_output.hpp>
@@ -55,6 +57,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/detail/vsys_data.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/find_real_poly_roots.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
@@ -679,6 +682,221 @@ detail::busy_guard taylor_adaptive<T>::make_busy_guard(const std::string_view na
     return detail::busy_guard(m_i_data->m_busy);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Helper to perform event detection across steps.
+//
+// Event detection within an integration step is performed on a Taylor series approximation of the event function g(t).
+// Across contiguous steps, such a piecewise Taylor series representation is not continuous, which can lead to events
+// being missed when they trigger close to a step boundary (i.e., g(t) has a zero in the neighbourhood of the step
+// boundary but the Taylor series approximations on either side of the boundary have no zeroes). Such occurrences can be
+// detected by tracking the sign of the event function across steps: if a sign change is detected, we flag an event at
+// the boundary.
+//
+// 'forward' is true for an integration forward in time, false otherwise. 'h' is the (signed) timestep size (positive
+// for forward integration, negative for backward integration). 'edd' is the ed_data instance for the integrator.
+// 'ev_begin' is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. 'order' is the
+// order of the Taylor series.
+//
+// This function will record in edd cross-step events, adding them to the results of in-step event detection (which is
+// assumed to have already taken place).
+void taylor_adaptive_detect_cross_step_events(const bool forward, const auto &h, auto &edd, const auto ev_begin,
+                                              const auto order)
+{
+    using std::abs;
+
+    if (h == 0) {
+        // Nothing to do if h is zero. In such case, no event detection must take place.
+        return;
+    }
+
+    assert((h > 0) == forward);
+
+    // Cache the number of terminal events.
+    const auto n_tes = edd.m_tes.size();
+
+    // Check for sign changes between the previous step and the current step for all events.
+    const auto &ev_signs_end_step = edd.m_ev_signs_end_step;
+    for (decltype(ev_signs_end_step.size()) idx = 0; idx < ev_signs_end_step.size(); ++idx) {
+        using enum event_sign_end_step;
+
+        const auto prev_sign = ev_signs_end_step[idx];
+        if (prev_sign == unknown) {
+            // The previous sign is unknown, there's nothing we can do.
+            continue;
+        }
+
+        // Fetch the constant coefficient of the current Taylor series of the event. This gives us exactly the sign of
+        // the Taylor series of the event function at the beginning of the step.
+        const auto &cf0 = edd.m_ev_jet[ev_begin + idx * (order + 1u)];
+        if (cf0 == 0) {
+            // NOTE: if the event function is zero at the beginning of the step, the root at t = 0 has been handled
+            // already by detect_events(). No need to report it here.
+            continue;
+        }
+
+        // Check if a sign change occurred.
+        //
+        // NOTE: here we are counting a sign change also when the previous sign is zero. This may result in a duplicate
+        // detection in case the real root finding in the previous step flagged a root at step end.
+        const auto positive_cf0 = (cf0 > 0);
+        if ((prev_sign == zero) || (positive_cf0 != (prev_sign == positive))) {
+            // Sign change detected. The event is reported at the beginning of the step (t = 0). Its direction is the
+            // sign of cf0, flipped when integrating backwards in time.
+            const auto d_sgn = (positive_cf0 == forward) ? 1 : -1;
+
+            // NOTE: idx and the event indices fit in 32-bit unsigned ints (see the size checks in the constructor of
+            // ed_data).
+            if (idx < n_tes) {
+                // Terminal event.
+                if (edd.m_te_cooldowns[idx]) {
+                    // The terminal event is on cooldown. Compute the absolute value of the remaining cooldown time at
+                    // the trigger time (i.e., beginning of the step).
+                    const auto lb = forward ? (edd.m_te_cooldowns[idx]->second - edd.m_te_cooldowns[idx]->first)
+                                            : (edd.m_te_cooldowns[idx]->second + edd.m_te_cooldowns[idx]->first);
+
+                    // NOTE: the event is meant to be added at the beginning of the step, if there's cooldown time
+                    // remaining we must skip it. This mirrors the [0, lb) exclusion applied to roots by
+                    // detect_events().
+                    if (lb > 0) {
+                        continue;
+                    }
+                }
+
+                // Fetch and check the direction.
+                const auto dir = edd.m_tes[idx].get_direction();
+                if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
+                    // NOTE: the derivative of the event function at t = 0 is the order-1 Taylor coefficient. It is
+                    // needed for the automatic deduction of the cooldown.
+                    edd.m_d_tes.emplace_back(static_cast<std::uint32_t>(idx), num_zero_like(h), d_sgn,
+                                             abs(edd.m_ev_jet[ev_begin + idx * (order + 1u) + 1u]));
+                }
+            } else {
+                // Non-terminal event.
+                const auto nte_idx = idx - n_tes;
+
+                // Fetch and check the direction.
+                const auto dir = edd.m_ntes[nte_idx].get_direction();
+                if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
+                    edd.m_d_ntes.emplace_back(static_cast<std::uint32_t>(nte_idx), num_zero_like(h), d_sgn);
+                }
+            }
+        }
+    }
+}
+
+// Helper to update the signs of the Taylor series of the event functions at the end of an integration step.
+//
+// Tracking the signs of the event functions is necessary in order to implement event detection across steps (see
+// taylor_adaptive_detect_cross_step_events() for an explanation). In this function, the objective is to compute the
+// signs of all event functions at the end of a step, that is, assuming a forward step [0, h) or a backward step (h, 0],
+// at t = h (note that h here is the integration timestep *after* possibly being clamped by a terminal event). The
+// computation is mathematically exact in all cases, except if the integration step was cut short by a terminal event.
+// In such a case, the sign of that event function is forcibly set to zero. This is justified by the fact that the sign
+// tracking mechanism is meant to identify missed roots in-between steps, and when the step has been cut short by a
+// terminal event, we have by definition identified a root at the step boundary and there's no point in looking for
+// missed roots via sign changes which would anyway be indistinguishable from the root just identified. As an added
+// bonus, this also guarantees that the result of in-step detection remains consistent with the result of cross-step
+// detection.
+//
+// 'forward' is true for an integration forward in time, false otherwise. 'h' is the (signed) timestep size (positive
+// for forward integration, negative for backward integration). 'edd' is the ed_data instance for the integrator.
+// 'ev_begin' is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. 'order' is the
+// order of the Taylor series.
+//
+// This function will update the m_ev_signs_end_step member in edd with the signs of the Taylor series of the event
+// functions at the end of the step. For h == 0, the signs are left unchanged. The function must be called after event
+// detection ran on finite inputs, and after h was possibly clamped by a terminal event.
+template <typename T>
+void taylor_adaptive_update_ev_signs_end_step(const bool forward, const T &h, auto &edd, const auto ev_begin,
+                                              const auto order)
+{
+    if (h == 0) {
+        // h == 0 means we took a zero step (either because the user or the automatic timestep deduction produced a
+        // value of 0, or because a terminal event triggered exactly at the beginning of the timestep). In such case,
+        // the signs of the event functions remain unchanged.
+        return;
+    }
+
+    assert((h > 0) == forward);
+
+    auto &ev_signs_end_step = edd.m_ev_signs_end_step;
+    const auto &ev_fex_check_res = edd.m_ev_fex_check_res;
+
+    for (decltype(ev_signs_end_step.size()) idx = 0; idx < ev_signs_end_step.size(); ++idx) {
+        using enum event_sign_end_step;
+
+        // Fetch a span over the Taylor coefficients for the current event.
+        const auto cfs_span = std::span<const T>{
+            edd.m_ev_jet.data() + ev_begin + idx * (order + 1u),
+            boost::numeric_cast<std::size_t>(order + 1u),
+        };
+
+        // NOTE: h != 0 here implies that ev_fex_check_res was filled in by detect_events(), so we are sure we are
+        // working with up-to-date values.
+        if (ev_fex_check_res[idx]) {
+            // The happy path: the fast exclusion check passed for the current event, thus the event function has no
+            // roots in the (possibly clamped) timestep (endpoint h included). The sign at the end of the step is simply
+            // the sign at the beginning of the step, which is given exactly by the constant coefficient of the Taylor
+            // polynomial (guaranteed to be nonzero, otherwise the fast exclusion check would have not passed).
+            //
+            // NOTE: this is a mathematically-certified sign.
+            const auto &cf0 = cfs_span[0];
+            assert(cf0 != 0);
+            ev_signs_end_step[idx] = (cf0 > 0) ? positive : negative;
+            continue;
+        }
+
+        // NOTE: if a terminal event triggered, it is the first element of edd.m_d_tes and h has been clamped to its
+        // trigger time. Terminal events come first in ev_signs_end_step, hence their indices coincide.
+        if (!edd.m_d_tes.empty() && idx == std::get<0>(edd.m_d_tes[0])) {
+            // The terminal event that ended the step. We consider the event function to be zero at the end of the step.
+            // Note that this is not necessarily mathematically correct as the location of the root itself is not
+            // certified. Nevertheless, we accept the fuzziness on the root location (like we do elsewhere in the code)
+            // and setting zero here keeps things logically consistent with the event detection that just took place.
+            //
+            // NOTE: setting this to zero will very likely trigger another detection when the integrator resumes in the
+            // next step. We are relying on the (nonzero) cooldown mechanism to ignore the second detection.
+            ev_signs_end_step[idx] = zero;
+            continue;
+        }
+
+        // As a last resort, we rigorously evaluate the Taylor series at the end of the step.
+        //
+        // First, we try with interval arithmetic.
+        //
+        // NOTE: we can replace ed_poly_eval_sign_ival() with a JIT-compiled implementation for performance, if
+        // necessary.
+        if (const auto sign_end_ival = ed_poly_eval_sign_ival(cfs_span, h)) {
+            assert(*sign_end_ival == 1 || *sign_end_ival == -1);
+            ev_signs_end_step[idx] = static_cast<event_sign_end_step>(*sign_end_ival);
+            continue;
+        }
+
+        // Interval arithmetic could not determine the sign: evaluate the Taylor series exactly in rational arithmetic.
+        //
+        // NOTE: the conversion of a finite floating-point value to a rational is exact. The conversions must be
+        // explicit, because mixed operations between rationals and floating-point values produce floating-point
+        // results.
+        using rat_t = mppp::rational<1>;
+        const auto h_rat = static_cast<rat_t>(h);
+        auto acc = static_cast<rat_t>(cfs_span.back());
+        for (auto i = cfs_span.size() - 1u; i > 0u; --i) {
+            acc *= h_rat;
+            acc += static_cast<rat_t>(cfs_span[i - 1u]);
+        }
+        ev_signs_end_step[idx] = static_cast<event_sign_end_step>(mppp::sgn(acc));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
 // Implementation detail to make a single integration timestep.
 //
 // The magnitude of the timestep is automatically deduced, but it will always be not greater than abs(max_delta_t). The
@@ -781,6 +999,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
 
         auto &edd = *m_ed_data;
 
+        // NOTE: the integration direction is inferred from max_delta_t.
+        const auto forward = (max_delta_t >= 0);
+
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector + event equations
         // at the beginning of the timestep for later use.
         auto max_abs_state = detail::num_zero_like(h);
@@ -856,8 +1077,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
 
         // NOTE: run event detection only if all its input data is finite.
         if (ed_finite) [[likely]] {
-            // Do the event detection.
+            // Do the in-step event detection.
             edd.detect_events(h, m_order, m_dim);
+
+            // Do the cross-step event detection.
+            detail::taylor_adaptive_detect_cross_step_events(forward, h, edd, ev_begin, m_order);
 
             // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary
             // memory). From here until we start invoking the callbacks, everything is noexcept, so we don't risk
@@ -911,6 +1135,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
         // Exit early if time or the state vector are non-finite at the end of the timestep, or if event detection could
         // not be performed due to non-finite inputs.
         if (!ed_finite || !is_finite(m_time) || !std::ranges::all_of(m_state, is_finite)) [[unlikely]] {
+            // NOTE: in case of non-finite data, we want to reset m_ev_signs_end_step to unknown - we cannot claim
+            // anything about the signs of the event functions.
+            std::ranges::fill(edd.m_ev_signs_end_step, detail::event_sign_end_step::unknown);
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
@@ -929,6 +1156,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
                 }
             }
         }
+
+        // Update the signs of the event functions at the end of the step.
+        detail::taylor_adaptive_update_ev_signs_end_step(forward, h, edd, ev_begin, m_order);
 
         // If we don't have terminal events, we will invoke the callbacks of *all* the non-terminal events. Otherwise,
         // we need to figure out which non-terminal events do not happen because their time coordinate is at or after
@@ -1051,14 +1281,21 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, const bool
 
 // Reset all cooldowns for the terminal events.
 template <supported_fp_type T>
-void taylor_adaptive<T>::reset_cooldowns()
+void taylor_adaptive<T>::reset_cooldowns() noexcept
 {
-    if (!m_i_data->m_ed_data) [[unlikely]] {
-        throw std::invalid_argument("No events were defined for this integrator");
+    if (m_i_data->m_ed_data) {
+        for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns) {
+            cd.reset();
+        }
     }
+}
 
-    for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns) {
-        cd.reset();
+// Reset the sign tracking for the event functions.
+template <supported_fp_type T>
+void taylor_adaptive<T>::reset_event_signs() noexcept
+{
+    if (m_i_data->m_ed_data) {
+        std::ranges::fill(m_i_data->m_ed_data->m_ev_signs_end_step, detail::event_sign_end_step::unknown);
     }
 }
 
@@ -1859,6 +2096,10 @@ void taylor_adaptive<T>::set_time(T t)
         t.prec_round(this->get_prec());
     }
 
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
+
     m_i_data->m_time = detail::dfloat<T>(std::move(t));
 }
 
@@ -1876,6 +2117,10 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
 
     // Check the components.
     detail::dtime_checks(hi, lo);
+
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
 
     m_i_data->m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
 }

@@ -201,6 +201,15 @@ TEST_CASE("taylor te")
                                        kw::cooldown = std::numeric_limits<fp_t>::quiet_NaN()),
                                    std::invalid_argument,
                                    Message("Cannot set a non-finite cooldown value for a terminal event"));
+            for (const auto cd : {fp_t(0), -fp_t(0)}) {
+                REQUIRE_THROWS_MATCHES(ev_t(
+                                           v * v - 1e-10, kw::direction = event_direction::negative,
+                                           kw::callback = [](auto &, int, auto...) { return true; },
+                                           kw::cooldown = cd),
+                                       std::invalid_argument,
+                                       Message("A zero cooldown is invalid: please provide a positive value or leave "
+                                               "it unspecified for automatic cooldown deduction"));
+            }
             REQUIRE_THROWS_MATCHES(ev_t(
                                        v * v - 1e-10, kw::direction = event_direction{50},
                                        kw::callback = [](auto &, int, auto...) { return true; }),

@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <concepts>
@@ -118,12 +119,8 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 
     if (isfinite(ret)) [[likely]] {
         if (ret == 0) [[unlikely]] {
-            // LCOV_EXCL_START
-
             // ret can come out zero in case of underflow. In such case, we want to avoid an exactly zero cooldown.
             ret = nextafter(std::move(ret), static_cast<T>(1));
-
-            // LCOV_EXCL_STOP
         }
 
         return ret;
@@ -316,6 +313,87 @@ mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
     return taylor_deduce_cooldown_impl(std::move(g_eps), std::move(abs_der));
 }
 
+// Helper to determine the sign of the polynomial with coefficients cfs (in ascending degree order) at the point x.
+//
+// The polynomial is evaluated via Horner's scheme in interval arithmetic: each operation is performed in
+// round-to-nearest, and its result is then widened outwards to the adjacent representable values. Since a
+// round-to-nearest result differs from the exact result by at most half the gap to the adjacent representable values,
+// the final interval is guaranteed to enclose the exact value of the polynomial at x.
+//
+// The return value is +1 or -1 if the enclosure lies entirely above or below zero, and an empty optional otherwise
+// (that is, if the enclosure contains zero or is not finite).
+//
+// cfs must be non-empty, and cfs and x must be finite. For mppp::real, cfs and x must all have the same precision.
+template <typename T>
+[[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(const std::span<const T> cfs, const T &x)
+{
+    using std::isfinite;
+
+    assert(!cfs.empty());
+    assert(isfinite(x));
+    assert(std::ranges::all_of(cfs, [](const auto &val) { return isfinite(val); }));
+
+    if constexpr (std::same_as<T, mppp::real>) {
+        assert(std::ranges::all_of(cfs, [x_prec = x.get_prec()](const auto &val) { return val.get_prec() == x_prec; }));
+    }
+
+    // Init the enclosure with the highest-degree coefficient.
+    auto lo = cfs.back(), hi = cfs.back();
+
+    // Cache the sign of x.
+    const auto x_is_neg = (x < 0);
+
+    for (auto i = cfs.size() - 1u; i > 0u; --i) {
+        const auto &cf = cfs[i - 1u];
+
+        // Multiply the enclosure by x. The bounds swap if x is negative.
+        auto prod_lo = x_is_neg ? hi * x : lo * x;
+        auto prod_hi = x_is_neg ? lo * x : hi * x;
+
+        // Widen the products, add the coefficient and widen again.
+        lo = num_nextdown(num_nextdown(std::move(prod_lo)) + cf);
+        hi = num_nextup(num_nextup(std::move(prod_hi)) + cf);
+    }
+
+    if (!isfinite(lo) || !isfinite(hi)) [[unlikely]] {
+        // NOTE: this can happen in case of overflow.
+        return {};
+    }
+
+    if (lo > 0) {
+        return 1;
+    }
+
+    if (hi < 0) {
+        return -1;
+    }
+
+    return {};
+}
+
+// Explicit instantiations.
+#define HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(F)                                                                          \
+    template std::optional<int> ed_poly_eval_sign_ival<F>(std::span<const F>, const F &);
+
+HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(float)
+HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(long double)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(mppp::real128)
+
+#endif
+
+HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(mppp::real)
+
+#undef HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST
+
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>
 ed_data<T>::ed_data() = default;
@@ -353,6 +431,20 @@ ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector
 
     // Setup the vector of cooldowns.
     m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
+
+    // Setup m_ev_fex_check_res.
+    {
+        using safe_size_t = boost::safe_numerics::safe<decltype(m_ev_fex_check_res.size())>;
+        // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+        m_ev_fex_check_res.resize(safe_size_t(n_tes) + n_ntes);
+    }
+
+    // Setup m_ev_signs_end_step.
+    {
+        using safe_size_t = boost::safe_numerics::safe<decltype(m_ev_signs_end_step.size())>;
+        // NOTE: the signs must be initialised in the unknown state.
+        m_ev_signs_end_step.resize(safe_size_t(n_tes) + n_ntes, event_sign_end_step::unknown);
+    }
 
     // Setup in parallel the JIT data and the poly root finding workspace.
     tbb_isolated_parallel_invoke(
@@ -399,12 +491,15 @@ template <typename T>
 ed_data<T>::ed_data(const ed_data &o)
     // NOTE: no need to copy m_poly_roots, empty initialisation is fine.
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns),
-      m_jit_data(o.m_jit_data), m_frpr_ws(o.m_frpr_ws)
+      m_jit_data(o.m_jit_data), m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
 {
     // For the vectors of detected events, just reserve the same amount of space.
     // These vectors are cleared out anyway during event detection.
     m_d_tes.reserve(o.m_d_tes.capacity());
     m_d_ntes.reserve(o.m_d_ntes.capacity());
+
+    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    m_ev_fex_check_res.resize(o.m_ev_fex_check_res.size());
 }
 
 template <typename T>
@@ -419,7 +514,8 @@ void ed_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_te_cooldowns;
     ar << m_jit_data;
     ar << m_frpr_ws;
-    // NOTE: we do NOT save m_poly_roots on purpose.
+    // NOTE: we do NOT save m_poly_roots and m_ev_fex_check_res on purpose.
+    ar << m_ev_signs_end_step;
 
     // Save the capacities of the vectors of detected events.
     ar << m_d_tes.capacity();
@@ -435,6 +531,7 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_te_cooldowns;
     ar >> m_jit_data;
     ar >> m_frpr_ws;
+    ar >> m_ev_signs_end_step;
 
     // Fetch the capacities.
     decltype(m_d_tes.capacity()) d_tes_cap{};
@@ -450,6 +547,9 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 
     // Clear out m_poly_roots.
     m_poly_roots.clear();
+
+    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    m_ev_fex_check_res.resize(static_cast<decltype(m_ev_fex_check_res.size())>(m_tes.size()) + m_ntes.size());
 }
 
 // Implementation of event detection.
@@ -496,6 +596,13 @@ void ed_data<T>::detect_events(const T &h, const std::uint32_t order, const std:
             // invocation of m_fex_check() hold.
             std::uint32_t fex_check_result{};
             m_fex_check(ptr, &h, &fex_check_result, enc);
+
+            // Store the result of the check before proceeding.
+            //
+            // NOTE: offset + i is computed in at least 32-bit unsigned width and it is guaranteed to be <
+            // m_ev_jet.size(), which elsewhere has been checked to fit 32-bit unsigned ints. Hence, no
+            // overflow/wraparound here is possible.
+            m_ev_fex_check_res[offset + i] = fex_check_result;
             if (fex_check_result) {
                 // The fast exclusion check returned true, we can move to the next event.
                 continue;
@@ -608,6 +715,20 @@ ed_data_batch<T>::ed_data_batch(const llvm_state &s, std::vector<t_event_t> tes,
     // which has been proven earlier to be able to represent order + 1u.
     m_scal_poly.resize(order + 1u);
 
+    // Setup m_ev_fex_check_res.
+    {
+        using safe_size_t = boost::safe_numerics::safe<decltype(m_ev_fex_check_res.size())>;
+        // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+        m_ev_fex_check_res.resize((safe_size_t(n_tes) + n_ntes) * batch_size);
+    }
+
+    // Setup m_ev_signs_end_step.
+    {
+        using safe_size_t = boost::safe_numerics::safe<decltype(m_ev_signs_end_step.size())>;
+        // NOTE: the signs must be initialised in the unknown state.
+        m_ev_signs_end_step.resize((safe_size_t(n_tes) + n_ntes) * batch_size, event_sign_end_step::unknown);
+    }
+
     // Setup in parallel the JIT data and the poly root finding workspace.
     tbb_isolated_parallel_invoke(
         [this, &s, order, batch_size] {
@@ -643,7 +764,7 @@ ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_ed_finite(o.m_ed_finite),
       m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps), m_te_cooldowns(o.m_te_cooldowns),
       m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res), m_fex_check_enc(o.m_fex_check_enc),
-      m_scal_poly(o.m_scal_poly), m_frpr_ws(o.m_frpr_ws)
+      m_scal_poly(o.m_scal_poly), m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
 {
     // Fetch the batch size.
     const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
@@ -661,7 +782,10 @@ ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
     }
 
     // Reserve space in m_cb_eptrs.
-    m_cb_eptrs.reserve(boost::numeric_cast<decltype(m_cb_eptrs.size())>(batch_size));
+    m_cb_eptrs.reserve(batch_size);
+
+    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    m_ev_fex_check_res.resize(o.m_ev_fex_check_res.size());
 }
 
 template <typename T>
@@ -682,7 +806,8 @@ void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_fex_check_enc;
     ar << m_scal_poly;
     ar << m_frpr_ws;
-    // NOTE: we do NOT save m_poly_roots on purpose.
+    // NOTE: we do NOT save m_poly_roots and m_ev_fex_check_res on purpose.
+    ar << m_ev_signs_end_step;
 
     // Save the batch size.
     ar << static_cast<std::uint32_t>(m_d_tes.size());
@@ -713,6 +838,7 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_fex_check_enc;
     ar >> m_scal_poly;
     ar >> m_frpr_ws;
+    ar >> m_ev_signs_end_step;
 
     // Recover the batch size.
     std::uint32_t batch_size{};
@@ -742,6 +868,10 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 
     // Clear out m_poly_roots.
     m_poly_roots.clear();
+
+    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    m_ev_fex_check_res.resize((static_cast<decltype(m_ev_fex_check_res.size())>(m_tes.size()) + m_ntes.size())
+                              * batch_size);
 }
 
 // Implementation of event detection.
@@ -789,17 +919,23 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
                     continue;
                 }
 
-                // See if the fast exclusion check was positive for the current batch element.
-                if (m_fex_check_res[j]) {
-                    continue;
-                }
-
                 // Load the timestep value.
                 const auto h = h_ptr[j];
                 assert(isfinite(h));
 
                 if (h == 0) {
                     // If the timestep is zero, skip event detection.
+                    continue;
+                }
+
+                // Store the result of the fast exclusion check before proceeding.
+                //
+                // NOTE: (offset + i) * batch_size + j is computed in at least 32-bit unsigned width and it is
+                // guaranteed to be < m_ev_jet.size(), which elsewhere has been checked to fit 32-bit unsigned ints.
+                // Hence, no overflow/wraparound here is possible.
+                m_ev_fex_check_res[(offset + i) * batch_size + j] = m_fex_check_res[j];
+                if (m_fex_check_res[j]) {
+                    // The fast exclusion check returned true, we can move to the next batch lane.
                     continue;
                 }
 

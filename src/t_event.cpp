@@ -64,12 +64,16 @@ void t_event_impl<T, B>::finalise_ctor(callback_t cb, T cd, event_direction d)
 
     callback = std::move(cb);
 
-    if (!isfinite(cd)) {
+    if (!isfinite(cd)) [[unlikely]] {
         throw std::invalid_argument("Cannot set a non-finite cooldown value for a terminal event");
+    }
+    if (cd == 0) [[unlikely]] {
+        throw std::invalid_argument("A zero cooldown is invalid: please provide a positive value or leave it "
+                                    "unspecified for automatic cooldown deduction");
     }
     cooldown = std::move(cd);
 
-    if (d < event_direction::negative || d > event_direction::positive) {
+    if (d < event_direction::negative || d > event_direction::positive) [[unlikely]] {
         throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
     }
 
@@ -85,7 +89,7 @@ t_event_impl<T, B>::t_event_impl(t_event_impl &&) noexcept = default;
 template <typename T, bool B>
 t_event_impl<T, B> &t_event_impl<T, B>::operator=(const t_event_impl &o)
 {
-    if (this != &o) {
+    if (this != &o) [[likely]] {
         *this = t_event_impl(o);
     }
 

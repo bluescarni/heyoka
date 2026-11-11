@@ -1744,29 +1744,6 @@ TEST_CASE("te step end")
     REQUIRE(std::all_of(counter.begin(), counter.end(), [](auto c) { return c == 1u; }));
 }
 
-// Bug: mr always being true for an
-// event with zero cooldown.
-TEST_CASE("te zero cd mr bug")
-{
-    auto [x, v] = make_vars("x", "v");
-
-    using t_ev_t = typename taylor_adaptive_batch<double>::t_event_t;
-
-    auto ta = taylor_adaptive_batch<double>{
-        {prime(x) = v, prime(v) = -9.8 * sin(x)},
-        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
-        4,
-        kw::t_events = {
-            t_ev_t(
-                v, kw::callback = [](auto &, int, std::uint32_t) { return false; }, kw::cooldown = 0),
-        }};
-
-    ta.propagate_until({10., 10., 10., 10.});
-
-    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
-                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
-}
-
 struct s11n_te_callback {
     template <typename I>
     bool operator()(I &, int, std::uint32_t) const
