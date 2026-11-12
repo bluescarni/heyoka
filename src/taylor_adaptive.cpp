@@ -741,8 +741,30 @@ void taylor_adaptive_detect_cross_step_events(const bool forward, const auto &h,
 
         // Check if a sign change occurred.
         //
-        // NOTE: here we are counting a sign change also when the previous sign is zero. This may result in a duplicate
-        // detection in case the real root finding in the previous step flagged a root at step end.
+        // NOTE: recall that prev_sign is the sign of the Taylor polynomial of the event function evaluated at the end
+        // prev_h of the previous step (except for the special case of a timestep clamped by a terminal event, in which
+        // case the prev_sign of that terminal event is forcibly set to zero - see
+        // taylor_adaptive_update_ev_signs_end_step()). Strictly speaking, prev_h does not belong to the previous step,
+        // as steps are half-open intervals. Since we are dealing with polynomials, the sign at prev_h is identical to
+        // the sign in the left/right neighbourhood of prev_h, except if prev_h is a root. In such a case, in order to
+        // detect a genuine sign change across steps we would need additional information about the behaviour of the
+        // polynomial around prev_h.
+        //
+        // What we do here instead is to flag a sign change unconditionally if prev_h is a root. This is necessary in
+        // order not to miss genuine sign changes at prev_h. E.g., the polynomial at the previous step is negative in
+        // the entire step and goes to zero at prev_h, while the polynomial at the beginning of the current step is
+        // positive: in-step root finding cannot detect such a root, neither in the previous step (as prev_h does not
+        // belong to it) nor in the current step (as cf0 is nonzero).
+        //
+        // On the other hand, flagging unconditionally can lead to misreporting a root. For instance, the polynomial at
+        // the previous step is positive in the entire step and goes to zero at prev_h, while the polynomial at the
+        // beginning of the current step is also positive. In this scenario, technically speaking we cannot claim to
+        // have identified a root, since the piecewise Taylor series approximation of the event function is never zero.
+        // This will be however a quasi-root, in the sense that the value of the event function gets arbitrarily close
+        // to zero towards the end of the previous step, so this is consistent with the general idea that our root
+        // finding approach may produce false positives for which the event function is nevertheless very close to zero.
+        // Note also that with a root at prev_h, in-step root finding during the previous step very likely already
+        // flagged this root, in which case the root is reported twice.
         const auto positive_cf0 = (cf0 > 0);
         if ((prev_sign == zero) || (positive_cf0 != (prev_sign == positive))) {
             // Sign change detected. The event is reported at the beginning of the step (t = 0). Its direction is the
