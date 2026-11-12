@@ -1403,6 +1403,9 @@ TEST_CASE("events error")
         REQUIRE_THROWS_MATCHES(
             tad.reset_cooldowns(2), std::invalid_argument,
             Message("Cannot reset the cooldowns at batch index 2: the batch size for this integrator is only 2"));
+        REQUIRE_THROWS_MATCHES(
+            tad.reset_event_signs(2), std::invalid_argument,
+            Message("Cannot reset the event signs at batch index 2: the batch size for this integrator is only 2"));
     }
 
     // Check reset cooldowns works when there are no terminal events defined.
@@ -1433,14 +1436,92 @@ TEST_CASE("events error")
                                Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
-                               Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(), std::invalid_argument,
-                               Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(2), std::invalid_argument,
-                               Message("No events were defined for this integrator"));
+        REQUIRE_NOTHROW(tad.reset_cooldowns());
+        REQUIRE_NOTHROW(tad.reset_cooldowns(1));
+        REQUIRE_THROWS_MATCHES(
+            tad.reset_cooldowns(2), std::invalid_argument,
+            Message("Cannot reset the cooldowns at batch index 2: the batch size for this integrator is only 2"));
+        REQUIRE_NOTHROW(tad.reset_event_signs());
+        REQUIRE_NOTHROW(tad.reset_event_signs(1));
+        REQUIRE_THROWS_MATCHES(
+            tad.reset_event_signs(2), std::invalid_argument,
+            Message("Cannot reset the event signs at batch index 2: the batch size for this integrator is only 2"));
+    }
+
+    // The reset functions without lane index are noexcept.
+    REQUIRE(noexcept(std::declval<taylor_adaptive_batch<double> &>().reset_cooldowns()));
+    REQUIRE(noexcept(std::declval<taylor_adaptive_batch<double> &>().reset_event_signs()));
+}
+
+// The time setters reset the cooldowns in all lanes. Throwing setters leave the cooldowns untouched. reset_cooldowns(i)
+// resets only the cooldown in lane i.
+TEST_CASE("time setters reset cooldowns")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+    using t_ev_t = ta_t::t_event_t;
+
+    // Helper to create an integrator in which the cooldown of the terminal event is engaged in both lanes.
+    const auto make_ta = [] {
+        auto x = make_vars("x");
+
+        // NOTE: the terminal event triggers at t = 0.5 in lane 0 and at t = 0.25 in lane 1, and its callback lets the
+        // integration continue.
+        auto ta = ta_t{{prime(x) = 1_dbl},
+                       {-.5, -.25},
+                       2,
+                       kw::t_events = {t_ev_t(x, kw::callback = [](ta_t &, int, std::uint32_t) { return true; })}};
+
+        ta.step(std::vector<double>{1., 1.});
+        for (const auto &[oc, h] : ta.get_step_res()) {
+            REQUIRE(oc == taylor_outcome{0});
+        }
+        REQUIRE(ta.get_te_cooldowns()[0][0]);
+        REQUIRE(ta.get_te_cooldowns()[1][0]);
+
+        return ta;
+    };
+
+    // Throwing setters leave the cooldowns untouched.
+    {
+        auto ta = make_ta();
+
+        REQUIRE_THROWS_AS(ta.set_time(std::vector<double>{0.}), std::invalid_argument);
+        REQUIRE_THROWS_AS(ta.set_dtime(std::vector<double>{0.}, std::vector<double>{0.}), std::invalid_argument);
+        REQUIRE_THROWS_AS(ta.set_dtime(std::vector<double>{1., 1.}, std::vector<double>{2., 0.}),
+                          std::invalid_argument);
+        REQUIRE_THROWS_AS(ta.set_dtime(1., 2.), std::invalid_argument);
+        REQUIRE(ta.get_te_cooldowns()[0][0]);
+        REQUIRE(ta.get_te_cooldowns()[1][0]);
+    }
+
+    // The setters reset the cooldowns in all lanes.
+    //
+    // NOTE: the vector setters keep the time unchanged, the scalar setters set the time of lane 0 in all lanes.
+    const std::vector<std::function<void(ta_t &)>> setters
+        = {[](ta_t &ta) { ta.set_time(ta.get_time()); }, [](ta_t &ta) { ta.set_time(ta.get_time()[0]); },
+           [](ta_t &ta) {
+               const auto [hi, lo] = ta.get_dtime();
+               ta.set_dtime(hi, lo);
+           },
+           [](ta_t &ta) { ta.set_dtime(ta.get_dtime().first[0], ta.get_dtime().second[0]); }};
+
+    for (const auto &setter : setters) {
+        auto ta = make_ta();
+
+        setter(ta);
+        REQUIRE(!ta.get_te_cooldowns()[0][0]);
+        REQUIRE(!ta.get_te_cooldowns()[1][0]);
+    }
+
+    // reset_cooldowns(i) resets only the cooldown in lane i.
+    {
+        auto ta = make_ta();
+
+        ta.reset_cooldowns(1);
+        REQUIRE(ta.get_te_cooldowns()[0][0]);
+        REQUIRE(!ta.get_te_cooldowns()[1][0]);
     }
 }
 
@@ -1586,9 +1667,9 @@ TEST_CASE("event cb time")
     REQUIRE(ta.get_time()[0] > 0);
 
     // Same test with set_dtime().
-    ta = taylor_adaptive_batch(
-        {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
-        kw::nt_events = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto, auto) { tint.set_dtime(-10., 0.); })});
+    ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
+                               kw::nt_events
+                               = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto, auto) { tint.set_dtime(-10., 0.); })});
 
     REQUIRE_THROWS_MATCHES(
         ta.step(), std::runtime_error,
@@ -2472,7 +2553,8 @@ TEST_CASE("event callbacks lane consistency")
 
     auto [x, v] = make_vars("x", "v");
 
-    // Attempt to change the time coordinate of the batch element 1 from within an event callback of the batch element 0.
+    // Attempt to change the time coordinate of the batch element 1 from within an event callback of the batch element
+    // 0.
     {
         // NOTE: in both batch elements, v starts from a small positive value and decreases. The event v - par[0]
         // triggers early in the first step only in the batch element 0 (where par[0] is zero).

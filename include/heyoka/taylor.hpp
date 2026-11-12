@@ -980,8 +980,10 @@ public:
     const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const;
-    void reset_cooldowns();
+    void reset_cooldowns() noexcept;
     void reset_cooldowns(std::uint32_t);
+    void reset_event_signs() noexcept;
+    void reset_event_signs(std::uint32_t);
     [[nodiscard]] const std::vector<t_event_t> &get_t_events() const;
     [[nodiscard]] const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
     [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;

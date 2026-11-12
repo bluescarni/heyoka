@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include <mp++/real.hpp>
+
 #include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -669,6 +671,184 @@ TEST_CASE("sign update overflow")
             } else {
                 REQUIRE(g_records.size() == 1u);
             }
+        }
+    }
+}
+
+// A reset of the stored signs from within an event callback must take effect. That is, the signs at the end of the step
+// must be computed before the invocation of the callbacks.
+TEST_CASE("sign reset from callback")
+{
+    using ta_t = taylor_adaptive<double>;
+    using nt_ev_t = ta_t::nt_event_t;
+
+    auto v = make_vars("v");
+
+    // The (time, direction) records of the non-terminal event on v.
+    std::vector<std::pair<double, int>> v_records;
+
+    // The number of invocations of the resetting callback.
+    auto n_resets = 0u;
+
+    auto ta = ta_t{{prime(v) = -1_dbl},
+                   {-1.},
+                   kw::nt_events = {nt_ev_t(v,
+                                            [&v_records](ta_t &, double tm, int d_sgn) {
+                                                v_records.emplace_back(tm, d_sgn);
+                                            }),
+                                    nt_ev_t(v + 1.1, [&n_resets](ta_t &t, double, int) {
+                                        ++n_resets;
+                                        t.reset_event_signs();
+                                    })}};
+
+    // First step: v + 1.1 crosses zero at t ~ 0.1, and its callback resets the stored signs. v stays negative.
+    REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+    REQUIRE(n_resets == 1u);
+    REQUIRE(v_records.empty());
+
+    // Jump of v (and of v + 1.1) through zero.
+    ta.get_state_data()[0] = 1.;
+
+    // Second step: no jump is reported. Neither v nor v + 1.1 cross zero within the step.
+    REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+    REQUIRE(n_resets == 1u);
+    REQUIRE(v_records.empty());
+}
+
+// The stored signs survive the end of a propagate_*() call: a jump between consecutive propagations is reported.
+TEST_CASE("consecutive propagations")
+{
+    using ta_t = taylor_adaptive<double>;
+    using nt_ev_t = ta_t::nt_event_t;
+
+    auto v = make_vars("v");
+
+    // The (time, direction) records of the non-terminal event.
+    std::vector<std::pair<double, int>> v_records;
+
+    auto ta = ta_t{{prime(v) = -1_dbl}, {-1.}, kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn) {
+                                                     v_records.emplace_back(tm, d_sgn);
+                                                 })}};
+
+    // First propagation: at the end, v is negative.
+    REQUIRE(std::get<0>(ta.propagate_until(.5)) == taylor_outcome::time_limit);
+    REQUIRE(v_records.empty());
+
+    // Jump of v through zero, then propagate_for(). v does not cross zero during the propagation.
+    ta.get_state_data()[0] = 1.;
+    REQUIRE(std::get<0>(ta.propagate_for(.25)) == taylor_outcome::time_limit);
+    REQUIRE(v_records == std::vector<std::pair<double, int>>{{.5, 1}});
+
+    // Jump of v through zero, then propagate_grid(). v does not cross zero during the propagation.
+    ta.get_state_data()[0] = -1.;
+    REQUIRE(std::get<0>(ta.propagate_grid({.75, 1.})) == taylor_outcome::time_limit);
+    REQUIRE(v_records == std::vector<std::pair<double, int>>{{.5, 1}, {.75, -1}});
+}
+
+// Smoke test for all the fixed-precision floating-point types, based on the "sign update exact zero" test.
+TEST_CASE("fp types")
+{
+    tuple_for_each(fixed_fp_types, [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+        using ta_t = taylor_adaptive<fp_t>;
+        using t_ev_t = typename ta_t::t_event_t;
+        using nt_ev_t = typename ta_t::nt_event_t;
+
+        auto x = make_vars("x");
+
+        // The (time, direction) records of the non-terminal event.
+        std::vector<std::pair<fp_t, int>> x_records;
+
+        // NOTE: the terminal and non-terminal events have the same event function.
+        auto ta = ta_t{{prime(x) = 1_dbl},
+                       {fp_t(-1)},
+                       kw::t_events = {t_ev_t(x)},
+                       kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, fp_t tm, int d_sgn) {
+                           x_records.emplace_back(tm, d_sgn);
+                       })}};
+
+        // First step: the terminal event stops the integration exactly at the root of x, t = 1. The value of the
+        // non-terminal event function at the end of the step is exactly zero.
+        const auto [oc, h] = ta.step(fp_t(2));
+        REQUIRE(oc == taylor_outcome{-1});
+        REQUIRE(h == 1);
+        REQUIRE(x_records.empty());
+        REQUIRE(ta.get_state()[0] == 0);
+
+        // Jump of x away from zero.
+        ta.get_state_data()[0] = fp_t(.5);
+
+        // Second step: the jump is reported at the beginning of the step.
+        REQUIRE(std::get<0>(ta.step(fp_t(.25))) == taylor_outcome::time_limit);
+        REQUIRE(x_records.size() == 1u);
+        REQUIRE(x_records[0].first == 1);
+        REQUIRE(x_records[0].second == 1);
+    });
+}
+
+// Smoke test for mppp::real, based on the "sign update ival" and "sign update exact zero" tests.
+TEST_CASE("real")
+{
+    using fp_t = mppp::real;
+    using ta_t = taylor_adaptive<fp_t>;
+    using t_ev_t = ta_t::t_event_t;
+    using nt_ev_t = ta_t::nt_event_t;
+
+    for (const auto prec : {30, 123}) {
+        auto x = make_vars("x");
+
+        // The (time, direction) records of the non-terminal event.
+        std::vector<std::pair<fp_t, int>> x_records;
+
+        const auto rec_cb = [&x_records](ta_t &, fp_t tm, int d_sgn) { x_records.emplace_back(std::move(tm), d_sgn); };
+
+        // Sign update via interval arithmetic.
+        {
+            auto ta = ta_t{{prime(x) = 1_dbl}, {fp_t(-.5, prec)}, kw::nt_events = {nt_ev_t(x, rec_cb)}};
+
+            // First step: x crosses zero at t = 0.5 and its value at the end of the step is 0.5.
+            REQUIRE(std::get<0>(ta.step(fp_t(1, prec))) == taylor_outcome::time_limit);
+            REQUIRE(x_records.size() == 1u);
+            REQUIRE(x_records[0].first == .5);
+            REQUIRE(x_records[0].first.get_prec() == prec);
+            REQUIRE(x_records[0].second == 1);
+
+            // Jump of x through zero.
+            ta.get_state_data()[0] = fp_t(-1, prec);
+
+            // Second step: the jump is reported at the beginning of the step.
+            REQUIRE(std::get<0>(ta.step(fp_t(.5, prec))) == taylor_outcome::time_limit);
+            REQUIRE(x_records.size() == 2u);
+            REQUIRE(x_records[1].first == 1);
+            REQUIRE(x_records[1].first.get_prec() == prec);
+            REQUIRE(x_records[1].second == -1);
+        }
+
+        x_records.clear();
+
+        // Sign update via exact arithmetic.
+        {
+            // NOTE: the terminal and non-terminal events have the same event function.
+            auto ta = ta_t{
+                {prime(x) = 1_dbl}, {fp_t(-1, prec)}, kw::t_events = {t_ev_t(x)}, kw::nt_events = {nt_ev_t(x, rec_cb)}};
+
+            // First step: the terminal event stops the integration exactly at the root of x, t = 1. The value of the
+            // non-terminal event function at the end of the step is exactly zero.
+            const auto [oc, h] = ta.step(fp_t(2, prec));
+            REQUIRE(oc == taylor_outcome{-1});
+            REQUIRE(h == 1);
+            REQUIRE(x_records.empty());
+            REQUIRE(ta.get_state()[0] == 0);
+
+            // Jump of x away from zero.
+            ta.get_state_data()[0] = fp_t(.5, prec);
+
+            // Second step: the jump is reported at the beginning of the step.
+            REQUIRE(std::get<0>(ta.step(fp_t(.25, prec))) == taylor_outcome::time_limit);
+            REQUIRE(x_records.size() == 1u);
+            REQUIRE(x_records[0].first == 1);
+            REQUIRE(x_records[0].first.get_prec() == prec);
+            REQUIRE(x_records[0].second == 1);
         }
     }
 }

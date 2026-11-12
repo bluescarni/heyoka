@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -92,7 +93,8 @@ template <typename T>
 [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(std::span<const T>);
 
 template <typename T>
-[[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(std::span<const T>, const T &);
+[[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(std::span<const T>, const T &, std::size_t offset = 0,
+                                                        std::size_t stride = 1);
 
 // Helper to split the input Bernstein polynomial at the midpoint of its interval.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>

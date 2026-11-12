@@ -17,6 +17,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <type_traits>
@@ -313,7 +314,11 @@ mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
     return taylor_deduce_cooldown_impl(std::move(g_eps), std::move(abs_der));
 }
 
-// Helper to determine the sign of the polynomial with coefficients cfs (in ascending degree order) at the point x.
+// Helper to determine the sign of the polynomial with coefficients cfs at the point x.
+//
+// cfs is assumed to contain the coefficients in ascending degree order starting from cfs[offset] at intervals of
+// stride. E.g., given cfs = [a, b, c, d, e, f, g, h], offset==1 and stride==2, the list of coefficients is [b, d, f,
+// h].
 //
 // The polynomial is evaluated via Horner's scheme in interval arithmetic: each operation is performed in
 // round-to-nearest, and its result is then widened outwards to the adjacent representable values. Since a
@@ -323,28 +328,48 @@ mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
 // The return value is +1 or -1 if the enclosure lies entirely above or below zero, and an empty optional otherwise
 // (that is, if the enclosure contains zero or is not finite).
 //
-// cfs must be non-empty, and cfs and x must be finite. For mppp::real, cfs and x must all have the same precision.
+// cfs must be non-empty, and both the coefficients selected from cfs for evaluation and x must be finite. For
+// mppp::real, cfs and x must all have the same precision. offset must be smaller than stride, and stride must divide
+// the size of cfs exactly.
 template <typename T>
-[[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(const std::span<const T> cfs, const T &x)
+[[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(const std::span<const T> cfs, const T &x,
+                                                        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                        const std::size_t offset, const std::size_t stride)
 {
     using std::isfinite;
 
+    assert(offset < stride);
     assert(!cfs.empty());
     assert(isfinite(x));
-    assert(std::ranges::all_of(cfs, [](const auto &val) { return isfinite(val); }));
 
     if constexpr (std::same_as<T, mppp::real>) {
         assert(std::ranges::all_of(cfs, [x_prec = x.get_prec()](const auto &val) { return val.get_prec() == x_prec; }));
     }
 
+    const auto cfs_size = cfs.size();
+    assert(cfs_size % stride == 0u);
+
+    // Determine the degree+1 of the polynomial.
+    const auto dp1 = cfs_size / stride;
+
+    // Helper to fetch a coefficient from cfs.
+    const auto fetch_cf = [&](const std::size_t degree) -> const T & {
+        assert(degree < dp1);
+        return cfs[(degree * stride) + offset];
+    };
+
+    // Check that all the coefficients which participate in the evaluation are finite.
+    assert(std::ranges::all_of(std::views::iota(0uz, dp1) | std::views::transform(fetch_cf),
+                               [](const auto &val) { return isfinite(val); }));
+
     // Init the enclosure with the highest-degree coefficient.
-    auto lo = cfs.back(), hi = cfs.back();
+    auto lo = fetch_cf(dp1 - 1u), hi = lo;
 
     // Cache the sign of x.
     const auto x_is_neg = (x < 0);
 
-    for (auto i = cfs.size() - 1u; i > 0u; --i) {
-        const auto &cf = cfs[i - 1u];
+    for (auto i = dp1 - 1u; i > 0u; --i) {
+        const auto &cf = fetch_cf(i - 1u);
 
         // Multiply the enclosure by x. The bounds swap if x is negative.
         //
@@ -376,7 +401,7 @@ template <typename T>
 
 // Explicit instantiations.
 #define HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(F)                                                                          \
-    template std::optional<int> ed_poly_eval_sign_ival<F>(std::span<const F>, const F &);
+    template std::optional<int> ed_poly_eval_sign_ival<F>(std::span<const F>, const F &, std::size_t, std::size_t);
 
 HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(float)
 HEYOKA_ED_POLY_EVAL_SIGN_IVAL_INST(double)
