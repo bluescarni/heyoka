@@ -694,7 +694,7 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 //   Taylor coefficients being recorded in the internal array (if wtc == true, or always in the presence of events).
 //   That is, h == 0 is not treated in any special way.
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, const bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -858,7 +858,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
         // functions.
         //
-        // NOTE: this is the index in m_ev_jet where the Taylor coefficients for the event functions begin.
+        // NOTE: ev_begin is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. It
+        // is computed in at least 32-bit unsigned arithmetic. edd.m_ev_jet's size is guaranteed to fit in 32-bit
+        // unsigned ints, hence no overflow/wraparound is possible.
         const auto ev_begin = m_dim * (m_order + 1u) * m_batch_size;
 
         // The total number of batches of Taylor coefficients for the event functions.
@@ -876,7 +878,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             ed_finite[i] = flag;
         }
 
-        // Do the event detection.
+        // Do the in-step event detection.
         edd.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
 
         // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary memory).
