@@ -971,3 +971,135 @@ TEST_CASE("fp types")
         REQUIRE(x_records == rec_t{{0u, fp_t(1), 1}, {1u, fp_t(-1), -1}});
     });
 }
+
+// Event functions whose Taylor polynomial is the zero polynomial. In-step detection reports the zero polynomial as a
+// single root at the beginning of the step with zero direction, cross-step detection skips it (its constant coefficient
+// is zero) and stores a zero sign at the end of the step.
+TEST_CASE("zero polynomial")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+    using t_ev_t = ta_t::t_event_t;
+    using nt_ev_t = ta_t::nt_event_t;
+    using rec_t = std::vector<std::tuple<std::uint32_t, double, int>>;
+
+    // NOTE: in all the tests below x' = 0, so that the Taylor polynomial of the event function x is the zero polynomial
+    // in the lanes in which x is zero. We always pass explicit timesteps, as the automatically-deduced ones are infinite.
+
+    // Helper to check the step outcomes.
+    const auto check_step = [](const ta_t &ta, const std::vector<std::tuple<taylor_outcome, double>> &expected) {
+        REQUIRE(ta.get_step_res() == expected);
+    };
+
+    // Non-terminal events. x is zero only in lane 0.
+    {
+        auto x = make_vars("x");
+
+        // The (lane, time, direction) records of the non-terminal events, with any and positive direction
+        // respectively.
+        rec_t any_records, pos_records;
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0., 1.},
+                       2,
+                       kw::nt_events = {nt_ev_t(x,
+                                                [&any_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                                    any_records.emplace_back(batch_idx, tm, d_sgn);
+                                                }),
+                                        nt_ev_t(
+                                            x,
+                                            [&pos_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                                pos_records.emplace_back(batch_idx, tm, d_sgn);
+                                            },
+                                            kw::direction = event_direction::positive)}};
+
+        // Two steps: in lane 0, a root with zero direction is reported at the beginning of each step (and filtered out
+        // by the event with positive direction). No cross-step event is reported in either lane.
+        ta.step(std::vector<double>{.25, .25});
+        ta.step(std::vector<double>{.25, .25});
+        check_step(ta, {{taylor_outcome::time_limit, .25}, {taylor_outcome::time_limit, .25}});
+        REQUIRE(any_records == rec_t{{0u, 0., 0}, {0u, .25, 0}});
+        REQUIRE(pos_records.empty());
+
+        // Jump of x away from zero in lane 0 (from the stored zero sign), and through zero in lane 1. The jumps are
+        // reported at the beginning of the next step.
+        ta.get_state_data()[0] = 1.;
+        ta.get_state_data()[1] = -1.;
+        ta.step(std::vector<double>{.25, .25});
+        check_step(ta, {{taylor_outcome::time_limit, .25}, {taylor_outcome::time_limit, .25}});
+        REQUIRE(any_records == rec_t{{0u, 0., 0}, {0u, .25, 0}, {0u, .5, 1}, {1u, .5, -1}});
+        REQUIRE(pos_records == rec_t{{0u, .5, 1}});
+
+        // Nothing else happens in the next step.
+        ta.step(std::vector<double>{.25, .25});
+        check_step(ta, {{taylor_outcome::time_limit, .25}, {taylor_outcome::time_limit, .25}});
+        REQUIRE(any_records == rec_t{{0u, 0., 0}, {0u, .25, 0}, {0u, .5, 1}, {1u, .5, -1}});
+        REQUIRE(pos_records == rec_t{{0u, .5, 1}});
+    }
+
+    // Terminal event with automatic cooldown. x is zero only in lane 0.
+    {
+        auto x = make_vars("x");
+
+        // The trigger times of the terminal event, for each lane.
+        std::vector<std::vector<double>> trigger_times(2);
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0., 1.},
+                       2,
+                       kw::t_events
+                       = {t_ev_t(x, kw::callback = [&trigger_times](ta_t &t, int, std::uint32_t batch_idx) {
+                              trigger_times[batch_idx].push_back(t.get_time()[batch_idx]);
+                              return true;
+                          })}};
+
+        // First step: the terminal event triggers at the beginning of the step in lane 0.
+        ta.step(std::vector<double>{.25, .25});
+        check_step(ta, {{taylor_outcome{0}, 0.}, {taylor_outcome::time_limit, .25}});
+        REQUIRE(trigger_times == std::vector<std::vector<double>>{{0.}, {}});
+
+        // NOTE: the derivative of the event function is zero, hence the cooldown heuristic produces an infinite value,
+        // which is replaced by the largest finite value.
+        REQUIRE(ta.get_te_cooldowns()[0][0]);
+        REQUIRE(ta.get_te_cooldowns()[0][0]->second == std::numeric_limits<double>::max());
+        REQUIRE(!ta.get_te_cooldowns()[1][0]);
+
+        // The next steps proceed normally, the terminal event stays on cooldown in lane 0.
+        for (auto i = 0; i < 3; ++i) {
+            ta.step(std::vector<double>{.25, .25});
+            check_step(ta, {{taylor_outcome::time_limit, .25}, {taylor_outcome::time_limit, .25}});
+        }
+        REQUIRE(trigger_times == std::vector<std::vector<double>>{{0.}, {}});
+    }
+
+    // Terminal event with custom cooldown. x is zero in both lanes, the timesteps differ.
+    {
+        auto x = make_vars("x");
+
+        // The trigger times of the terminal event, for each lane.
+        std::vector<std::vector<double>> trigger_times(2);
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0., 0.},
+                       2,
+                       kw::t_events = {t_ev_t(
+                           x,
+                           kw::callback =
+                               [&trigger_times](ta_t &t, int, std::uint32_t batch_idx) {
+                                   trigger_times[batch_idx].push_back(t.get_time()[batch_idx]);
+                                   return true;
+                               },
+                           kw::cooldown = .3)}};
+
+        // The terminal event triggers at the beginning of a step (with a zero timestep) whenever it is not on cooldown.
+        // After each trigger, the cooldown of 0.3 lasts for two steps of size 0.25 in lane 0 and 0.2 in lane 1.
+        for (auto i = 0; i < 2; ++i) {
+            ta.step(std::vector<double>{.25, .2});
+            check_step(ta, {{taylor_outcome{0}, 0.}, {taylor_outcome{0}, 0.}});
+            for (auto j = 0; j < 2; ++j) {
+                ta.step(std::vector<double>{.25, .2});
+                check_step(ta, {{taylor_outcome::time_limit, .25}, {taylor_outcome::time_limit, .2}});
+            }
+        }
+        REQUIRE(trigger_times == std::vector<std::vector<double>>{{0., .5}, {0., .4}});
+    }
+}

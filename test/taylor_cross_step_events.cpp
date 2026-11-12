@@ -852,3 +852,111 @@ TEST_CASE("real")
         }
     }
 }
+
+// Event functions whose Taylor polynomial is the zero polynomial. In-step detection reports the zero polynomial as a
+// single root at the beginning of the step with zero direction, cross-step detection skips it (its constant coefficient
+// is zero) and stores a zero sign at the end of the step.
+TEST_CASE("zero polynomial")
+{
+    using ta_t = taylor_adaptive<double>;
+    using t_ev_t = ta_t::t_event_t;
+    using nt_ev_t = ta_t::nt_event_t;
+    using rec_t = std::vector<std::pair<double, int>>;
+
+    // NOTE: in all the tests below x' = 0 and x0 = 0, so that the Taylor polynomial of the event function x is the zero
+    // polynomial. We always pass an explicit timestep, as the automatically-deduced one is infinite.
+
+    // Non-terminal events.
+    {
+        auto x = make_vars("x");
+
+        // The (time, direction) records of the non-terminal events, with any and positive direction respectively.
+        rec_t any_records, pos_records;
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0.},
+                       kw::nt_events
+                       = {nt_ev_t(x, [&any_records](ta_t &, double tm, int d_sgn) { any_records.emplace_back(tm, d_sgn); }),
+                          nt_ev_t(
+                              x, [&pos_records](ta_t &, double tm, int d_sgn) { pos_records.emplace_back(tm, d_sgn); },
+                              kw::direction = event_direction::positive)}};
+
+        // Two steps: a root with zero direction is reported at the beginning of each step (and filtered out by the
+        // event with positive direction). No cross-step event is reported.
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+        REQUIRE(any_records == rec_t{{0., 0}, {.25, 0}});
+        REQUIRE(pos_records.empty());
+
+        // Jump of x away from zero. The jump from the stored zero sign is reported at the beginning of the next step.
+        ta.get_state_data()[0] = 1.;
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+        REQUIRE(any_records == rec_t{{0., 0}, {.25, 0}, {.5, 1}});
+        REQUIRE(pos_records == rec_t{{.5, 1}});
+
+        // Nothing else happens in the next step.
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+        REQUIRE(any_records == rec_t{{0., 0}, {.25, 0}, {.5, 1}});
+        REQUIRE(pos_records == rec_t{{.5, 1}});
+    }
+
+    // Terminal event with automatic cooldown.
+    {
+        auto x = make_vars("x");
+
+        // The trigger times of the terminal event.
+        std::vector<double> trigger_times;
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0.},
+                       kw::t_events = {t_ev_t(x, kw::callback = [&trigger_times](ta_t &t, int) {
+                                           trigger_times.push_back(t.get_time());
+                                           return true;
+                                       })}};
+
+        // First step: the terminal event triggers at the beginning of the step.
+        const auto [oc, h] = ta.step(.25);
+        REQUIRE(oc == taylor_outcome{0});
+        REQUIRE(h == 0);
+        REQUIRE(trigger_times == std::vector<double>{0.});
+
+        // NOTE: the derivative of the event function is zero, hence the cooldown heuristic produces an infinite value,
+        // which is replaced by the largest finite value.
+        REQUIRE(ta.get_te_cooldowns()[0]);
+        REQUIRE(ta.get_te_cooldowns()[0]->second == std::numeric_limits<double>::max());
+
+        // The next steps proceed normally, the terminal event stays on cooldown.
+        for (auto i = 0; i < 3; ++i) {
+            REQUIRE(ta.step(.25) == std::tuple{taylor_outcome::time_limit, .25});
+        }
+        REQUIRE(trigger_times == std::vector<double>{0.});
+    }
+
+    // Terminal event with custom cooldown.
+    {
+        auto x = make_vars("x");
+
+        // The trigger times of the terminal event.
+        std::vector<double> trigger_times;
+
+        auto ta = ta_t{{prime(x) = 0_dbl},
+                       {0.},
+                       kw::t_events = {t_ev_t(
+                           x,
+                           kw::callback =
+                               [&trigger_times](ta_t &t, int) {
+                                   trigger_times.push_back(t.get_time());
+                                   return true;
+                               },
+                           kw::cooldown = .3)}};
+
+        // The terminal event triggers at the beginning of a step (with a zero timestep) whenever it is not on cooldown.
+        // After each trigger, the cooldown of 0.3 lasts for two steps of size 0.25.
+        for (auto i = 0; i < 2; ++i) {
+            REQUIRE(ta.step(.25) == std::tuple{taylor_outcome{0}, 0.});
+            REQUIRE(ta.step(.25) == std::tuple{taylor_outcome::time_limit, .25});
+            REQUIRE(ta.step(.25) == std::tuple{taylor_outcome::time_limit, .25});
+        }
+        REQUIRE(trigger_times == std::vector<double>{0., .5});
+    }
+}

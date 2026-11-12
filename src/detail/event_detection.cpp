@@ -126,15 +126,11 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 
         return ret;
     } else {
-        // LCOV_EXCL_START
-
         // The heuristic produced a non-finite value. Since we are assuming that g_eps is strictly positive, the only
         // non-finite result for ret can be +infinity. Replace it with a large number in order to keep the spirit of a
         // very large cooldown without the headache of making it non-finite.
         assert(ret == std::numeric_limits<float>::infinity());
         return nextafter(std::move(ret), static_cast<T>(0));
-
-        // LCOV_EXCL_STOP
     }
 }
 
