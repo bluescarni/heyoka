@@ -138,4 +138,9 @@ struct hash<heyoka::number> {
 
 } // namespace std
 
+// Boost s11n class version history for number:
+//
+// - 1: long double is now conditionally supported depending on the platform.
+BOOST_CLASS_VERSION(heyoka::number, 1)
+
 #endif

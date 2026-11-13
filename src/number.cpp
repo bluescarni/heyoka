@@ -127,8 +127,15 @@ void number::save(boost::archive::binary_oarchive &ar, unsigned) const
     ar << m_value;
 }
 
-void number::load(boost::archive::binary_iarchive &ar, unsigned)
+void number::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    if (version < static_cast<unsigned>(boost::serialization::version<number>::type::value)) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Unable to load a number object: the archive version ({}) is too old", version));
+        // LCOV_EXCL_STOP
+    }
+
     ar >> m_value;
 }
 
