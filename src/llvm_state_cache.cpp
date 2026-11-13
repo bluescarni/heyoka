@@ -283,16 +283,16 @@ void llvm_state_memcache_insert_impl(std::vector<std::string> bc, const std::uin
     // LCOV_EXCL_STOP
 }
 
-// Environment fingerprint for the on-disk cache.
+// Base environment fingerprint for the on-disk cache.
 //
-// This captures properties of the execution environment that affect the bitcode->object code transformation, but are
-// NOT reflected in the bitcode itself. Things that affect bitcode *generation* should not need to be here - they
-// produce different bitcode, which is already part of the cache key.
+// This captures compile-time properties of the execution environment that affect the bitcode->object code
+// transformation, but are NOT reflected in the bitcode itself. Things that affect bitcode *generation* should not need
+// to be here - they produce different bitcode, which is already part of the cache key.
 //
-// For instance, if we are on a heyoka version *without* mppp::real support, we cannot possibly generate bitcode that
-// references MPFR functions, so even if such bitcode exists somewhere in the cache originating from a heyoka version
-// which does include mppp::real support, we should never get to the point of loading such binary code because we could
-// never match the bitcode.
+// For instance, if we are on a heyoka build *without* mppp::real128 support, we cannot possibly generate bitcode that
+// references quadmath functions, so even if such bitcode exists somewhere in the cache originating from a heyoka build
+// which does include mppp::real128 support, we should never get to the point of loading such binary code because we
+// could never match the bitcode.
 //
 // Current ingredients:
 //
@@ -301,12 +301,58 @@ void llvm_state_memcache_insert_impl(std::vector<std::string> bc, const std::uin
 // - LLVM_VERSION: LLVM performs the actual compilation, so even identical bitcode + identical pass
 //   pipeline can produce different object code with a different LLVM version.
 //
-// The format is "KEY1=VALUE1;KEY2=VALUE2;..." to allow extension with additional ingredients in the future.
+// The format is "KEY1=VALUE1;KEY2=VALUE2;..." to allow extension with additional ingredients.
 //
 // NOTE: if we ever realise that we need additional fingerprinting (e.g., presence/absence of optional dependencies,
 // and/or their specific version numbers), we can easily add new ingredients.
-constexpr auto diskcache_fingerprint
+constexpr auto base_diskcache_fingerprint
     = std::string_view("HEYOKA_VERSION=" HEYOKA_VERSION_STRING ";LLVM_VERSION=" LLVM_VERSION_STRING);
+
+// Helper to build the complete fingerprint for the on-disk cache, adding the host's target triple, CPU and features to
+// the base fingerprint.
+//
+// These are the host-dependent inputs of the LLVM target machine. They affect code generation but they are not part of
+// the bitcode used as the cache key (the CPU and features are added to the module only during optimisation). The CPU
+// name alone is not enough, as the same name can come with different features (e.g., features masked in VMs, disabled
+// in the BIOS or fused off in cut-down SKUs). The triple is already in the bitcode and it is included for completeness.
+std::string build_diskcache_fingerprint()
+{
+    // Start from the base.
+    std::string retval(base_diskcache_fingerprint);
+
+    // Fetch the target features.
+    const auto &target_features = get_target_features();
+
+    // Make sure triple, cpu and feature_string do not contain special characters used to assemble the fingerprint for
+    // the on-disk cache.
+    const auto validate_string = [](const std::string &s, const std::string_view name) {
+        if (s.contains('=') || s.contains(';')) [[unlikely]] {
+            // LCOV_EXCL_START
+            throw std::runtime_error(fmt::format(
+                "Invalid target {} '{}' detected while building the fingerprint for the on-disk cache: it contains one "
+                "of the forbidden characters ['=', ';']",
+                name, s));
+            // LCOV_EXCL_STOP
+        }
+    };
+    validate_string(target_features.triple, "triple");
+    validate_string(target_features.cpu, "cpu");
+    validate_string(target_features.feature_string, "feature string");
+
+    // Complete the fingerprint.
+    retval += fmt::format(";TARGET_TRIPLE={}", target_features.triple);
+    retval += fmt::format(";TARGET_CPU={}", target_features.cpu);
+    retval += fmt::format(";TARGET_FEATURES={}", target_features.feature_string);
+
+    return retval;
+}
+
+// Static getter for the complete fingerprint for the on-disk cache.
+const std::string &get_diskcache_fingerprint()
+{
+    static const auto retval = build_diskcache_fingerprint();
+    return retval;
+}
 
 // Version of the DB schema for the on-disk cache.
 constexpr int diskcache_schema_version = 0;
@@ -772,8 +818,8 @@ struct diskcache_state {
             // Key verification: check that the full key matches, not just the hash.
             assert(bc_blob != nullptr);
             assert(db_fp != nullptr);
-            if (db_comp_flag != comp_flag || std::string_view(db_fp) != diskcache_fingerprint
-                || !vec_str_matches_blob(bc_blob, bc_blob_len, bc)) {
+            if (db_comp_flag != comp_flag || std::string_view(db_fp) != get_diskcache_fingerprint()
+                || !vec_str_matches_blob(bc_blob, bc_blob_len, bc)) [[unlikely]] {
                 // Hashes match but the full key does not. Cache miss.
                 //
                 // NOTE: this is very difficult to cover - it would require crafting a collision by hand.
@@ -906,6 +952,9 @@ struct diskcache_state {
 
                 // Insert the new entry if it fits.
                 if (total_size + entry_size <= total_limit) {
+                    // Fetch the fingerprint.
+                    const auto &diskcache_fingerprint = get_diskcache_fingerprint();
+
                     auto *const insert_stmt = conn->m_insert_stmt.get();
                     // NOTE: the scope guard ensures sqlite3_reset() on all exit paths, including exceptions.
                     const boost::scope::scope_exit insert_reset([insert_stmt] noexcept { sqlite3_reset(insert_stmt); });
@@ -915,8 +964,6 @@ struct diskcache_state {
                         || sqlite3_bind_blob(insert_stmt, 2, bc_data, bc_len, SQLITE_STATIC) != SQLITE_OK
                         || sqlite3_bind_int64(insert_stmt, 3, static_cast<sqlite3_int64>(comp_flag)) != SQLITE_OK
                         // NOTE: no need for null termination here, we are passing in the size explicitly.
-                        //
-                        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
                         || sqlite3_bind_text(insert_stmt, 4, diskcache_fingerprint.data(),
                                              boost::numeric_cast<int>(diskcache_fingerprint.size()), SQLITE_STATIC)
                                != SQLITE_OK
@@ -1078,7 +1125,7 @@ private:
         boost::hash_combine(seed, comp_flag);
 
         // Mix in the environment fingerprint.
-        boost::hash_combine(seed, diskcache_fingerprint);
+        boost::hash_combine(seed, get_diskcache_fingerprint());
 
         return seed;
     }

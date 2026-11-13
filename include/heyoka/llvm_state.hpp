@@ -50,9 +50,15 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Helper struct to signal the availability
-// of certain features on the host machine.
+// Helper encapsulating several properties of the host compilation target.
 struct target_features {
+    // The target triple.
+    std::string triple;
+    // The target cpu.
+    std::string cpu;
+    // The features string.
+    std::string feature_string;
+
     // x86.
     bool sse2 = false;
     bool avx = false;

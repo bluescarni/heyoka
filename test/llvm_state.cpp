@@ -14,6 +14,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -549,4 +550,31 @@ TEST_CASE("code model")
     REQUIRE_THROWS_MATCHES(
         llvm_state{kw::code_model = code_model{100}}, std::invalid_argument,
         Message("An invalid code model enumerator with a value of 100 was passed to the constructor of an llvm_state"));
+}
+
+// Check that the triple, cpu and feature string in the target features (used in the fingerprint of the on-disk cache)
+// are the ones used in the compilation of an llvm_state.
+TEST_CASE("target properties")
+{
+    const auto &tf = detail::get_target_features();
+
+    auto [x, y] = make_vars("x", "y");
+
+    // NOTE: the cpu and feature string are added to the functions in the module only if optimisations are enabled.
+    llvm_state s{kw::opt_level = 3u};
+    detail::add_cfunc<double>(s, "cf", {x * y}, {x, y}, 1, false, 0, false);
+    s.compile();
+
+    const auto ir = s.get_ir();
+
+    REQUIRE(!tf.triple.empty());
+    REQUIRE(ir.contains("target triple = \"" + tf.triple + "\""));
+
+    // NOTE: the cpu and feature string are added to the functions only if non-empty.
+    if (!tf.cpu.empty()) {
+        REQUIRE(ir.contains("\"target-cpu\"=\"" + tf.cpu + "\""));
+    }
+    if (!tf.feature_string.empty()) {
+        REQUIRE(ir.contains("\"target-features\"=\"" + tf.feature_string + "\""));
+    }
 }

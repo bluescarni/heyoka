@@ -244,6 +244,6 @@ if(TARGET eop_data)
   target_link_libraries(eop_data PRIVATE heyoka_erfa)
 endif()
 target_link_libraries(model_sw PRIVATE heyoka_erfa)
-target_link_libraries(llvm_state_diskcache PRIVATE Boost::filesystem)
+target_link_libraries(llvm_state_diskcache PRIVATE Boost::filesystem SQLite3::SQLite3)
 set_tests_properties(llvm_state_diskcache_envvar PROPERTIES
     ENVIRONMENT "HEYOKA_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/heyoka_envvar_test_cache")
