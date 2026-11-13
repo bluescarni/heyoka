@@ -45,26 +45,28 @@ TEST_CASE("bounce")
     std::vector<unsigned> n_bounces(2);
 
     // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1].
-    auto ta = ta_t{
-        {prime(x) = v, prime(v) = -1_dbl},
-        {1., 10., -.5, -.5},
-        2,
-        kw::t_events = {t_ev_t(
-            x,
-            kw::callback =
-                [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
-                    ++n_bounces[batch_idx];
-                    t.get_state_data()[2u + batch_idx] = -t.get_state()[2u + batch_idx];
-                    return true;
-                },
-            kw::direction = event_direction::negative)},
-        kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-            v_records.emplace_back(batch_idx, tm, d_sgn);
-        })}};
+    auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl},
+                   {1., 10., -.5, -.5},
+                   2,
+                   kw::t_events = {t_ev_t(
+                       x,
+                       kw::callback =
+                           [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
+                               ++n_bounces[batch_idx];
+                               t.get_state_data()[2u + batch_idx] = -t.get_state()[2u + batch_idx];
+                               return true;
+                           },
+                       kw::direction = event_direction::negative, kw::cross_step = true)},
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // NOTE: in lane 0, x(t) = 1 - t/2 - t**2/2 reaches the floor at t = 1, where v = -1.5. After the bounce v = 1.5,
-    // and the next (genuine) root of v is at the apex, t = 2.5. In lane 1, x(t) = 10 - t/2 - t**2/2 stays positive up to
-    // t = 2, and v has no roots. We stop at t = 2.
+    // and the next (genuine) root of v is at the apex, t = 2.5. In lane 1, x(t) = 10 - t/2 - t**2/2 stays positive up
+    // to t = 2, and v has no roots. We stop at t = 2.
     ta.propagate_until(2.);
 
     for (const auto &res : ta.get_propagate_res()) {
@@ -93,22 +95,24 @@ TEST_CASE("bounce backward")
     std::vector<unsigned> n_bounces(2);
 
     // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1].
-    auto ta = ta_t{
-        {prime(x) = v, prime(v) = -1_dbl},
-        {1., 10., .5, .5},
-        2,
-        kw::t_events = {t_ev_t(
-            x,
-            kw::callback =
-                [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
-                    ++n_bounces[batch_idx];
-                    t.get_state_data()[2u + batch_idx] = -t.get_state()[2u + batch_idx];
-                    return true;
-                },
-            kw::direction = event_direction::positive)},
-        kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-            v_records.emplace_back(batch_idx, tm, d_sgn);
-        })}};
+    auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl},
+                   {1., 10., .5, .5},
+                   2,
+                   kw::t_events = {t_ev_t(
+                       x,
+                       kw::callback =
+                           [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
+                               ++n_bounces[batch_idx];
+                               t.get_state_data()[2u + batch_idx] = -t.get_state()[2u + batch_idx];
+                               return true;
+                           },
+                       kw::direction = event_direction::positive, kw::cross_step = true)},
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // NOTE: in lane 0, x(t) = 1 + t/2 - t**2/2 reaches the floor at t = -1, where v = 1.5 (x increasing in time, hence
     // the positive direction of the terminal event). After the bounce v = -1.5: as a function of time, v jumps upwards
@@ -137,8 +141,8 @@ TEST_CASE("direction filter")
 
     auto v = make_vars("v");
 
-    // Helper to take a first step, at the end of which v is negative in lane 0 and positive in lane 1, and then to make v
-    // jump through zero in both lanes (upwards in lane 0, downwards in lane 1).
+    // Helper to take a first step, at the end of which v is negative in lane 0 and positive in lane 1, and then to make
+    // v jump through zero in both lanes (upwards in lane 0, downwards in lane 1).
     const auto first_step_and_jump = [](ta_t &ta) {
         ta.step(std::vector<double>{.25, .25});
         for (const auto &[oc, h] : ta.get_step_res()) {
@@ -162,13 +166,13 @@ TEST_CASE("direction filter")
                                             [&pos_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
                                                 pos_records.emplace_back(batch_idx, tm, d_sgn);
                                             },
-                                            kw::direction = event_direction::positive),
+                                            kw::direction = event_direction::positive, kw::cross_step = true),
                                         nt_ev_t(
                                             v,
                                             [&neg_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
                                                 neg_records.emplace_back(batch_idx, tm, d_sgn);
                                             },
-                                            kw::direction = event_direction::negative)}};
+                                            kw::direction = event_direction::negative, kw::cross_step = true)}};
 
         first_step_and_jump(ta);
 
@@ -184,8 +188,10 @@ TEST_CASE("direction filter")
 
     // Terminal event.
     {
-        auto ta = ta_t{
-            {prime(v) = -1_dbl}, {-1., 2.}, 2, kw::t_events = {t_ev_t(v, kw::direction = event_direction::negative)}};
+        auto ta = ta_t{{prime(v) = -1_dbl},
+                       {-1., 2.},
+                       2,
+                       kw::t_events = {t_ev_t(v, kw::direction = event_direction::negative, kw::cross_step = true)}};
 
         first_step_and_jump(ta);
 
@@ -219,28 +225,28 @@ TEST_CASE("terminal cooldown filter")
         std::vector<unsigned> n_bounces(2);
 
         // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1].
-        auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl},
-                       {1., .125, s, .5 * s},
-                       2,
-                       kw::t_events = {t_ev_t(
-                                           x,
-                                           kw::callback =
-                                               [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
-                                                   ++n_bounces[batch_idx];
-                                                   t.get_state_data()[2u + batch_idx]
-                                                       = -t.get_state()[2u + batch_idx];
-                                                   return true;
-                                               },
-                                           kw::direction
-                                           = backward ? event_direction::positive : event_direction::negative),
-                                       t_ev_t(
-                                           v,
-                                           kw::callback =
-                                               [&v_records](ta_t &t, int d_sgn, std::uint32_t batch_idx) {
-                                                   v_records[batch_idx].emplace_back(t.get_time()[batch_idx], d_sgn);
-                                                   return true;
-                                               },
-                                           kw::cooldown = 1.)}};
+        auto ta
+            = ta_t{{prime(x) = v, prime(v) = -1_dbl},
+                   {1., .125, s, .5 * s},
+                   2,
+                   kw::t_events = {t_ev_t(
+                                       x,
+                                       kw::callback =
+                                           [&n_bounces](ta_t &t, int, std::uint32_t batch_idx) {
+                                               ++n_bounces[batch_idx];
+                                               t.get_state_data()[2u + batch_idx] = -t.get_state()[2u + batch_idx];
+                                               return true;
+                                           },
+                                       kw::direction = backward ? event_direction::positive : event_direction::negative,
+                                       kw::cross_step = true),
+                                   t_ev_t(
+                                       v,
+                                       kw::callback =
+                                           [&v_records](ta_t &t, int d_sgn, std::uint32_t batch_idx) {
+                                               v_records[batch_idx].emplace_back(t.get_time()[batch_idx], d_sgn);
+                                               return true;
+                                           },
+                                       kw::cooldown = 1., kw::cross_step = true)}};
 
         // NOTE: forward, lane 0: x(t) = 1 + t - t**2/2. The apex is at t = 1, the floor is reached at t = 1 + sqrt(3),
         // the next apex is at t = 1 + 2 * sqrt(3) > 4. Lane 1: x(t) = 1/8 + t/2 - t**2/2. The apex is at t = 1/2, the
@@ -282,9 +288,12 @@ TEST_CASE("null step")
     auto ta = ta_t{{prime(v) = -1_dbl},
                    {-1., 2.},
                    2,
-                   kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       v_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // First step: at the end of the step, v is negative in lane 0 and positive in lane 1.
     ta.step(std::vector<double>{.25, .25});
@@ -336,10 +345,13 @@ TEST_CASE("terminal event null step")
     auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl},
                    {1., 2., -1., -1.},
                    2,
-                   kw::t_events = {t_ev_t(x)},
-                   kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       v_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+                   kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // First step: at the end of the step, x is positive and v is negative in both lanes.
     ta.step(std::vector<double>{.25, .25});
@@ -401,13 +413,15 @@ TEST_CASE("sign resets")
         // The (lane, time, direction) records of the non-terminal event.
         rec_t v_records;
 
-        auto ta
-            = ta_t{{prime(v) = -1_dbl},
-                   {-1., 2.},
-                   2,
-                   kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       v_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+        auto ta = ta_t{{prime(v) = -1_dbl},
+                       {-1., 2.},
+                       2,
+                       kw::nt_events = {nt_ev_t(
+                           v,
+                           [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                               v_records.emplace_back(batch_idx, tm, d_sgn);
+                           },
+                           kw::cross_step = true)}};
 
         // First step: at the end of the step, v is negative in lane 0 and positive in lane 1.
         ta.step(std::vector<double>{.25, .25});
@@ -446,9 +460,12 @@ TEST_CASE("err_nf_state reset")
     auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl},
                    {0., 0., -1., -1.},
                    2,
-                   kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       v_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // First step: at the end of the step, v is negative in both lanes.
     ta.step(std::vector<double>{.25, .25});
@@ -475,8 +492,8 @@ TEST_CASE("err_nf_state reset")
     ta.get_state_data()[2] = 1.;
     ta.get_state_data()[3] = -1.;
 
-    // Third step: the jump is not reported in lane 0, whose signs were reset, while it is reported in lane 1. v does not
-    // cross zero within the step in either lane.
+    // Third step: the jump is not reported in lane 0, whose signs were reset, while it is reported in lane 1. v does
+    // not cross zero within the step in either lane.
     ta.step(std::vector<double>{.25, .25});
     for (const auto &[oc, h] : ta.get_step_res()) {
         REQUIRE(oc == taylor_outcome::time_limit);
@@ -491,33 +508,32 @@ TEST_CASE("copy and s11n")
     using t_ev_t = ta_t::t_event_t;
 
     // The copy methods.
-    const std::vector<std::function<ta_t(const ta_t &)>> copies
-        = {[](const ta_t &ta) { return ta_t(ta); },
-           [](const ta_t &ta) {
-               ta_t ret;
-               ret = ta;
-               return ret;
-           },
-           [](const ta_t &ta) {
-               std::stringstream ss;
-               {
-                   boost::archive::binary_oarchive oa(ss);
-                   oa << ta;
-               }
-               ta_t ret;
-               {
-                   boost::archive::binary_iarchive ia(ss);
-                   ia >> ret;
-               }
-               return ret;
-           }};
+    const std::vector<std::function<ta_t(const ta_t &)>> copies = {[](const ta_t &ta) { return ta_t(ta); },
+                                                                   [](const ta_t &ta) {
+                                                                       ta_t ret;
+                                                                       ret = ta;
+                                                                       return ret;
+                                                                   },
+                                                                   [](const ta_t &ta) {
+                                                                       std::stringstream ss;
+                                                                       {
+                                                                           boost::archive::binary_oarchive oa(ss);
+                                                                           oa << ta;
+                                                                       }
+                                                                       ta_t ret;
+                                                                       {
+                                                                           boost::archive::binary_iarchive ia(ss);
+                                                                           ia >> ret;
+                                                                       }
+                                                                       return ret;
+                                                                   }};
 
     for (const auto &copy : copies) {
         auto v = make_vars("v");
 
         // NOTE: we use a terminal event without callback (so that it can be serialised), and we detect its trigger via
         // the outcome of the step.
-        auto ta = ta_t{{prime(v) = -1_dbl}, {-1., 2.}, 2, kw::t_events = {t_ev_t(v)}};
+        auto ta = ta_t{{prime(v) = -1_dbl}, {-1., 2.}, 2, kw::t_events = {t_ev_t(v, kw::cross_step = true)}};
 
         // First step: at the end of the step, v is negative in lane 0 and positive in lane 1.
         ta.step(std::vector<double>{.25, .25});
@@ -556,9 +572,12 @@ TEST_CASE("sign update ival")
     auto ta = ta_t{{prime(x) = v, prime(v) = 0_dbl},
                    {-.5, -.5, 1., -1.},
                    2,
-                   kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       x_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+                   kw::nt_events = {nt_ev_t(
+                       x,
+                       [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           x_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // First step: in lane 0, x(t) = -1/2 + t crosses zero at t = 1/2 and its value at the end of the step is 1/2. In
     // lane 1, x(t) = -1/2 - t crosses zero at t = -1/2 and its value at the end of the step is also 1/2.
@@ -605,14 +624,16 @@ TEST_CASE("sign update exact zero")
 
         // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1]. v is constant. The terminal and
         // non-terminal events have the same event function.
-        auto ta
-            = ta_t{{prime(x) = v, prime(v) = 0_dbl},
-                   {-1., -1., 1., -1.},
-                   2,
-                   kw::t_events = {t_ev_t(x)},
-                   kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       x_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+        auto ta = ta_t{{prime(x) = v, prime(v) = 0_dbl},
+                       {-1., -1., 1., -1.},
+                       2,
+                       kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                       kw::nt_events = {nt_ev_t(
+                           x,
+                           [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                               x_records.emplace_back(batch_idx, tm, d_sgn);
+                           },
+                           kw::cross_step = true)}};
 
         // First step: in lane 0, x(t) = -1 + t, in lane 1, x(t) = -1 - t. The terminal event stops the integration
         // exactly at the root of x, t = 1 in lane 0 and t = -1 in lane 1. The root of the non-terminal event is
@@ -668,14 +689,16 @@ TEST_CASE("sign update exact nonzero")
         // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1]. v is constant. The root of the
         // terminal event function, x - eps, is at t = 1 + eps in lane 0 and at t = -(1 + eps) in lane 1, right after
         // the root of x.
-        auto ta
-            = ta_t{{prime(x) = v, prime(v) = 0_dbl},
-                   {-1., -1., 1., -1.},
-                   2,
-                   kw::t_events = {t_ev_t(x - eps)},
-                   kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       x_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+        auto ta = ta_t{{prime(x) = v, prime(v) = 0_dbl},
+                       {-1., -1., 1., -1.},
+                       2,
+                       kw::t_events = {t_ev_t(x - eps, kw::cross_step = true)},
+                       kw::nt_events = {nt_ev_t(
+                           x,
+                           [&x_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                               x_records.emplace_back(batch_idx, tm, d_sgn);
+                           },
+                           kw::cross_step = true)}};
 
         // First step: in lane 0, x(t) = -1 + t, in lane 1, x(t) = -1 - t. The non-terminal event triggers at t = 1 in
         // lane 0 and at t = -1 in lane 1, then the terminal event stops the integration. There, the value of x is eps
@@ -732,13 +755,15 @@ TEST_CASE("sign update overflow")
 
         // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1]. v is constant. The event
         // function is g = 1e308 * x.
-        auto ta = ta_t{
-            {prime(x) = v, prime(v) = 0_dbl},
-            {-1., -1., 1., -1.},
-            2,
-            kw::nt_events = {nt_ev_t(1e308 * x, [&g_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                g_records.emplace_back(batch_idx, tm, d_sgn);
-            })}};
+        auto ta = ta_t{{prime(x) = v, prime(v) = 0_dbl},
+                       {-1., -1., 1., -1.},
+                       2,
+                       kw::nt_events = {nt_ev_t(
+                           1e308 * x,
+                           [&g_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                               g_records.emplace_back(batch_idx, tm, d_sgn);
+                           },
+                           kw::cross_step = true)}};
 
         // First step: in lane 0, x(t) = -1 + t, in lane 1, x(t) = -1 - t. g triggers at t = 1 in lane 0 and at t = -1
         // in lane 1. At the end of the step, g = 1e308 in both lanes, but the interval evaluation overflows
@@ -794,8 +819,11 @@ TEST_CASE("cooldown underflow")
     //
     // In lane 1, x0 = -1/2 and g0 = -5e37. The infinity norm of the state vector is |g0| > 1, thus
     // g_eps = max(tol, eps) * |g0| ~ 6e30, and the cooldown heuristic produces ~6e-7.
-    auto ta = ta_t{
-        {prime(x) = expression{1.f}}, {-1e-44f, -.5f}, 2, kw::tol = 1e-20f, kw::t_events = {t_ev_t(expression{1e38f} * x)}};
+    auto ta = ta_t{{prime(x) = expression{1.f}},
+                   {-1e-44f, -.5f},
+                   2,
+                   kw::tol = 1e-20f,
+                   kw::t_events = {t_ev_t(expression{1e38f} * x, kw::cross_step = true)}};
 
     ta.step(std::vector<float>{1.f, 1.f});
     for (const auto &[oc, h] : ta.get_step_res()) {
@@ -824,8 +852,8 @@ TEST_CASE("cooldown underflow")
 }
 
 // A reset of the stored signs from within an event callback must take effect. That is, the signs at the end of the step
-// must be computed in all lanes before the invocation of the callbacks. The reset happens in a callback of lane 0, and it
-// must take effect in lane 1 too.
+// must be computed in all lanes before the invocation of the callbacks. The reset happens in a callback of lane 0, and
+// it must take effect in lane 1 too.
 TEST_CASE("sign reset from callback")
 {
     using ta_t = taylor_adaptive_batch<double>;
@@ -843,15 +871,19 @@ TEST_CASE("sign reset from callback")
     auto ta = ta_t{{prime(v) = -1_dbl},
                    {-1., -2.},
                    2,
-                   kw::nt_events
-                   = {nt_ev_t(v,
-                              [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                                  v_records.emplace_back(batch_idx, tm, d_sgn);
-                              }),
-                      nt_ev_t(v + 1.1, [&n_resets](ta_t &t, double, int, std::uint32_t) {
-                          ++n_resets;
-                          t.reset_event_signs();
-                      })}};
+                   kw::nt_events = {nt_ev_t(
+                                        v,
+                                        [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                            v_records.emplace_back(batch_idx, tm, d_sgn);
+                                        },
+                                        kw::cross_step = true),
+                                    nt_ev_t(
+                                        v + 1.1,
+                                        [&n_resets](ta_t &t, double, int, std::uint32_t) {
+                                            ++n_resets;
+                                            t.reset_event_signs();
+                                        },
+                                        kw::cross_step = true)}};
 
     // First step: v + 1.1 crosses zero at t ~ 0.1 only in lane 0, and its callback resets the stored signs in all
     // lanes. v stays negative in both lanes.
@@ -890,9 +922,12 @@ TEST_CASE("consecutive propagations")
     auto ta = ta_t{{prime(v) = -1_dbl},
                    {-1., 2.},
                    2,
-                   kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                       v_records.emplace_back(batch_idx, tm, d_sgn);
-                   })}};
+                   kw::nt_events = {nt_ev_t(
+                       v,
+                       [&v_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                           v_records.emplace_back(batch_idx, tm, d_sgn);
+                       },
+                       kw::cross_step = true)}};
 
     // Helper to check that all the outcomes of a propagation are time_limit.
     const auto check_res = [&ta]() {
@@ -942,14 +977,16 @@ TEST_CASE("fp types")
 
         // NOTE: the state vector is stored variable-major, i.e., [x_0, x_1, v_0, v_1]. v is constant. The terminal and
         // non-terminal events have the same event function.
-        auto ta = ta_t{
-            {prime(x) = v, prime(v) = 0_dbl},
-            {fp_t(-1), fp_t(-1), fp_t(1), fp_t(-1)},
-            2,
-            kw::t_events = {t_ev_t(x)},
-            kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, fp_t tm, int d_sgn, std::uint32_t batch_idx) {
-                x_records.emplace_back(batch_idx, tm, d_sgn);
-            })}};
+        auto ta = ta_t{{prime(x) = v, prime(v) = 0_dbl},
+                       {fp_t(-1), fp_t(-1), fp_t(1), fp_t(-1)},
+                       2,
+                       kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                       kw::nt_events = {nt_ev_t(
+                           x,
+                           [&x_records](ta_t &, fp_t tm, int d_sgn, std::uint32_t batch_idx) {
+                               x_records.emplace_back(batch_idx, tm, d_sgn);
+                           },
+                           kw::cross_step = true)}};
 
         // First step: in lane 0, x(t) = -1 + t, in lane 1, x(t) = -1 - t. The terminal event stops the integration
         // exactly at the root of x, t = 1 in lane 0 and t = -1 in lane 1. The value of the non-terminal event function
@@ -983,7 +1020,8 @@ TEST_CASE("zero polynomial")
     using rec_t = std::vector<std::tuple<std::uint32_t, double, int>>;
 
     // NOTE: in all the tests below x' = 0, so that the Taylor polynomial of the event function x is the zero polynomial
-    // in the lanes in which x is zero. We always pass explicit timesteps, as the automatically-deduced ones are infinite.
+    // in the lanes in which x is zero. We always pass explicit timesteps, as the automatically-deduced ones are
+    // infinite.
 
     // Helper to check the step outcomes.
     const auto check_step = [](const ta_t &ta, const std::vector<std::tuple<taylor_outcome, double>> &expected) {
@@ -1001,16 +1039,18 @@ TEST_CASE("zero polynomial")
         auto ta = ta_t{{prime(x) = 0_dbl},
                        {0., 1.},
                        2,
-                       kw::nt_events = {nt_ev_t(x,
-                                                [&any_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
-                                                    any_records.emplace_back(batch_idx, tm, d_sgn);
-                                                }),
+                       kw::nt_events = {nt_ev_t(
+                                            x,
+                                            [&any_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                                any_records.emplace_back(batch_idx, tm, d_sgn);
+                                            },
+                                            kw::cross_step = true),
                                         nt_ev_t(
                                             x,
                                             [&pos_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
                                                 pos_records.emplace_back(batch_idx, tm, d_sgn);
                                             },
-                                            kw::direction = event_direction::positive)}};
+                                            kw::direction = event_direction::positive, kw::cross_step = true)}};
 
         // Two steps: in lane 0, a root with zero direction is reported at the beginning of each step (and filtered out
         // by the event with positive direction). No cross-step event is reported in either lane.
@@ -1046,11 +1086,14 @@ TEST_CASE("zero polynomial")
         auto ta = ta_t{{prime(x) = 0_dbl},
                        {0., 1.},
                        2,
-                       kw::t_events
-                       = {t_ev_t(x, kw::callback = [&trigger_times](ta_t &t, int, std::uint32_t batch_idx) {
-                              trigger_times[batch_idx].push_back(t.get_time()[batch_idx]);
-                              return true;
-                          })}};
+                       kw::t_events = {t_ev_t(
+                           x,
+                           kw::callback =
+                               [&trigger_times](ta_t &t, int, std::uint32_t batch_idx) {
+                                   trigger_times[batch_idx].push_back(t.get_time()[batch_idx]);
+                                   return true;
+                               },
+                           kw::cross_step = true)}};
 
         // First step: the terminal event triggers at the beginning of the step in lane 0.
         ta.step(std::vector<double>{.25, .25});
@@ -1088,7 +1131,7 @@ TEST_CASE("zero polynomial")
                                    trigger_times[batch_idx].push_back(t.get_time()[batch_idx]);
                                    return true;
                                },
-                           kw::cooldown = .3)}};
+                           kw::cooldown = .3, kw::cross_step = true)}};
 
         // The terminal event triggers at the beginning of a step (with a zero timestep) whenever it is not on cooldown.
         // After each trigger, the cooldown of 0.3 lasts for two steps of size 0.25 in lane 0 and 0.2 in lane 1.
@@ -1101,5 +1144,81 @@ TEST_CASE("zero polynomial")
             }
         }
         REQUIRE(trigger_times == std::vector<std::vector<double>>{{0., .5}, {0., .4}});
+    }
+}
+
+// Cross-step detection is opt-in: events constructed without the cross-step flag do not report jumps across step
+// boundaries.
+TEST_CASE("opt in")
+{
+    using ta_t = taylor_adaptive_batch<double>;
+    using t_ev_t = ta_t::t_event_t;
+    using nt_ev_t = ta_t::nt_event_t;
+    using rec_t = std::vector<std::tuple<std::uint32_t, double, int>>;
+
+    // Helper to take a first step, at the end of which v is negative in lane 0 and positive in lane 1, and then to make v
+    // jump through zero in both lanes (upwards in lane 0, downwards in lane 1).
+    const auto first_step_and_jump = [](ta_t &ta) {
+        ta.step(std::vector<double>{.25, .25});
+        for (const auto &[oc, h] : ta.get_step_res()) {
+            REQUIRE(oc == taylor_outcome::time_limit);
+        }
+
+        ta.get_state_data()[0] = 1.;
+        ta.get_state_data()[1] = -1.;
+    };
+
+    // Non-terminal events: two events on v, only the second one with the cross-step flag.
+    {
+        auto v = make_vars("v");
+
+        // The (lane, time, direction) records of the non-terminal events.
+        rec_t def_records, cs_records;
+
+        auto ta = ta_t{{prime(v) = -1_dbl},
+                       {-1., 2.},
+                       2,
+                       kw::nt_events = {nt_ev_t(v,
+                                                [&def_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                                    def_records.emplace_back(batch_idx, tm, d_sgn);
+                                                }),
+                                        nt_ev_t(
+                                            v,
+                                            [&cs_records](ta_t &, double tm, int d_sgn, std::uint32_t batch_idx) {
+                                                cs_records.emplace_back(batch_idx, tm, d_sgn);
+                                            },
+                                            kw::cross_step = true)}};
+
+        first_step_and_jump(ta);
+
+        // Second step: the jumps are reported only by the event with the cross-step flag. v does not cross zero within
+        // the step in either lane.
+        ta.step(std::vector<double>{.25, .25});
+        for (const auto &[oc, h] : ta.get_step_res()) {
+            REQUIRE(oc == taylor_outcome::time_limit);
+        }
+        REQUIRE(def_records.empty());
+        REQUIRE(cs_records == rec_t{{0u, .25, 1}, {1u, .25, -1}});
+    }
+
+    // Terminal events: two events on v without callback, only the second one with the cross-step flag. The second
+    // event has positive direction, so that it triggers only in lane 0.
+    {
+        auto v = make_vars("v");
+
+        auto ta = ta_t{{prime(v) = -1_dbl},
+                       {-1., 2.},
+                       2,
+                       kw::t_events = {t_ev_t(v),
+                                       t_ev_t(v, kw::direction = event_direction::positive, kw::cross_step = true)}};
+
+        first_step_and_jump(ta);
+
+        // Second step: only the second event triggers at the beginning of the step in lane 0. Nothing happens in lane 1.
+        //
+        // NOTE: if both events triggered in lane 0, the one with the lowest index would take precedence.
+        ta.step(std::vector<double>{.25, .25});
+        REQUIRE(ta.get_step_res()[0] == std::tuple{taylor_outcome{-2}, 0.});
+        REQUIRE(ta.get_step_res()[1] == std::tuple{taylor_outcome::time_limit, .25});
     }
 }

@@ -690,7 +690,8 @@ namespace
 // 'batch_size' is the batch size. 'tot_n_events' is the total number of events.
 //
 // This function will record in edd cross-step events, adding them to the results of in-step event detection (which is
-// assumed to have already taken place).
+// assumed to have already taken place). Cross-step detection is performed only for the events whose cross-step flag is
+// enabled.
 //
 // NOTE: the inner loops of this function could be in principle shared with taylor_adaptive_detect_cross_step_events()
 // in order to avoid duplication. Not clear at this time how much this would save. Keep it in mind for future potential
@@ -729,6 +730,12 @@ void taylor_adaptive_batch_detect_cross_step_events(const auto &delta_ts, auto &
 
         // Iterate over all the events for the current lane.
         for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+            // Check whether cross-step tracking is enabled for the current event. If it is not, continue to the next
+            // event.
+            if (taylor_skip_event_cross_step(edd, n_tes, ev_idx)) {
+                continue;
+            }
+
             using enum event_sign_end_step;
 
             // Fetch the previous sign.
@@ -810,6 +817,9 @@ void taylor_adaptive_batch_detect_cross_step_events(const auto &delta_ts, auto &
 // called after event detection ran on finite inputs for the current lane (i.e., the lane did not end up in
 // err_nf_state), and after h was possibly clamped by a terminal event.
 //
+// Cross-step sign tracking is enabled only for events whose cross-step flag is enabled. The signs of the other events
+// are left untouched (i.e., unknown).
+//
 // NOTE: some of the code of this function could be in principle shared with taylor_adaptive_update_ev_signs_end_step()
 // in order to avoid duplication. Not clear at this time how much this would save. Keep it in mind for future potential
 // refactors.
@@ -830,7 +840,15 @@ void taylor_adaptive_batch_update_ev_signs_end_step(const T &h, auto &edd, const
     auto &ev_signs_end_step = edd.m_ev_signs_end_step;
     const auto &ev_fex_check_res = edd.m_ev_fex_check_res;
 
+    // Cache the number of terminal events.
+    const auto n_tes = edd.m_tes.size();
+
     for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+        // Check whether cross-step tracking is enabled for the current event. If it is not, continue to the next event.
+        if (taylor_skip_event_cross_step(edd, n_tes, ev_idx)) {
+            continue;
+        }
+
         using enum event_sign_end_step;
 
         // Fetch a span over the Taylor coefficients for the current event for *all* lanes (not just the current one).

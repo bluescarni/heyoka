@@ -187,6 +187,21 @@ TEST_CASE("taylor te")
                     Message("Cannot set a non-positive cooldown value of 0 for a terminal event"));
             }
 
+            // The cross-step flag (disabled by default).
+            {
+                const auto ev_def = ev_t(v * v - 1e-10);
+                REQUIRE(!ev_def.get_cross_step());
+                oss << ev_def;
+                REQUIRE(boost::algorithm::contains(oss.str(), "Cross step     : no"));
+                oss.str("");
+
+                const auto ev_cs = ev_t(v * v - 1e-10, kw::cross_step = true);
+                REQUIRE(ev_cs.get_cross_step());
+                oss << ev_cs;
+                REQUIRE(boost::algorithm::contains(oss.str(), "Cross step     : yes"));
+                oss.str("");
+            }
+
             // Check the assignment operators.
             ev_t ev0(
                 v * v - 1e-10, kw::callback = [](auto &, int, auto...) { return true; }),
@@ -1091,7 +1106,7 @@ TEST_CASE("t s11n")
 
         {
             t_event<fp_t> ev(v, kw::callback = s11n_callback{}, kw::direction = event_direction::positive,
-                             kw::cooldown = fp_t(100));
+                             kw::cooldown = fp_t(100), kw::cross_step = true);
 
             std::stringstream ss;
 
@@ -1113,6 +1128,7 @@ TEST_CASE("t s11n")
             REQUIRE(ev.get_direction() == event_direction::positive);
             REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_callback));
             REQUIRE(*ev.get_cooldown() == fp_t(100));
+            REQUIRE(ev.get_cross_step());
         }
 
         // Try also a terminal event with empty callback.
@@ -1127,7 +1143,7 @@ TEST_CASE("t s11n")
                 oa << ev;
             }
 
-            ev = t_event<fp_t>(v + x);
+            ev = t_event<fp_t>(v + x, kw::cross_step = true);
 
             {
                 boost::archive::binary_iarchive ia(ss);
@@ -1139,6 +1155,7 @@ TEST_CASE("t s11n")
             REQUIRE(ev.get_direction() == event_direction::positive);
             REQUIRE(!ev.get_callback());
             REQUIRE(*ev.get_cooldown() == fp_t(100));
+            REQUIRE(!ev.get_cross_step());
         }
     };
 

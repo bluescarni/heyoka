@@ -47,6 +47,7 @@ void t_event_impl<T, B>::save(boost::archive::binary_oarchive &ar, unsigned) con
     ar << callback;
     ar << cooldown;
     ar << dir;
+    ar << cross_step;
 }
 
 template <typename T, bool B>
@@ -63,6 +64,7 @@ void t_event_impl<T, B>::load(boost::archive::binary_iarchive &ar, const unsigne
     ar >> callback;
     ar >> cooldown;
     ar >> dir;
+    ar >> cross_step;
 }
 
 template <typename T, bool B>
@@ -71,9 +73,9 @@ t_event_impl<T, B>::t_event_impl() : t_event_impl(expression{})
 }
 
 template <typename T, bool B>
-t_event_impl<T, B>::t_event_impl(ptag, std::tuple<expression, callback_t, std::optional<T>, event_direction> tup)
+t_event_impl<T, B>::t_event_impl(ptag, std::tuple<expression, callback_t, std::optional<T>, event_direction, bool> tup)
     : eq(std::move(std::get<0>(tup))), callback(std::move(std::get<1>(tup))), cooldown(std::move(std::get<2>(tup))),
-      dir(std::get<3>(tup))
+      dir(std::get<3>(tup)), cross_step(std::get<4>(tup))
 {
     // Validate the cooldown.
     if (cooldown) {
@@ -146,6 +148,12 @@ const std::optional<T> &t_event_impl<T, B>::get_cooldown() const noexcept
     return cooldown;
 }
 
+template <typename T, bool B>
+bool t_event_impl<T, B>::get_cross_step() const noexcept
+{
+    return cross_step;
+}
+
 // Implementation of stream insertion for the terminal event class.
 template <typename T, bool B>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &ev)
@@ -156,6 +164,7 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &ev)
     os << "Event direction: " << ev.get_direction() << '\n';
     os << "With callback  : " << (ev.get_callback() ? "yes" : "no") << '\n';
     os << "Cooldown       : " << (ev.get_cooldown() ? fp_to_string(*ev.get_cooldown()) : "auto") << '\n';
+    os << "Cross step     : " << (ev.get_cross_step() ? "yes" : "no") << '\n';
 
     return os;
 }

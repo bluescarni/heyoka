@@ -191,6 +191,21 @@ TEST_CASE("taylor nte")
             REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
             oss.str("");
 
+            // The cross-step flag (disabled by default).
+            {
+                const auto ev_def = ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {});
+                REQUIRE(!ev_def.get_cross_step());
+                oss << ev_def;
+                REQUIRE(boost::algorithm::contains(oss.str(), "Cross step     : no"));
+                oss.str("");
+
+                const auto ev_cs = ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::cross_step = true);
+                REQUIRE(ev_cs.get_cross_step());
+                oss << ev_cs;
+                REQUIRE(boost::algorithm::contains(oss.str(), "Cross step     : yes"));
+                oss.str("");
+            }
+
             // Check the assignment operators.
             ev_t ev0(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}),
                 ev1(
@@ -803,7 +818,7 @@ TEST_CASE("nt s11n")
 
         auto [x, v] = make_vars("x", "v");
 
-        nt_event<fp_t> ev(v, s11n_callback{}, kw::direction = event_direction::positive);
+        nt_event<fp_t> ev(v, s11n_callback{}, kw::direction = event_direction::positive, kw::cross_step = true);
 
         std::stringstream ss;
 
@@ -824,6 +839,29 @@ TEST_CASE("nt s11n")
         REQUIRE(ev.get_expression() == v);
         REQUIRE(ev.get_direction() == event_direction::positive);
         REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_callback));
+        REQUIRE(ev.get_cross_step());
+
+        // Round-trip also an event with the cross-step flag disabled, loading it into an event with the flag enabled.
+        ev = nt_event<fp_t>(v, s11n_callback{});
+
+        std::stringstream ss2;
+
+        {
+            boost::archive::binary_oarchive oa(ss2);
+
+            oa << ev;
+        }
+
+        ev = nt_event<fp_t>(v + x, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::cross_step = true);
+
+        {
+            boost::archive::binary_iarchive ia(ss2);
+
+            ia >> ev;
+        }
+
+        REQUIRE(ev.get_expression() == v);
+        REQUIRE(!ev.get_cross_step());
     };
 
     tuple_for_each(fixed_fp_types, tester);

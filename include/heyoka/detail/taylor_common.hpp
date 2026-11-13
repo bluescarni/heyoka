@@ -268,6 +268,20 @@ std::uint32_t tot_n_pars_in_ode_sys(const std::vector<std::pair<expression, expr
     return get_param_size(tot_func);
 }
 
+// Small helper to check if cross-step event detection should be skipped for a specific event.
+//
+// Used within the step() implementation of the Taylor integrators. edd is the event detection data structure. n_tes is
+// the total number of terminal events (assumed to be equal to edd.m_tes.size()). idx is the event index, under the
+// usual convention that terminal events are placed before non-terminal ones.
+bool taylor_skip_event_cross_step(const auto &edd, const auto n_tes, const auto idx)
+{
+    assert(n_tes == edd.m_tes.size());
+    assert(idx < n_tes || (idx - n_tes) < edd.m_ntes.size());
+
+    return (idx < n_tes && !edd.m_tes[idx].get_cross_step())
+           || (idx >= n_tes && !edd.m_ntes[idx - n_tes].get_cross_step());
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

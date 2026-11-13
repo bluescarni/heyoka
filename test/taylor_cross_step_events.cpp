@@ -29,8 +29,8 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 // A sign change across a step boundary caused by a callback: a ball bouncing on the floor at x = 0, with a terminal
-// event flipping the velocity. The non-terminal event v = 0 has no root within the steps around the bounce, but its sign
-// jumps from negative to positive at the step boundary, which must be reported as a crossing at the bounce time.
+// event flipping the velocity. The non-terminal event v = 0 has no root within the steps around the bounce, but its
+// sign jumps from negative to positive at the step boundary, which must be reported as a crossing at the bounce time.
 TEST_CASE("bounce")
 {
     using t_ev_t = taylor_adaptive<double>::t_event_t;
@@ -54,9 +54,10 @@ TEST_CASE("bounce")
                     t.get_state_data()[1] = -t.get_state()[1];
                     return true;
                 },
-            kw::direction = event_direction::negative)},
+            kw::direction = event_direction::negative, kw::cross_step = true)},
         kw::nt_events = {nt_ev_t(
-            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); })}};
+            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+            kw::cross_step = true)}};
 
     // NOTE: x(t) = 1 - t/2 - t**2/2 reaches the floor at t = 1, where v = -1.5. After the bounce v = 1.5, and the next
     // (genuine) root of v is at the apex, t = 2.5. We stop before it.
@@ -93,13 +94,15 @@ TEST_CASE("bounce backward")
                     t.get_state_data()[1] = -t.get_state()[1];
                     return true;
                 },
-            kw::direction = event_direction::positive)},
+            kw::direction = event_direction::positive, kw::cross_step = true)},
         kw::nt_events = {nt_ev_t(
-            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); })}};
+            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+            kw::cross_step = true)}};
 
-    // NOTE: x(t) = 1 + t/2 - t**2/2 reaches the floor at t = -1, where v = 1.5 (x increasing in time, hence the positive
-    // direction of the terminal event). After the bounce v = -1.5: as a function of time, v jumps upwards across the
-    // bounce, hence the expected direction +1. The next (genuine) root of v is at t = -2.5. We stop before it.
+    // NOTE: x(t) = 1 + t/2 - t**2/2 reaches the floor at t = -1, where v = 1.5 (x increasing in time, hence the
+    // positive direction of the terminal event). After the bounce v = -1.5: as a function of time, v jumps upwards
+    // across the bounce, hence the expected direction +1. The next (genuine) root of v is at t = -2.5. We stop before
+    // it.
     const auto oc = std::get<0>(ta.propagate_until(-2.));
 
     REQUIRE(oc == taylor_outcome::time_limit);
@@ -135,15 +138,17 @@ TEST_CASE("direction filter")
                                     t.get_state_data()[1] = -t.get_state()[1];
                                     return true;
                                 },
-                            kw::direction = event_direction::negative),
-                        t_ev_t(v, kw::direction = event_direction::negative)},
+                            kw::direction = event_direction::negative, kw::cross_step = true),
+                        t_ev_t(v, kw::direction = event_direction::negative, kw::cross_step = true)},
         kw::nt_events
         = {nt_ev_t(
-               v, [&pos_records](taylor_adaptive<double> &, double tm, int d_sgn) { pos_records.emplace_back(tm, d_sgn); },
-               kw::direction = event_direction::positive),
+               v,
+               [&pos_records](taylor_adaptive<double> &, double tm, int d_sgn) { pos_records.emplace_back(tm, d_sgn); },
+               kw::direction = event_direction::positive, kw::cross_step = true),
            nt_ev_t(
-               v, [&neg_records](taylor_adaptive<double> &, double tm, int d_sgn) { neg_records.emplace_back(tm, d_sgn); },
-               kw::direction = event_direction::negative)}};
+               v,
+               [&neg_records](taylor_adaptive<double> &, double tm, int d_sgn) { neg_records.emplace_back(tm, d_sgn); },
+               kw::direction = event_direction::negative, kw::cross_step = true)}};
 
     const auto oc = std::get<0>(ta.propagate_until(2.));
 
@@ -187,7 +192,8 @@ TEST_CASE("terminal cooldown filter")
                                         t.get_state_data()[1] = -t.get_state()[1];
                                         return true;
                                     },
-                                kw::direction = backward ? event_direction::positive : event_direction::negative),
+                                kw::direction = backward ? event_direction::positive : event_direction::negative,
+                                kw::cross_step = true),
                             t_ev_t(
                                 v,
                                 kw::callback =
@@ -195,7 +201,7 @@ TEST_CASE("terminal cooldown filter")
                                         v_records.emplace_back(t.get_time(), d_sgn);
                                         return true;
                                     },
-                                kw::cooldown = cd)}};
+                                kw::cooldown = cd, kw::cross_step = true)}};
 
         // NOTE: forward: x(t) = 1 + t - t**2/2. v has a genuine root at the apex, t = 1 (direction -1). The floor is
         // reached at t = 1 + sqrt(3), where v = -sqrt(3) jumps to sqrt(3) (direction +1). The next apex is at
@@ -241,7 +247,8 @@ TEST_CASE("null step")
         {prime(x) = v, prime(v) = -1_dbl},
         {0., -1.},
         kw::nt_events = {nt_ev_t(
-            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); })}};
+            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+            kw::cross_step = true)}};
 
     // First step: the sign of v at the end of the step is negative.
     REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -278,9 +285,10 @@ TEST_CASE("terminal event null step")
     auto ta = taylor_adaptive<double>{
         {prime(x) = v, prime(v) = -1_dbl},
         {1., -1.},
-        kw::t_events = {t_ev_t(x)},
+        kw::t_events = {t_ev_t(x, kw::cross_step = true)},
         kw::nt_events = {nt_ev_t(
-            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); })}};
+            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+            kw::cross_step = true)}};
 
     // First step: the signs of x and v at the end of the step are positive and negative respectively.
     REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -331,9 +339,9 @@ TEST_CASE("sign resets")
         auto ta = taylor_adaptive<double>{
             {prime(x) = v, prime(v) = -1_dbl},
             {0., -1.},
-            kw::nt_events = {nt_ev_t(v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) {
-                v_records.emplace_back(tm, d_sgn);
-            })}};
+            kw::nt_events = {nt_ev_t(
+                v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+                kw::cross_step = true)}};
 
         // First step: the sign of v at the end of the step is negative.
         REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -362,7 +370,8 @@ TEST_CASE("err_nf_state reset")
         {prime(x) = v, prime(v) = -1_dbl},
         {0., -1.},
         kw::nt_events = {nt_ev_t(
-            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); })}};
+            v, [&v_records](taylor_adaptive<double> &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+            kw::cross_step = true)}};
 
     // First step: the sign of v at the end of the step is negative.
     REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -390,33 +399,32 @@ TEST_CASE("copy and s11n")
     using t_ev_t = ta_t::t_event_t;
 
     // The copy methods.
-    const std::vector<std::function<ta_t(const ta_t &)>> copies
-        = {[](const ta_t &ta) { return ta_t(ta); },
-           [](const ta_t &ta) {
-               ta_t ret;
-               ret = ta;
-               return ret;
-           },
-           [](const ta_t &ta) {
-               std::stringstream ss;
-               {
-                   boost::archive::binary_oarchive oa(ss);
-                   oa << ta;
-               }
-               ta_t ret;
-               {
-                   boost::archive::binary_iarchive ia(ss);
-                   ia >> ret;
-               }
-               return ret;
-           }};
+    const std::vector<std::function<ta_t(const ta_t &)>> copies = {[](const ta_t &ta) { return ta_t(ta); },
+                                                                   [](const ta_t &ta) {
+                                                                       ta_t ret;
+                                                                       ret = ta;
+                                                                       return ret;
+                                                                   },
+                                                                   [](const ta_t &ta) {
+                                                                       std::stringstream ss;
+                                                                       {
+                                                                           boost::archive::binary_oarchive oa(ss);
+                                                                           oa << ta;
+                                                                       }
+                                                                       ta_t ret;
+                                                                       {
+                                                                           boost::archive::binary_iarchive ia(ss);
+                                                                           ia >> ret;
+                                                                       }
+                                                                       return ret;
+                                                                   }};
 
     for (const auto &copy : copies) {
         auto [x, v] = make_vars("x", "v");
 
         // NOTE: we use a terminal event without callback (so that it can be serialised), and we detect its trigger via
         // the outcome of the step.
-        auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl}, {0., -1.}, kw::t_events = {t_ev_t(v)}};
+        auto ta = ta_t{{prime(x) = v, prime(v) = -1_dbl}, {0., -1.}, kw::t_events = {t_ev_t(v, kw::cross_step = true)}};
 
         // First step: the sign of v at the end of the step is negative.
         REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -446,7 +454,7 @@ TEST_CASE("cooldown underflow")
     auto ta = ta_t{{prime(x) = expression{1.f}},
                    {-1e-44f},
                    kw::tol = 1e-20f,
-                   kw::t_events = {t_ev_t(expression{1e38f} * x)}};
+                   kw::t_events = {t_ev_t(expression{1e38f} * x, kw::cross_step = true)}};
 
     const auto [oc, h] = ta.step(1.f);
     REQUIRE(oc == taylor_outcome{-1});
@@ -485,9 +493,9 @@ TEST_CASE("sign update ival")
         auto ta = taylor_adaptive<double>{
             {prime(x) = 1_dbl},
             {-.5 * s},
-            kw::nt_events = {nt_ev_t(x, [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) {
-                x_records.emplace_back(tm, d_sgn);
-            })}};
+            kw::nt_events = {nt_ev_t(
+                x, [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) { x_records.emplace_back(tm, d_sgn); },
+                kw::cross_step = true)}};
 
         // First step: x crosses zero at t = 0.5 * s and its value at the end of the step is 0.5 * s.
         REQUIRE(std::get<0>(ta.step(s)) == taylor_outcome::time_limit);
@@ -525,13 +533,15 @@ TEST_CASE("sign update exact zero")
             std::vector<std::pair<double, int>> x_records;
 
             // NOTE: the terminal and non-terminal events have the same event function.
-            auto ta = taylor_adaptive<double>{
-                {prime(x) = 1_dbl},
-                {-s},
-                kw::t_events = {t_ev_t(x)},
-                kw::nt_events = {nt_ev_t(x, [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) {
-                    x_records.emplace_back(tm, d_sgn);
-                })}};
+            auto ta = taylor_adaptive<double>{{prime(x) = 1_dbl},
+                                              {-s},
+                                              kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                                              kw::nt_events = {nt_ev_t(
+                                                  x,
+                                                  [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) {
+                                                      x_records.emplace_back(tm, d_sgn);
+                                                  },
+                                                  kw::cross_step = true)}};
 
             // First step: the terminal event stops the integration exactly at the root of x, t = s. The root of the
             // non-terminal event is discarded, as it does not happen before the terminal event. The value of the
@@ -580,13 +590,15 @@ TEST_CASE("sign update exact nonzero")
 
             // NOTE: the root of the terminal event function, x - s * eps, is at t = s * (1 + eps), right after the root
             // of x at t = s.
-            auto ta = taylor_adaptive<double>{
-                {prime(x) = 1_dbl},
-                {-s},
-                kw::t_events = {t_ev_t(x - s * eps)},
-                kw::nt_events = {nt_ev_t(x, [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) {
-                    x_records.emplace_back(tm, d_sgn);
-                })}};
+            auto ta = taylor_adaptive<double>{{prime(x) = 1_dbl},
+                                              {-s},
+                                              kw::t_events = {t_ev_t(x - s * eps, kw::cross_step = true)},
+                                              kw::nt_events = {nt_ev_t(
+                                                  x,
+                                                  [&x_records](taylor_adaptive<double> &, double tm, int d_sgn) {
+                                                      x_records.emplace_back(tm, d_sgn);
+                                                  },
+                                                  kw::cross_step = true)}};
 
             // First step: the non-terminal event triggers at t = s, then the terminal event stops the integration at
             // t = s * (1 + eps). There, the value of x is s * eps: interval arithmetic cannot decide its sign, the
@@ -640,12 +652,14 @@ TEST_CASE("sign update overflow")
             std::vector<std::pair<double, int>> g_records;
 
             // NOTE: the event function is g = 1e308 * x, whose Taylor coefficients are -1e308 * s and 1e308.
-            auto ta = taylor_adaptive<double>{
-                {prime(x) = 1_dbl},
-                {-s},
-                kw::nt_events = {nt_ev_t(1e308 * x, [&g_records](taylor_adaptive<double> &, double tm, int d_sgn) {
-                    g_records.emplace_back(tm, d_sgn);
-                })}};
+            auto ta = taylor_adaptive<double>{{prime(x) = 1_dbl},
+                                              {-s},
+                                              kw::nt_events = {nt_ev_t(
+                                                  1e308 * x,
+                                                  [&g_records](taylor_adaptive<double> &, double tm, int d_sgn) {
+                                                      g_records.emplace_back(tm, d_sgn);
+                                                  },
+                                                  kw::cross_step = true)}};
 
             // First step: g triggers at t = s. At the end of the step, g = 1e308 * s, but the interval evaluation
             // overflows (1e308 * 2 > DBL_MAX) and the sign is computed by the exact evaluation.
@@ -692,14 +706,17 @@ TEST_CASE("sign reset from callback")
 
     auto ta = ta_t{{prime(v) = -1_dbl},
                    {-1.},
-                   kw::nt_events = {nt_ev_t(v,
-                                            [&v_records](ta_t &, double tm, int d_sgn) {
-                                                v_records.emplace_back(tm, d_sgn);
-                                            }),
-                                    nt_ev_t(v + 1.1, [&n_resets](ta_t &t, double, int) {
-                                        ++n_resets;
-                                        t.reset_event_signs();
-                                    })}};
+                   kw::nt_events
+                   = {nt_ev_t(
+                          v, [&v_records](ta_t &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+                          kw::cross_step = true),
+                      nt_ev_t(
+                          v + 1.1,
+                          [&n_resets](ta_t &t, double, int) {
+                              ++n_resets;
+                              t.reset_event_signs();
+                          },
+                          kw::cross_step = true)}};
 
     // First step: v + 1.1 crosses zero at t ~ 0.1, and its callback resets the stored signs. v stays negative.
     REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
@@ -726,9 +743,11 @@ TEST_CASE("consecutive propagations")
     // The (time, direction) records of the non-terminal event.
     std::vector<std::pair<double, int>> v_records;
 
-    auto ta = ta_t{{prime(v) = -1_dbl}, {-1.}, kw::nt_events = {nt_ev_t(v, [&v_records](ta_t &, double tm, int d_sgn) {
-                                                     v_records.emplace_back(tm, d_sgn);
-                                                 })}};
+    auto ta = ta_t{{prime(v) = -1_dbl},
+                   {-1.},
+                   kw::nt_events = {nt_ev_t(
+                       v, [&v_records](ta_t &, double tm, int d_sgn) { v_records.emplace_back(tm, d_sgn); },
+                       kw::cross_step = true)}};
 
     // First propagation: at the end, v is negative.
     REQUIRE(std::get<0>(ta.propagate_until(.5)) == taylor_outcome::time_limit);
@@ -762,10 +781,10 @@ TEST_CASE("fp types")
         // NOTE: the terminal and non-terminal events have the same event function.
         auto ta = ta_t{{prime(x) = 1_dbl},
                        {fp_t(-1)},
-                       kw::t_events = {t_ev_t(x)},
-                       kw::nt_events = {nt_ev_t(x, [&x_records](ta_t &, fp_t tm, int d_sgn) {
-                           x_records.emplace_back(tm, d_sgn);
-                       })}};
+                       kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                       kw::nt_events = {nt_ev_t(
+                           x, [&x_records](ta_t &, fp_t tm, int d_sgn) { x_records.emplace_back(tm, d_sgn); },
+                           kw::cross_step = true)}};
 
         // First step: the terminal event stops the integration exactly at the root of x, t = 1. The value of the
         // non-terminal event function at the end of the step is exactly zero.
@@ -804,7 +823,8 @@ TEST_CASE("real")
 
         // Sign update via interval arithmetic.
         {
-            auto ta = ta_t{{prime(x) = 1_dbl}, {fp_t(-.5, prec)}, kw::nt_events = {nt_ev_t(x, rec_cb)}};
+            auto ta = ta_t{
+                {prime(x) = 1_dbl}, {fp_t(-.5, prec)}, kw::nt_events = {nt_ev_t(x, rec_cb, kw::cross_step = true)}};
 
             // First step: x crosses zero at t = 0.5 and its value at the end of the step is 0.5.
             REQUIRE(std::get<0>(ta.step(fp_t(1, prec))) == taylor_outcome::time_limit);
@@ -829,8 +849,10 @@ TEST_CASE("real")
         // Sign update via exact arithmetic.
         {
             // NOTE: the terminal and non-terminal events have the same event function.
-            auto ta = ta_t{
-                {prime(x) = 1_dbl}, {fp_t(-1, prec)}, kw::t_events = {t_ev_t(x)}, kw::nt_events = {nt_ev_t(x, rec_cb)}};
+            auto ta = ta_t{{prime(x) = 1_dbl},
+                           {fp_t(-1, prec)},
+                           kw::t_events = {t_ev_t(x, kw::cross_step = true)},
+                           kw::nt_events = {nt_ev_t(x, rec_cb, kw::cross_step = true)}};
 
             // First step: the terminal event stops the integration exactly at the root of x, t = 1. The value of the
             // non-terminal event function at the end of the step is exactly zero.
@@ -876,10 +898,12 @@ TEST_CASE("zero polynomial")
         auto ta = ta_t{{prime(x) = 0_dbl},
                        {0.},
                        kw::nt_events
-                       = {nt_ev_t(x, [&any_records](ta_t &, double tm, int d_sgn) { any_records.emplace_back(tm, d_sgn); }),
+                       = {nt_ev_t(
+                              x, [&any_records](ta_t &, double tm, int d_sgn) { any_records.emplace_back(tm, d_sgn); },
+                              kw::cross_step = true),
                           nt_ev_t(
                               x, [&pos_records](ta_t &, double tm, int d_sgn) { pos_records.emplace_back(tm, d_sgn); },
-                              kw::direction = event_direction::positive)}};
+                              kw::direction = event_direction::positive, kw::cross_step = true)}};
 
         // Two steps: a root with zero direction is reported at the beginning of each step (and filtered out by the
         // event with positive direction). No cross-step event is reported.
@@ -909,10 +933,14 @@ TEST_CASE("zero polynomial")
 
         auto ta = ta_t{{prime(x) = 0_dbl},
                        {0.},
-                       kw::t_events = {t_ev_t(x, kw::callback = [&trigger_times](ta_t &t, int) {
-                                           trigger_times.push_back(t.get_time());
-                                           return true;
-                                       })}};
+                       kw::t_events = {t_ev_t(
+                           x,
+                           kw::callback =
+                               [&trigger_times](ta_t &t, int) {
+                                   trigger_times.push_back(t.get_time());
+                                   return true;
+                               },
+                           kw::cross_step = true)}};
 
         // First step: the terminal event triggers at the beginning of the step.
         const auto [oc, h] = ta.step(.25);
@@ -948,7 +976,7 @@ TEST_CASE("zero polynomial")
                                    trigger_times.push_back(t.get_time());
                                    return true;
                                },
-                           kw::cooldown = .3)}};
+                           kw::cooldown = .3, kw::cross_step = true)}};
 
         // The terminal event triggers at the beginning of a step (with a zero timestep) whenever it is not on cooldown.
         // After each trigger, the cooldown of 0.3 lasts for two steps of size 0.25.
@@ -958,5 +986,61 @@ TEST_CASE("zero polynomial")
             REQUIRE(ta.step(.25) == std::tuple{taylor_outcome::time_limit, .25});
         }
         REQUIRE(trigger_times == std::vector<double>{0., .5});
+    }
+}
+
+// Cross-step detection is opt-in: events constructed without the cross-step flag do not report jumps across step
+// boundaries.
+TEST_CASE("opt in")
+{
+    using ta_t = taylor_adaptive<double>;
+    using t_ev_t = ta_t::t_event_t;
+    using nt_ev_t = ta_t::nt_event_t;
+    using rec_t = std::vector<std::pair<double, int>>;
+
+    // Non-terminal events: two events on v, only the second one with the cross-step flag.
+    {
+        auto v = make_vars("v");
+
+        // The (time, direction) records of the non-terminal events.
+        rec_t def_records, cs_records;
+
+        auto ta = ta_t{{prime(v) = -1_dbl},
+                       {-1.},
+                       kw::nt_events
+                       = {nt_ev_t(v, [&def_records](ta_t &, double tm, int d_sgn) { def_records.emplace_back(tm, d_sgn); }),
+                          nt_ev_t(
+                              v, [&cs_records](ta_t &, double tm, int d_sgn) { cs_records.emplace_back(tm, d_sgn); },
+                              kw::cross_step = true)}};
+
+        // First step: the sign of v at the end of the step is negative.
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+
+        // Jump of v through zero.
+        ta.get_state_data()[0] = 1.;
+
+        // Second step: the jump is reported only by the event with the cross-step flag. v does not cross zero within
+        // the step.
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+        REQUIRE(def_records.empty());
+        REQUIRE(cs_records == rec_t{{.25, 1}});
+    }
+
+    // Terminal events: two events on v without callback, only the second one with the cross-step flag.
+    {
+        auto v = make_vars("v");
+
+        auto ta = ta_t{{prime(v) = -1_dbl}, {-1.}, kw::t_events = {t_ev_t(v), t_ev_t(v, kw::cross_step = true)}};
+
+        // First step: the sign of v at the end of the step is negative.
+        REQUIRE(std::get<0>(ta.step(.25)) == taylor_outcome::time_limit);
+
+        // Jump of v through zero.
+        ta.get_state_data()[0] = 1.;
+
+        // Second step: only the second event triggers at the beginning of the step.
+        //
+        // NOTE: if both events triggered, the one with the lowest index would take precedence.
+        REQUIRE(ta.step(.25) == std::tuple{taylor_outcome{-2}, 0.});
     }
 }

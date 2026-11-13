@@ -14,6 +14,8 @@
 
 #include <boost/core/demangle.hpp>
 
+#include <fmt/core.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -78,14 +80,23 @@ void nt_event_impl<T, B>::save(boost::archive::binary_oarchive &ar, unsigned) co
     ar << eq;
     ar << callback;
     ar << dir;
+    ar << cross_step;
 }
 
 template <typename T, bool B>
-void nt_event_impl<T, B>::load(boost::archive::binary_iarchive &ar, unsigned)
+void nt_event_impl<T, B>::load(boost::archive::binary_iarchive &ar, const unsigned version)
 {
+    if (version < static_cast<unsigned>(boost::serialization::version<nt_event_impl>::type::value)) [[unlikely]] {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Unable to load a non-terminal event object: the archive version ({}) is too old", version));
+        // LCOV_EXCL_STOP
+    }
+
     ar >> eq;
     ar >> callback;
     ar >> dir;
+    ar >> cross_step;
 }
 
 template <typename T, bool B>
@@ -94,17 +105,18 @@ nt_event_impl<T, B>::nt_event_impl() : nt_event_impl(expression{}, nt_event_def_
 }
 
 template <typename T, bool B>
-void nt_event_impl<T, B>::finalise_ctor(event_direction d)
+void nt_event_impl<T, B>::finalise_ctor(const event_direction d, const bool cstep)
 {
-    if (!callback) {
+    if (!callback) [[unlikely]] {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
     }
 
-    if (d < event_direction::negative || d > event_direction::positive) {
+    if (d < event_direction::negative || d > event_direction::positive) [[unlikely]] {
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
     }
 
     dir = d;
+    cross_step = cstep;
 }
 
 template <typename T, bool B>
@@ -153,6 +165,12 @@ event_direction nt_event_impl<T, B>::get_direction() const noexcept
     return dir;
 }
 
+template <typename T, bool B>
+bool nt_event_impl<T, B>::get_cross_step() const noexcept
+{
+    return cross_step;
+}
+
 // Implementation of stream insertion for the non-terminal event class.
 template <typename T, bool B>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &ev)
@@ -161,6 +179,7 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &ev)
     os << "Event type     : non-terminal\n";
     os << "Event equation : " << ev.get_expression() << '\n';
     os << "Event direction: " << ev.get_direction() << '\n';
+    os << "Cross step     : " << (ev.get_cross_step() ? "yes" : "no") << '\n';
 
     return os;
 }

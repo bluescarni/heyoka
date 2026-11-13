@@ -43,8 +43,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Common descriptor used in the validation of keyword arguments for both terminal and non-terminal events.
+// Common descriptors used in the validation of keyword arguments for both terminal and non-terminal events.
 inline constexpr auto event_direction_descr = kw::descr::same_as<kw::direction, event_direction>;
+inline constexpr auto cross_step_descr = kw::descr::same_as<kw::cross_step, bool>;
 
 // Metaprogramming for selecting the callback type for t_event_impl.
 template <typename T, bool B>
@@ -68,6 +69,7 @@ private:
     callback_t callback;
     std::optional<T> cooldown;
     event_direction dir = event_direction::any;
+    bool cross_step = false;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -77,7 +79,7 @@ private:
 
     // Private implementation-detail ctor.
     struct ptag {};
-    explicit t_event_impl(ptag, std::tuple<expression, callback_t, std::optional<T>, event_direction>);
+    explicit t_event_impl(ptag, std::tuple<expression, callback_t, std::optional<T>, event_direction, bool>);
 
     // Parser for the kwargs.
     template <typename... KwArgs>
@@ -100,12 +102,16 @@ private:
         // Direction (defaults to any).
         const auto d = p(kw::direction, event_direction::any);
 
-        return std::make_tuple(std::move(e), std::move(cb), std::move(cd_opt), d);
+        // Cross-step flag (defaults to false).
+        const auto cstep = p(kw::cross_step, false);
+
+        return std::make_tuple(std::move(e), std::move(cb), std::move(cd_opt), d, cstep);
     }
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg = igor::config<kw::descr::convertible_to<kw::callback, callback_t>,
-                                                kw::descr::optional_from<T, kw::cooldown>, event_direction_descr>{};
+    static constexpr auto kw_cfg
+        = igor::config<kw::descr::convertible_to<kw::callback, callback_t>, kw::descr::optional_from<T, kw::cooldown>,
+                       event_direction_descr, cross_step_descr>{};
 
 public:
     t_event_impl();
@@ -132,6 +138,7 @@ public:
     [[nodiscard]] const callback_t &get_callback() const noexcept;
     [[nodiscard]] event_direction get_direction() const noexcept;
     [[nodiscard]] const std::optional<T> &get_cooldown() const noexcept;
+    [[nodiscard]] bool get_cross_step() const noexcept;
 };
 
 // Metaprogramming for selecting the callback type for nt_event_impl.
@@ -155,6 +162,7 @@ private:
     expression eq;
     callback_t callback;
     event_direction dir = event_direction::any;
+    bool cross_step = false;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -162,10 +170,10 @@ private:
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    void finalise_ctor(event_direction);
+    void finalise_ctor(event_direction, bool);
 
     // Configuration for the keyword arguments.
-    static constexpr auto kw_cfg = igor::config<event_direction_descr>{};
+    static constexpr auto kw_cfg = igor::config<event_direction_descr, cross_step_descr>{};
 
 public:
     nt_event_impl();
@@ -180,7 +188,10 @@ public:
         // Direction (defaults to any).
         const auto d = p(kw::direction, event_direction::any);
 
-        finalise_ctor(d);
+        // Cross-step flag (defaults to false).
+        const auto cstep = p(kw::cross_step, false);
+
+        finalise_ctor(d, cstep);
     }
 
     nt_event_impl(const nt_event_impl &);
@@ -195,6 +206,7 @@ public:
     [[nodiscard]] callback_t &get_callback() noexcept;
     [[nodiscard]] const callback_t &get_callback() const noexcept;
     [[nodiscard]] event_direction get_direction() const noexcept;
+    [[nodiscard]] bool get_cross_step() const noexcept;
 };
 
 template <typename T, bool B>
@@ -205,8 +217,13 @@ std::ostream &operator<<(std::ostream &, const t_event_impl<T, B> &);
 
 // Boost s11n class version history for t_event_impl:
 //
-// - 1: the cooldown is now stored in a std::optional.
+// - 1: the cooldown is now stored in a std::optional, added the cross_step option.
 inline constexpr int t_event_impl_s11n_version = 1;
+
+// Boost s11n class version history for nt_event_impl:
+//
+// - 1: added the cross_step option.
+inline constexpr int nt_event_impl_s11n_version = 1;
 
 } // namespace detail
 
@@ -235,27 +252,30 @@ struct formatter<heyoka::event_direction> : fmt::ostream_formatter {};
 
 } // namespace fmt
 
-#define HEYOKA_T_EVENT_IMPL_CLASS_VERSION(T)                                                                           \
+#define HEYOKA_EVENT_IMPL_CLASS_VERSION(T)                                                                             \
     BOOST_CLASS_VERSION(heyoka::t_event<T>, heyoka::detail::t_event_impl_s11n_version);                                \
-    BOOST_CLASS_VERSION(heyoka::t_event_batch<T>, heyoka::detail::t_event_impl_s11n_version);
+    BOOST_CLASS_VERSION(heyoka::t_event_batch<T>, heyoka::detail::t_event_impl_s11n_version);                          \
+    BOOST_CLASS_VERSION(heyoka::nt_event<T>, heyoka::detail::nt_event_impl_s11n_version);                              \
+    BOOST_CLASS_VERSION(heyoka::nt_event_batch<T>, heyoka::detail::nt_event_impl_s11n_version);
 
-HEYOKA_T_EVENT_IMPL_CLASS_VERSION(float)
-HEYOKA_T_EVENT_IMPL_CLASS_VERSION(double)
+HEYOKA_EVENT_IMPL_CLASS_VERSION(float)
+HEYOKA_EVENT_IMPL_CLASS_VERSION(double)
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-HEYOKA_T_EVENT_IMPL_CLASS_VERSION(long double)
+HEYOKA_EVENT_IMPL_CLASS_VERSION(long double)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_T_EVENT_IMPL_CLASS_VERSION(mppp::real128)
+HEYOKA_EVENT_IMPL_CLASS_VERSION(mppp::real128)
 
 #endif
 
 BOOST_CLASS_VERSION(heyoka::t_event<mppp::real>, heyoka::detail::t_event_impl_s11n_version);
+BOOST_CLASS_VERSION(heyoka::nt_event<mppp::real>, heyoka::detail::nt_event_impl_s11n_version);
 
-#undef HEYOKA_T_EVENT_IMPL_CLASS_VERSION
+#undef HEYOKA_EVENT_IMPL_CLASS_VERSION
 
 #endif
