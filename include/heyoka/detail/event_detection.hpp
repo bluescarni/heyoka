@@ -9,8 +9,6 @@
 #ifndef HEYOKA_DETAIL_EVENT_DETECTION_HPP
 #define HEYOKA_DETAIL_EVENT_DETECTION_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -19,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
