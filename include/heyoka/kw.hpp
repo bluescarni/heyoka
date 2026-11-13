@@ -54,6 +54,7 @@ IGOR_MAKE_NAMED_ARGUMENT(nt_events);
 IGOR_MAKE_NAMED_ARGUMENT(callback);
 IGOR_MAKE_NAMED_ARGUMENT(cooldown);
 IGOR_MAKE_NAMED_ARGUMENT(direction);
+IGOR_MAKE_NAMED_ARGUMENT(cross_step);
 // NOTE: these are used in the
 // propagate_*() functions.
 IGOR_MAKE_NAMED_ARGUMENT(max_steps);

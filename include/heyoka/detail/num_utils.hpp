@@ -9,10 +9,8 @@
 #ifndef HEYOKA_DETAIL_NUM_UTILS_HPP
 #define HEYOKA_DETAIL_NUM_UTILS_HPP
 
-// This header contains function that allow to treat number-like
-// entities in a uniform way, even when the number-like entity might have
-// extra properties in addition to its numerical value (e.g., the precision
-// in case of mppp::real).
+// This header contains function that allow to treat number-like entities in a uniform way, even when the number-like
+// entity might have extra properties in addition to its numerical value (e.g., the precision in case of mppp::real).
 
 #include <heyoka/config.hpp>
 
@@ -32,6 +30,17 @@ T num_eps_like(const T &);
 
 template <typename T>
 T num_inf_like(const T &);
+
+// NOTE: helpers to compute the next/previous representable floating-point numbers.
+template <typename T>
+T num_nextup(T);
+
+template <typename T>
+T num_nextdown(T);
+
+// Small helper to divide an input value by 2.
+template <typename T>
+T num_div_2(T);
 
 } // namespace detail
 

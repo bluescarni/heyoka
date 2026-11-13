@@ -38,6 +38,8 @@
 
 #include <fmt/core.h>
 
+#include <mp++/rational.hpp>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -575,18 +577,22 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
             m_batch_size, new_time.size()));
     }
 
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
+
     // Copy over the new times.
-    // NOTE: do not use std::copy(), as it gives UB if new_time
-    // and m_time_hi are the same object.
+    //
+    // NOTE: do not use std::copy(), as it gives UB if new_time and m_time_hi are the same object.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_time_hi[i] = new_time[i];
     }
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
+    std::ranges::fill(m_time_lo, static_cast<T>(0));
 }
 
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::set_time(T new_time)
+void taylor_adaptive_batch<T>::set_time(const T new_time)
 {
     // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
     // time keeping logic in the propagate_*() functions.
@@ -595,10 +601,14 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
 
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
+
     // Set the hi part.
-    std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
+    std::ranges::fill(m_time_hi, new_time);
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
+    std::ranges::fill(m_time_lo, static_cast<T>(0));
 }
 
 template <supported_batch_fp_type T>
@@ -621,13 +631,17 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
     }
 
     // Check the values in hi/lo.
+    //
     // NOTE: do it before ever touching m_time_hi/lo for exception safety.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         detail::dtime_checks(hi[i], lo[i]);
     }
 
-    // Copy over the new times, ensuring proper
-    // normalisation.
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
+
+    // Copy over the new times, ensuring proper normalisation.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         const auto tmp = normalise(detail::dfloat<T>(hi[i], lo[i]));
 
@@ -637,7 +651,7 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
 }
 
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
+void taylor_adaptive_batch<T>::set_dtime(const T hi, const T lo)
 {
     // NOTE: the time cannot be changed if the integrator is stepping/propagating as this would mess up the internal
     // time keeping logic in the propagate_*() functions.
@@ -649,12 +663,273 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
     // Check the components.
     detail::dtime_checks(hi, lo);
 
-    // Copy over the new time, ensuring proper
-    // normalisation.
+    // Reset the cooldowns and the event signs.
+    reset_cooldowns();
+    reset_event_signs();
+
+    // Copy over the new time, ensuring proper normalisation.
     const auto tmp = normalise(detail::dfloat<T>(hi, lo));
-    std::fill(m_time_hi.begin(), m_time_hi.end(), tmp.hi);
-    std::fill(m_time_lo.begin(), m_time_lo.end(), tmp.lo);
+    std::ranges::fill(m_time_hi, tmp.hi);
+    std::ranges::fill(m_time_lo, tmp.lo);
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// Helper to perform event detection across steps.
+//
+// See taylor_adaptive_detect_cross_step_events() for an explanation of cross-step events. This is the batch version of
+// the same code.
+//
+// 'delta_ts' contains, in its first batch_size elements and for each batch lane, the timestep that was used (before any
+// clamping by terminal events). 'edd' is the ed_data_batch instance for the integrator. 'ev_begin' is the index in
+// edd.m_ev_jet where the Taylor coefficients for the event functions begin. 'order' is the order of the Taylor series.
+// 'batch_size' is the batch size. 'tot_n_events' is the total number of events.
+//
+// This function will record in edd cross-step events, adding them to the results of in-step event detection (which is
+// assumed to have already taken place). Cross-step detection is performed only for the events whose cross-step flag is
+// enabled.
+//
+// NOTE: the inner loops of this function could be in principle shared with taylor_adaptive_detect_cross_step_events()
+// in order to avoid duplication. Not clear at this time how much this would save. Keep it in mind for future potential
+// refactors.
+void taylor_adaptive_batch_detect_cross_step_events(const auto &delta_ts, auto &edd, const auto ev_begin,
+                                                    const auto order, const auto batch_size, const auto tot_n_events)
+{
+    using std::abs;
+
+    assert(batch_size > 0u);
+
+    // Cache the number of terminal events.
+    const auto n_tes = edd.m_tes.size();
+
+    // Fetch several members from edd.
+    const auto &ev_signs_end_step = edd.m_ev_signs_end_step;
+    const auto &ed_finite = edd.m_ed_finite;
+
+    for (std::uint32_t batch_idx = 0; batch_idx != batch_size; ++batch_idx) {
+        // NOTE: skip lanes with non-finite input data for event detection (in-step event detection for such lanes did
+        // not take place anyway).
+        if (!ed_finite[batch_idx]) [[unlikely]] {
+            continue;
+        }
+
+        // Fetch the timestep that was used for the current lane (before any clamping by terminal events).
+        const auto h = delta_ts[batch_idx];
+
+        if (h == 0) {
+            // Nothing to do if h is zero. In such case, no event detection must take place.
+            continue;
+        }
+
+        // Compute the integration direction.
+        const auto forward = (h > 0);
+
+        // Iterate over all the events for the current lane.
+        for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+            // Check whether cross-step tracking is enabled for the current event. If it is not, continue to the next
+            // event.
+            if (taylor_skip_event_cross_step(edd, n_tes, ev_idx)) {
+                continue;
+            }
+
+            using enum event_sign_end_step;
+
+            // Fetch the previous sign.
+            const auto prev_sign = ev_signs_end_step[ev_idx * batch_size + batch_idx];
+            if (prev_sign == unknown) {
+                // The previous sign is unknown, there's nothing we can do.
+                continue;
+            }
+
+            // Fetch the constant coefficient of the current Taylor series of the event. This gives us exactly the sign
+            // of the Taylor series of the event function at the beginning of the step.
+            const auto cf0_idx = ev_begin + ev_idx * (order + 1u) * batch_size + batch_idx;
+            const auto &cf0 = edd.m_ev_jet[cf0_idx];
+            if (cf0 == 0) {
+                // NOTE: if the event function is zero at the beginning of the step, the root at t = 0 has been handled
+                // already by detect_events(). No need to report it here.
+                continue;
+            }
+
+            // NOTE: see taylor_adaptive_detect_cross_step_events() for an explanation of the sign change checking
+            // logic.
+            const auto positive_cf0 = (cf0 > 0);
+            if ((prev_sign == zero) || (positive_cf0 != (prev_sign == positive))) {
+                // Sign change detected. The event is reported at the beginning of the step (t = 0). Its direction is
+                // the sign of cf0, flipped when integrating backwards in time.
+                const auto d_sgn = (positive_cf0 == forward) ? 1 : -1;
+
+                // NOTE: ev_idx and the event indices fit in 32-bit unsigned ints (see the size checks in the
+                // constructor of ed_data_batch).
+                if (ev_idx < n_tes) {
+                    // Terminal event.
+                    if (const auto &cd = edd.m_te_cooldowns[batch_idx][ev_idx]) {
+                        // The terminal event is on cooldown. Compute the absolute value of the remaining cooldown time
+                        // at the trigger time (i.e., beginning of the step).
+                        const auto lb = forward ? (cd->second - cd->first) : (cd->second + cd->first);
+
+                        // NOTE: the event is meant to be added at the beginning of the step, if there's cooldown time
+                        // remaining we must skip it. This mirrors the [0, lb) exclusion applied to roots by
+                        // detect_events().
+                        if (lb > 0) {
+                            continue;
+                        }
+                    }
+
+                    // Fetch and check the direction.
+                    const auto dir = edd.m_tes[ev_idx].get_direction();
+                    if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
+                        // NOTE: the derivative of the event function at t = 0 is the order-1 Taylor coefficient. It is
+                        // needed for the automatic deduction of the cooldown.
+                        edd.m_d_tes[batch_idx].emplace_back(static_cast<std::uint32_t>(ev_idx), 0, d_sgn,
+                                                            abs(edd.m_ev_jet[cf0_idx + batch_size]));
+                    }
+                } else {
+                    // Non-terminal event.
+                    const auto nte_idx = ev_idx - n_tes;
+
+                    // Fetch and check the direction.
+                    const auto dir = edd.m_ntes[nte_idx].get_direction();
+                    if (dir == event_direction::any || static_cast<event_direction>(d_sgn) == dir) {
+                        edd.m_d_ntes[batch_idx].emplace_back(static_cast<std::uint32_t>(nte_idx), 0, d_sgn);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Helper to update the signs of the Taylor series of the event functions at the end of an integration step.
+//
+// See the explanation in taylor_adaptive_update_ev_signs_end_step(). This is the batch version of the same code.
+//
+// 'h' is the (signed) timestep size for the current lane (positive for forward integration, negative for backward
+// integration). 'edd' is the ed_data_batch instance for the integrator. 'ev_begin' is the index in edd.m_ev_jet where
+// the Taylor coefficients for the event functions begin. 'order' is the order of the Taylor series. 'batch_idx' is the
+// index of the current lane. 'batch_size' is the total number of lanes. 'tot_n_events' is the total number of events.
+//
+// This function will update for the current lane the m_ev_signs_end_step member in edd with the signs of the Taylor
+// series of the event functions at the end of the step. For h == 0, the signs are left unchanged. The function must be
+// called after event detection ran on finite inputs for the current lane (i.e., the lane did not end up in
+// err_nf_state), and after h was possibly clamped by a terminal event.
+//
+// Cross-step sign tracking is enabled only for events whose cross-step flag is enabled. The signs of the other events
+// are left untouched (i.e., unknown).
+//
+// NOTE: some of the code of this function could be in principle shared with taylor_adaptive_update_ev_signs_end_step()
+// in order to avoid duplication. Not clear at this time how much this would save. Keep it in mind for future potential
+// refactors.
+template <typename T>
+void taylor_adaptive_batch_update_ev_signs_end_step(const T &h, auto &edd, const auto ev_begin, const auto order,
+                                                    const auto batch_idx, const auto batch_size,
+                                                    const auto tot_n_events)
+{
+    assert(batch_idx < batch_size);
+
+    if (h == 0) {
+        // h == 0 means we took a zero step for the current lane (either because the user or the automatic timestep
+        // deduction produced a value of 0, or because a terminal event triggered exactly at the beginning of the
+        // timestep). In such case, the signs of the event functions remain unchanged.
+        return;
+    }
+
+    auto &ev_signs_end_step = edd.m_ev_signs_end_step;
+    const auto &ev_fex_check_res = edd.m_ev_fex_check_res;
+
+    // Cache the number of terminal events.
+    const auto n_tes = edd.m_tes.size();
+
+    for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+        // Check whether cross-step tracking is enabled for the current event. If it is not, continue to the next event.
+        if (taylor_skip_event_cross_step(edd, n_tes, ev_idx)) {
+            continue;
+        }
+
+        using enum event_sign_end_step;
+
+        // Fetch a span over the Taylor coefficients for the current event for *all* lanes (not just the current one).
+        const auto cfs_span = std::span<const T>{
+            edd.m_ev_jet.data() + ev_begin + ev_idx * (order + 1u) * batch_size,
+            boost::numeric_cast<std::size_t>((order + 1u) * batch_size),
+        };
+
+        // Compute the flattened event index - we use this to read from ev_fex_check_res and write into
+        // ev_signs_end_step for the current lane.
+        const auto flat_ev_idx = ev_idx * batch_size + batch_idx;
+
+        // NOTE: h != 0 here implies that ev_fex_check_res was filled in by detect_events(), so we are sure we are
+        // working with up-to-date values.
+        if (ev_fex_check_res[flat_ev_idx]) {
+            // The happy path: the fast exclusion check in the current lane passed for the current event, thus the event
+            // function has no roots in the (possibly clamped) timestep (endpoint h included). The sign at the end of
+            // the step is simply the sign at the beginning of the step, which is given exactly by the constant
+            // coefficient of the Taylor polynomial (guaranteed to be nonzero, otherwise the fast exclusion check would
+            // have not passed).
+            //
+            // NOTE: this is a mathematically-certified sign.
+            const auto &cf0 = cfs_span[batch_idx];
+            assert(cf0 != 0);
+            ev_signs_end_step[flat_ev_idx] = (cf0 > 0) ? positive : negative;
+            continue;
+        }
+
+        // NOTE: if a terminal event triggered, it is the first element of edd.m_d_tes for the current lane and h has
+        // been clamped to its trigger time. Terminal events come first in ev_signs_end_step, hence their indices
+        // coincide.
+        if (!edd.m_d_tes[batch_idx].empty() && ev_idx == std::get<0>(edd.m_d_tes[batch_idx][0])) {
+            // The terminal event that ended the step for the current lane. We consider the event function to be zero at
+            // the end of the step. Note that this is not necessarily mathematically correct as the location of the root
+            // itself is not certified. Nevertheless, we accept the fuzziness on the root location (like we do elsewhere
+            // in the code) and setting zero here keeps things logically consistent with the event detection that just
+            // took place.
+            //
+            // NOTE: setting this to zero will very likely trigger another detection when the integrator resumes in the
+            // next step. We are relying on the (nonzero) cooldown mechanism to ignore the second detection.
+            ev_signs_end_step[flat_ev_idx] = zero;
+            continue;
+        }
+
+        // As a last resort, we rigorously evaluate the Taylor series at the end of the step.
+        //
+        // First, we try with interval arithmetic.
+        //
+        // NOTE: we can replace ed_poly_eval_sign_ival() with a JIT-compiled implementation for performance, if
+        // necessary.
+        if (const auto sign_end_ival = ed_poly_eval_sign_ival(cfs_span, h, boost::numeric_cast<std::size_t>(batch_idx),
+                                                              boost::numeric_cast<std::size_t>(batch_size))) {
+            assert(*sign_end_ival == 1 || *sign_end_ival == -1);
+            ev_signs_end_step[flat_ev_idx] = static_cast<event_sign_end_step>(*sign_end_ival);
+            continue;
+        }
+
+        // Interval arithmetic could not determine the sign: evaluate the Taylor series exactly in rational arithmetic.
+        //
+        // NOTE: the conversion of a finite floating-point value to a rational is exact. The conversions must be
+        // explicit, because mixed operations between rationals and floating-point values produce floating-point
+        // results.
+        using rat_t = mppp::rational<1>;
+        const auto h_rat = static_cast<rat_t>(h);
+
+        // Small helper to fetch the coefficient of the given input degree from cfs for the current lane.
+        const auto fetch_cf
+            = [&](const auto degree) -> const T & { return cfs_span[(degree * batch_size) + batch_idx]; };
+
+        auto acc = static_cast<rat_t>(fetch_cf(order));
+        for (auto i = order; i > 0u; --i) {
+            acc *= h_rat;
+            acc += static_cast<rat_t>(fetch_cf(i - 1u));
+        }
+        ev_signs_end_step[flat_ev_idx] = static_cast<event_sign_end_step>(mppp::sgn(acc));
+    }
+}
+
+} // namespace
+
+} // namespace detail
 
 // Implementation detail to make a single integration timestep.
 //
@@ -694,7 +969,7 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 //   Taylor coefficients being recorded in the internal array (if wtc == true, or always in the presence of events).
 //   That is, h == 0 is not treated in any special way.
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, const bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -793,6 +1068,11 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
         auto &edd = *m_ed_data;
 
+        // Fetch a reference to m_ev_signs_end_step and compute the total number of events (terminal and non-terminal).
+        auto &ev_signs_end_step = edd.m_ev_signs_end_step;
+        assert(ev_signs_end_step.size() % m_batch_size == 0u);
+        const auto tot_n_events = ev_signs_end_step.size() / m_batch_size;
+
         // Fetch the vector to store the callback exceptions.
         auto &cb_eptrs = edd.m_cb_eptrs;
 
@@ -858,7 +1138,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // NOTE: event detection requires a finite h, a finite g_eps and finite Taylor coefficients for the event
         // functions.
         //
-        // NOTE: this is the index in m_ev_jet where the Taylor coefficients for the event functions begin.
+        // NOTE: ev_begin is the index in edd.m_ev_jet where the Taylor coefficients for the event functions begin. It
+        // is computed in at least 32-bit unsigned arithmetic. edd.m_ev_jet's size is guaranteed to fit in 32-bit
+        // unsigned ints, hence no overflow/wraparound is possible.
         const auto ev_begin = m_dim * (m_order + 1u) * m_batch_size;
 
         // The total number of batches of Taylor coefficients for the event functions.
@@ -876,8 +1158,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             ed_finite[i] = flag;
         }
 
-        // Do the event detection.
+        // Do the in-step event detection.
         edd.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
+
+        // Do the cross-step event detection.
+        detail::taylor_adaptive_batch_detect_cross_step_events(m_delta_ts, edd, ev_begin, m_order, m_batch_size,
+                                                               tot_n_events);
 
         // NOTE: before this point, we did not alter any user-visible data in the integrator (just temporary memory).
         // From here until we start invoking the callbacks, everything is noexcept, so we don't risk leaving the
@@ -901,7 +1187,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // guarantees that the event with the lowest index takes precedence.
             if (!edd.m_d_tes[i].empty()) {
                 const auto earliest_it = std::ranges::min_element(edd.m_d_tes[i], detail::taylor_ev_cmp);
-                std::iter_swap(earliest_it, edd.m_d_tes[i].begin());
+                std::ranges::iter_swap(earliest_it, edd.m_d_tes[i].begin());
             }
 
             // For non-terminal events, we want to sort the detected events and remove duplicates.
@@ -928,7 +1214,8 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
         // Update the time, store the last timestep, and run the finiteness checks. If the finiteness checks pass, also
-        // update the cooldowns, otherwise set m_step_res to err_nf_state.
+        // update the cooldowns and the event signs at step end, otherwise set m_step_res to err_nf_state and reset the
+        // event signs at step end to unknown.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // Fetch the timestep that was used for the current lane.
             const auto cur_h = m_delta_ts[i];
@@ -952,6 +1239,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             if (cur_nf_detected) [[unlikely]] {
                 // Non-finite values detected, set the outcome to err_nf_state.
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, cur_h};
+
+                // Make also sure to reset m_ev_signs_end_step for the current lane to unknown - we cannot claim
+                // anything about the signs of the event functions.
+                for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+                    ev_signs_end_step[ev_idx * m_batch_size + i] = detail::event_sign_end_step::unknown;
+                }
             } else {
                 // Update the cooldowns.
                 for (auto &cd : edd.m_te_cooldowns[i]) {
@@ -968,6 +1261,10 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                         }
                     }
                 }
+
+                // Update the signs of the event functions at the end of the step.
+                detail::taylor_adaptive_batch_update_ev_signs_end_step(cur_h, edd, ev_begin, m_order, i, m_batch_size,
+                                                                       tot_n_events);
             }
         }
 
@@ -1039,9 +1336,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 auto &te = edd.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
-                if (te.get_cooldown() >= 0) {
+                if (const auto &cd = te.get_cooldown()) {
                     // Cooldown explicitly provided by the user, use it.
-                    edd.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
+                    edd.m_te_cooldowns[i][te_idx].emplace(0, *cd);
                 } else {
                     // Deduce the cooldown automatically.
                     //
@@ -2462,24 +2759,24 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel
     return m_d_out;
 }
 
+// Reset the cooldowns of the terminal events for all lanes.
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::reset_cooldowns()
+void taylor_adaptive_batch<T>::reset_cooldowns() noexcept
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
-
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        reset_cooldowns(i);
+    if (m_i_data->m_ed_data) {
+        for (auto &cd_vec : m_i_data->m_ed_data->m_te_cooldowns) {
+            for (auto &cd : cd_vec) {
+                cd.reset();
+            }
+        }
     }
 }
 
+// Reset the cooldowns of the terminal events for a specific lane.
 template <supported_batch_fp_type T>
-void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
+void taylor_adaptive_batch<T>::reset_cooldowns(const std::uint32_t i)
 {
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
-
-    if (!m_i_data->m_ed_data) [[unlikely]] {
-        throw std::invalid_argument("No events were defined for this integrator");
-    }
 
     if (i >= m_batch_size) {
         throw std::invalid_argument(
@@ -2487,8 +2784,42 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
                         i, m_batch_size));
     }
 
-    for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns[i]) {
-        cd.reset();
+    if (m_i_data->m_ed_data) {
+        for (auto &cd : m_i_data->m_ed_data->m_te_cooldowns[i]) {
+            cd.reset();
+        }
+    }
+}
+
+// Reset the tracked event signs for all lanes.
+template <supported_batch_fp_type T>
+void taylor_adaptive_batch<T>::reset_event_signs() noexcept
+{
+    if (m_i_data->m_ed_data) {
+        std::ranges::fill(m_i_data->m_ed_data->m_ev_signs_end_step, detail::event_sign_end_step::unknown);
+    }
+}
+
+// Reset the tracked event signs for a specific lane.
+template <supported_batch_fp_type T>
+void taylor_adaptive_batch<T>::reset_event_signs(const std::uint32_t i)
+{
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
+
+    if (i >= m_batch_size) {
+        throw std::invalid_argument(
+            fmt::format("Cannot reset the event signs at batch index {}: the batch size for this integrator is only {}",
+                        i, m_batch_size));
+    }
+
+    if (m_i_data->m_ed_data) {
+        auto &ev_signs_end_step = m_i_data->m_ed_data->m_ev_signs_end_step;
+        assert(ev_signs_end_step.size() % m_batch_size == 0u);
+        const auto tot_n_events = ev_signs_end_step.size() / m_batch_size;
+
+        for (decltype(ev_signs_end_step.size()) ev_idx = 0; ev_idx < tot_n_events; ++ev_idx) {
+            ev_signs_end_step[(ev_idx * m_batch_size) + i] = detail::event_sign_end_step::unknown;
+        }
     }
 }
 

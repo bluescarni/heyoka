@@ -8,8 +8,10 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -138,6 +140,83 @@ template mppp::real128 num_inf_like(const mppp::real128 &);
 #endif
 
 template mppp::real num_inf_like(const mppp::real &);
+
+// NOTE: helpers to compute the next/previous representable floating-point numbers.
+template <typename T>
+T num_nextup(T x)
+{
+    using std::nextafter;
+    // NOTE: for mppp::real, the second argument will be an infinity in single precision. This is ok, as
+    // mppp::nextafter() ignores the precision of the second argument and outputs a value with the same precision as the
+    // first argument.
+    return nextafter(std::move(x), static_cast<T>(std::numeric_limits<float>::infinity()));
+}
+
+template <typename T>
+T num_nextdown(T x)
+{
+    using std::nextafter;
+    return nextafter(std::move(x), static_cast<T>(-std::numeric_limits<float>::infinity()));
+}
+
+// Explicit instantiations.
+#define HEYOKA_NUM_NEXT_UP_DOWN_INST(F)                                                                                \
+    template F num_nextup<F>(F);                                                                                       \
+    template F num_nextdown<F>(F);
+
+HEYOKA_NUM_NEXT_UP_DOWN_INST(float)
+HEYOKA_NUM_NEXT_UP_DOWN_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+HEYOKA_NUM_NEXT_UP_DOWN_INST(long double)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_NUM_NEXT_UP_DOWN_INST(mppp::real128)
+
+#endif
+
+HEYOKA_NUM_NEXT_UP_DOWN_INST(mppp::real)
+
+#undef HEYOKA_NUM_NEXT_UP_DOWN_INST
+
+// Small helper to divide an input value by 2, with mppp::real specialisation.
+template <typename T>
+T num_div_2(T x)
+{
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: the specialisation for mppp::real is guaranteed to produce a result with the same precision as x. It
+        // also uses a specialised division primitive for performance.
+        return mppp::div_2ui(std::move(x), 1u);
+    } else {
+        return x / 2;
+    }
+}
+
+// Explicit instantiations.
+#define HEYOKA_NUM_DIV_2_INST(F) template F num_div_2<F>(F);
+
+HEYOKA_NUM_DIV_2_INST(float)
+HEYOKA_NUM_DIV_2_INST(double)
+
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+
+HEYOKA_NUM_DIV_2_INST(long double)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_NUM_DIV_2_INST(mppp::real128)
+
+#endif
+
+HEYOKA_NUM_DIV_2_INST(mppp::real)
+
+#undef HEYOKA_NUM_DIV_2_INST
 
 } // namespace detail
 

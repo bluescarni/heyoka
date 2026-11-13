@@ -381,7 +381,11 @@ to the scalar mode API, with the following differences:
 * the event classes in batch mode are called ``nt_event_batch`` and ``t_event_batch``
   (for non-terminal and terminal events respectively), rather than ``nt_event`` and ``t_event``;
 * with respect to scalar mode, the callback signatures in batch mode feature an extra trailing argument
-  of type ``std::uint32_t`` that indicates in which element of the batch the event was detected.
+  of type ``std::uint32_t`` that indicates in which element of the batch the event was detected;
+* the ``reset_cooldowns()`` and ``reset_event_signs()`` member functions also come with an overload accepting
+  a batch index, which resets only the cooldowns (or the :ref:`cross-step sign tracking <tut_cross_step_events>`)
+  of the corresponding batch element. Similarly, when a step ends with ``taylor_outcome::err_nf_state`` in a batch
+  element, the sign tracking is reset only for that batch element.
 
 Let us see a concrete example: we will be integrating in batch mode the simple pendulum with slightly
 different sets of initial conditions for each batch element, and we want to detect via

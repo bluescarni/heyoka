@@ -1932,8 +1932,60 @@ TEST_CASE("no events error")
                                Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(), std::invalid_argument,
-                               Message("No events were defined for this integrator"));
+
+        // The reset functions are no-ops.
+        REQUIRE_NOTHROW(tad.reset_cooldowns());
+        REQUIRE_NOTHROW(tad.reset_event_signs());
+    }
+
+    // The reset functions are noexcept.
+    REQUIRE(noexcept(std::declval<taylor_adaptive<double> &>().reset_cooldowns()));
+    REQUIRE(noexcept(std::declval<taylor_adaptive<double> &>().reset_event_signs()));
+}
+
+// The time setters reset the cooldowns, even if the time does not change. Throwing setters leave the cooldowns
+// untouched.
+TEST_CASE("time setters reset cooldowns")
+{
+    using ta_t = taylor_adaptive<double>;
+    using t_ev_t = ta_t::t_event_t;
+
+    // Helper to create an integrator in which the cooldown of the terminal event is engaged.
+    const auto make_ta = [] {
+        auto x = make_vars("x");
+
+        // NOTE: the terminal event triggers at t = 0.5, and its callback lets the integration continue.
+        auto ta = ta_t{{prime(x) = 1_dbl}, {-.5}, kw::t_events = {t_ev_t(x, kw::callback = [](ta_t &, int) {
+                                                                      return true;
+                                                                  })}};
+
+        REQUIRE(std::get<0>(ta.step(1.)) == taylor_outcome{0});
+        REQUIRE(ta.get_te_cooldowns()[0]);
+
+        return ta;
+    };
+
+    // A throwing setter leaves the cooldown untouched.
+    {
+        auto ta = make_ta();
+
+        REQUIRE_THROWS_AS(ta.set_dtime(1., 2.), std::invalid_argument);
+        REQUIRE(ta.get_te_cooldowns()[0]);
+    }
+
+    // The setters reset the cooldown.
+    const std::vector<std::function<void(ta_t &)>> setters
+        = {[](ta_t &ta) { ta.set_time(ta.get_time()); },
+           [](ta_t &ta) {
+               const auto [hi, lo] = ta.get_dtime();
+               ta.set_dtime(hi, lo);
+           }};
+
+    for (const auto &setter : setters) {
+        auto ta = make_ta();
+
+        setter(ta);
+        REQUIRE(!ta.get_te_cooldowns()[0]);
     }
 }
 

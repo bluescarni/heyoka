@@ -7,6 +7,11 @@ Changelog
 New
 ~~~
 
+- Event detection can now optionally detect the zero crossings of the event functions occurring across
+  integration step boundaries, which could be missed by the in-step event detection. This
+  :ref:`cross-step event detection <tut_cross_step_events>` is enabled on a per-event basis via the new
+  ``kw::cross_step`` keyword argument
+  (`#569 <https://github.com/bluescarni/heyoka/pull/569>`__).
 - Parallel JIT compilation is now available and enabled by default on LLVM >= 20
   (`#568 <https://github.com/bluescarni/heyoka/pull/568>`__).
 - The new :c:macro:`HEYOKA_HAVE_LONG_DOUBLE` definition signals whether heyoka supports the C++ ``long double``
@@ -30,6 +35,19 @@ New
 Changes
 ~~~~~~~
 
+- Zero and negative cooldown values for terminal events now raise an exception. In order to request the
+  automatic deduction of the cooldown, the ``kw::cooldown`` keyword argument must now be omitted (or set to an
+  empty ``std::optional``). Accordingly, the ``get_cooldown()`` member function of terminal events now returns
+  a ``std::optional``, which is empty if the cooldown is automatically deduced
+  (`#569 <https://github.com/bluescarni/heyoka/pull/569>`__).
+- The automatically-deduced cooldown of terminal events is now guaranteed to be finite and strictly positive
+  (`#569 <https://github.com/bluescarni/heyoka/pull/569>`__).
+- The ``set_time()``/``set_dtime()`` member functions of the integrators now reset the cooldowns of the
+  terminal events (and the sign tracking of cross-step event detection)
+  (`#569 <https://github.com/bluescarni/heyoka/pull/569>`__).
+- The ``reset_cooldowns()`` member functions of the integrators do not raise an exception any more
+  if no events were defined
+  (`#569 <https://github.com/bluescarni/heyoka/pull/569>`__).
 - Invoking the stepping/propagation functions or the ``set_time()``/``set_dtime()`` functions of an integrator,
   copy-assigning to it or deserialising into it from within one of its own event or step callbacks now raises
   an exception
