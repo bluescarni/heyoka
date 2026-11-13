@@ -298,7 +298,12 @@ of a terminal event:
   (see :ref:`below <tut_t_event_cooldown>` for an explanation);
 - ``kw::direction``: a value of the ``event_direction`` enum which, like for non-terminal
   events, can be used to specify that the event should be detected only for a specific direction
-  of the zero crossing.
+  of the zero crossing;
+- ``kw::cross_step``: a boolean flag (``false`` by default) which enables
+  :ref:`cross-step event detection <tut_cross_step_events>` for the event (this keyword argument
+  is available also for non-terminal events).
+
+  .. versionadded:: 7.14.0
 
 It is important to understand how heyoka reacts to terminal events. At every integration timestep, heyoka
 performs event detection for both terminal and non-terminal events. If one or more terminal events
@@ -437,14 +442,65 @@ that takes into account:
 
 The heuristic works best under the assumption that the event function :math:`g\left( t, \boldsymbol{x} \left( t \right) \right)`
 does not change (much) after the execution of the event's callback. If, for any reason, the automatic deduction heuristic is
-to be avoided, it is possible to set a custom value for the cooldown.
-A custom cooldown period can be selected when constructing
-a terminal event via the ``kw::cooldown`` keyword argument.
+to be avoided, it is possible to set a custom value for the cooldown on event construction via the ``kw::cooldown`` keyword argument.
+Note that a manually-specified cooldown must have a strictly positive
+finite value. Similarly, an automatically-deduced cooldown is guaranteed to be always finite and positive.
 
-Note that manually modifying the integrator's time or state does **not** automatically reset the cooldown values
-for terminal events. This could in principle lead to missing terminal events when the integration restarts.
-For this reason, a member function called ``reset_cooldowns()`` is available to clear the cooldown timers of
+.. versionchanged:: 7.14.0
+
+   Zero cooldowns are now forbidden. A negative cooldown (which was previously interpreted as not-provided) now raises
+   an exception. In order to request automatic deduction, omit the ``kw::cooldown`` keyword argument when constructing
+   an event.
+
+The cooldowns are automatically reset whenever the integrator's time coordinate is set via the ``set_time()/set_dtime()``
+member functions. Modifying the state, on the other hand, does **not** automatically reset the cooldowns.
+A member function called ``reset_cooldowns()`` is available to manually clear the cooldown timers of
 all terminal events.
+
+.. versionchanged:: 7.14.0
+
+   The integrator's time setters now automatically reset the cooldowns.
+
+.. _tut_cross_step_events:
+
+Cross-step event detection
+--------------------------
+
+.. versionadded:: 7.14.0
+
+So far we have been focusing on the detection of events within a single integration step. In some cases
+(which should be rare in practice), events occurring very close to a step boundary can be missed by the in-step event
+detection system. This happens because the sign of the Taylor series of an event function switches discontinuously from
+positive to negative (or vice-versa) when crossing a step boundary, with no zero on either side of the boundary.
+
+In order to detect these rare *cross-step* events, heyoka can track the signs of the Taylor series of the
+event functions and report an event whenever a sign change between two steps is identified. This feature is opt-in,
+and it must be enabled on a per-event basis via the boolean ``kw::cross_step`` keyword argument, passed on event construction.
+Both terminal and non-terminal events support the feature.
+
+A cross-step event is reported at the beginning of the step in which the discontinuity is detected.
+Its direction is defined with respect to time, exactly like for in-step events: it is positive if
+the event function increases across the step boundary as time increases, and negative if it decreases.
+Cross-step events are also subject to the direction filter selected via ``kw::direction`` and, for terminal events,
+to the :ref:`cooldown <tut_t_event_cooldown>`. Just like in-step terminal events, a cross-step terminal event stops
+the integration, unless its callback returns ``true``.
+
+The sign-tracking mechanism kicks in at the beginning of the *second* integration step after the construction of an integrator,
+and it is active thereafter. Users can invoke the ``reset_event_signs()`` member function to reset the sign tracking
+mechanism (e.g., in order to avoid unwanted events being detected after changing the integrator's state). Setting the
+integrator's time via ``set_time()/set_dtime()`` automatically resets the sign tracking mechanism. The sign tracking is
+also reset whenever a step ends with ``taylor_outcome::err_nf_state``.
+
+Note that cross-step event detection also reports the discontinuities of an event function which are caused by explicit
+modifications of the integrator's state, rather than by the Taylor series approximation. If the callback of an event (or
+the user, in-between two steps) changes the state of the system so that an event function switches sign, a cross-step
+event will be reported at the beginning of the next step. For instance, consider a bouncing ball, in which a terminal
+event detects the impact with the floor and its callback flips the sign of the vertical velocity :math:`v`.
+A non-terminal event on :math:`v` with cross-step detection enabled and direction ``event_direction::any`` will then
+trigger not only at the apexes of the trajectory (where :math:`v` crosses zero continuously), but also at every bounce.
+If this is not desired, it is possible to either restrict the direction of the event (e.g., ``event_direction::negative``
+would detect only the apexes), reset the sign tracking via ``reset_event_signs()`` after modifying the state, or simply
+not enable cross-step detection for the event.
 
 Limitations and caveats
 -----------------------
@@ -481,6 +537,20 @@ are stationary points.
 
    Roots which cannot be separated at the working precision are now reported as single events, and an
    exception is raised if the roots cannot be located. Previously, such events could be missed.
+
+Multiple and spurious cross-step events
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When :ref:`cross-step detection <tut_cross_step_events>` is enabled for an event, a zero crossing occurring very close
+to a step boundary may be reported more than once: by the in-step event detection right before the boundary, and as a
+cross-step event at the beginning of the next step (possibly followed by another in-step detection, with alternating
+directions). For terminal events, the additional detections are normally suppressed by the cooldown mechanism. For non-terminal
+events, on the other hand, the callback may be invoked multiple times in quick succession.
+
+Similarly, a cross-step event may be reported when the Taylor series of an event function reaches exactly zero at the
+end of a step, even if the event function has the same sign on both sides of the step boundary (i.e., even if it does
+not actually change sign). Like the spurious events discussed above for badly-conditioned event equations, such reports
+can occur only when the event function is extremely close to zero.
 
 Event equations and timestepping
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
