@@ -1318,9 +1318,9 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, con
                 auto &te = edd.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
-                if (te.get_cooldown() >= 0) {
+                if (const auto &cd = te.get_cooldown()) {
                     // Cooldown explicitly provided by the user, use it.
-                    edd.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
+                    edd.m_te_cooldowns[i][te_idx].emplace(0, *cd);
                 } else {
                     // Deduce the cooldown automatically.
                     //

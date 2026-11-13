@@ -130,25 +130,25 @@ template <typename T, bool B>
 nt_event_impl<T, B>::~nt_event_impl() = default;
 
 template <typename T, bool B>
-const expression &nt_event_impl<T, B>::get_expression() const
+const expression &nt_event_impl<T, B>::get_expression() const noexcept
 {
     return eq;
 }
 
 template <typename T, bool B>
-nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback()
+nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() noexcept
 {
     return callback;
 }
 
 template <typename T, bool B>
-const nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const
+const nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const noexcept
 {
     return callback;
 }
 
 template <typename T, bool B>
-event_direction nt_event_impl<T, B>::get_direction() const
+event_direction nt_event_impl<T, B>::get_direction() const noexcept
 {
     return dir;
 }

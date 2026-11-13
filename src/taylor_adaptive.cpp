@@ -1216,9 +1216,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
             auto &te = edd.m_tes[te_idx];
 
             // Set the corresponding cooldown.
-            if (te.get_cooldown() >= 0) {
+            if (const auto &cd = te.get_cooldown()) {
                 // Cooldown explicitly provided by the user, use it.
-                edd.m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
+                edd.m_te_cooldowns[te_idx].emplace(0, *cd);
             } else {
                 // Deduce the cooldown automatically.
                 //

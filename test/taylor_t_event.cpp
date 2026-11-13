@@ -11,6 +11,7 @@
 #include <cmath>
 #include <initializer_list>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -157,7 +158,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = fp_t(-5));
+                kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = std::optional<fp_t>{});
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -172,6 +173,19 @@ TEST_CASE("taylor te")
             REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
             REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
             oss.str("");
+
+            // The cooldown can also be passed as an optional: an empty optional selects the automatic deduction.
+            {
+                const auto ev = ev_t(v * v - 1e-10, kw::cooldown = std::optional<fp_t>{fp_t(5)});
+                REQUIRE(ev.get_cooldown());
+                REQUIRE(*ev.get_cooldown() == 5);
+
+                REQUIRE(!ev_t(v * v - 1e-10, kw::cooldown = std::optional<fp_t>{}).get_cooldown());
+
+                REQUIRE_THROWS_MATCHES(
+                    ev_t(v * v - 1e-10, kw::cooldown = std::optional<fp_t>{fp_t(0)}), std::invalid_argument,
+                    Message("Cannot set a non-positive cooldown value of 0 for a terminal event"));
+            }
 
             // Check the assignment operators.
             ev_t ev0(
@@ -201,15 +215,16 @@ TEST_CASE("taylor te")
                                        kw::cooldown = std::numeric_limits<fp_t>::quiet_NaN()),
                                    std::invalid_argument,
                                    Message("Cannot set a non-finite cooldown value for a terminal event"));
-            for (const auto cd : {fp_t(0), -fp_t(0)}) {
-                REQUIRE_THROWS_MATCHES(ev_t(
-                                           v * v - 1e-10, kw::direction = event_direction::negative,
-                                           kw::callback = [](auto &, int, auto...) { return true; },
-                                           kw::cooldown = cd),
-                                       std::invalid_argument,
-                                       Message("A zero cooldown is invalid: please provide a positive value or leave "
-                                               "it unspecified for automatic cooldown deduction"));
-            }
+            REQUIRE_THROWS_MATCHES(
+                ev_t(
+                    v * v - 1e-10, kw::direction = event_direction::negative,
+                    kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = fp_t(0)),
+                std::invalid_argument, Message("Cannot set a non-positive cooldown value of 0 for a terminal event"));
+            REQUIRE_THROWS_MATCHES(
+                ev_t(
+                    v * v - 1e-10, kw::direction = event_direction::negative,
+                    kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = fp_t(-1)),
+                std::invalid_argument, Message("Cannot set a non-positive cooldown value of -1 for a terminal event"));
             REQUIRE_THROWS_MATCHES(ev_t(
                                        v * v - 1e-10, kw::direction = event_direction{50},
                                        kw::callback = [](auto &, int, auto...) { return true; }),
@@ -1097,7 +1112,7 @@ TEST_CASE("t s11n")
             REQUIRE(ev.get_expression() == v);
             REQUIRE(ev.get_direction() == event_direction::positive);
             REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_callback));
-            REQUIRE(ev.get_cooldown() == fp_t(100));
+            REQUIRE(*ev.get_cooldown() == fp_t(100));
         }
 
         // Try also a terminal event with empty callback.
@@ -1123,7 +1138,7 @@ TEST_CASE("t s11n")
             REQUIRE(ev.get_expression() == v);
             REQUIRE(ev.get_direction() == event_direction::positive);
             REQUIRE(!ev.get_callback());
-            REQUIRE(ev.get_cooldown() == fp_t(100));
+            REQUIRE(*ev.get_cooldown() == fp_t(100));
         }
     };
 
@@ -1137,7 +1152,7 @@ TEST_CASE("te def ctor")
     REQUIRE(te.get_expression() == 0_dbl);
     REQUIRE(!te.get_callback());
     REQUIRE(te.get_direction() == event_direction::any);
-    REQUIRE(te.get_cooldown() == -1.);
+    REQUIRE(!te.get_cooldown());
 }
 
 // Test to verify an event is not detected

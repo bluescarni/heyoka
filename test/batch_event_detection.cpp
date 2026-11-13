@@ -1789,7 +1789,7 @@ TEST_CASE("te s11n")
     REQUIRE(ev.get_expression() == v);
     REQUIRE(ev.get_direction() == event_direction::positive);
     REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_te_callback));
-    REQUIRE(ev.get_cooldown() == fp_t(100));
+    REQUIRE(*ev.get_cooldown() == fp_t(100));
 }
 
 TEST_CASE("te def ctor")
@@ -1799,5 +1799,5 @@ TEST_CASE("te def ctor")
     REQUIRE(te.get_expression() == 0_dbl);
     REQUIRE(!te.get_callback());
     REQUIRE(te.get_direction() == event_direction::any);
-    REQUIRE(te.get_cooldown() == -1.);
+    REQUIRE(!te.get_cooldown());
 }
