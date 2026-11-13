@@ -87,53 +87,6 @@ struct is_terminal_event<t_event_impl<T, B>> : std::true_type {};
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
-// Helper to automatically deduce the cooldown for a terminal event. g_eps is the maximum absolute error on the Taylor
-// series of the event equation (which depends on the integrator tolerance and the infinity norm of the state
-// vector/event equations), abs_der is the absolute value of the time derivative of the event equation at the zero.
-//
-// The result is always finite and strictly positive.
-template <typename T>
-T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
-{
-    using std::isfinite;
-    using std::nextafter;
-
-    // LCOV_EXCL_START
-    assert(isfinite(g_eps));
-    assert(isfinite(abs_der));
-    assert(g_eps > 0);
-    assert(abs_der >= 0);
-    // LCOV_EXCL_STOP
-
-    // NOTE: the * 10 is a safety factor composed of:
-    //
-    // - 2 is the original factor from theoretical considerations,
-    // - 2 factor to deal with very small values of the derivative,
-    // - 2 factor to deal with the common case of event equation flipping around after the event (e.g., for collisions).
-    //
-    // The rest is additional safety.
-    //
-    // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
-    //
-    // NOLINTNEXTLINE(misc-const-correctness)
-    auto ret = std::move(g_eps) / std::move(abs_der) * 10;
-
-    if (isfinite(ret)) [[likely]] {
-        if (ret == 0) [[unlikely]] {
-            // ret can come out zero in case of underflow. In such case, we want to avoid an exactly zero cooldown.
-            ret = nextafter(std::move(ret), static_cast<T>(1));
-        }
-
-        return ret;
-    } else {
-        // The heuristic produced a non-finite value. Since we are assuming that g_eps is strictly positive, the only
-        // non-finite result for ret can be +infinity. Replace it with a large number in order to keep the spirit of a
-        // very large cooldown without the headache of making it non-finite.
-        assert(ret == std::numeric_limits<float>::infinity());
-        return nextafter(std::move(ret), static_cast<T>(0));
-    }
-}
-
 // Generic branchless sign function.
 template <typename T>
 int sgn(T val)
@@ -272,43 +225,74 @@ void detect_events_common_impl(auto &out, const std::vector<Event> &ev_vec, cons
 
 } // namespace
 
-template <>
-float taylor_deduce_cooldown(float g_eps, float abs_der)
+// Helper to automatically deduce the cooldown for a terminal event. g_eps is the maximum absolute error on the Taylor
+// series of the event equation (which depends on the integrator tolerance and the infinity norm of the state
+// vector/event equations), abs_der is the absolute value of the time derivative of the event equation at the zero.
+//
+// The result is always finite and strictly positive.
+template <typename T>
+T taylor_deduce_cooldown(T g_eps, T abs_der)
 {
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
+    using std::isfinite;
+    using std::nextafter;
+
+    // LCOV_EXCL_START
+    assert(isfinite(g_eps));
+    assert(isfinite(abs_der));
+    assert(g_eps > 0);
+    assert(abs_der >= 0);
+    // LCOV_EXCL_STOP
+
+    // NOTE: the * 10 is a safety factor composed of:
+    //
+    // - 2 is the original factor from theoretical considerations,
+    // - 2 factor to deal with very small values of the derivative,
+    // - 2 factor to deal with the common case of event equation flipping around after the event (e.g., for collisions).
+    //
+    // The rest is additional safety.
+    //
+    // NOTE: clang-tidy suggests constness but this prevents moving out (important for mppp::real).
+    //
+    // NOLINTNEXTLINE(misc-const-correctness)
+    auto ret = std::move(g_eps) / std::move(abs_der) * 10;
+
+    if (isfinite(ret)) [[likely]] {
+        if (ret == 0) [[unlikely]] {
+            // ret can come out zero in case of underflow. In such case, we want to avoid an exactly zero cooldown.
+            ret = nextafter(std::move(ret), static_cast<T>(1));
+        }
+
+        return ret;
+    } else {
+        // The heuristic produced a non-finite value. Since we are assuming that g_eps is strictly positive, the only
+        // non-finite result for ret can be +infinity. Replace it with a large number in order to keep the spirit of a
+        // very large cooldown without the headache of making it non-finite.
+        assert(ret == std::numeric_limits<float>::infinity());
+        return nextafter(std::move(ret), static_cast<T>(0));
+    }
 }
 
-template <>
-double taylor_deduce_cooldown(double g_eps, double abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
+// Explicit instantiations.
+#define HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(F) template F taylor_deduce_cooldown<F>(F, F);
+
+HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(float)
+HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(double)
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-template <>
-long double taylor_deduce_cooldown(long double g_eps, long double abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
+HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(long double)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template <>
-mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
+HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(mppp::real128)
 
 #endif
 
-template <>
-mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
-{
-    return taylor_deduce_cooldown_impl(std::move(g_eps), std::move(abs_der));
-}
+HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST(mppp::real)
+
+#undef HEYOKA_TAYLOR_DEDUCE_COOLDOWN_INST
 
 // Helper to determine the sign of the polynomial with coefficients cfs at the point x.
 //
