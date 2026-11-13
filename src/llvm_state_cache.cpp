@@ -500,16 +500,10 @@ struct diskcache_state {
             // Configure the connection.
             configure_db(db_path);
 
-            // Integrity check: if the database is corrupt, throw. The user will need to manually delete the corrupt
-            // cache directory in order to restore disk caching.
-            if (!integrity_check()) [[unlikely]] {
-                // LCOV_EXCL_START
-                throw std::runtime_error(
-                    fmt::format("The llvm_state on-disk cache database '{}' is corrupt. Please delete "
-                                "the cache directory to restore disk caching.",
-                                db_path));
-                // LCOV_EXCL_STOP
-            }
+            // NOTE: no integrity check (e.g., "PRAGMA quick_check") is run here, as it reads the whole database and it
+            // can cause a noticeable lag when opening a large cache. Errors due to a corrupted db surface instead when
+            // the affected queries fail: as warnings during cache lookups/insertions, and as exceptions from the other
+            // disk cache functions.
 
             // Create the tables.
 
@@ -687,9 +681,9 @@ struct diskcache_state {
                 const stmt_ptr stmt(stmt_raw);
                 if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
                     // LCOV_EXCL_START
-                    throw std::runtime_error(fmt::format(
-                        "Failed to set the WAL journal mode for the llvm_state on-disk cache database at the path '{}'",
-                        db_path));
+                    throw std::runtime_error(fmt::format("Failed to set the WAL journal mode for the llvm_state "
+                                                         "on-disk cache database at the path '{}': {}",
+                                                         db_path, sqlite3_errmsg_non_null(m_db.get())));
                     // LCOV_EXCL_STOP
                 }
 
@@ -707,30 +701,6 @@ struct diskcache_state {
             // NOTE: this reduces the aggressiveness of disk flushes in order to increase performance. This is an
             // acceptable tradeoff for a cache.
             exec("PRAGMA synchronous = NORMAL");
-        }
-
-        // Helper to run PRAGMA quick_check. Returns true if the database is healthy.
-        [[nodiscard]] bool integrity_check() const
-        {
-            assert(m_db);
-
-            sqlite3_stmt *stmt_raw = nullptr;
-            // NOTE: quick_check is faster than integrity_check (skips index verification).
-            if (sqlite3_prepare_v3(m_db.get(), "PRAGMA quick_check", -1, 0, &stmt_raw, nullptr) != SQLITE_OK)
-                // LCOV_EXCL_START
-                [[unlikely]] {
-                return false;
-                // LCOV_EXCL_STOP
-            }
-            const stmt_ptr stmt(stmt_raw);
-
-            if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
-                return false; // LCOV_EXCL_LINE
-            }
-
-            // quick_check returns "ok" as the first row if the database is healthy.
-            const auto *const result = reinterpret_cast<const char *>(sqlite3_column_text(stmt.get(), 0));
-            return result != nullptr && std::string_view(result) == "ok";
         }
     };
 
@@ -902,7 +872,9 @@ struct diskcache_state {
                 const auto stmt_limit = conn->prepare("SELECT value FROM config WHERE key = 'size_limit'");
                 if (sqlite3_step(stmt_limit.get()) != SQLITE_ROW) [[unlikely]] {
                     // LCOV_EXCL_START
-                    throw std::runtime_error("Failed to read size_limit from the llvm_state on-disk cache config");
+                    throw std::runtime_error(
+                        fmt::format("Failed to read size_limit from the llvm_state on-disk cache config: {}",
+                                    sqlite3_errmsg_non_null(conn->m_db.get())));
                     // LCOV_EXCL_STOP
                 }
                 const auto total_limit = sqlite3_column_int64(stmt_limit.get(), 0);
@@ -910,7 +882,9 @@ struct diskcache_state {
                 const auto stmt_size = conn->prepare("SELECT value FROM config WHERE key = 'total_size'");
                 if (sqlite3_step(stmt_size.get()) != SQLITE_ROW) [[unlikely]] {
                     // LCOV_EXCL_START
-                    throw std::runtime_error("Failed to read total_size from the llvm_state on-disk cache config");
+                    throw std::runtime_error(
+                        fmt::format("Failed to read total_size from the llvm_state on-disk cache config: {}",
+                                    sqlite3_errmsg_non_null(conn->m_db.get())));
                     // LCOV_EXCL_STOP
                 }
                 safe_int64_t total_size = sqlite3_column_int64(stmt_size.get(), 0);
@@ -1029,7 +1003,9 @@ struct diskcache_state {
         const auto stmt = conn->prepare("SELECT value FROM config WHERE key = 'size_limit'");
         if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
             // LCOV_EXCL_START
-            throw std::runtime_error("Failed to read size_limit from the llvm_state on-disk cache config");
+            throw std::runtime_error(
+                fmt::format("Failed to read size_limit from the llvm_state on-disk cache config: {}",
+                            sqlite3_errmsg_non_null(conn->m_db.get())));
             // LCOV_EXCL_STOP
         }
 
@@ -1061,7 +1037,9 @@ struct diskcache_state {
         const auto stmt = conn->prepare("SELECT value FROM config WHERE key = 'total_size'");
         if (sqlite3_step(stmt.get()) != SQLITE_ROW) [[unlikely]] {
             // LCOV_EXCL_START
-            throw std::runtime_error("Failed to read total_size from the llvm_state on-disk cache config");
+            throw std::runtime_error(
+                fmt::format("Failed to read total_size from the llvm_state on-disk cache config: {}",
+                            sqlite3_errmsg_non_null(conn->m_db.get())));
             // LCOV_EXCL_STOP
         }
 

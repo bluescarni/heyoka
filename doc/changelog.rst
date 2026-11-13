@@ -80,6 +80,10 @@ Changes
 Fix
 ~~~
 
+- Fix a noticeable lag on the first use of the on-disk cache due to an expensive integrity check.
+  The check has now been removed and errors due to a corrupted database are expected to surface either
+  as exceptions or warnings
+  (`#570 <https://github.com/bluescarni/heyoka/pull/570>`__).
 - Fix incorrect indexing into memory buffers with :math:`2^{31}` or more elements in JIT-compiled code
   (`#565 <https://github.com/bluescarni/heyoka/pull/565>`__).
 - Fix the relational ``neq()`` operator evaluating to false when one or both operands are NaN
