@@ -26,6 +26,8 @@
 
 #endif
 
+#include <mp++/real.hpp>
+
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
