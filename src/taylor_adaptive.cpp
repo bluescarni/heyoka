@@ -67,6 +67,11 @@
 // NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
 #define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) [[maybe_unused]] auto &name = m_i_data->name
 #define HEYOKA_TAYLOR_CREF_FROM_I_DATA(name) [[maybe_unused]] const auto &name = m_i_data->name
+// NOTE: this one is used to fetch a copy instead of a reference, and it is supposed to be used only with primitive
+// datatypes.
+#define HEYOKA_TAYLOR_COPY_FROM_I_DATA(name)                                                                           \
+    [[maybe_unused]] const auto name = m_i_data->name;                                                                 \
+    static_assert(std::is_arithmetic_v<std::remove_const_t<decltype(name)>>)
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -989,9 +994,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T max_delta_t,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cm_tape);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ed_data);
 
@@ -1354,10 +1359,10 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, const std::size_t 
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tplt_state);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_high_accuracy);
 
     // Check the current time.
     if (!isfinite(m_time)) [[unlikely]] {
@@ -2200,7 +2205,7 @@ void taylor_adaptive<T>::check_variational(const char *fname) const
 template <supported_fp_type T>
 void taylor_adaptive<T>::assign_stepper(bool with_events)
 {
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_step_f = m_ta_jit_data->m_step_f;
@@ -2370,5 +2375,5 @@ HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
 HEYOKA_END_NAMESPACE
 
 #undef HEYOKA_TAYLOR_REF_FROM_I_DATA
-
 #undef HEYOKA_TAYLOR_CREF_FROM_I_DATA
+#undef HEYOKA_TAYLOR_COPY_FROM_I_DATA

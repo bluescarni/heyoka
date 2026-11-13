@@ -71,6 +71,11 @@
 // NOTE: these are helper macros to reduce typing when accessing the data members of i_data.
 #define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) [[maybe_unused]] auto &name = m_i_data->name
 #define HEYOKA_TAYLOR_CREF_FROM_I_DATA(name) [[maybe_unused]] const auto &name = m_i_data->name
+// NOTE: this one is used to fetch a copy instead of a reference, and it is supposed to be used only with primitive
+// datatypes.
+#define HEYOKA_TAYLOR_COPY_FROM_I_DATA(name)                                                                           \
+    [[maybe_unused]] const auto name = m_i_data->name;                                                                 \
+    static_assert(std::is_arithmetic_v<std::remove_const_t<decltype(name)>>)
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -563,7 +568,7 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
     // time keeping logic in the propagate_*() functions.
     detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_time");
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
 
@@ -616,7 +621,7 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
     // time keeping logic in the propagate_*() functions.
     detail::taylor_adaptive_batch_check_busy(m_i_data->m_busy, "set_dtime");
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
 
@@ -977,14 +982,14 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, con
     // Small helper to reduce typing below.
     constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_tol);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
@@ -1441,7 +1446,7 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, const bo
 {
     const auto bg = make_busy_guard("step");
 
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
 
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1472,7 +1477,7 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
 {
     assert(m_i_data->m_busy);
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
@@ -1536,12 +1541,12 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, const st
     // Small helper to reduce typing below.
     constexpr auto is_finite = [](const auto &x) { return isfinite(x); };
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_high_accuracy);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tplt_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
@@ -1960,11 +1965,11 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid_, const
 
     assert(m_i_data->m_busy);
 
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_pinf);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
@@ -2681,7 +2686,7 @@ const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &taylor_adaptiv
 template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -2725,7 +2730,7 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vecto
 template <supported_batch_fp_type T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel_time)
 {
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
@@ -2774,7 +2779,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns() noexcept
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::reset_cooldowns(const std::uint32_t i)
 {
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
 
     if (i >= m_batch_size) {
         throw std::invalid_argument(
@@ -2802,7 +2807,7 @@ void taylor_adaptive_batch<T>::reset_event_signs() noexcept
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::reset_event_signs(const std::uint32_t i)
 {
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_batch_size);
 
     if (i >= m_batch_size) {
         throw std::invalid_argument(
@@ -2836,7 +2841,7 @@ void taylor_adaptive_batch<T>::check_variational(const char *fname) const
 template <supported_batch_fp_type T>
 void taylor_adaptive_batch<T>::assign_stepper(bool with_events)
 {
-    HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_COPY_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_CREF_FROM_I_DATA(m_ta_jit_data);
 
     auto &m_step_f = m_ta_jit_data->m_step_f;
@@ -3020,5 +3025,5 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(mppp::real128)
 HEYOKA_END_NAMESPACE
 
 #undef HEYOKA_TAYLOR_REF_FROM_I_DATA
-
 #undef HEYOKA_TAYLOR_CREF_FROM_I_DATA
+#undef HEYOKA_TAYLOR_COPY_FROM_I_DATA
