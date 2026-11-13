@@ -54,7 +54,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -224,8 +223,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
 
     if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(*tol)));
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead", *tol));
     }
 
     if (parallel_mode && !compact_mode) {

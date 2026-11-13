@@ -50,7 +50,6 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/ta_jit_data.hpp>
 #include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -376,8 +375,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     // Check the tolerance value.
     if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(*tol)));
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead", *tol));
     }
 
     // Check the consistency of parallel vs compact mode.
