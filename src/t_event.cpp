@@ -29,7 +29,6 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
@@ -163,7 +162,7 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &ev)
     os << "Event equation : " << ev.get_expression() << '\n';
     os << "Event direction: " << ev.get_direction() << '\n';
     os << "With callback  : " << (ev.get_callback() ? "yes" : "no") << '\n';
-    os << "Cooldown       : " << (ev.get_cooldown() ? fp_to_string(*ev.get_cooldown()) : "auto") << '\n';
+    os << "Cooldown       : " << (ev.get_cooldown() ? fmt::format("{}", *ev.get_cooldown()) : "auto") << '\n';
     os << "Cross step     : " << (ev.get_cross_step() ? "yes" : "no") << '\n';
 
     return os;

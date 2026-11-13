@@ -51,7 +51,6 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
@@ -380,8 +379,7 @@ void continuous_output<T>::call_impl(T t)
     // LCOV_EXCL_STOP
 
     if (!isfinite(t)) {
-        throw std::invalid_argument(
-            fmt::format("Cannot compute the continuous output at the non-finite time {}", detail::fp_to_string(t)));
+        throw std::invalid_argument(fmt::format("Cannot compute the continuous output at the non-finite time {}", t));
     }
 
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -491,10 +489,8 @@ std::ostream &operator<<(std::ostream &os, const continuous_output<T> &co)
         const auto dir = df_t_start <= df_t_end;
         oss << "Direction   : " << (dir ? "forward" : "backward") << '\n';
         oss << "Time range  : "
-            << (dir ? fmt::format("[{}, {})", detail::fp_to_string(co.m_times_hi[0]),
-                                  detail::fp_to_string(co.m_times_hi.back()))
-                    : fmt::format("({}, {}]", detail::fp_to_string(co.m_times_hi.back()),
-                                  detail::fp_to_string(co.m_times_hi[0])))
+            << (dir ? fmt::format("[{}, {})", co.m_times_hi[0], co.m_times_hi.back())
+                    : fmt::format("({}, {}]", co.m_times_hi.back(), co.m_times_hi[0]))
             << '\n';
         oss << "N of steps  : " << (co.m_times_hi.size() - 1u) << '\n';
     }
@@ -1024,7 +1020,7 @@ void continuous_output_batch<T>::call_impl(const T *t)
         if (!isfinite(t[i])) {
             throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
                                                     "for the batch index {} at the non-finite time {}",
-                                                    i, detail::fp_to_string(t[i])));
+                                                    i, t[i]));
         }
 
         m_tmp_tm[i] = t[i];
@@ -1084,7 +1080,7 @@ const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
     if (!isfinite(tm)) {
         throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
                                                 "at the non-finite time {}",
-                                                detail::fp_to_string(tm)));
+                                                tm));
     }
 
     // Copy over the time to the temp buffer.
@@ -1236,10 +1232,8 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &co)
             const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
                          co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
-            oss << (dir ? fmt::format("[{}, {})", detail::fp_to_string(df_t_start.hi),
-                                      detail::fp_to_string(df_t_end.hi))
-                        : fmt::format("({}, {}]", detail::fp_to_string(df_t_end.hi),
-                                      detail::fp_to_string(df_t_start.hi)));
+            oss << (dir ? fmt::format("[{}, {})", df_t_start.hi, df_t_end.hi)
+                        : fmt::format("({}, {}]", df_t_end.hi, df_t_start.hi));
 
             if (i != batch_size - 1u) {
                 oss << ", ";

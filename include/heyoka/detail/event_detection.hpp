@@ -9,8 +9,6 @@
 #ifndef HEYOKA_DETAIL_EVENT_DETECTION_HPP
 #define HEYOKA_DETAIL_EVENT_DETECTION_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -19,17 +17,9 @@
 #include <utility>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
-#include <mp++/real.hpp>
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -38,33 +28,7 @@ namespace detail
 {
 
 template <typename T>
-inline T taylor_deduce_cooldown(T, T)
-{
-    static_assert(always_false_v<T>, "Unhandled type");
-}
-
-template <>
-float taylor_deduce_cooldown(float, float);
-
-template <>
-double taylor_deduce_cooldown(double, double);
-
-#if defined(HEYOKA_HAVE_LONG_DOUBLE)
-
-template <>
-long double taylor_deduce_cooldown(long double, long double);
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
-
-#endif
-
-template <>
-mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
+T taylor_deduce_cooldown(T, T);
 
 // Helper to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,

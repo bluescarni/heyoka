@@ -49,7 +49,6 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_adaptive_i_data.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -236,17 +235,17 @@ void dtime_checks(const T &hi, const T &lo)
     using std::abs;
     using std::isfinite;
 
-    if (!isfinite(hi) || !isfinite(lo)) {
+    if (!isfinite(hi) || !isfinite(lo)) [[unlikely]] {
         throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
                                                 "coordinate must both be finite, but they are {} and {} instead",
-                                                detail::fp_to_string(hi), detail::fp_to_string(lo)));
+                                                hi, lo));
     }
 
-    if (abs(hi) < abs(lo)) {
+    if (abs(hi) < abs(lo)) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("The first component of the double-length representation of the time "
                         "coordinate ({}) must not be smaller in magnitude than the second component ({})",
-                        detail::fp_to_string(hi), detail::fp_to_string(lo)));
+                        hi, lo));
     }
 }
 

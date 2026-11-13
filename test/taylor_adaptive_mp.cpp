@@ -1167,6 +1167,69 @@ TEST_CASE("s11n")
     }
 }
 
+// Same as the previous test, but with a terminal event, so that the event detection data is copied and serialised too.
+TEST_CASE("s11n events")
+{
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            // NOTE: the terminal event has no callback, so that it can be serialised.
+            const auto make_ta = [&] {
+                return taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                             {fp_t(0., prec), fp_t(0.5, prec)},
+                                             kw::compact_mode = true,
+                                             kw::opt_level = opt_level,
+                                             kw::t_events = {t_event<fp_t>(v)}};
+            };
+
+            auto ta = make_ta();
+
+            ta.step(true);
+
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+                oa << ta;
+            }
+
+            // NOTE: ta_copy goes through the copy constructor, ta through deserialisation.
+            auto ta_copy = ta;
+            ta = make_ta();
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+                ia >> ta;
+            }
+
+            REQUIRE(ta.get_prec() == ta_copy.get_prec());
+            REQUIRE(ta.get_time() == ta_copy.get_time());
+            REQUIRE(ta.get_state() == ta_copy.get_state());
+
+            // Take several steps in both integrators and check that they behave identically, including the triggering
+            // of the terminal event.
+            auto n_trig = 0;
+            for (auto i = 0; i < 50; ++i) {
+                const auto [oc, h] = ta.step(true);
+                const auto [oc_copy, h_copy] = ta_copy.step(true);
+
+                REQUIRE(oc == oc_copy);
+                REQUIRE(h == h_copy);
+                REQUIRE(ta.get_time() == ta_copy.get_time());
+                REQUIRE(ta.get_state() == ta_copy.get_state());
+                REQUIRE(ta.get_tc() == ta_copy.get_tc());
+
+                n_trig += static_cast<int>(oc == taylor_outcome{-1});
+            }
+
+            REQUIRE(n_trig > 0);
+        }
+    }
+}
+
 TEST_CASE("empty init state")
 {
     const auto dyn = model::pendulum();
