@@ -1231,7 +1231,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, con
             // NOTE: m_nf_detected considers the finiteness of time/state plus the input data for event detection as
             // well. That is, a lane for which m_nf_detected is true must end up with an err_nf_state outcome, just like
             // in the scalar case.
-            const auto cur_nf_detected = (ed_finite[i] == 0 || !is_finite(cur_new_time) || check_nf_batch(i));
+            const auto cur_nf_detected = (!ed_finite[i] || !is_finite(cur_new_time) || check_nf_batch(i));
             m_nf_detected[i] = cur_nf_detected;
 
             if (cur_nf_detected) [[unlikely]] {

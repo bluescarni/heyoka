@@ -495,39 +495,41 @@ ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector
         });
 }
 
+// NOTE: the detected events and m_poly_roots are scratch space and don't need to be copied. m_ev_jet and
+// m_ev_fex_check_res need only to be sized correctly.
 template <typename T>
 ed_data<T>::ed_data(const ed_data &o)
-    // NOTE: no need to copy m_poly_roots, empty initialisation is fine.
-    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns),
-      m_jit_data(o.m_jit_data), m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data),
+      m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
 {
-    // For the vectors of detected events, just reserve the same amount of space.
-    // These vectors are cleared out anyway during event detection.
-    m_d_tes.reserve(o.m_d_tes.capacity());
-    m_d_ntes.reserve(o.m_d_ntes.capacity());
-
-    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    // NOTE: for real we rely on o.m_ev_jet to contain values with the correct precision.
+    assert(!o.m_ev_jet.empty());
+    m_ev_jet.resize(o.m_ev_jet.size(), num_zero_like(o.m_ev_jet[0]));
     m_ev_fex_check_res.resize(o.m_ev_fex_check_res.size());
 }
 
 template <typename T>
 ed_data<T>::~ed_data() = default;
 
+// NOTE: for serialisation, we do not want to save any scratch data. Deserialisation clears out and sizes appropriately
+// the scratch data, in analogy with the copy constructor.
 template <typename T>
 void ed_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_tes;
     ar << m_ntes;
-    ar << m_ev_jet;
+
+    // NOTE: for m_ev_jet we save only the size and, if necessary, the precision.
+    ar << m_ev_jet.size();
+    if constexpr (std::same_as<T, mppp::real>) {
+        assert(!m_ev_jet.empty());
+        ar << m_ev_jet[0].get_prec();
+    }
+
     ar << m_te_cooldowns;
     ar << m_jit_data;
     ar << m_frpr_ws;
-    // NOTE: we do NOT save m_poly_roots and m_ev_fex_check_res on purpose.
     ar << m_ev_signs_end_step;
-
-    // Save the capacities of the vectors of detected events.
-    ar << m_d_tes.capacity();
-    ar << m_d_ntes.capacity();
 }
 
 template <typename T>
@@ -535,28 +537,31 @@ void ed_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_tes;
     ar >> m_ntes;
-    ar >> m_ev_jet;
+
+    // Clear and resize m_ev_jet correctly.
+    m_ev_jet.clear();
+    decltype(m_ev_jet.size()) ev_jet_size{};
+    ar >> ev_jet_size;
+    if constexpr (std::same_as<T, mppp::real>) {
+        mpfr_prec_t prec{};
+        ar >> prec;
+        m_ev_jet.resize(ev_jet_size, mppp::real{mppp::real_kind::zero, prec});
+    } else {
+        m_ev_jet.resize(ev_jet_size);
+    }
+
     ar >> m_te_cooldowns;
     ar >> m_jit_data;
     ar >> m_frpr_ws;
     ar >> m_ev_signs_end_step;
 
-    // Fetch the capacities.
-    decltype(m_d_tes.capacity()) d_tes_cap{};
-    ar >> d_tes_cap;
-    decltype(m_d_ntes.capacity()) d_ntes_cap{};
-    ar >> d_ntes_cap;
-
-    // Clear and reserve the capacities.
+    // NOTE: these can be restored to their default-constructed state.
     m_d_tes.clear();
-    m_d_tes.reserve(d_tes_cap);
     m_d_ntes.clear();
-    m_d_ntes.reserve(d_ntes_cap);
-
-    // Clear out m_poly_roots.
     m_poly_roots.clear();
 
-    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
+    // Make sure m_ev_fex_check_res is restored with the correct size, which we can compute.
+    m_ev_fex_check_res.clear();
     m_ev_fex_check_res.resize(static_cast<decltype(m_ev_fex_check_res.size())>(m_tes.size()) + m_ntes.size());
 }
 
@@ -766,109 +771,99 @@ ed_data_batch<T>::ed_data_batch(const llvm_state &s, std::vector<t_event_t> tes,
         });
 }
 
+// NOTE: the scratch data is not copied, it only needs to be sized correctly (for the detected events, this means one
+// empty vector per batch lane). m_poly_roots is left empty, while m_cb_eptrs must be reserved to the batch size in
+// order to guarantee that pushing back into it in step_impl() does not throw.
 template <typename T>
 ed_data_batch<T>::ed_data_batch(const ed_data_batch &o)
-    // NOTE: no need to copy m_poly_roots, empty initialisation is fine.
-    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_ed_finite(o.m_ed_finite),
-      m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps), m_te_cooldowns(o.m_te_cooldowns),
-      m_jit_data(o.m_jit_data), m_fex_check_res(o.m_fex_check_res), m_fex_check_enc(o.m_fex_check_enc),
-      m_scal_poly(o.m_scal_poly), m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_te_cooldowns(o.m_te_cooldowns), m_jit_data(o.m_jit_data),
+      m_frpr_ws(o.m_frpr_ws), m_ev_signs_end_step(o.m_ev_signs_end_step)
 {
     // Fetch the batch size.
     const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
 
-    // Prepare m_d_tes with the correct size and capacities.
-    m_d_tes.resize(batch_size);
-    for (std::uint32_t i = 0; i < batch_size; ++i) {
-        m_d_tes[i].reserve(o.m_d_tes[i].capacity());
-    }
-
-    // Prepare m_d_ntes with the correct size and capacities.
-    m_d_ntes.resize(batch_size);
-    for (std::uint32_t i = 0; i < batch_size; ++i) {
-        m_d_ntes[i].reserve(o.m_d_ntes[i].capacity());
-    }
+    // Prepare these vectors with the correct sizes.
+    m_ev_jet.resize(o.m_ev_jet.size());
+    m_ed_finite.resize(o.m_ed_finite.size());
+    m_max_abs_state.resize(o.m_max_abs_state.size());
+    m_g_eps.resize(o.m_g_eps.size());
+    m_d_tes.resize(o.m_d_tes.size());
+    m_d_ntes.resize(o.m_d_ntes.size());
+    m_fex_check_res.resize(o.m_fex_check_res.size());
+    m_fex_check_enc.resize(o.m_fex_check_enc.size());
+    m_scal_poly.resize(o.m_scal_poly.size());
+    m_ev_fex_check_res.resize(o.m_ev_fex_check_res.size());
 
     // Reserve space in m_cb_eptrs.
     m_cb_eptrs.reserve(batch_size);
-
-    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
-    m_ev_fex_check_res.resize(o.m_ev_fex_check_res.size());
 }
 
 template <typename T>
 ed_data_batch<T>::~ed_data_batch() = default;
 
+// NOTE: for serialisation, we do not want to save any scratch data. Deserialisation clears out and sizes appropriately
+// the scratch data, in analogy with the copy constructor.
 template <typename T>
 void ed_data_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
+    // Start by saving the batch size and the order+1.
+    ar << static_cast<std::uint32_t>(m_d_tes.size());
+    ar << static_cast<std::uint32_t>(m_scal_poly.size());
+
     ar << m_tes;
     ar << m_ntes;
-    ar << m_ev_jet;
-    ar << m_ed_finite;
-    ar << m_max_abs_state;
-    ar << m_g_eps;
+    // NOTE: for m_ev_jet we save only the size.
+    ar << m_ev_jet.size();
     ar << m_te_cooldowns;
     ar << m_jit_data;
-    ar << m_fex_check_res;
-    ar << m_fex_check_enc;
-    ar << m_scal_poly;
     ar << m_frpr_ws;
-    // NOTE: we do NOT save m_poly_roots and m_ev_fex_check_res on purpose.
     ar << m_ev_signs_end_step;
-
-    // Save the batch size.
-    ar << static_cast<std::uint32_t>(m_d_tes.size());
-
-    // Save the capacities of m_d_tes.
-    for (const auto &v : m_d_tes) {
-        ar << v.capacity();
-    }
-
-    // Save the capacities of m_d_ntes.
-    for (const auto &v : m_d_ntes) {
-        ar << v.capacity();
-    }
 }
 
 template <typename T>
 void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
+    // Recover the batch size and the order+1.
+    std::uint32_t batch_size{};
+    ar >> batch_size;
+    std::uint32_t op1{};
+    ar >> op1;
+
     ar >> m_tes;
     ar >> m_ntes;
-    ar >> m_ev_jet;
-    ar >> m_ed_finite;
-    ar >> m_max_abs_state;
-    ar >> m_g_eps;
+
+    // Clear and resize m_ev_jet correctly.
+    m_ev_jet.clear();
+    decltype(m_ev_jet.size()) ev_jet_size{};
+    ar >> ev_jet_size;
+    m_ev_jet.resize(ev_jet_size);
+
     ar >> m_te_cooldowns;
     ar >> m_jit_data;
-    ar >> m_fex_check_res;
-    ar >> m_fex_check_enc;
-    ar >> m_scal_poly;
     ar >> m_frpr_ws;
     ar >> m_ev_signs_end_step;
 
-    // Recover the batch size.
-    std::uint32_t batch_size{};
-    ar >> batch_size;
-
-    // Recover m_d_tes.
+    // Reset the scratch data.
+    const auto clear_and_resize = [](auto &vec, const auto sz) {
+        vec.clear();
+        vec.resize(sz);
+    };
+    clear_and_resize(m_ed_finite, batch_size);
+    clear_and_resize(m_max_abs_state, batch_size);
+    clear_and_resize(m_g_eps, batch_size);
     m_d_tes.resize(batch_size);
     for (auto &v : m_d_tes) {
-        decltype(v.capacity()) cap{};
-        ar >> cap;
         v.clear();
-        v.reserve(cap);
     }
-
-    // Recover m_d_ntes.
     m_d_ntes.resize(batch_size);
     for (auto &v : m_d_ntes) {
-        decltype(v.capacity()) cap{};
-        ar >> cap;
         v.clear();
-        v.reserve(cap);
     }
+    clear_and_resize(m_fex_check_res, batch_size);
+    clear_and_resize(m_fex_check_enc, batch_size * 2u);
+    clear_and_resize(m_scal_poly, op1);
+    clear_and_resize(m_ev_fex_check_res,
+                     (static_cast<decltype(m_ev_fex_check_res.size())>(m_tes.size()) + m_ntes.size()) * batch_size);
 
     // Clear and reserve the capacity in m_cb_eptrs.
     m_cb_eptrs.clear();
@@ -876,17 +871,13 @@ void ed_data_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 
     // Clear out m_poly_roots.
     m_poly_roots.clear();
-
-    // NOTE: the content of this vector is not important, just make sure it is sized correctly.
-    m_ev_fex_check_res.resize((static_cast<decltype(m_ev_fex_check_res.size())>(m_tes.size()) + m_ntes.size())
-                              * batch_size);
 }
 
 // Implementation of event detection.
 //
 // NOTE: the list of detected events may contain duplicates which will have to be removed outside this function.
 //
-// NOTE: batch lanes whose flag in m_ed_finite is zero are skipped. The flags must be set by the caller before invoking
+// NOTE: batch lanes whose flag in m_ed_finite is false are skipped. The flags must be set by the caller before invoking
 // this function.
 template <typename T>
 void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t order, const std::uint32_t dim,
@@ -923,7 +914,7 @@ void ed_data_batch<T>::detect_events(const T *const h_ptr, const std::uint32_t o
             // Run event detection on all the batch elements.
             for (std::uint32_t j = 0; j < batch_size; ++j) {
                 // Check if we are in a lane which contains non-finite data.
-                if (m_ed_finite[j] == 0) [[unlikely]] {
+                if (!m_ed_finite[j]) [[unlikely]] {
                     continue;
                 }
 
