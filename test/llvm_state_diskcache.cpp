@@ -6,15 +6,23 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include <llvm/Config/llvm-config.h>
+
+#include <sqlite3.h>
+
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -522,4 +530,47 @@ TEST_CASE("diskcache entry too large")
     double out[] = {0};
     cf(out, std::vector{1., 2.});
     REQUIRE(out[0] == 3);
+}
+
+TEST_CASE("diskcache fingerprint")
+{
+    tmp_diskcache_dir tdd;
+    llvm_state::set_diskcache_enabled(true);
+    llvm_state::clear_memcache();
+
+    // Compile a cfunc - populates the disk cache.
+    cfunc<double> cf({"x"_var + "y"_var}, {"x"_var, "y"_var});
+    REQUIRE(llvm_state::get_diskcache_size() > 0);
+
+    // Assemble the expected fingerprint.
+    const auto &tf = detail::get_target_features();
+    const auto expected_fp = std::string("HEYOKA_VERSION=" HEYOKA_VERSION_STRING ";LLVM_VERSION=" LLVM_VERSION_STRING)
+                             + ";TARGET_TRIPLE=" + tf.triple + ";TARGET_CPU=" + tf.cpu
+                             + ";TARGET_FEATURES=" + tf.feature_string;
+
+    // Open a separate read-only connection to the database.
+    //
+    // NOTE: the connection is declared after tdd, so that it is closed before the temporary directory is removed.
+    sqlite3 *db_raw = nullptr;
+    const auto db_path = (tdd.tmp_path / "cache.db").string();
+    const auto open_ret = sqlite3_open_v2(db_path.c_str(), &db_raw, SQLITE_OPEN_READONLY, nullptr);
+    // NOTE: sqlite3_open_v2() may return a handle even on failure, which must be closed.
+    const std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(db_raw, &sqlite3_close);
+    REQUIRE(open_ret == SQLITE_OK);
+
+    sqlite3_stmt *stmt_raw = nullptr;
+    REQUIRE(sqlite3_prepare_v2(db.get(), "SELECT env_fingerprint FROM cache", -1, &stmt_raw, nullptr) == SQLITE_OK);
+    const std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)> stmt(stmt_raw, &sqlite3_finalize);
+
+    // Check the fingerprint of all entries.
+    std::size_t n_rows = 0;
+    int step_ret{};
+    while ((step_ret = sqlite3_step(stmt.get())) == SQLITE_ROW) {
+        const auto *const fp = reinterpret_cast<const char *>(sqlite3_column_text(stmt.get(), 0));
+        REQUIRE(fp != nullptr);
+        REQUIRE(std::string(fp) == expected_fp);
+        ++n_rows;
+    }
+    REQUIRE(step_ret == SQLITE_DONE);
+    REQUIRE(n_rows > 0u);
 }

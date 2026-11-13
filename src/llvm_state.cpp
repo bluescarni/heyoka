@@ -189,6 +189,11 @@ target_features get_target_features_impl()
     // Init the return value.
     target_features retval;
 
+    // Setup triple, cpu and feature_string.
+    retval.triple = (*tm)->getTargetTriple().str();
+    retval.cpu = (*tm)->getTargetCPU().str();
+    retval.feature_string = (*tm)->getTargetFeatureString().str();
+
     // Fetch the target name.
     const auto target_name = std::string{(*tm)->getTarget().getName()};
 
@@ -196,30 +201,26 @@ target_features get_target_features_impl()
     bool zen4_or_later = false;
 
     if (boost::starts_with(target_name, "x86")) {
-        const auto t_features = (*tm)->getTargetFeatureString();
-
-        if (boost::algorithm::contains(t_features, "+avx512f")) {
+        if (boost::algorithm::contains(retval.feature_string, "+avx512f")) {
             retval.avx512f = true;
         }
 
-        if (boost::algorithm::contains(t_features, "+avx2")) {
+        if (boost::algorithm::contains(retval.feature_string, "+avx2")) {
             retval.avx2 = true;
         }
 
-        if (boost::algorithm::contains(t_features, "+avx")) {
+        if (boost::algorithm::contains(retval.feature_string, "+avx")) {
             retval.avx = true;
         }
 
-        if (boost::algorithm::contains(t_features, "+sse2")) {
+        if (boost::algorithm::contains(retval.feature_string, "+sse2")) {
             retval.sse2 = true;
         }
 
         // Check if we are on Zen version 4 or later.
-        const auto target_cpu = std::string{(*tm)->getTargetCPU()};
         boost::cmatch m;
-        if (boost::regex_match(target_cpu.c_str(), m, zen_regex_pattern)) {
-            // The CPU name matches and contains a subgroup.
-            // Extract the N from "znverN".
+        if (boost::regex_match(retval.cpu.c_str(), m, zen_regex_pattern)) {
+            // The CPU name matches and contains a subgroup. Extract the N from "znverN".
             std::uint32_t zen_version{};
             const auto ret = std::from_chars(m[1].first, m[1].second, zen_version);
 
@@ -234,20 +235,16 @@ target_features get_target_features_impl()
     }
 
     if (boost::starts_with(target_name, "ppc")) {
-        // On powerpc, detect the presence of the VSX
-        // instruction set from the CPU string.
-        const auto target_cpu = std::string{(*tm)->getTargetCPU()};
-
+        // On powerpc, detect the presence of the VSX instruction set from the CPU string.
         boost::cmatch m;
 
-        if (boost::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
-            // The CPU name matches and contains a subgroup.
-            // Extract the N from "pwrN".
+        if (boost::regex_match(retval.cpu.c_str(), m, ppc_regex_pattern)) {
+            // The CPU name matches and contains a subgroup. Extract the N from "pwrN".
             std::uint32_t pwr_idx{};
             const auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
 
-            // NOTE: it looks like VSX3 is supported from Power9,
-            // VSX from Power7.
+            // NOTE: it looks like VSX3 is supported from Power9, VSX from Power7. See:
+            //
             // https://packages.gentoo.org/useflags/cpu_flags_ppc_vsx3
             if (ret.ec == std::errc{}) {
                 if (pwr_idx >= 9) {
@@ -267,9 +264,8 @@ target_features get_target_features_impl()
         retval.simd_size_flt = 16;
         retval.simd_size_dbl = 8;
     } else if (retval.avx512f || retval.avx2 || retval.avx) {
-        // NOTE: on Intel processors with avx512, it is difficult
-        // to establish whether or not 512-bit vectors are worth it.
-        // Let us be prudent about this.
+        // NOTE: on Intel processors with avx512, it is difficult to establish whether or not 512-bit vectors are worth
+        // it. Let us be prudent about this.
         retval.simd_size_flt = 8;
         retval.simd_size_dbl = 4;
     } else if (retval.sse2 || retval.aarch64 || retval.vsx || retval.vsx3) {
