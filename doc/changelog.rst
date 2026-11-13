@@ -35,6 +35,10 @@ New
 Changes
 ~~~~~~~
 
+- The on-disk cache now takes into account the target triple, CPU and CPU features of the host machine,
+  so that object code compiled on a machine with a different CPU is not reused (e.g., when the cache
+  directory is shared between machines via a network file system)
+  (`#570 <https://github.com/bluescarni/heyoka/pull/570>`__).
 - Zero and negative cooldown values for terminal events now raise an exception. In order to request the
   automatic deduction of the cooldown, the ``kw::cooldown`` keyword argument must now be omitted (or set to an
   empty ``std::optional``). Accordingly, the ``get_cooldown()`` member function of terminal events now returns
@@ -76,6 +80,10 @@ Changes
 Fix
 ~~~
 
+- Fix a noticeable lag on the first use of the on-disk cache due to an expensive integrity check.
+  The check has now been removed and errors due to a corrupted database are expected to surface either
+  as exceptions or warnings
+  (`#570 <https://github.com/bluescarni/heyoka/pull/570>`__).
 - Fix incorrect indexing into memory buffers with :math:`2^{31}` or more elements in JIT-compiled code
   (`#565 <https://github.com/bluescarni/heyoka/pull/565>`__).
 - Fix the relational ``neq()`` operator evaluating to false when one or both operands are NaN
