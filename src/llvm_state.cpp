@@ -217,6 +217,11 @@ target_features get_target_features_impl()
             retval.sse2 = true;
         }
 
+        // NOTE: this will catch also the fma4 instructions from earlier AMD processors.
+        if (boost::algorithm::contains(retval.feature_string, "+fma")) {
+            retval.sd_fma = true;
+        }
+
         // Check if we are on Zen version 4 or later.
         boost::cmatch m;
         if (boost::regex_match(retval.cpu.c_str(), m, zen_regex_pattern)) {
@@ -232,6 +237,8 @@ target_features get_target_features_impl()
 
     if (boost::starts_with(target_name, "aarch64")) {
         retval.aarch64 = true;
+        // NOTE: FMA is always available on 64-bit arm.
+        retval.sd_fma = true;
     }
 
     if (boost::starts_with(target_name, "ppc")) {
@@ -256,6 +263,11 @@ target_features get_target_features_impl()
                 }
             }
         }
+    }
+
+    if (boost::starts_with(target_name, "ppc64")) {
+        // NOTE: FMA is always available on 64-bit PPC.
+        retval.sd_fma = true;
     }
 
     // Compute the recommended SIMD sizes.

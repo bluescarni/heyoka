@@ -67,10 +67,12 @@ struct target_features {
     // aarch64.
     bool aarch64 = false;
     // powerpc64.
-    // NOTE: for now, in the sleef support
-    // bit we need only vsx and vsx3 (not vsx2).
+    //
+    // NOTE: for now, in the sleef support bit we need only vsx and vsx3 (not vsx2).
     bool vsx = false;
     bool vsx3 = false;
+    // Whether or not hardware FMA instructions are available for both single and double precision.
+    bool sd_fma = false;
     // Recommended SIMD sizes.
     std::uint32_t simd_size_flt = 1;
     std::uint32_t simd_size_dbl = 1;

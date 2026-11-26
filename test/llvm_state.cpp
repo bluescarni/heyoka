@@ -19,7 +19,10 @@
 #include <vector>
 
 #include <boost/predef/architecture.h>
+#include <boost/predef/compiler/clang.h>
+#include <boost/predef/compiler/gcc.h>
 #include <boost/predef/os.h>
+#include <boost/predef/other/wordsize.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -62,14 +65,9 @@ TEST_CASE("simd size")
 
     REQUIRE(recommended_simd_size<mppp::real>() == 1u);
 
-#if defined(__GNUC__)
-
-    // NOTE: Boost.Predef does not offer a specific check macro for 64-bit arm, thus we keep on using __aarch64__ here.
-#if BOOST_ARCH_X86_64 || defined(__aarch64__)
+#if BOOST_ARCH_X86_64 || (BOOST_ARCH_ARM && BOOST_ARCH_WORD_BITS_64)
     REQUIRE(recommended_simd_size<float>() >= 4u);
     REQUIRE(recommended_simd_size<double>() >= 2u);
-#endif
-
 #endif
 }
 
@@ -577,4 +575,20 @@ TEST_CASE("target properties")
     if (!tf.feature_string.empty()) {
         REQUIRE(ir.contains("\"target-features\"=\"" + tf.feature_string + "\""));
     }
+}
+
+// Test the detection of hardware FMA support.
+TEST_CASE("sd_fma")
+{
+    const auto &tf = detail::get_target_features();
+
+    // NOTE: FMA is always available on 64-bit arm and 64-bit powerpc.
+#if (BOOST_ARCH_ARM && BOOST_ARCH_WORD_BITS_64) || BOOST_ARCH_PPC_64
+    REQUIRE(tf.sd_fma);
+#endif
+
+#if (BOOST_COMP_GNUC || BOOST_COMP_CLANG) && BOOST_ARCH_X86
+    // NOTE: on x86, cross-check against the CPU detection of the compiler runtime. Both FMA3 and FMA4 count.
+    REQUIRE(tf.sd_fma == (__builtin_cpu_supports("fma") != 0 || __builtin_cpu_supports("fma4") != 0));
+#endif
 }
