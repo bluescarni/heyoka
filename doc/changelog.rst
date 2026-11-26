@@ -1,6 +1,16 @@
 Changelog
 =========
 
+7.15.0 (unreleased)
+-------------------
+
+Fix
+~~~
+
+- Fix a compilation failure on platforms where explicit specialisations of ``std::less`` are
+  ignored
+  (`#573 <https://github.com/bluescarni/heyoka/pull/573>`__).
+
 7.14.0 (2026-11-14)
 -------------------
 
