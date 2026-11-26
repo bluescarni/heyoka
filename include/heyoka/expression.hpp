@@ -349,6 +349,7 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real);
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator<(const expression &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
@@ -678,8 +679,6 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
-
 // Concepts for the cfunc class.
 template <typename T, typename R>
 concept cfunc_out_range_1d = requires(R &r) {
@@ -982,15 +981,6 @@ struct hash<heyoka::expression> {
     size_t operator()(const heyoka::expression &ex) const noexcept
     {
         return heyoka::detail::hash(ex);
-    }
-};
-
-// Specialisation of std::less for expression.
-template <>
-struct less<heyoka::expression> {
-    bool operator()(const heyoka::expression &ex1, const heyoka::expression &ex2) const
-    {
-        return heyoka::detail::ex_less_than(ex1, ex2);
     }
 };
 
