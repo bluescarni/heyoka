@@ -49,7 +49,6 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/safe_integer.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -1228,55 +1227,6 @@ std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expressi
     }
 
     return retval;
-}
-
-// NOTE: this does not have any specific mathematical meaning, it
-// is just used to impose an ordering on expressions.
-bool ex_less_than(const expression &e1, const expression &e2)
-{
-    return std::visit(
-        [](const auto &v1, const auto &v2) {
-            using type1 = std::remove_cvref_t<decltype(v1)>;
-            using type2 = std::remove_cvref_t<decltype(v2)>;
-
-            if constexpr (std::is_same_v<type1, type2>) {
-                // Handle the cases where v1 and v2
-                // are the same type.
-                if constexpr (std::is_same_v<variable, type1>) {
-                    // Both arguments are variables: use lexicographic comparison.
-                    return v1.name() < v2.name();
-                } else if constexpr (std::is_same_v<param, type1>) {
-                    // Both arguments are params: compare the indices.
-                    return v1.idx() < v2.idx();
-                } else if constexpr (std::is_same_v<number, type1>) {
-                    // Both arguments are numbers: compare.
-                    return v1 < v2;
-                } else if constexpr (std::is_same_v<func, type1>) {
-                    // Both arguments are functions: compare.
-                    return v1 < v2;
-                } else {
-                    static_assert(always_false_v<type1>);
-                }
-            } else {
-                // Handle mixed types.
-                if constexpr (std::is_same_v<number, type1>) {
-                    // Number is always less than non-number.
-                    return true;
-                } else if constexpr (std::is_same_v<func, type1>) {
-                    // Function never less than non-function.
-                    return false;
-                } else if constexpr (std::is_same_v<variable, type1>) {
-                    // Variable less than function, greater than anything elses.
-                    return std::is_same_v<type2, func>;
-                } else if constexpr (std::is_same_v<param, type1>) {
-                    // Param greater than number, less than anything else.
-                    return !std::is_same_v<type2, number>;
-                } else {
-                    static_assert(always_false_v<type1>);
-                }
-            }
-        },
-        e1.value(), e2.value());
 }
 
 } // namespace detail

@@ -11,6 +11,7 @@
 #include <variant>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
@@ -270,6 +271,51 @@ bool operator==(const expression &e1, const expression &e2) noexcept
 bool operator!=(const expression &e1, const expression &e2) noexcept
 {
     return !(e1 == e2);
+}
+
+// NOTE: this does not have any specific mathematical meaning, it is just used to impose an ordering on expressions.
+bool operator<(const expression &e1, const expression &e2)
+{
+    return std::visit(
+        []<typename T, typename U>(const T &v1, const U &v2) {
+            if constexpr (std::is_same_v<T, U>) {
+                // Handle the cases where v1 and v2
+                // are the same type.
+                if constexpr (std::is_same_v<variable, T>) {
+                    // Both arguments are variables: use lexicographic comparison.
+                    return v1.name() < v2.name();
+                } else if constexpr (std::is_same_v<param, T>) {
+                    // Both arguments are params: compare the indices.
+                    return v1.idx() < v2.idx();
+                } else if constexpr (std::is_same_v<number, T>) {
+                    // Both arguments are numbers: compare.
+                    return v1 < v2;
+                } else if constexpr (std::is_same_v<func, T>) {
+                    // Both arguments are functions: compare.
+                    return v1 < v2;
+                } else {
+                    static_assert(detail::always_false_v<T>);
+                }
+            } else {
+                // Handle mixed types.
+                if constexpr (std::is_same_v<number, T>) {
+                    // Number is always less than non-number.
+                    return true;
+                } else if constexpr (std::is_same_v<func, T>) {
+                    // Function never less than non-function.
+                    return false;
+                } else if constexpr (std::is_same_v<variable, T>) {
+                    // Variable less than function, greater than anything elses.
+                    return std::is_same_v<U, func>;
+                } else if constexpr (std::is_same_v<param, T>) {
+                    // Param greater than number, less than anything else.
+                    return !std::is_same_v<U, number>;
+                } else {
+                    static_assert(detail::always_false_v<T>);
+                }
+            }
+        },
+        e1.value(), e2.value());
 }
 
 HEYOKA_END_NAMESPACE

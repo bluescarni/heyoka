@@ -556,13 +556,11 @@ bool operator<(const func &a, const func &b)
     }
 
     // Run a lexicographical compare.
-    if (std::lexicographical_compare(a.args().begin(), a.args().end(), b.args().begin(), b.args().end(),
-                                     std::less<expression>{})) {
+    if (std::lexicographical_compare(a.args().begin(), a.args().end(), b.args().begin(), b.args().end())) {
         return true;
     }
 
-    if (std::lexicographical_compare(b.args().begin(), b.args().end(), a.args().begin(), a.args().end(),
-                                     std::less<expression>{})) {
+    if (std::lexicographical_compare(b.args().begin(), b.args().end(), a.args().begin(), a.args().end())) {
         return false;
     }
 
