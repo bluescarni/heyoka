@@ -44,6 +44,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -67,10 +68,12 @@ struct target_features {
     // aarch64.
     bool aarch64 = false;
     // powerpc64.
-    // NOTE: for now, in the sleef support
-    // bit we need only vsx and vsx3 (not vsx2).
+    //
+    // NOTE: for now, in the sleef support bit we need only vsx and vsx3 (not vsx2).
     bool vsx = false;
     bool vsx3 = false;
+    // Whether or not hardware FMA instructions are available for single/double precision scalar/vector datatypes.
+    bool sd_fma = false;
     // Recommended SIMD sizes.
     std::uint32_t simd_size_flt = 1;
     std::uint32_t simd_size_dbl = 1;
@@ -89,36 +92,8 @@ HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
 
-template <typename T>
-inline std::uint32_t recommended_simd_size()
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return 0;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<float>();
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<double>();
-
-#if defined(HEYOKA_HAVE_LONG_DOUBLE)
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
-
-#endif
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
+template <supported_fp_type>
+std::uint32_t recommended_simd_size();
 
 // Code model.
 //
@@ -129,7 +104,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, code_model);
 
 HEYOKA_END_NAMESPACE
 
-// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
+// fmt formatter for heyoka::code_model, implemented on top of the streaming operator.
 namespace fmt
 {
 

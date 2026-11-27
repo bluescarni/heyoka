@@ -24,6 +24,7 @@
 #include <llvm/ADT/FloatingPointMode.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/FMF.h>
@@ -31,6 +32,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -260,6 +262,41 @@ llvm::Value *avx512_binop_up(llvm_state &s, const std::string_view op, llvm::Val
     return builder.CreateExtractElement(res_vec, static_cast<std::uint64_t>(0));
 }
 
+// Helper to compute a*b+c with a single rounding toward +inf, via the AVX512 FMA intrinsics with static rounding. a, b
+// and c must be of the same type, which must be either float/double or a 512-bit vector of float/double (i.e., of size
+// 16/8).
+llvm::Value *avx512_fma_up(llvm_state &s, llvm::Value *const a, llvm::Value *const b, llvm::Value *const c)
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(c != nullptr);
+    assert(a->getType() == b->getType());
+    assert(a->getType() == c->getType());
+
+    auto &builder = s.builder();
+
+    auto *const x_t = a->getType();
+    const auto *const scal_t = x_t->getScalarType();
+    assert(scal_t->isFloatTy() || scal_t->isDoubleTy());
+    const auto is_double = scal_t->isDoubleTy();
+
+    // The rounding argument: rounding toward +inf (_MM_FROUND_TO_POS_INF == 2) with suppression of all floating-point
+    // exceptions (_MM_FROUND_NO_EXC == 8).
+    auto *const rnd = builder.getInt32(10);
+
+    if (llvm::isa<llvm::FixedVectorType>(x_t)) {
+        // 512-bit vectors: use the packed intrinsics.
+        assert(llvm::cast<llvm::FixedVectorType>(x_t)->getNumElements() == (is_double ? 8u : 16u));
+
+        return llvm_invoke_intrinsic(builder, fmt::format("llvm.x86.avx512.vfmadd.{}.512", is_double ? "pd" : "ps"), {},
+                                     {a, b, c, rnd});
+    }
+
+    // Scalars: unlike the binary operations, the scalar FMA intrinsics operate directly on scalar values.
+    return llvm_invoke_intrinsic(builder, fmt::format("llvm.x86.avx512.vfmadd.{}", is_double ? "f64" : "f32"), {},
+                                 {a, b, c, rnd});
+}
+
 // Helper to widen a size-2 float/double SIMD vector to the full 512-bit AVX512 size.
 llvm::Value *avx512_widen_vec2(llvm_state &s, llvm::Value *const x)
 {
@@ -295,6 +332,50 @@ llvm::Value *avx512_shrink_to_vec2(llvm_state &s, llvm::Value *const x)
 }
 
 // LCOV_EXCL_STOP
+
+// Helper to compute a*b+c with a single rounding according to the current dynamic rounding mode, using the constrained
+// FMA intrinsic if a hardware FMA instruction is available on the current platform for the input types. Otherwise, the
+// operation is decomposed into a multiplication followed by an addition (i.e., two roundings).
+//
+// The builder must have been set up for constrained operations, and the function being generated must have the strictfp
+// attribute (llvm_ival_guard does both in portable mode).
+llvm::Value *llvm_constrained_fma(llvm_state &s, llvm::Value *const a, llvm::Value *const b, llvm::Value *const c)
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(c != nullptr);
+    assert(a->getType() == b->getType());
+    assert(a->getType() == c->getType());
+    assert(s.builder().getIsFPConstrained());
+    assert(s.builder().GetInsertBlock() != nullptr);
+    assert(s.builder().GetInsertBlock()->getParent() != nullptr);
+    assert(s.builder().GetInsertBlock()->getParent()->hasFnAttribute(llvm::Attribute::StrictFP));
+
+    // Fetch the type and scalar type of the arguments.
+    auto *const val_t = a->getType();
+    const auto *const scal_fp_t = val_t->getScalarType();
+
+    if ((scal_fp_t->isDoubleTy() || scal_fp_t->isFloatTy()) && get_target_features().sd_fma) {
+        // We are working with single/double precision FP and the hardware FMA instruction is available: use the
+        // constrained FMA intrinsic.
+        //
+        // NOTE: we cannot use llvm_fma() here, as it emits the non-constrained llvm.fma() intrinsic.
+        // CreateConstrainedFPCall() fills in the rounding and exception arguments of the constrained intrinsic from the
+        // builder.
+        auto *const fma_f =
+#if LLVM_VERSION_MAJOR < 20
+            llvm::Intrinsic::getDeclaration(&s.module(), llvm::Intrinsic::experimental_constrained_fma, {val_t});
+#else
+            llvm::Intrinsic::getOrInsertDeclaration(&s.module(), llvm::Intrinsic::experimental_constrained_fma,
+                                                    {val_t});
+#endif
+        return s.builder().CreateConstrainedFPCall(fma_f, {a, b, c});
+    }
+
+    // No dedicated FMA hardware instruction available for this type/platform combination, decompose as mul+add.
+    auto *const tmp = llvm_fmul(s, a, b);
+    return llvm_fadd(s, tmp, c);
+}
 
 } // namespace
 
@@ -505,13 +586,6 @@ struct llvm_ival_guard::impl {
         return val_arith_op_up("add", llvm_fadd, a, b);
     }
 
-    // Helper to compute a - b rounded toward +inf, where the type of a and b is assumed to be the value type of the
-    // interval (i.e., a and b are interval bounds, not intervals).
-    llvm::Value *val_sub_up(llvm::Value *const a, llvm::Value *const b) const
-    {
-        return val_arith_op_up("sub", llvm_fsub, a, b);
-    }
-
     // Helper to compute a * b rounded toward +inf, where the type of a and b is assumed to be the value type of the
     // interval (i.e., a and b are interval bounds, not intervals).
     llvm::Value *val_mul_up(llvm::Value *const a, llvm::Value *const b) const
@@ -524,6 +598,38 @@ struct llvm_ival_guard::impl {
     llvm::Value *val_div_up(llvm::Value *const a, llvm::Value *const b) const
     {
         return val_arith_op_up("div", llvm_fdiv, a, b);
+    }
+
+    // Helper to compute a*b+c rounded toward +inf, where the type of a, b and c is assumed to be the value type of the
+    // interval (i.e., a, b and c are interval bounds, not intervals). If an FMA primitive is available, a single
+    // rounding will be performed, otherwise the computation will be decomposed into a multiplication followed by an
+    // addition, and two roundings will be performed.
+    llvm::Value *val_fma_up(llvm::Value *const a, llvm::Value *const b, llvm::Value *const c) const
+    {
+        assert(a != nullptr);
+        assert(b != nullptr);
+        assert(c != nullptr);
+        assert(a->getType() == b->getType());
+        assert(a->getType() == c->getType());
+        assert(a->getType() == m_val_t);
+
+        switch (m_mode) {
+            // LCOV_EXCL_START
+            case ival_mode::avx512:
+                return avx512_fma_up(m_state, a, b, c);
+                // LCOV_EXCL_STOP
+            case ival_mode::multiprecision:
+                // NOTE: explicit rounding mode passed to the MPFR primitive.
+                //
+                // NOTE: real_nary_op() may generate a wrapper function here. This is allowed while the guard is
+                // alive, see the class documentation in llvm_helpers.hpp.
+                assert(!m_val_t->isVectorTy());
+                return m_state.builder().CreateCall(real_nary_op(m_state, m_val_t, "mpfr_fma", 3, MPFR_RNDU),
+                                                    {a, b, c});
+            default:
+                assert(m_mode == ival_mode::portable);
+                return llvm_constrained_fma(m_state, a, b, c);
+        }
     }
 };
 
@@ -654,36 +760,6 @@ llvm::Value *llvm_ival_guard::ival_add(llvm::Value *const a, llvm::Value *const 
     }
 }
 
-// Helper to compute the sum of an interval a and a point b.
-//
-// b must be finite.
-llvm::Value *llvm_ival_guard::ival_add_val(llvm::Value *const a, llvm::Value *const b) const
-{
-    assert(a != nullptr);
-    assert(a->getType() == m_impl->m_ival_t);
-    assert(b != nullptr);
-    assert(b->getType() == m_impl->m_val_t);
-
-    if (const auto *const ival_t = m_impl->m_ival_t; ival_t->isVectorTy()) {
-        // For the vector implementation, we construct an interval from b and then add it to a.
-        auto *const b_ival = ival_construct(val_neg(b), b);
-        return ival_add(a, b_ival);
-    } else {
-        // For the struct implementation, we can optimise slightly by replacing a neg+sum with a sub.
-        assert(ival_t->isStructTy());
-
-        // Extract the components of a.
-        const auto [a_mlo, a_hi] = ival_extract(a);
-
-        // Compute the addition.
-        auto *const ret_mlo = m_impl->val_sub_up(a_mlo, b);
-        auto *const ret_hi = m_impl->val_add_up(a_hi, b);
-
-        // Construct and return the result.
-        return ival_construct(ret_mlo, ret_hi);
-    }
-}
-
 // Helper to negate a, where the type of a is assumed to be the value type of the interval.
 //
 // NOTE: negation is exact. For builtin FP types and vector counterparts, this emits an fneg instruction (which has
@@ -694,102 +770,6 @@ llvm::Value *llvm_ival_guard::val_neg(llvm::Value *const a) const
     assert(a->getType() == m_impl->m_val_t);
 
     return llvm_fneg(m_impl->m_state, a);
-}
-
-// Multiply the interval a by the interval [0, b], where b is a non-negative value.
-//
-// The standard interval arithmetic formula is:
-//
-// [lo, hi] * [0, b] = [min(lo*0, lo*b, hi*0, hi*b), max(lo*0, lo*b, hi*0, hi*b)],
-//
-// which simplifies to [min(lo*b, 0), max(hi*b, 0)], because lo<=hi and b>=0. Note that the simplification relies on
-// hi*0 and lo*0 going to zero, which looks a bit iffy if hi/lo are infinite. We will be assuming here that infinities
-// in the interval a originate from overflow, not from poles/singularities. The infinities can thus be regarded as
-// representing large values that, when multiplied by zero, produce zero as a result, thus the simplification still
-// holds.
-//
-// Because in our internal representation we are carrying around mlo=-lo, instead of lo, the final formula is:
-//
-// (mlo, hi) * (0, b) = (max(mlo*b, 0), max(hi*b, 0))
-//
-// where the two multiplications are performed while rounding up.
-//
-// In order to guarantee that the interval returned by this function is valid, if b is zero then no bound of a may be
-// infinite, and if b is +inf, no interval bound may be zero.
-llvm::Value *llvm_ival_guard::ival_mul_zlb(llvm::Value *const a, llvm::Value *const b) const
-{
-    assert(a != nullptr);
-    assert(a->getType() == m_impl->m_ival_t);
-    assert(b != nullptr);
-    assert(b->getType() == m_impl->m_val_t);
-
-    if (auto *const ival_t = m_impl->m_ival_t; ival_t->isVectorTy()) {
-        auto &s = m_impl->m_state;
-        auto &bld = s.builder();
-
-        // Splat b into a size-2 vector.
-        auto *const b_vec = bld.CreateVectorSplat(2, b);
-
-        // Compute the multiplications with a single rounding-up size-2 vector mul.
-        llvm::Value *mul_res = nullptr;
-        // LCOV_EXCL_START
-        if (m_impl->m_mode == ival_mode::avx512) {
-            // Widen to full 512-bit vectors.
-            auto *const aw = avx512_widen_vec2(s, a);
-            auto *const bw = avx512_widen_vec2(s, b_vec);
-
-            // 512-bit multiplication with static rounding up: avx512_binop_up() already handles 512-bit vectors.
-            auto *const rw = avx512_binop_up(s, "mul", aw, bw);
-
-            // Narrow back to the first two lanes.
-            mul_res = avx512_shrink_to_vec2(s, rw);
-        } else {
-            // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
-            // builder is set up to emit constrained operations, hence we can just mul the vectors component-wise.
-            assert(m_impl->m_mode == ival_mode::portable);
-            mul_res = llvm_fmul(s, a, b_vec);
-        }
-        // LCOV_EXCL_STOP
-
-        // Run the max with zero.
-        auto *const zero = llvm_constantfp(s, ival_t, 0.);
-
-        // NOTE: if possible we use maximumnum(), with the same caveats as explained in impl::val_max(). Otherwise, we
-        // use an fcmp olt + select: in portable mode the constrained intrinsic will be used, in AVX512 mode a plain
-        // fcmp will be issued. Either way, comparisons are not affected by FP rounding.
-        //
-        // NOTE: the behaviour of this block is essentially equivalent to impl::val_max(). Note that mul_res cannot
-        // contain NaN under the function's preconditions, and the sign of a zero in mul_res is irrelevant. Also note
-        // that we don't apply the workarounds from impl::val_lt() here: we are sure that ival_t is a vector of
-        // float/double, for which LLVM lowers constrained comparisons correctly, and a vector compare + select does not
-        // produce a branch.
-#if LLVM_VERSION_MAJOR >= 22
-        auto *const ret = bld.CreateMaximumNum(mul_res, zero);
-#else
-        auto *const ret = bld.CreateSelect(llvm_fcmp_olt(s, mul_res, zero), zero, mul_res);
-#endif
-
-        return ret;
-    } else {
-        assert(ival_t->isStructTy());
-
-        // Extract the components of a.
-        const auto [a_mlo, a_hi] = ival_extract(a);
-
-        // Compute the multiplications.
-        auto *const mul_mlo = m_impl->val_mul_up(a_mlo, b);
-        auto *const mul_hi = m_impl->val_mul_up(a_hi, b);
-
-        // Compute the result's components.
-        auto *const zero = llvm_constantfp(m_impl->m_state, m_impl->m_val_t, 0.);
-        // NOTE: val_max() is safe here, mul_mlo and mul_hi cannot be NaN under the function's preconditions, and the
-        // sign of a zero result is irrelevant.
-        auto *const ret_mlo = m_impl->val_max(mul_mlo, zero);
-        auto *const ret_hi = m_impl->val_max(mul_hi, zero);
-
-        // Construct and return the result.
-        return ival_construct(ret_mlo, ret_hi);
-    }
 }
 
 // Multiply the interval a by the non-negative value b.
@@ -856,6 +836,237 @@ llvm::Value *llvm_ival_guard::ival_mul_nn_val(llvm::Value *const a, llvm::Value 
 
         // Construct and return the result.
         return ival_construct(mul_mlo, mul_hi);
+    }
+}
+
+// Compute a*b + c, where a is an interval, b is a non-negative value and c is an interval.
+//
+// The standard interval arithmetic formulae for the multiplication of an interval by a value and for the sum of two
+// intervals are:
+//
+// [lo, hi] * [b, b] = [min(lo*b, lo*b, hi*b, hi*b), max(lo*b, lo*b, hi*b, hi*b)],
+// [x_lo, x_hi] + [c_lo, c_hi] = [x_lo + c_lo, x_hi + c_hi].
+//
+// Because lo<=hi and b>=0, the first formula simplifies to [lo*b, hi*b] (see ival_mul_nn_val()). Combining the two
+// formulae, we obtain:
+//
+// [lo, hi] * [b, b] + [c_lo, c_hi] = [lo*b + c_lo, hi*b + c_hi].
+//
+// That is, each bound of the result is a multiply-add of the corresponding bounds of the inputs. In floating-point
+// arithmetic, the lower bound must be rounded down and the upper bound must be rounded up, so that the computed result
+// encloses the exact one.
+//
+// Because in our internal representation we are carrying around mlo=-lo, instead of lo, the lower bound of the result
+// becomes:
+//
+// -(lo*b + c_lo) = (-lo)*b + (-c_lo) = mlo*b + c_mlo,
+//
+// and rounding the lower bound down is equivalent to rounding its negation up. Thus, the final result is:
+//
+// (mlo*b + c_mlo, hi*b + c_hi),
+//
+// where both multiply-adds are performed while rounding up. In other words, in the lo-negated representation this
+// operation is a component-wise multiply-add of (mlo, hi) by (b, b) and (c_mlo, c_hi).
+//
+// If an FMA primitive is available, each multiply-add is computed with a single rounding (see impl::val_fma_up()), and
+// the result is never wider than the one computed by ival_add(ival_mul_nn_val(a, b), c), which rounds twice per bound.
+// Otherwise, each multiply-add is decomposed into a multiplication followed by an addition, and the result is identical
+// to the one computed by ival_add(ival_mul_nn_val(a, b), c).
+//
+// In order to guarantee that the interval returned by this function is valid, the preconditions are the same as in
+// ival_mul_nn_val(), that is, b must be finite and, if b is zero, no bound of a may be infinite. Under these
+// preconditions, no NaN can be generated: no bound of a valid interval is -inf in the lo-negated representation, hence
+// neither the products nor the bounds of c can be -inf, and inf-inf cannot occur in the sums. These preconditions and
+// the validity guarantee hold regardless of whether the multiply-adds are fused or decomposed.
+llvm::Value *llvm_ival_guard::ival_mul_nn_val_add(llvm::Value *const a, llvm::Value *const b,
+                                                  llvm::Value *const c) const
+{
+    assert(a != nullptr);
+    assert(a->getType() == m_impl->m_ival_t);
+    assert(b != nullptr);
+    assert(b->getType() == m_impl->m_val_t);
+    assert(c != nullptr);
+    assert(c->getType() == m_impl->m_ival_t);
+
+    if (const auto *const ival_t = m_impl->m_ival_t; ival_t->isVectorTy()) {
+        auto &s = m_impl->m_state;
+        auto &bld = s.builder();
+
+        // Splat b into a size-2 vector.
+        auto *const b_vec = bld.CreateVectorSplat(2, b);
+
+        // Compute the multiply-adds with a single rounding-up size-2 vector FMA, if possible.
+        llvm::Value *fma_res = nullptr;
+        // LCOV_EXCL_START
+        if (m_impl->m_mode == ival_mode::avx512) {
+            // Widen to full 512-bit vectors.
+            auto *const aw = avx512_widen_vec2(s, a);
+            auto *const bw = avx512_widen_vec2(s, b_vec);
+            auto *const cw = avx512_widen_vec2(s, c);
+
+            // 512-bit FMA with static rounding up: avx512_fma_up() already handles 512-bit vectors.
+            auto *const rw = avx512_fma_up(s, aw, bw, cw);
+
+            // Narrow back to the first two lanes.
+            fma_res = avx512_shrink_to_vec2(s, rw);
+        } else {
+            // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
+            // builder is set up to emit constrained operations, hence we can just apply the FMA to the vectors
+            // component-wise.
+            assert(m_impl->m_mode == ival_mode::portable);
+            fma_res = llvm_constrained_fma(s, a, b_vec, c);
+        }
+        // LCOV_EXCL_STOP
+
+        return fma_res;
+    } else {
+        assert(ival_t->isStructTy());
+
+        // Extract the components of a and c.
+        const auto [a_mlo, a_hi] = ival_extract(a);
+        const auto [c_mlo, c_hi] = ival_extract(c);
+
+        // Compute the multiply-adds.
+        auto *const ret_mlo = m_impl->val_fma_up(a_mlo, b, c_mlo);
+        auto *const ret_hi = m_impl->val_fma_up(a_hi, b, c_hi);
+
+        // Construct and return the result.
+        return ival_construct(ret_mlo, ret_hi);
+    }
+}
+
+// Compute a*[0, b] + c, where a is an interval, b is a non-negative value and c is a finite value.
+//
+// The standard interval arithmetic formulae for the multiplication of two intervals and for the sum of an interval and
+// a value are:
+//
+// [lo, hi] * [0, b] = [min(lo*0, lo*b, hi*0, hi*b), max(lo*0, lo*b, hi*0, hi*b)],
+// [x_lo, x_hi] + [c, c] = [x_lo + c, x_hi + c].
+//
+// Because lo<=hi and b>=0, the first formula simplifies to [min(lo*b, 0), max(hi*b, 0)]. Note that the simplification
+// relies on hi*0 and lo*0 going to zero, which looks a bit iffy if hi/lo are infinite. We will be assuming here that
+// infinities in the interval a originate from overflow, not from poles/singularities. The infinities can thus be
+// regarded as representing large values that, when multiplied by zero, produce zero as a result, thus the
+// simplification still holds. Combining the two formulae, we obtain:
+//
+// [lo, hi] * [0, b] + [c, c] = [min(lo*b, 0) + c, max(hi*b, 0) + c].
+//
+// Adding c preserves the ordering of real numbers, hence the addition can be moved inside the min/max via the
+// identities min(x, 0) + c = min(x + c, c) and max(x, 0) + c = max(x + c, c):
+//
+// [lo, hi] * [0, b] + [c, c] = [min(lo*b + c, c), max(hi*b + c, c)].
+//
+// That is, each bound of the result is a multiply-add of the corresponding bound of a, followed by a min/max with c. In
+// floating-point arithmetic, the lower bound must be rounded down and the upper bound must be rounded up, so that the
+// computed result encloses the exact one. The min/max operations are exact (they just select one of their arguments),
+// hence only the multiply-adds need to be rounded.
+//
+// Because in our internal representation we are carrying around mlo=-lo, instead of lo, the lower bound of the result
+// becomes:
+//
+// -min(lo*b + c, c) = max(-(lo*b + c), -c) = max(mlo*b - c, -c),
+//
+// and rounding the lower bound down is equivalent to rounding its negation up. Thus, the final result is:
+//
+// (max(mlo*b - c, -c), max(hi*b + c, c)),
+//
+// where both multiply-adds are performed while rounding up. In other words, in the lo-negated representation this
+// operation is a component-wise multiply-add of (mlo, hi) by (b, b) and (-c, c), followed by a component-wise max with
+// (-c, c). Rounding the multiply-adds up before the max is valid because max is monotone, i.e., max(x', y) >= max(x, y)
+// for x' >= x.
+//
+// If an FMA primitive is available, each multiply-add is computed with a single rounding (see impl::val_fma_up()).
+// Otherwise, each multiply-add is decomposed into a multiplication followed by an addition, and two roundings are
+// performed.
+//
+// In order to guarantee that the interval returned by this function is valid, if b is zero then no bound of a may be
+// infinite, if b is +inf then no bound of a may be zero, and c must be finite. Under these preconditions, no NaN can be
+// generated: the products cannot be inf*0, and, because c is finite, the sums cannot be inf-inf (a product of -inf,
+// which can occur if b is +inf, just yields -inf, which is then replaced by -c or c in the max). These preconditions
+// and the validity guarantee hold regardless of whether the multiply-adds are fused or decomposed.
+llvm::Value *llvm_ival_guard::ival_mul_zlb_add_val(llvm::Value *const a, llvm::Value *const b,
+                                                   llvm::Value *const c) const
+{
+    assert(a != nullptr);
+    assert(a->getType() == m_impl->m_ival_t);
+    assert(b != nullptr);
+    assert(b->getType() == m_impl->m_val_t);
+    assert(c != nullptr);
+    assert(c->getType() == m_impl->m_val_t);
+
+    if (const auto *const ival_t = m_impl->m_ival_t; ival_t->isVectorTy()) {
+        auto &s = m_impl->m_state;
+        auto &bld = s.builder();
+
+        // Splat b into a size-2 vector.
+        auto *const b_vec = bld.CreateVectorSplat(2, b);
+
+        // Construct the size-2 vector (-c, c).
+        auto *const c_vec = ival_construct(val_neg(c), c);
+
+        // Compute the multiply-adds with a single rounding-up size-2 vector FMA.
+        llvm::Value *fma_res = nullptr;
+        // LCOV_EXCL_START
+        if (m_impl->m_mode == ival_mode::avx512) {
+            // Widen to full 512-bit vectors.
+            auto *const aw = avx512_widen_vec2(s, a);
+            auto *const bw = avx512_widen_vec2(s, b_vec);
+            auto *const cw = avx512_widen_vec2(s, c_vec);
+
+            // 512-bit FMA with static rounding up: avx512_fma_up() already handles 512-bit vectors.
+            auto *const rw = avx512_fma_up(s, aw, bw, cw);
+
+            // Narrow back to the first two lanes.
+            fma_res = avx512_shrink_to_vec2(s, rw);
+        } else {
+            // NOTE: if we get here, we must be in portable mode. The rounding has been set to up by the guard and the
+            // builder is set up to emit constrained operations, hence we can just apply the FMA to the vectors
+            // component-wise.
+            assert(m_impl->m_mode == ival_mode::portable);
+            fma_res = llvm_constrained_fma(s, a, b_vec, c_vec);
+        }
+        // LCOV_EXCL_STOP
+
+        // Run the max with (-c, c).
+        //
+        // NOTE: if possible we use maximumnum(), with the same caveats as explained in impl::val_max(). Otherwise, we
+        // use an fcmp olt + select: in portable mode the constrained intrinsic will be used, in AVX512 mode a plain
+        // fcmp will be issued. Either way, comparisons are not affected by FP rounding.
+        //
+        // NOTE: the behaviour of this block is essentially equivalent to impl::val_max(). Note that fma_res cannot
+        // contain NaN under the function's preconditions, and the sign of a zero in the result is irrelevant. Also note
+        // that we don't apply the workarounds from impl::val_lt() here: we are sure that ival_t is a vector of
+        // float/double, for which LLVM lowers constrained comparisons correctly, and a vector compare + select does not
+        // produce a branch.
+#if LLVM_VERSION_MAJOR >= 22
+        auto *const ret = bld.CreateMaximumNum(fma_res, c_vec);
+#else
+        auto *const ret = bld.CreateSelect(llvm_fcmp_olt(s, fma_res, c_vec), c_vec, fma_res);
+#endif
+
+        return ret;
+    } else {
+        assert(ival_t->isStructTy());
+
+        // Extract the components of a.
+        const auto [a_mlo, a_hi] = ival_extract(a);
+
+        // Compute -c.
+        auto *const neg_c = val_neg(c);
+
+        // Compute the multiply-adds.
+        auto *const fma_mlo = m_impl->val_fma_up(a_mlo, b, neg_c);
+        auto *const fma_hi = m_impl->val_fma_up(a_hi, b, c);
+
+        // Compute the result's components.
+        //
+        // NOTE: val_max() is safe here, fma_mlo and fma_hi cannot be NaN under the function's preconditions, and the
+        // sign of a zero result is irrelevant.
+        auto *const ret_mlo = m_impl->val_max(fma_mlo, neg_c);
+        auto *const ret_hi = m_impl->val_max(fma_hi, c);
+
+        // Construct and return the result.
+        return ival_construct(ret_mlo, ret_hi);
     }
 }
 
@@ -990,6 +1201,12 @@ llvm::Value *llvm_ival_guard::val_abs(llvm::Value *const a) const
     assert(a->getType() == m_impl->m_val_t);
 
     return llvm_abs(m_impl->m_state, a);
+}
+
+// NOTE: this is the public facing version of impl::val_fma_up(), see the docs there.
+llvm::Value *llvm_ival_guard::val_fma_up(llvm::Value *const a, llvm::Value *const b, llvm::Value *const c) const
+{
+    return m_impl->val_fma_up(a, b, c);
 }
 
 // Helper to detect if the interval a does NOT contain zero.

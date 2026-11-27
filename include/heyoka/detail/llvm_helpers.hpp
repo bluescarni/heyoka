@@ -233,10 +233,11 @@ public:
 
     [[nodiscard]] llvm::Value *val_neg(llvm::Value *) const;
     [[nodiscard]] llvm::Value *val_abs(llvm::Value *) const;
+    [[nodiscard]] llvm::Value *val_fma_up(llvm::Value *, llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *ival_add(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *ival_add_val(llvm::Value *, llvm::Value *) const;
-    [[nodiscard]] llvm::Value *ival_mul_zlb(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *ival_mul_nn_val(llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_nn_val_add(llvm::Value *, llvm::Value *, llvm::Value *) const;
+    [[nodiscard]] llvm::Value *ival_mul_zlb_add_val(llvm::Value *, llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *val_mul_nn_ival(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *ival_div_pos_val(llvm::Value *, llvm::Value *) const;
     [[nodiscard]] llvm::Value *ival_div_pos_ival(llvm::Value *, llvm::Value *) const;
