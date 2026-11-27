@@ -44,6 +44,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -91,36 +92,8 @@ HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_multi_state &);
 
-template <typename T>
-inline std::uint32_t recommended_simd_size()
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return 0;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<float>();
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<double>();
-
-#if defined(HEYOKA_HAVE_LONG_DOUBLE)
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
-
-#endif
-
-template <>
-HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
+template <supported_fp_type>
+std::uint32_t recommended_simd_size();
 
 // Code model.
 //
