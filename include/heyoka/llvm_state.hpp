@@ -71,7 +71,7 @@ struct target_features {
     // NOTE: for now, in the sleef support bit we need only vsx and vsx3 (not vsx2).
     bool vsx = false;
     bool vsx3 = false;
-    // Whether or not hardware FMA instructions are available for both single and double precision.
+    // Whether or not hardware FMA instructions are available for single/double precision scalar/vector datatypes.
     bool sd_fma = false;
     // Recommended SIMD sizes.
     std::uint32_t simd_size_flt = 1;
@@ -131,7 +131,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, code_model);
 
 HEYOKA_END_NAMESPACE
 
-// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
+// fmt formatter for heyoka::code_model, implemented on top of the streaming operator.
 namespace fmt
 {
 
