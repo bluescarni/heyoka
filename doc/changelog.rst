@@ -4,6 +4,13 @@ Changelog
 7.15.0 (unreleased)
 -------------------
 
+Changes
+~~~~~~~
+
+- The interval arithmetic used in event detection and polynomial root finding now employs fused multiply-add
+  (FMA) instructions where available, which makes it faster and produces tighter enclosures
+  (`#574 <https://github.com/bluescarni/heyoka/pull/574>`__).
+
 Fix
 ~~~
 

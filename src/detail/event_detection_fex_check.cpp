@@ -156,16 +156,17 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Run the Horner scheme.
     //
     // At each iteration, the accumulator is multiplied by the time range and then the current coefficient c is added to
-    // it. In order to accommodate backward integrations, for which h<0, we run the evaluation with the time range [0,
-    // |h|], making sure to negate the odd-degree coefficients of the input polynomial. This produces a result
+    // it. Both steps are performed by a single interval operation, ival_mul_zlb_add_val(), which uses FMA primitives if
+    // available. In order to accommodate backward integrations, for which h<0, we run the evaluation with the time
+    // range [0, |h|], making sure to negate the odd-degree coefficients of the input polynomial. This produces a result
     // equivalent, for h<0, to evaluation with the time range [h, 0].
     //
     // NOTE: the input values are required to be finite. Non-finite values in the accumulator can still arise for h!=0
     // (for h==0, the enclosure is trivially the [c0, c0] interval, where c0 is the constant coefficient of the
-    // polynomial): the multiplications and additions in the accumulation are rounded up, and they can thus overflow to
-    // +inf, but never to -inf. Hence, mlo and hi may become +inf, but never -inf. Once a component of the accumulator
-    // is +inf, the only operations it goes through are the multiplication by |h| (which is finite and nonzero, because
-    // an overflow requires h!=0), the max with zero and the addition/subtraction of finite coefficients, all of which
+    // polynomial): the multiply-adds in the accumulation are rounded up, and they can thus overflow to +inf, but never
+    // to -inf. Hence, mlo and hi may become +inf, but never -inf. Once a component of the accumulator is +inf, the only
+    // operations it goes through are the multiply-add with |h| (which is finite and nonzero, because an overflow
+    // requires h!=0) and a finite (possibly negated) coefficient, and the max with that same coefficient, all of which
     // leave +inf unchanged. Thus, the accumulation never produces NaN. Moreover, because mlo and hi are never -inf, the
     // lower bound -mlo is never +inf and the upper bound hi is never -inf, and the enclosure can never be in the
     // invalid forms [-inf, -inf] and [+inf, +inf].
@@ -194,8 +195,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
         }
 
         // Update the accumulator.
-        auto *const tmp = ivg.ival_mul_zlb(acc, abs_h);
-        acc = ivg.ival_add_val(tmp, cf);
+        acc = ivg.ival_mul_zlb_add_val(acc, abs_h, cf);
     }
 
     // Check if the enclosure does not contain zero.
