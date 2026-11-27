@@ -14,8 +14,6 @@
 #include <string>
 #include <utility>
 
-#include <fmt/format.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>

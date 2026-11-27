@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/safe_integer.hpp>

@@ -14,7 +14,7 @@
 #include <span>
 #include <stdexcept>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/egm2008.hpp>

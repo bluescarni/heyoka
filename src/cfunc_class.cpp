@@ -27,7 +27,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/serialization/array.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <oneapi/tbb/blocked_range.h>

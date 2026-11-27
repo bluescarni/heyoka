@@ -33,7 +33,6 @@
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/predef/compiler/visualc.h>
 
-#include <fmt/core.h>
 #include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)

@@ -25,7 +25,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/serialization/unordered_set.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL128)

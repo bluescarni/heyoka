@@ -36,8 +36,6 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-#include <fmt/ranges.h>
-
 using namespace heyoka;
 using namespace heyoka_test;
 

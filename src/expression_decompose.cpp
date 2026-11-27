@@ -14,6 +14,8 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/format.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
 #include <heyoka/detail/fwd_decl.hpp>

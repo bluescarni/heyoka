@@ -19,7 +19,7 @@
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

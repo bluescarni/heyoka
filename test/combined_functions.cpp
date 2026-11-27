@@ -22,7 +22,7 @@
 #include <boost/predef/os.h>
 #include <boost/regex.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

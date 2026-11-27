@@ -11,7 +11,7 @@
 #include <cassert>
 #include <stdexcept>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>

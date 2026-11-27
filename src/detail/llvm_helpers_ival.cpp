@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <boost/predef/architecture/x86/64.h>
 #include <boost/scope/scope_exit.hpp>

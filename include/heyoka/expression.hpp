@@ -35,7 +35,6 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
 #include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)

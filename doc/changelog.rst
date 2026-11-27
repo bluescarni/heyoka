@@ -1,6 +1,24 @@
 Changelog
 =========
 
+7.15.0 (unreleased)
+-------------------
+
+Changes
+~~~~~~~
+
+- heyoka now requires fmt >= 11
+  (`#575 <https://github.com/bluescarni/heyoka/pull/575>`__).
+
+Fix
+~~~
+
+- Fix compilation failures with fmt >= 12.2, whose ``fmt/core.h`` header no longer provides ``fmt::format()``
+  (`#575 <https://github.com/bluescarni/heyoka/pull/575>`__).
+- Fix a compilation failure on platforms where explicit specialisations of ``std::less`` are
+  ignored
+  (`#573 <https://github.com/bluescarni/heyoka/pull/573>`__).
+
 7.14.0 (2026-11-14)
 -------------------
 

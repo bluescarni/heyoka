@@ -16,7 +16,7 @@
 
 #include <boost/regex.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/composite_function.hpp>

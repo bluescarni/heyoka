@@ -17,7 +17,7 @@
 #include <variant>
 #include <vector>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>

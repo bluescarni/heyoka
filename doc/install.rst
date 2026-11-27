@@ -15,7 +15,7 @@ heyoka has the following **mandatory** dependencies:
 
 * the `LLVM <https://llvm.org/>`__ compiler infrastructure library (versions >=19 and <=23 are officially supported),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >=1.85),
-* the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=9 and <=12),
+* the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >=11 and <=12),
 * the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library,
   which provides support for arbitrary-precision integrations on all platforms,
   and for quadruple-precision integrations on platforms

@@ -19,7 +19,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>

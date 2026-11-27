@@ -16,7 +16,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/program_options.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>

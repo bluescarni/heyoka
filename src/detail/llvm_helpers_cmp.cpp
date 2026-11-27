@@ -12,7 +12,7 @@
 #include <limits>
 #include <stdexcept>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>

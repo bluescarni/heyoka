@@ -10,7 +10,6 @@
 
 #include <boost/program_options.hpp>
 
-#include <fmt/core.h>
 #include <fmt/ranges.h>
 
 #include <spdlog/spdlog.h>

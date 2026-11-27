@@ -30,7 +30,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/regex.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>

@@ -9,7 +9,7 @@
 #include <boost/numeric/odeint.hpp>
 #include <chrono>
 #include <cmath>
-#include <fmt/core.h>
+#include <fmt/base.h>
 #include <iomanip>
 #include <iostream>
 #include <vector>

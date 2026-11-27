@@ -22,7 +22,7 @@
 #include <boost/predef/compiler/clang.h>
 #include <boost/predef/compiler/gcc.h>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/ex_traversal.hpp>
