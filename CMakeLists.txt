@@ -599,7 +599,9 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 target_compile_definitions(heyoka PRIVATE BOOST_ASIO_NO_DEPRECATED)
 
 # Mandatory dependency on mp++.
-find_package(mp++ 2...<3 REQUIRED CONFIG)
+set(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION "3")
+set(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION "4")
+find_package(mp++ ${_HEYOKA_MIN_SUPPORTED_MPPP_VERSION}...<${_HEYOKA_MAX_SUPPORTED_MPPP_VERSION} REQUIRED CONFIG)
 message(STATUS "mp++ version: ${mp++_VERSION}")
 # NOTE: this is necessary for the serialisation of several classes.
 if(NOT mp++_WITH_BOOST_S11N)
@@ -681,6 +683,8 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-vers
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.
+unset(_HEYOKA_MIN_SUPPORTED_MPPP_VERSION)
+unset(_HEYOKA_MAX_SUPPORTED_MPPP_VERSION)
 unset(_HEYOKA_MIN_BOOST_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_LLVM_STATIC_LINK)
