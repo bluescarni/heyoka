@@ -48,9 +48,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-#include <fmt/core.h>
-#include <fmt/ranges.h>
-
 #include "catch.hpp"
 #include "test_utils.hpp"
 

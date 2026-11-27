@@ -36,7 +36,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/scope/scope_exit.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <mp++/rational.hpp>
 

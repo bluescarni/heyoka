@@ -24,7 +24,7 @@
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/DataLayout.h>

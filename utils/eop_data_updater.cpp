@@ -8,7 +8,7 @@
 
 #include <fstream>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/eop_data.hpp>
 

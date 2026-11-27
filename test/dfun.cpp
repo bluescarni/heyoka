@@ -15,7 +15,7 @@
 #include <variant>
 #include <vector>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>

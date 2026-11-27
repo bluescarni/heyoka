@@ -15,7 +15,7 @@
 #include <new>
 #include <stdexcept>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/aligned_vector.hpp>

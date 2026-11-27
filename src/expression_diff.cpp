@@ -31,7 +31,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>

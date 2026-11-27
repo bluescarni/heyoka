@@ -42,7 +42,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

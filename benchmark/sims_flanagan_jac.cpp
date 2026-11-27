@@ -28,7 +28,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 
-#include <fmt/ranges.h>
+#include <fmt/format.h>
 
 using namespace heyoka;
 

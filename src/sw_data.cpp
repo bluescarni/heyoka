@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Type.h>

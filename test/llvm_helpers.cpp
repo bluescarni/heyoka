@@ -23,8 +23,6 @@
 #include <boost/predef/architecture/ppc.h>
 #include <boost/predef/os.h>
 
-#include <fmt/format.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>

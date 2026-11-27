@@ -19,7 +19,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/safe_integer.hpp>

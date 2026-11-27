@@ -20,7 +20,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/ex_traversal.hpp>

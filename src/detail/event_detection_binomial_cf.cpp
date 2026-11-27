@@ -19,7 +19,7 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

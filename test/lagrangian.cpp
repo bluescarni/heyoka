@@ -15,6 +15,8 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <fmt/format.h>
+
 #include <xtensor/containers/xadapt.hpp>
 #include <xtensor/views/xslice.hpp>
 #include <xtensor/views/xview.hpp>

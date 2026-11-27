@@ -20,7 +20,7 @@
 #include <string>
 #include <utility>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>

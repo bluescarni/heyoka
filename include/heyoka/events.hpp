@@ -17,7 +17,6 @@
 #include <tuple>
 #include <utility>
 
-#include <fmt/core.h>
 #include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)

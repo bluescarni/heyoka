@@ -20,7 +20,7 @@
 
 #include <boost/charconv.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/erfa_decls.hpp>

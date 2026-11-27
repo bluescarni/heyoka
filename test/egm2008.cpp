@@ -12,7 +12,7 @@
 
 #include <boost/math/constants/constants.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/detail/debug.hpp>
 #include <heyoka/detail/egm2008.hpp>

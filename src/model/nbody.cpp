@@ -16,7 +16,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/math/pow.hpp>

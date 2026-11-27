@@ -20,7 +20,7 @@
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

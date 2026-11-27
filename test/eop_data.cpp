@@ -27,7 +27,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>

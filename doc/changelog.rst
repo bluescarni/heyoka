@@ -7,13 +7,18 @@ Changelog
 Changes
 ~~~~~~~
 
+- heyoka now requires fmt >= 11
+  (`#575 <https://github.com/bluescarni/heyoka/pull/575>`__).
 - The interval arithmetic used in event detection and polynomial root finding now employs fused multiply-add
   (FMA) instructions where available, which makes it faster and produces tighter enclosures
   (`#574 <https://github.com/bluescarni/heyoka/pull/574>`__).
 
+
 Fix
 ~~~
 
+- Fix compilation failures with fmt >= 12.2, whose ``fmt/core.h`` header no longer provides ``fmt::format()``
+  (`#575 <https://github.com/bluescarni/heyoka/pull/575>`__).
 - Fix a compilation failure on platforms where explicit specialisations of ``std::less`` are
   ignored
   (`#573 <https://github.com/bluescarni/heyoka/pull/573>`__).

@@ -21,7 +21,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>

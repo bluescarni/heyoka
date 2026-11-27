@@ -29,7 +29,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <oneapi/tbb/blocked_range.h>

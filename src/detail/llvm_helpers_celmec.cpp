@@ -18,7 +18,7 @@
 
 #include <boost/math/constants/constants.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>

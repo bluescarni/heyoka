@@ -34,7 +34,7 @@
 #include <boost/scope/scope_exit.hpp>
 #include <boost/unordered_map.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <llvm/Config/llvm-config.h>
 
