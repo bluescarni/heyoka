@@ -1,6 +1,23 @@
 Changelog
 =========
 
+7.15.0 (unreleased)
+-------------------
+
+Changes
+~~~~~~~
+
+- The interval arithmetic used in event detection and polynomial root finding now employs fused multiply-add
+  (FMA) instructions where available, which makes it faster and produces tighter enclosures
+  (`#574 <https://github.com/bluescarni/heyoka/pull/574>`__).
+
+Fix
+~~~
+
+- Fix a compilation failure on platforms where explicit specialisations of ``std::less`` are
+  ignored
+  (`#573 <https://github.com/bluescarni/heyoka/pull/573>`__).
+
 7.14.0 (2026-11-14)
 -------------------
 

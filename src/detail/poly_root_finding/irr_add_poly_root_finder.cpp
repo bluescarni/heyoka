@@ -254,11 +254,17 @@ llvm::Function *irr_add_poly_root_finder(const std::string &name, llvm_state &s,
             // NOTE: we are iterating backwards from the high-order coefficients to the low-order ones.
             const auto cur_degree = i - 1u;
 
-            // NOTE: here we can use ival_mul_nn_val() because we are guaranteeing that x is non-negative (x is strictly
-            // inside a bracket with lo>=0).
-            q = ivg.ival_add(ivg.ival_mul_nn_val(q, x), cfs[cur_degree]);
+            // NOTE: here we can use ival_mul_nn_val_add() because we are guaranteeing that x is non-negative (x is
+            // strictly inside a bracket with lo>=0).
+            q = ivg.ival_mul_nn_val_add(q, x, cfs[cur_degree]);
             if (cur_degree > 0u) {
-                qp = llvm_fadd(s, llvm_fmul(s, qp, x), cfs_prime[cur_degree - 1u]);
+                // NOTE: here for the derivative we are using val_fma_up() not because of the rounding (which is
+                // inconsequential for the production of candidate values) but because it's the "correct" way of issuing
+                // an FMA primitive guaranteed to be compatible with all the interval arithmetic implementations we
+                // support. Contrary to single-instruction primitives such as add/sub/mul/div, which are automatically
+                // converted to their constrained counterparts by the builder if necessary, FMA is an intrinsic that
+                // requires specific setup when invoked in a strictfp/constrained environment in the portable codepath.
+                qp = ivg.val_fma_up(qp, x, cfs_prime[cur_degree - 1u]);
             }
         }
 

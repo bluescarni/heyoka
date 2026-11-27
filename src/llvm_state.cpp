@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -113,15 +114,16 @@
 
 #include <heyoka/detail/get_dl_path.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/supported_fp_type.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -217,6 +219,11 @@ target_features get_target_features_impl()
             retval.sse2 = true;
         }
 
+        // NOTE: this will catch also the fma4 instructions from earlier AMD processors.
+        if (boost::algorithm::contains(retval.feature_string, "+fma")) {
+            retval.sd_fma = true;
+        }
+
         // Check if we are on Zen version 4 or later.
         boost::cmatch m;
         if (boost::regex_match(retval.cpu.c_str(), m, zen_regex_pattern)) {
@@ -232,6 +239,8 @@ target_features get_target_features_impl()
 
     if (boost::starts_with(target_name, "aarch64")) {
         retval.aarch64 = true;
+        // NOTE: FMA is always available on 64-bit arm.
+        retval.sd_fma = true;
     }
 
     if (boost::starts_with(target_name, "ppc")) {
@@ -256,6 +265,11 @@ target_features get_target_features_impl()
                 }
             }
         }
+    }
+
+    if (boost::starts_with(target_name, "ppc64")) {
+        // NOTE: FMA is always available on 64-bit PPC.
+        retval.sd_fma = true;
     }
 
     // Compute the recommended SIMD sizes.
@@ -639,43 +653,46 @@ const target_features &get_target_features()
 
 } // namespace detail
 
-template <>
-std::uint32_t recommended_simd_size<float>()
+template <supported_fp_type T>
+std::uint32_t recommended_simd_size()
 {
-    return detail::get_target_features().simd_size_flt;
+    [[maybe_unused]] const auto &tf = detail::get_target_features();
+
+    if constexpr (std::same_as<T, float>) {
+        return tf.simd_size_flt;
+    } else if constexpr (std::same_as<T, double>) {
+        return tf.simd_size_dbl;
+#if defined(HEYOKA_HAVE_LONG_DOUBLE)
+    } else if constexpr (std::same_as<T, long double>) {
+        return tf.simd_size_ldbl;
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::same_as<T, mppp::real128>) {
+        return tf.simd_size_f128;
+#endif
+    } else {
+        static_assert(std::same_as<T, mppp::real>);
+        return 1;
+    }
 }
 
-template <>
-std::uint32_t recommended_simd_size<double>()
-{
-    return detail::get_target_features().simd_size_dbl;
-}
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<float>();
+template HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<double>();
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-template <>
-std::uint32_t recommended_simd_size<long double>()
-{
-    return detail::get_target_features().simd_size_ldbl;
-}
+template HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template <>
-std::uint32_t recommended_simd_size<mppp::real128>()
-{
-    return detail::get_target_features().simd_size_f128;
-}
+template HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
 
 #endif
 
-template <>
-std::uint32_t recommended_simd_size<mppp::real>()
-{
-    return 1;
-}
+template HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 
 // Implementation of the jit class.
 struct llvm_state::jit {
