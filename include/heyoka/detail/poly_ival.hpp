@@ -32,6 +32,10 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_root_exclusion_check(llvm_state 
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> llvm_ival_poly_shift_1(const llvm_ival_guard &,
                                                                                   const std::vector<llvm::Value *> &);
 
+// Helper implementing polynomial rescaling in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
+llvm_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

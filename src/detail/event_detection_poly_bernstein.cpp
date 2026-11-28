@@ -44,7 +44,7 @@ namespace detail
 // original independent variable t into the [0, 1] interval of the new independent variable x.
 //
 // The first step of the conversion is the computation of interval enclosures for the coefficients of q(x) via
-// llvm_ed_ival_poly_rescale().
+// llvm_ival_poly_rescale().
 //
 // The second step reverses q(x), shifts the result by 1 via llvm_ival_poly_shift_1(), and reverses the result of the
 // shift. This produces a polynomial whose coefficients are C(n,k)*b_k. Indeed, with the substitution x = 1/(1+y) we
@@ -87,7 +87,7 @@ llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::
     auto *const val_t = ivg.get_val_t();
 
     // Apply the rescaling.
-    auto ret = llvm_ed_ival_poly_rescale(ivg, cfs, h);
+    auto ret = llvm_ival_poly_rescale(ivg, cfs, h);
 
     // Store the rescaled polynomial (this will be the second element of the return value).
     auto ret_rescaled = ret;

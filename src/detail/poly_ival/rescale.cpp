@@ -16,8 +16,8 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/llvm_state.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -33,7 +33,7 @@ namespace
 // -0.
 //
 // x and y must be scalar float or double values of the same type.
-llvm::Value *llvm_ed_ival_poly_rescale_xor_signbit(llvm_state &s, llvm::Value *const x, llvm::Value *const y)
+llvm::Value *llvm_ival_poly_rescale_xor_signbit(llvm_state &s, llvm::Value *const x, llvm::Value *const y)
 {
     assert(x != nullptr);
     assert(y != nullptr);
@@ -71,8 +71,8 @@ llvm::Value *llvm_ed_ival_poly_rescale_xor_signbit(llvm_state &s, llvm::Value *c
 // cfs is assumed non-empty. h and all elements of cfs are assumed to have the same type as ivg.get_val_t(). All input
 // values are assumed to be finite. The output intervals enclose the exact coefficients, and they have no NaN bounds.
 // Infinite bounds may be returned in case of overflow, but never in the invalid forms [-inf, -inf] and [+inf, +inf].
-std::vector<llvm::Value *> llvm_ed_ival_poly_rescale(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
-                                                     llvm::Value *const h)
+std::vector<llvm::Value *> llvm_ival_poly_rescale(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
+                                                  llvm::Value *const h)
 {
     assert(!cfs.empty());
     assert(h != nullptr);
@@ -114,7 +114,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_rescale(const llvm_ival_guard &ivg,
         // register spilling. Thus, in this case we XOR the sign bit of h into cf instead. This also negates cf when h
         // is -0, which is harmless since cf * |h|**i is zero in this case.
         if (i % 2u != 0u) {
-            cf = use_signbit ? llvm_ed_ival_poly_rescale_xor_signbit(s, cf, h)
+            cf = use_signbit ? llvm_ival_poly_rescale_xor_signbit(s, cf, h)
                              : bld.CreateSelect(h_neg, ivg.val_neg(cf), cf);
         }
 
