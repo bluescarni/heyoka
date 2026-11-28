@@ -51,6 +51,10 @@ llvm_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value 
 template <typename T>
 [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(std::span<const T>);
 
+// Helper to split the input Bernstein polynomial at the midpoint of its interval.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
+llvm_ival_poly_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

@@ -36,17 +36,17 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for llvm_ed_ival_de_casteljau_half().
+// Tests for llvm_ival_poly_de_casteljau_half().
 //
-// llvm_ed_ival_de_casteljau_half() expresses a Bernstein polynomial on [a, b] in the Bernstein bases of [a, m] and
+// llvm_ival_poly_de_casteljau_half() expresses a Bernstein polynomial on [a, b] in the Bernstein bases of [a, m] and
 // [m, b], with m = (a+b)/2. The computation does not depend on [a, b], hence the tests take [a, b] = [0, 1], so that
 // the two halves are [0, 1/2] and [1/2, 1].
 //
@@ -67,7 +67,7 @@ using boost::multiprecision::cpp_int;
 // The polynomial degrees tested.
 //
 // NOTE: in single and double precision, the degrees up to 23 use the unrolled implementation of
-// llvm_ed_ival_de_casteljau_half(), the higher degrees the loop implementation.
+// llvm_ival_poly_de_casteljau_half(), the higher degrees the loop implementation.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 23, 24, 40};
 
 // The value at x of the polynomial with interval Bernstein coefficients b on the interval [lb, ub], computed in
@@ -124,7 +124,7 @@ std::vector<rat_ival> to_rat_ivals(const std::vector<T> &cfs)
 template <typename T>
 using split_t = void (*)(T *, T *, const T *);
 
-// Add to s a function computing the split of an interval polynomial of degree n via llvm_ed_ival_de_casteljau_half(),
+// Add to s a function computing the split of an interval polynomial of degree n via llvm_ival_poly_de_casteljau_half(),
 // compile s and return a pointer to the function. fp_t is the scalar LLVM type used in the computation, and T is the
 // corresponding C++ type.
 template <typename T>
@@ -157,7 +157,7 @@ split_t<T> add_split(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
             cfs.push_back(ivg.ival_construct(mlo, hi));
         }
 
-        const auto [left, right] = detail::llvm_ed_ival_de_casteljau_half(ivg, cfs);
+        const auto [left, right] = detail::llvm_ival_poly_de_casteljau_half(ivg, cfs);
 
         // Store the output intervals ret into out_ptr.
         const auto store = [&](llvm::Value *out_ptr, const std::vector<llvm::Value *> &ret) {
@@ -208,7 +208,7 @@ std::vector<rat> rand_test_points(std::size_t count)
     return ret;
 }
 
-// Check the output of llvm_ed_ival_de_casteljau_half() for the input polynomial in. out_left and out_right are the
+// Check the output of llvm_ival_poly_de_casteljau_half() for the input polynomial in. out_left and out_right are the
 // output polynomials on [0, 1/2] and [1/2, 1]. At each test point x, their evaluations must contain the evaluation of
 // in.
 //

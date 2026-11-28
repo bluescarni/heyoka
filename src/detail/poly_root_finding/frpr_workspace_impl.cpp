@@ -36,7 +36,6 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/poly_ival.hpp>
@@ -249,7 +248,7 @@ void frpr_workspace_add_de_casteljau(const std::string &name, llvm_state &s, llv
     }
 
     // Run the de Casteljau split.
-    const auto [left_cfs, right_cfs] = llvm_ed_ival_de_casteljau_half(ivg, cfs);
+    const auto [left_cfs, right_cfs] = llvm_ival_poly_de_casteljau_half(ivg, cfs);
 
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {

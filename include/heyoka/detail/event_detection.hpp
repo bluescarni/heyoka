@@ -12,13 +12,8 @@
 #include <cstddef>
 #include <optional>
 #include <span>
-#include <utility>
-#include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -31,10 +26,6 @@ T taylor_deduce_cooldown(T, T);
 template <typename T>
 [[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(std::span<const T>, const T &, std::size_t offset = 0,
                                                         std::size_t stride = 1);
-
-// Helper to split the input Bernstein polynomial at the midpoint of its interval.
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ed_ival_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
 } // namespace detail
 

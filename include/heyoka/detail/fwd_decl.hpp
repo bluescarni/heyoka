@@ -57,8 +57,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch;
 
 // Enum to represent the direction of an event.
 //
-// NOTE: put it here because this is currently shared between taylor.hpp and event_detection.hpp.
-//
 // NOLINTNEXTLINE(performance-enum-size)
 enum class event_direction { negative = -1, any = 0, positive = 1 };
 
