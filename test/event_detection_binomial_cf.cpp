@@ -50,7 +50,6 @@ using rat = boost::multiprecision::cpp_rational;
 using boost::multiprecision::cpp_int;
 using Catch::Matchers::Message;
 
-// The floating-point types tested.
 // The largest n tested.
 constexpr std::uint32_t n_max = 140;
 

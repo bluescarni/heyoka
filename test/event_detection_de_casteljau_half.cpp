@@ -64,7 +64,6 @@ using namespace heyoka_test;
 using rat = boost::multiprecision::cpp_rational;
 using boost::multiprecision::cpp_int;
 
-// The floating-point types tested.
 // The polynomial degrees tested.
 //
 // NOTE: in single and double precision, the degrees up to 23 use the unrolled implementation of

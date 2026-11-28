@@ -54,7 +54,6 @@ using namespace heyoka_test;
 
 using rat = boost::multiprecision::cpp_rational;
 
-// The floating-point types tested.
 // The polynomial degrees tested.
 const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
 

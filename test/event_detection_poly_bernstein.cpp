@@ -52,7 +52,6 @@ using namespace heyoka_test;
 
 using rat = boost::multiprecision::cpp_rational;
 
-// The floating-point types tested.
 // The polynomial degrees tested.
 //
 // NOTE: in double precision, the binomial coefficients C(n,k) are all exactly representable only up to n = 56. The
