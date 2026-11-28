@@ -10,7 +10,6 @@
 #define HEYOKA_DETAIL_EVENT_DETECTION_HPP
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <span>
 #include <utility>
@@ -28,10 +27,6 @@ namespace detail
 
 template <typename T>
 T taylor_deduce_cooldown(T, T);
-
-// Helper to count the number of sign changes in a list of interval coefficients.
-template <typename T>
-[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(std::span<const T>);
 
 template <typename T>
 [[nodiscard]] std::optional<int> ed_poly_eval_sign_ival(std::span<const T>, const T &, std::size_t offset = 0,

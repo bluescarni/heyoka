@@ -10,6 +10,7 @@
 #define HEYOKA_DETAIL_POLY_IVAL_HPP
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,6 +46,10 @@ template <typename T>
 // Helper to convert an input polynomial from the monomial basis into the interval Bernstein form.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
 llvm_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
+// Helper to count the number of sign changes in a list of interval coefficients.
+template <typename T>
+[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(std::span<const T>);
 
 } // namespace detail
 

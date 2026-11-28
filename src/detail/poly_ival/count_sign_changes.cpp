@@ -28,7 +28,7 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -42,17 +42,17 @@ namespace
 // NOTE: we don't need the zero option here as it is always filtered out when we use this enum.
 //
 // NOLINTNEXTLINE(performance-enum-size)
-enum class ed_csc_ival_sign : unsigned {
+enum class csc_ival_sign : unsigned {
     undecided = 0,
     plus = 1,
     minus = 2,
 };
 
 // Small helper to compute the sign of a nonzero interval coefficient represented as the (mlo, hi) pair.
-ed_csc_ival_sign ed_csc_get_ival_sign(const auto &p)
+csc_ival_sign csc_get_ival_sign(const auto &p)
 {
     assert(p.first != 0 || p.second != 0);
-    return ed_csc_ival_sign{static_cast<unsigned>((p.first < 0) + ((p.second < 0) << 1u))};
+    return csc_ival_sign{static_cast<unsigned>((p.first < 0) + ((p.second < 0) << 1u))};
 }
 
 } // namespace
@@ -76,7 +76,7 @@ ed_csc_ival_sign ed_csc_get_ival_sign(const auto &p)
 // cfs is assumed to be non-empty, to have an even size and to represent valid intervals (in particular, it must not
 // contain NaN values).
 template <typename T>
-[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(const std::span<const T> cfs)
+[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(const std::span<const T> cfs)
 {
     assert(!cfs.empty());
     assert(cfs.size() % 2u == 0u);
@@ -116,7 +116,7 @@ template <typename T>
     std::uint32_t min_n_sc = 0, max_n_sc = 0;
 
     // The last decided sign found (if any).
-    std::optional<ed_csc_ival_sign> last_decided_sign;
+    std::optional<csc_ival_sign> last_decided_sign;
 
     // The size of the current group of undecided signs.
     std::uint32_t undecided_group_size = 0;
@@ -125,12 +125,12 @@ template <typename T>
     const auto ival_view_end = std::ranges::end(ival_view);
     for (auto it = std::ranges::begin(ival_view); it != ival_view_end;) {
         // Compute the sign of the current coefficient.
-        const auto cur_sign = ed_csc_get_ival_sign(*it);
+        const auto cur_sign = csc_get_ival_sign(*it);
 
         // Move immediately to the next coefficient.
         ++it;
 
-        if (cur_sign == ed_csc_ival_sign::undecided) {
+        if (cur_sign == csc_ival_sign::undecided) {
             // We are within an undecided group, update the group size.
             ++undecided_group_size;
 
@@ -188,27 +188,27 @@ template <typename T>
 
 // Explicit instantiations.
 
-#define HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(T)                                                                      \
-    template HEYOKA_DLL_PUBLIC std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(std::span<const T>)
+#define HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(T)                                                             \
+    template HEYOKA_DLL_PUBLIC std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(std::span<const T>)
 
-HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(float);
-HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(double);
+HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(float);
+HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(double);
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(long double);
+HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(long double);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(mppp::real128);
+HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(mppp::real128);
 
 #endif
 
-HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL(mppp::real);
+HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(mppp::real);
 
-#undef HEYOKA_INST_ED_COUNT_SIGN_CHANGES_IVAL
+#undef HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES
 
 } // namespace detail
 

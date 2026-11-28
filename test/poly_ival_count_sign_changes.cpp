@@ -27,16 +27,16 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for ed_count_sign_changes_ival().
+// Tests for ival_poly_count_sign_changes().
 //
 // The tests are exhaustive: for every sequence of signs from {'+', '-', '0', '?'} up to a maximum length, the output of
-// ed_count_sign_changes_ival() is compared with the minimum/maximum number of sign changes computed by brute force over
-// all the replacements of each '?' with '+', '-' or '0'.
+// ival_poly_count_sign_changes() is compared with the minimum/maximum number of sign changes computed by brute force
+// over all the replacements of each '?' with '+', '-' or '0'.
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -160,7 +160,8 @@ void run_exhaustive_test(const std::uint32_t max_len, const auto &make_fp)
                 cfs.push_back(make_fp(hi));
             }
 
-            REQUIRE(detail::ed_count_sign_changes_ival<T>(std::span<const T>(cfs)) == brute_force_sign_changes(signs));
+            REQUIRE(detail::ival_poly_count_sign_changes<T>(std::span<const T>(cfs))
+                    == brute_force_sign_changes(signs));
         }
     }
 }
