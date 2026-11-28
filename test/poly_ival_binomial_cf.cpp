@@ -31,14 +31,14 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for ed_make_ival_binomial_cf_like().
+// Tests for make_ival_binomial_cf_like().
 //
-// ed_make_ival_binomial_cf_like() computes an interval [lo, hi] enclosing the binomial coefficient C(n, k). The tests
+// make_ival_binomial_cf_like() computes an interval [lo, hi] enclosing the binomial coefficient C(n, k). The tests
 // compare the result with the exact value: if C(n, k) is representable, lo and hi must both be equal to C(n, k),
 // otherwise lo and hi must be the two consecutive values enclosing C(n, k). The tests also check that an exception is
 // thrown when lo or hi overflows.
@@ -78,12 +78,12 @@ const auto binomials = pascal_triangle();
 std::string overflow_message(std::uint32_t n, std::uint32_t k)
 {
     return fmt::format("The computation of a binomial coefficient with arguments ({}, {}) overflows the target "
-                       "floating-point type in ed_make_ival_binomial_cf_like()",
+                       "floating-point type in make_ival_binomial_cf_like()",
                        n, k);
 }
 
-// Check the interval computed by ed_make_ival_binomial_cf_like() for C(n, k). x is passed to
-// ed_make_ival_binomial_cf_like(), and p is the number of significand bits of x's type.
+// Check the interval computed by make_ival_binomial_cf_like() for C(n, k). x is passed to make_ival_binomial_cf_like(),
+// and p is the number of significand bits of x's type.
 template <typename T>
 void check_binomial(std::uint32_t n, std::uint32_t k, const T &x, std::uint32_t p)
 {
@@ -91,7 +91,7 @@ void check_binomial(std::uint32_t n, std::uint32_t k, const T &x, std::uint32_t 
 
     const auto &C_int = binomials[n][k];
     const rat C(C_int);
-    const auto [lo, hi] = detail::ed_make_ival_binomial_cf_like(n, k, x);
+    const auto [lo, hi] = detail::make_ival_binomial_cf_like(n, k, x);
 
     if constexpr (std::same_as<T, mppp::real>) {
         // The results must have the precision of x.
@@ -123,7 +123,7 @@ TEST_CASE("fixed precision")
                 // Within the tested range, the result overflows if and only if C(n, k) has more than max_exponent bits.
                 // This happens only for float, from n = 132.
                 if (boost::multiprecision::msb(binomials[n][k]) + 1u > max_exponent) {
-                    REQUIRE_THROWS_MATCHES(detail::ed_make_ival_binomial_cf_like(n, k, x), std::overflow_error,
+                    REQUIRE_THROWS_MATCHES(detail::make_ival_binomial_cf_like(n, k, x), std::overflow_error,
                                            Message(overflow_message(n, k)));
                 } else {
                     check_binomial(n, k, x, p);
@@ -133,7 +133,7 @@ TEST_CASE("fixed precision")
     });
 
     // C(1100, 550) has 1095 bits, thus it overflows double.
-    REQUIRE_THROWS_MATCHES(detail::ed_make_ival_binomial_cf_like(1100u, 550u, 0.), std::overflow_error,
+    REQUIRE_THROWS_MATCHES(detail::make_ival_binomial_cf_like(1100u, 550u, 0.), std::overflow_error,
                            Message(overflow_message(1100, 550)));
 
     // C(132496419, 5) lies strictly between the largest float and 2**128: lo is the largest float, hi overflows.
@@ -141,7 +141,7 @@ TEST_CASE("fixed precision")
     REQUIRE(rat(C) > to_rat(std::numeric_limits<float>::max()));
     REQUIRE(C < (cpp_int(1) << 128));
 
-    REQUIRE_THROWS_MATCHES(detail::ed_make_ival_binomial_cf_like(132496419u, 5u, 0.f), std::overflow_error,
+    REQUIRE_THROWS_MATCHES(detail::make_ival_binomial_cf_like(132496419u, 5u, 0.f), std::overflow_error,
                            Message(overflow_message(132496419, 5)));
 }
 

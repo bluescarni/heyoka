@@ -29,7 +29,7 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -64,7 +64,7 @@ boost::multiprecision::cpp_int cpp_int_choose(const std::uint32_t n, const std::
 // The output is guaranteed to be finite (an exception will be thrown in case of overflow). The function will throw if T
 // is a builtin floating-point type whose radix is not 2 or which is not an IEC 559/IEEE 754 floating-point type.
 template <typename T>
-std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::uint32_t k, [[maybe_unused]] const T &x)
+std::pair<T, T> make_ival_binomial_cf_like(const std::uint32_t n, const std::uint32_t k, [[maybe_unused]] const T &x)
 {
     using boost::multiprecision::cpp_int;
     using safe_uint32_t = boost::safe_numerics::safe<std::uint32_t>;
@@ -120,7 +120,7 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
         if (!isfinite(p.first) || !isfinite(p.second)) [[unlikely]] {
             throw std::overflow_error(
                 fmt::format("The computation of a binomial coefficient with arguments ({}, {}) overflows the "
-                            "target floating-point type in ed_make_ival_binomial_cf_like()",
+                            "target floating-point type in make_ival_binomial_cf_like()",
                             n, k));
         }
         return p;
@@ -156,27 +156,27 @@ std::pair<T, T> ed_make_ival_binomial_cf_like(const std::uint32_t n, const std::
 }
 
 // Explicit instantiations.
-#define HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(T)                                                                        \
-    template HEYOKA_DLL_PUBLIC std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &)
+#define HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(T)                                                               \
+    template HEYOKA_DLL_PUBLIC std::pair<T, T> make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &)
 
-HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(float);
-HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(double);
+HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(float);
+HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(double);
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(long double);
+HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(long double);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(mppp::real128);
+HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(mppp::real128);
 
 #endif
 
-HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST(mppp::real);
+HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST(mppp::real);
 
-#undef HEYOKA_ED_MAKE_IVAL_BINOMIAL_CF_INST
+#undef HEYOKA_DETAIL_MAKE_IVAL_BINOMIAL_CF_LIKE_INST
 
 } // namespace detail
 

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -35,6 +36,11 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_root_exclusion_check(llvm_state 
 // Helper implementing polynomial rescaling in interval arithmetic.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
 llvm_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
+// Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
+// inputs.
+template <typename T>
+[[nodiscard]] std::pair<T, T> make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
 
 } // namespace detail
 

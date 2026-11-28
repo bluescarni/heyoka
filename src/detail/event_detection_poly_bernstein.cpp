@@ -53,8 +53,8 @@ namespace detail
 // ascending order of k.
 //
 // The last step recovers the b_k by dividing the coefficients by C(n,k). Because C(n,k) may not be representable, the
-// division is by the enclosure of C(n,k) computed by ed_make_ival_binomial_cf_like(). For k = 0 and k = n, C(n,k) = 1
-// and no division is needed.
+// division is by the enclosure of C(n,k) computed by make_ival_binomial_cf_like(). For k = 0 and k = n, C(n,k) = 1 and
+// no division is needed.
 //
 // Compared to the direct formula b_k = sum_{i<=k} C(k,i)/C(n,i) * c_i (where c_i are the coefficients of q(x)), which
 // requires O(n**2) interval multiplications, the O(n**2) part of this approach consists only of interval additions
@@ -116,7 +116,7 @@ llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::
         // NOTE: C_lo and C_hi are finite and >= 1, which satisfies the preconditions of the division primitives.
         const auto [C_lo, C_hi, exact] = std::visit(
             [n, k](const auto &v) {
-                const auto [lo, hi] = ed_make_ival_binomial_cf_like(n, boost::numeric_cast<std::uint32_t>(k), v);
+                const auto [lo, hi] = make_ival_binomial_cf_like(n, boost::numeric_cast<std::uint32_t>(k), v);
                 return std::tuple{number{lo}, number{hi}, lo == hi};
             },
             x.value());

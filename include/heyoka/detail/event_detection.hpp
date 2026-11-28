@@ -29,11 +29,6 @@ namespace detail
 template <typename T>
 T taylor_deduce_cooldown(T, T);
 
-// Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
-// inputs.
-template <typename T>
-[[nodiscard]] std::pair<T, T> ed_make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
-
 // Helper to convert an input polynomial from the monomial basis into the interval Bernstein form required by event
 // detection.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
