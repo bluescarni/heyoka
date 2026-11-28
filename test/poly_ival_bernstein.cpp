@@ -41,9 +41,9 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for llvm_ival_poly_bernstein().
+// Tests for llvm_poly_ival_bernstein().
 //
-// llvm_ival_poly_bernstein() computes intervals enclosing the Bernstein coefficients b_k on [0, 1] of q(x) = p(h*x),
+// llvm_poly_ival_bernstein() computes intervals enclosing the Bernstein coefficients b_k on [0, 1] of q(x) = p(h*x),
 // where p(t) is a polynomial with coefficients a_i. The tests compare the output with the exact coefficients, computed
 // with rationals: the intervals must contain them, and their bounds must never be NaN or infinite on the inner side.
 
@@ -110,7 +110,7 @@ template <typename T>
 using bernstein_t = void (*)(T *, const T *, const T *);
 
 // Add to s a function computing the Bernstein forms of batch_size polynomials of degree n via
-// llvm_ival_poly_bernstein(), compile s and return a pointer to the function. fp_t is the scalar LLVM type used in the
+// llvm_poly_ival_bernstein(), compile s and return a pointer to the function. fp_t is the scalar LLVM type used in the
 // computation, and T is the corresponding C++ type.
 template <typename T>
 bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size = 1)
@@ -140,7 +140,7 @@ bernstein_t<T> add_bernstein(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, s
 
         auto *const h = detail::ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
 
-        const auto ret = detail::llvm_ival_poly_bernstein(ivg, cfs, h).first;
+        const auto ret = detail::llvm_poly_ival_bernstein(ivg, cfs, h).first;
 
         // Store the output intervals in the split layout.
         for (std::uint32_t i = 0; i <= n; ++i) {

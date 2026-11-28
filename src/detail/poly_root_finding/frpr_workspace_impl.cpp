@@ -142,7 +142,7 @@ void frpr_workspace_add_bernstein(const std::string &name, llvm_state &s, llvm::
     }
 
     // Run the Bernstein conversion.
-    const auto [bern_cfs, rescaled_cfs] = llvm_ival_poly_bernstein(ivg, cfs, h);
+    const auto [bern_cfs, rescaled_cfs] = llvm_poly_ival_bernstein(ivg, cfs, h);
 
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {
@@ -248,7 +248,7 @@ void frpr_workspace_add_de_casteljau(const std::string &name, llvm_state &s, llv
     }
 
     // Run the de Casteljau split.
-    const auto [left_cfs, right_cfs] = llvm_ival_poly_de_casteljau_half(ivg, cfs);
+    const auto [left_cfs, right_cfs] = llvm_poly_ival_de_casteljau_half(ivg, cfs);
 
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {

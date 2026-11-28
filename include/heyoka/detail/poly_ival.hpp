@@ -31,12 +31,12 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_root_exclusion_check(llvm_state 
                                                                      std::uint32_t, std::uint32_t);
 
 // Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> llvm_ival_poly_shift_1(const llvm_ival_guard &,
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> llvm_poly_ival_shift_1(const llvm_ival_guard &,
                                                                                   const std::vector<llvm::Value *> &);
 
 // Helper implementing polynomial rescaling in interval arithmetic.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
-llvm_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+llvm_poly_ival_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
 
 // Helper to produce an interval [lo, hi] of floating-point type T guaranteed to include the binomial coefficient of the
 // inputs.
@@ -45,15 +45,15 @@ template <typename T>
 
 // Helper to convert an input polynomial from the monomial basis into the interval Bernstein form.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+llvm_poly_ival_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
 
 // Helper to count the number of sign changes in a list of interval coefficients.
 template <typename T>
-[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(std::span<const T>);
+[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> poly_ival_count_sign_changes(std::span<const T>);
 
 // Helper to split the input Bernstein polynomial at the midpoint of its interval.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ival_poly_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
+llvm_poly_ival_de_casteljau_half(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
 
 } // namespace detail
 

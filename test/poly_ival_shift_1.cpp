@@ -40,9 +40,9 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for llvm_ival_poly_shift_1().
+// Tests for llvm_poly_ival_shift_1().
 //
-// llvm_ival_poly_shift_1() computes intervals enclosing the coefficients of p(x+1), where p(x) is a polynomial with
+// llvm_poly_ival_shift_1() computes intervals enclosing the coefficients of p(x+1), where p(x) is a polynomial with
 // interval coefficients. The tests check that the computed intervals contain the exact ones, computed with interval
 // arithmetic on rationals.
 
@@ -80,7 +80,7 @@ std::vector<rat_ival> exact_shift_1(const std::vector<rat_ival> &cfs)
 template <typename T>
 using shift_t = void (*)(T *, const T *);
 
-// Add to s a function computing the shift by 1 of an interval polynomial of degree n via llvm_ival_poly_shift_1(),
+// Add to s a function computing the shift by 1 of an interval polynomial of degree n via llvm_poly_ival_shift_1(),
 // compile s and return a pointer to the function. fp_t is the scalar LLVM type used in the computation, and T is the
 // corresponding C++ type.
 template <typename T>
@@ -112,7 +112,7 @@ shift_t<T> add_shift(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
             cfs.push_back(ivg.ival_construct(mlo, hi));
         }
 
-        const auto ret = detail::llvm_ival_poly_shift_1(ivg, cfs);
+        const auto ret = detail::llvm_poly_ival_shift_1(ivg, cfs);
 
         // Store the output intervals in the split layout.
         for (std::uint32_t i = 0; i <= n; ++i) {

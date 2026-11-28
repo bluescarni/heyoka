@@ -155,7 +155,7 @@ bool isolate_real_roots_3n(frpr_workspace_impl<T> &ws_impl, const std::span<cons
         assert(cur_poly_span.size() % 2u == 0u);
 
         // Count the min/max number of sign changes.
-        const auto [V_min, V_max] = ival_poly_count_sign_changes(cur_poly_span);
+        const auto [V_min, V_max] = poly_ival_count_sign_changes(cur_poly_span);
 
         // NOTE: in order to determine the behaviour of the polynomial at lo, we can look at the first Bernstein
         // coefficient b_0 (for which we have an interval enclosure). The value of the polynomial at lo equals b_0, and
@@ -500,7 +500,7 @@ const std::vector<irr_interval<T>> &isolate_real_roots(frpr_workspace<T> &ws, co
         assert(cur_poly_span.size() % 2u == 0u);
 
         // Count the min/max number of sign changes.
-        const auto [V_min, V_max] = ival_poly_count_sign_changes(cur_poly_span);
+        const auto [V_min, V_max] = poly_ival_count_sign_changes(cur_poly_span);
 
         // NOTE: in order to determine the behaviour of the polynomial at lo, we can look at the first Bernstein
         // coefficient b_0 (for which we have an interval enclosure). The value of the polynomial at lo equals b_0, and

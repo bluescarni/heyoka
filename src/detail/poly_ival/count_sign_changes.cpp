@@ -76,7 +76,7 @@ csc_ival_sign csc_get_ival_sign(const auto &p)
 // cfs is assumed to be non-empty, to have an even size and to represent valid intervals (in particular, it must not
 // contain NaN values).
 template <typename T>
-[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(const std::span<const T> cfs)
+[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> poly_ival_count_sign_changes(const std::span<const T> cfs)
 {
     assert(!cfs.empty());
     assert(cfs.size() % 2u == 0u);
@@ -188,27 +188,27 @@ template <typename T>
 
 // Explicit instantiations.
 
-#define HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(T)                                                             \
-    template HEYOKA_DLL_PUBLIC std::pair<std::uint32_t, std::uint32_t> ival_poly_count_sign_changes(std::span<const T>)
+#define HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(T)                                                             \
+    template HEYOKA_DLL_PUBLIC std::pair<std::uint32_t, std::uint32_t> poly_ival_count_sign_changes(std::span<const T>)
 
-HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(float);
-HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(double);
+HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(float);
+HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(double);
 
 #if defined(HEYOKA_HAVE_LONG_DOUBLE)
 
-HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(long double);
+HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(long double);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(mppp::real128);
+HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(mppp::real128);
 
 #endif
 
-HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES(mppp::real);
+HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES(mppp::real);
 
-#undef HEYOKA_INST_DETAIL_IVAL_POLY_COUNT_SIGN_CHANGES
+#undef HEYOKA_INST_DETAIL_POLY_IVAL_COUNT_SIGN_CHANGES
 
 } // namespace detail
 

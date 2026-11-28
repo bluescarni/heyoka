@@ -34,7 +34,7 @@ namespace detail
 namespace
 {
 
-// Manually-unrolled version of llvm_ival_poly_de_casteljau_half().
+// Manually-unrolled version of llvm_poly_ival_de_casteljau_half().
 //
 // NOTE: the de Casteljau algorithm constructs the outputs by building a triangle of averages and then reading the new
 // coefficients off the sides of the triangle.
@@ -51,7 +51,7 @@ namespace
 // Left result, from the left side: (0, 0, 0, 1).
 // Right result, from the reversed right side: (1, 2, 4, 8).
 std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ival_poly_de_casteljau_half_unrolled(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
+llvm_poly_ival_de_casteljau_half_unrolled(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
                                           const std::uint32_t op1)
 {
     // Prepare the return values.
@@ -101,9 +101,9 @@ llvm_ival_poly_de_casteljau_half_unrolled(const llvm_ival_guard &ivg, const std:
     return std::make_pair(std::move(ret_first), std::move(ret_second));
 }
 
-// Loop version of llvm_ival_poly_de_casteljau_half().
+// Loop version of llvm_poly_ival_de_casteljau_half().
 std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ival_poly_de_casteljau_half_loop(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
+llvm_poly_ival_de_casteljau_half_loop(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs,
                                       const std::uint32_t op1)
 {
     // Get the state and builder from ivg.
@@ -212,7 +212,7 @@ llvm_ival_poly_de_casteljau_half_loop(const llvm_ival_guard &ivg, const std::vec
 // cfs is assumed non-empty. All elements of cfs are assumed to have the same type as ivg.get_ival_t() and to represent
 // valid intervals. The output intervals enclose the exact coefficients, and they are guaranteed to be valid.
 std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ival_poly_de_casteljau_half(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs)
+llvm_poly_ival_de_casteljau_half(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs)
 {
     assert(!cfs.empty());
     assert(
@@ -228,9 +228,9 @@ llvm_ival_poly_de_casteljau_half(const llvm_ival_guard &ivg, const std::vector<l
     // manually unroll the computation in order to improve performance. For the other floating-point types, we expect
     // the unrolling not to improve performance.
     if ((scal_t->isFloatTy() || scal_t->isDoubleTy()) && op1 < 25u) {
-        return llvm_ival_poly_de_casteljau_half_unrolled(ivg, cfs, op1);
+        return llvm_poly_ival_de_casteljau_half_unrolled(ivg, cfs, op1);
     } else {
-        return llvm_ival_poly_de_casteljau_half_loop(ivg, cfs, op1);
+        return llvm_poly_ival_de_casteljau_half_loop(ivg, cfs, op1);
     }
 }
 

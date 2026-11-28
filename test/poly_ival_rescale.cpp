@@ -43,9 +43,9 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for llvm_ival_poly_rescale().
+// Tests for llvm_poly_ival_rescale().
 //
-// llvm_ival_poly_rescale() computes intervals enclosing the coefficients c_i * h**i of p(h*x), where p(x) is a
+// llvm_poly_ival_rescale() computes intervals enclosing the coefficients c_i * h**i of p(h*x), where p(x) is a
 // polynomial with coefficients c_i. The tests check that the computed intervals contain the exact coefficients,
 // computed with rationals, and that the output components are never NaN or -inf, and +inf only in case of overflow.
 
@@ -63,7 +63,7 @@ const std::vector<std::uint32_t> degrees = {0, 1, 2, 3, 4, 7, 10, 20, 40};
 template <typename T>
 using rescale_t = void (*)(T *, const T *, const T *);
 
-// Add to s a function computing the rescaling of a polynomial of degree n via llvm_ival_poly_rescale(), compile s and
+// Add to s a function computing the rescaling of a polynomial of degree n via llvm_poly_ival_rescale(), compile s and
 // return a pointer to the function. fp_t is the scalar LLVM type used in the computation, and T is the corresponding
 // C++ type.
 template <typename T>
@@ -94,7 +94,7 @@ rescale_t<T> add_rescale(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 
         auto *const h = detail::ext_load_vector_from_memory(s, fp_t, h_ptr, 1);
 
-        const auto ret = detail::llvm_ival_poly_rescale(ivg, cfs, h);
+        const auto ret = detail::llvm_poly_ival_rescale(ivg, cfs, h);
 
         // Store the output intervals in the split layout.
         for (std::uint32_t i = 0; i <= n; ++i) {
