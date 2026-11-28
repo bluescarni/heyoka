@@ -39,6 +39,7 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/poly_root_finding/frpr_workspace_impl.hpp>
 #include <heyoka/detail/poly_root_finding/vector_cache.hpp>
 #include <heyoka/detail/safe_integer.hpp>
@@ -142,7 +143,7 @@ void frpr_workspace_add_bernstein(const std::string &name, llvm_state &s, llvm::
     }
 
     // Run the Bernstein conversion.
-    const auto [bern_cfs, rescaled_cfs] = llvm_ed_ival_poly_bernstein(ivg, cfs, h);
+    const auto [bern_cfs, rescaled_cfs] = llvm_ival_poly_bernstein(ivg, cfs, h);
 
     // Store the results.
     for (std::uint32_t i = 0; i <= n; ++i) {

@@ -42,6 +42,10 @@ llvm_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *>
 template <typename T>
 [[nodiscard]] std::pair<T, T> make_ival_binomial_cf_like(std::uint32_t, std::uint32_t, const T &);
 
+// Helper to convert an input polynomial from the monomial basis into the interval Bernstein form.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
+llvm_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

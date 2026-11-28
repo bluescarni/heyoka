@@ -20,7 +20,6 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/poly_ival.hpp>
@@ -31,8 +30,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Helper to convert an input polynomial from the monomial basis into the interval Bernstein form required by event
-// detection.
+// Helper to convert an input polynomial from the monomial basis into the interval Bernstein form.
 //
 // cfs contains the scalar coefficients in the monomial basis of an input polynomial p(t) of degree n, stored in
 // ascending order (that is, n = cfs.size() - 1). This function will compute intervals enclosing the Bernstein
@@ -76,7 +74,7 @@ namespace detail
 // values are assumed to be finite. The output intervals enclose the exact coefficients, and they have no NaN bounds.
 // Infinite bounds may be returned in case of overflow, but never in the invalid forms [-inf, -inf] and [+inf, +inf].
 std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs, llvm::Value *const h)
+llvm_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs, llvm::Value *const h)
 {
     assert(!cfs.empty());
     assert(h != nullptr);

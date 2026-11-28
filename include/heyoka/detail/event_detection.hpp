@@ -29,11 +29,6 @@ namespace detail
 template <typename T>
 T taylor_deduce_cooldown(T, T);
 
-// Helper to convert an input polynomial from the monomial basis into the interval Bernstein form required by event
-// detection.
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::pair<std::vector<llvm::Value *>, std::vector<llvm::Value *>>
-llvm_ed_ival_poly_bernstein(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
-
 // Helper to count the number of sign changes in a list of interval coefficients.
 template <typename T>
 [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ed_count_sign_changes_ival(std::span<const T>);
