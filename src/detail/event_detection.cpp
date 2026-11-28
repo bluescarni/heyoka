@@ -42,6 +42,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/optional_s11n.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/detail/tbb_isolated.hpp>
 #include <heyoka/find_real_poly_roots.hpp>
@@ -470,7 +471,12 @@ ed_data<T>::ed_data(const llvm_state &s, std::vector<t_event_t> tes, std::vector
             auto *const fp_t = internal_llvm_type_like(state, s0);
 
             // Add the function for the fast exclusion check.
-            llvm_ed_add_fex_check(state, "fex_check", fp_t, order, 1);
+            //
+            // NOTE: although integration steps nominally consist of half-open time ranges, the fast exclusion check
+            // looks for roots in the closed range [0, h] (resp., [h, 0]), in order to be consistent with the usual
+            // formulation of interval arithmetic. This does not affect the correctness of event detection, and it will
+            // at most slightly degrade the quality of the check's output.
+            llvm_add_poly_root_exclusion_check(state, "fex_check", fp_t, order, 1);
 
             // Compile.
             state.compile();
@@ -756,8 +762,9 @@ ed_data_batch<T>::ed_data_batch(const llvm_state &s, std::vector<t_event_t> tes,
 
             // Add the function for the fast exclusion check.
             //
-            // NOTE: the fast exclusion check is vectorised.
-            llvm_ed_add_fex_check(state, "fex_check", fp_t, order, batch_size);
+            // NOTE: the fast exclusion check is vectorised. As in the scalar case, it looks for roots in the closed
+            // range [0, h] (resp., [h, 0]) even though integration steps are half-open time ranges.
+            llvm_add_poly_root_exclusion_check(state, "fex_check", fp_t, order, batch_size);
 
             // Compile.
             state.compile();

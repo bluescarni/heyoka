@@ -23,9 +23,9 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/safe_integer.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -34,36 +34,31 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Helper to add a fast event exclusion check function to an llvm_state.
+// Helper to add a function to exclude the presence of a root for a polynomial over the range [0, h] (resp., [h, 0] when
+// h < 0).
 //
-// The function, to be invoked from C++, will compute a rigorous enclosure of the event function's Taylor polynomial
-// over the [0, h] range (resp., [h, 0] when integrating backwards in time, i.e., when h < 0) using interval arithmetic.
-// The signature of the function is:
+// The function, to be invoked from C++, will compute a rigorous enclosure of the input polynomial over the [0, h] range
+// (resp., [h, 0] when h < 0) using interval arithmetic. The signature of the function is:
 //
 // void fname(const ext_fp_t *cf_ptr, const ext_fp_t *h_ptr, std::uint32_t *out_ptr, ext_fp_t *enc_ptr)
 //
 // fname is the name of the LLVM function that will be added. fp_t is the scalar floating-point LLVM type used in the
-// computation, and ext_fp_t is the corresponding C++ type. The coefficients of the Taylor polynomial of an event
-// function are stored in cf_ptr in a 2D array of shape (n + 1, batch_size). n is the degree of the Taylor polynomial.
-// batch_size is the SIMD vector size. h_ptr points to an array of size batch_size containing the value(s) of h. out_ptr
-// points to an output array of size batch_size, containing 1 if the enclosure does not contain zero (i.e., the
-// polynomial certainly has no roots in the range), 0 otherwise. enc_ptr points to an output 2D array of shape (2,
-// batch_size) into which the [lo, hi] enclosure will be written (row 0 holds lo and row 1 holds hi). No overlap is
-// allowed between the arrays.
+// computation, and ext_fp_t is the corresponding C++ type. The coefficients of the polynomial are stored in cf_ptr in a
+// 2D array of shape (n + 1, batch_size). n is the degree of the polynomial. batch_size is the SIMD vector size. h_ptr
+// points to an array of size batch_size containing the value(s) of h. out_ptr points to an output array of size
+// batch_size, containing 1 if the enclosure does not contain zero (i.e., the polynomial certainly has no roots in the
+// range), 0 otherwise. enc_ptr points to an output 2D array of shape (2, batch_size) into which the [lo, hi] enclosure
+// will be written (row 0 holds lo and row 1 holds hi). No overlap is allowed between the arrays.
 //
 // If a global value with the same name exists already in the module, an error will be raised.
 //
-// NOTE: although integration steps nominally consist of half-open time ranges, here we will be checking for roots in
-// closed intervals in order to be consistent with the usual formulation of interval arithmetic. This does not affect
-// the correctness of the function, and it will at most slightly degrade the quality of its output.
-//
 // NOTE: this implementation of the exclusion check assumes that all input values (i.e., the polynomial coefficients and
-// the timestep h) are finite. Invoking it with non-finite values may produce incorrect results. In batch mode, this
-// applies to each lane separately: non-finite values in a lane may produce incorrect results only in that lane.
+// h) are finite. Invoking it with non-finite values may produce incorrect results. In batch mode, this applies to each
+// lane separately: non-finite values in a lane may produce incorrect results only in that lane.
 //
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, llvm::Type *const fp_t,
-                                      const std::uint32_t n, const std::uint32_t batch_size)
+llvm::Function *llvm_add_poly_root_exclusion_check(llvm_state &s, const std::string &fname, llvm::Type *const fp_t,
+                                                   const std::uint32_t n, const std::uint32_t batch_size)
 {
     assert(fp_t != nullptr);
     assert(!fp_t->isVectorTy());
@@ -75,7 +70,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
         static_cast<void>(static_cast<std::uint32_t>((safe_uint32_t(n) + 1u) * batch_size));
         // LCOV_EXCL_START
     } catch (...) {
-        throw std::overflow_error("Overflow detected in llvm_ed_add_fex_check()");
+        throw std::overflow_error("Overflow detected in llvm_add_poly_root_exclusion_check()");
     }
     // LCOV_EXCL_STOP
 
@@ -92,7 +87,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // The function arguments:
     //
     // - pointer to the array of poly coefficients (read-only),
-    // - pointer to the timestep value(s) (read-only),
+    // - pointer to the value(s) of h (read-only),
     // - output pointer (write-only),
     // - enclosure pointer (write-only).
     //
@@ -135,7 +130,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Setup the interval arithmetic guard.
     const auto ivg = llvm_ival_guard(s, f, val_t);
 
-    // Load the timestep.
+    // Load h.
     auto *const h = ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
 
     // The zero constant.
@@ -144,7 +139,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
     // Determine the back flag. True if h < 0, false otherwise.
     auto *const back_flag = ivg.val_lt(h, zero);
 
-    // Helper to load the coefficient of order i of the Taylor polynomial.
+    // Helper to load the coefficient of order i of the polynomial.
     //
     // NOTE: i * batch_size cannot overflow, as checked at the beginning of the function.
     auto *const ext_fp_t = make_external_llvm_type(fp_t);
@@ -155,11 +150,11 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
 
     // Run the Horner scheme.
     //
-    // At each iteration, the accumulator is multiplied by the time range and then the current coefficient c is added to
-    // it. Both steps are performed by a single interval operation, ival_mul_zlb_add_val(), which uses FMA primitives if
-    // available. In order to accommodate backward integrations, for which h<0, we run the evaluation with the time
-    // range [0, |h|], making sure to negate the odd-degree coefficients of the input polynomial. This produces a result
-    // equivalent, for h<0, to evaluation with the time range [h, 0].
+    // At each iteration, the accumulator is multiplied by the range and then the current coefficient c is added to it.
+    // Both steps are performed by a single interval operation, ival_mul_zlb_add_val(), which uses FMA primitives if
+    // available. In order to accommodate h<0, we run the evaluation with the range [0, |h|], making sure to negate the
+    // odd-degree coefficients of the input polynomial. This produces a result equivalent, for h<0, to evaluation with
+    // the range [h, 0].
     //
     // NOTE: the input values are required to be finite. Non-finite values in the accumulator can still arise for h!=0
     // (for h==0, the enclosure is trivially the [c0, c0] interval, where c0 is the constant coefficient of the
@@ -176,7 +171,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
 
     // Init the accumulator (mlo, hi) with the highest-order coefficient.
     auto *cf_n = load_cf(n);
-    // If the poly degree is odd, negate the coefficient for backward integration.
+    // If the poly degree is odd, negate the coefficient for h < 0.
     if (n % 2u != 0u) {
         cf_n = builder.CreateSelect(back_flag, ivg.val_neg(cf_n), cf_n);
     }
@@ -189,7 +184,7 @@ llvm::Function *llvm_ed_add_fex_check(llvm_state &s, const std::string &fname, l
         const auto cur_degree = i - 1u;
         auto *cf = load_cf(cur_degree);
 
-        // Negate odd-degree coefficients for backward integration.
+        // Negate odd-degree coefficients for h < 0.
         if (cur_degree % 2u != 0u) {
             cf = builder.CreateSelect(back_flag, ivg.val_neg(cf), cf);
         }

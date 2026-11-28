@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -29,10 +28,6 @@ namespace detail
 
 template <typename T>
 T taylor_deduce_cooldown(T, T);
-
-// Helper to add a fast event exclusion check function to an llvm_state.
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_ed_add_fex_check(llvm_state &, const std::string &, llvm::Type *, std::uint32_t,
-                                                        std::uint32_t);
 
 // Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>

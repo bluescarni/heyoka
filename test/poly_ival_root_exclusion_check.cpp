@@ -35,8 +35,8 @@
 
 #include <mp++/real.hpp>
 
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -44,22 +44,21 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-// Tests for llvm_ed_add_fex_check().
+// Tests for llvm_add_poly_root_exclusion_check().
 //
-// llvm_ed_add_fex_check() computes an interval [lo, hi] enclosing the values of a polynomial over the time range [0, h]
-// (or [h, 0] if h < 0). The tests check that [lo, hi] contains the exact enclosure, i.e., the interval computed by the
-// textbook interval Horner scheme in exact arithmetic.
+// llvm_add_poly_root_exclusion_check() computes an interval [lo, hi] enclosing the values of a polynomial over the
+// range [0, h] (or [h, 0] if h < 0). The tests check that [lo, hi] contains the exact enclosure, i.e., the interval
+// computed by the textbook interval Horner scheme in exact arithmetic.
 //
-// The test cases are random polynomials and timesteps. Their exact enclosures were computed offline with rational
+// The test cases are random polynomials and values of h. Their exact enclosures were computed offline with rational
 // arithmetic, and they are stored rounded outward (the lower bound down, the upper bound up). An implementation which
 // does not round all operations up fails a large fraction of the test cases.
 
 using namespace heyoka;
 using namespace heyoka_test;
 
-// The floating-point types tested.
-// A test case: the timestep h, the polynomial coefficients cf (from degree 0 upwards), and the bounds of the exact
-// enclosure rounded outward. All values are hexadecimal floating-point strings, exactly representable in the
+// A test case: the range endpoint h, the polynomial coefficients cf (from degree 0 upwards), and the bounds of the
+// exact enclosure rounded outward. All values are hexadecimal floating-point strings, exactly representable in the
 // floating-point type.
 struct test_case {
     const char *h;
@@ -888,7 +887,7 @@ using fex_check_t = void (*)(const T *, const T *, std::uint32_t *, T *);
 template <typename T>
 fex_check_t<T> add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    detail::llvm_ed_add_fex_check(s, "fex_check", detail::to_internal_llvm_type<T>(s), n, batch_size);
+    detail::llvm_add_poly_root_exclusion_check(s, "fex_check", detail::to_internal_llvm_type<T>(s), n, batch_size);
 
     s.compile();
 
@@ -959,8 +958,8 @@ TEST_CASE("batch")
                     std::vector<fp_t> cf((n + 1u) * batch_size), h(batch_size), enc(2u * batch_size);
                     std::vector<std::uint32_t> out(batch_size);
 
-                    // Batch lane j gets the test case with index (start + j) % n_test_cases. Forward and backward test
-                    // cases alternate, hence each batch mixes the two integration directions.
+                    // Batch lane j gets the test case with index (start + j) % n_test_cases. Test cases with h > 0 and
+                    // h < 0 alternate, hence each batch mixes the two signs of h.
                     for (std::size_t start = 0; start < n_test_cases; ++start) {
                         for (std::uint32_t j = 0; j < batch_size; ++j) {
                             const auto &tc = cur_test_cases[(start + j) % n_test_cases];
@@ -1151,7 +1150,8 @@ TEST_CASE("real")
 
                 // NOTE: the function operates on mppp::real values with precision prec. All the mppp::real objects
                 // passed to it (inputs and outputs) must have this precision.
-                detail::llvm_ed_add_fex_check(s, "fex_check", detail::internal_llvm_type_like(s, fp_t{0, prec}), n, 1);
+                detail::llvm_add_poly_root_exclusion_check(s, "fex_check",
+                                                           detail::internal_llvm_type_like(s, fp_t{0, prec}), n, 1);
 
                 s.compile();
 
