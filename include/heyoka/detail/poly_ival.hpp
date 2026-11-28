@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -26,6 +27,10 @@ namespace detail
 // h < 0).
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_root_exclusion_check(llvm_state &, const std::string &, llvm::Type *,
                                                                      std::uint32_t, std::uint32_t);
+
+// Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
+[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> llvm_ival_poly_shift_1(const llvm_ival_guard &,
+                                                                                  const std::vector<llvm::Value *> &);
 
 } // namespace detail
 

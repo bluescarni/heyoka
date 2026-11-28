@@ -18,8 +18,8 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/llvm_state.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -30,10 +30,9 @@ namespace detail
 namespace
 {
 
-// Loop version of llvm_ed_ival_poly_shift_1().
-std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard &ivg,
-                                                          const std::vector<llvm::Value *> &cfs,
-                                                          const std::uint32_t op1)
+// Loop version of llvm_ival_poly_shift_1().
+std::vector<llvm::Value *> llvm_ival_poly_shift_1_loop(const llvm_ival_guard &ivg,
+                                                       const std::vector<llvm::Value *> &cfs, const std::uint32_t op1)
 {
     // Get the state and builder from ivg.
     auto &s = ivg.get_state();
@@ -100,10 +99,10 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_loop(const llvm_ival_guard 
     return ret;
 }
 
-// Manually-unrolled version of llvm_ed_ival_poly_shift_1().
-std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_guard &ivg,
-                                                              const std::vector<llvm::Value *> &cfs,
-                                                              const std::uint32_t op1)
+// Manually-unrolled version of llvm_ival_poly_shift_1().
+std::vector<llvm::Value *> llvm_ival_poly_shift_1_unrolled(const llvm_ival_guard &ivg,
+                                                           const std::vector<llvm::Value *> &cfs,
+                                                           const std::uint32_t op1)
 {
     // Init the return value from cfs.
     auto ret = cfs;
@@ -156,7 +155,7 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1_unrolled(const llvm_ival_gu
 // https://www.researchgate.net/publication/368987410_Polynomial_Taylor_Shifting
 //
 // In our case, shift==1.
-std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs)
+std::vector<llvm::Value *> llvm_ival_poly_shift_1(const llvm_ival_guard &ivg, const std::vector<llvm::Value *> &cfs)
 {
     assert(!cfs.empty());
     assert(
@@ -172,9 +171,9 @@ std::vector<llvm::Value *> llvm_ed_ival_poly_shift_1(const llvm_ival_guard &ivg,
     // manually unroll the computation in order to improve performance. For the other floating-point types, we expect
     // the unrolling not to improve performance.
     if ((scal_t->isFloatTy() || scal_t->isDoubleTy()) && op1 < 25u) {
-        return llvm_ed_ival_poly_shift_1_unrolled(ivg, cfs, op1);
+        return llvm_ival_poly_shift_1_unrolled(ivg, cfs, op1);
     } else {
-        return llvm_ed_ival_poly_shift_1_loop(ivg, cfs, op1);
+        return llvm_ival_poly_shift_1_loop(ivg, cfs, op1);
     }
 }
 

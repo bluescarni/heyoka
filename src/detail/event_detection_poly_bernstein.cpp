@@ -23,6 +23,7 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/poly_ival.hpp>
 #include <heyoka/number.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -45,11 +46,11 @@ namespace detail
 // The first step of the conversion is the computation of interval enclosures for the coefficients of q(x) via
 // llvm_ed_ival_poly_rescale().
 //
-// The second step reverses q(x), shifts the result by 1 via llvm_ed_ival_poly_shift_1(), and reverses the result of
-// the shift. This produces a polynomial whose coefficients are C(n,k)*b_k. Indeed, with the substitution x = 1/(1+y)
-// we have x**k * (1-x)**(n-k) = y**(n-k) / (1+y)**n, and thus (1+y)**n * q(1/(1+y)) = sum_k C(n,k) * b_k * y**(n-k).
-// The left-hand side is the reversal of q(x) shifted by 1, and the final reversal brings the coefficients C(n,k)*b_k
-// into ascending order of k.
+// The second step reverses q(x), shifts the result by 1 via llvm_ival_poly_shift_1(), and reverses the result of the
+// shift. This produces a polynomial whose coefficients are C(n,k)*b_k. Indeed, with the substitution x = 1/(1+y) we
+// have x**k * (1-x)**(n-k) = y**(n-k) / (1+y)**n, and thus (1+y)**n * q(1/(1+y)) = sum_k C(n,k) * b_k * y**(n-k). The
+// left-hand side is the reversal of q(x) shifted by 1, and the final reversal brings the coefficients C(n,k)*b_k into
+// ascending order of k.
 //
 // The last step recovers the b_k by dividing the coefficients by C(n,k). Because C(n,k) may not be representable, the
 // division is by the enclosure of C(n,k) computed by ed_make_ival_binomial_cf_like(). For k = 0 and k = n, C(n,k) = 1
@@ -57,7 +58,7 @@ namespace detail
 //
 // Compared to the direct formula b_k = sum_{i<=k} C(k,i)/C(n,i) * c_i (where c_i are the coefficients of q(x)), which
 // requires O(n**2) interval multiplications, the O(n**2) part of this approach consists only of interval additions
-// (in llvm_ed_ival_poly_shift_1()).
+// (in llvm_ival_poly_shift_1()).
 //
 // The return value is a pair of lists of interval polynomial coefficients, stored in the (-lo, hi) format (that is, the
 // lower bound of the interval is carried around negated), in ascending order:
@@ -95,7 +96,7 @@ llvm_ed_ival_poly_bernstein(const llvm_ival_guard &ivg, const std::vector<llvm::
     std::ranges::reverse(ret);
 
     // Shift by 1.
-    ret = llvm_ed_ival_poly_shift_1(ivg, ret);
+    ret = llvm_ival_poly_shift_1(ivg, ret);
 
     // Reverse again.
     std::ranges::reverse(ret);

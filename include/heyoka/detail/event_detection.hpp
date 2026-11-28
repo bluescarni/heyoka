@@ -29,10 +29,6 @@ namespace detail
 template <typename T>
 T taylor_deduce_cooldown(T, T);
 
-// Helper implementing polynomial Taylor shifting by 1 in interval arithmetic.
-[[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
-llvm_ed_ival_poly_shift_1(const llvm_ival_guard &, const std::vector<llvm::Value *> &);
-
 // Helper implementing polynomial rescaling in interval arithmetic.
 [[nodiscard]] HEYOKA_DLL_PUBLIC std::vector<llvm::Value *>
 llvm_ed_ival_poly_rescale(const llvm_ival_guard &, const std::vector<llvm::Value *> &, llvm::Value *);
