@@ -22,7 +22,7 @@ heyoka has the following **mandatory** dependencies:
   supporting the non-standard ``__float128`` type. heyoka requires
   an mp++ installation in which the ``MPPP_WITH_MPFR``, ``MPPP_WITH_BOOST_S11N`` and
   ``MPPP_WITH_FMT`` options are enabled (see the :ref:`mp++ installation instructions <mppp:installation>`).
-  heyoka currently requires mp++ 2.x;
+  heyoka currently requires mp++ 3.x;
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
 * the `TBB <https://github.com/oneapi-src/oneTBB>`__ library,
 * the `OpenSSL <https://www.openssl.org/>`__ library,

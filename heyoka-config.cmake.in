@@ -30,7 +30,7 @@ endif()
 find_package(fmt @_HEYOKA_MIN_SUPPORTED_FMT_VERSION@...<@_HEYOKA_MAX_SUPPORTED_FMT_VERSION@ REQUIRED CONFIG)
 
 # Mandatory public dependency on mp++.
-find_package(mp++ 2...<3 REQUIRED CONFIG)
+find_package(mp++ @_HEYOKA_MIN_SUPPORTED_MPPP_VERSION@...<@_HEYOKA_MAX_SUPPORTED_MPPP_VERSION@ REQUIRED CONFIG)
 # NOTE: this is necessary for the serialisation of several classes.
 if(NOT mp++_WITH_BOOST_S11N)
     message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")

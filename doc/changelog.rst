@@ -7,6 +7,8 @@ Changelog
 Changes
 ~~~~~~~
 
+- heyoka now requires mp++ version 3
+  (`#576 <https://github.com/bluescarni/heyoka/pull/576>`__).
 - heyoka now requires fmt >= 11
   (`#575 <https://github.com/bluescarni/heyoka/pull/575>`__).
 - The interval arithmetic used in event detection and polynomial root finding now employs fused multiply-add
